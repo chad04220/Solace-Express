@@ -201,7 +201,9 @@ void paved(Placer& P, const Airport& a, const AptLayout& L) {
 // strips: a parking area, a couple of hangars, a club house, fuel, windsocks, and the place's own character
 void strip(Placer& P, const Airport& a, const AptLayout& L) {
   float hl = a.length * 0.5f, hw = a.width * 0.5f, pu = L.termU;
-  std::string code = a.code;
+  // Generated airport codes may collide with the original three-letter identifiers.
+  // Place-specific fixtures belong only to the authored Solace region.
+  const std::string code = g_world.procedural ? "" : a.code;
   bool farm = code == "HFS" || code == "ORC", polar = code == "GLS", volcano = code == "VCF", mountain = code == "SMP", beach = code == "PMB";
   // hangars along the back of the parking area
   P.facing(EK_ARCH_HANGAR, pu - 34.f, L.bldV, 1, 1, 1);
@@ -279,9 +281,10 @@ void groundLife(Placer& P, const Airport& a, const AptLayout& L) {
     // Fence-backed fuel delivery bays: trucks remain outside the tank footprints.
     P.detail(EK_TRUCK, L.apU0 + (big ? 78.f : 45.f), L.bldV + (big ? 80.f : 52.f), 0, 1, .85f, .85f, .85f);
   } else {
-    const bool polar = !strcmp(a.code, "GLS"), volcano = !strcmp(a.code, "VCF");
-    const bool farm = !strcmp(a.code, "HFS") || !strcmp(a.code, "ORC");
-    float officeU = L.termU + (!strcmp(a.code, "GLR") ? 88.f : 56.f);
+    const char* code = g_world.procedural ? "" : a.code;
+    const bool polar = !strcmp(code, "GLS"), volcano = !strcmp(code, "VCF");
+    const bool farm = !strcmp(code, "HFS") || !strcmp(code, "ORC");
+    float officeU = L.termU + (!strcmp(code, "GLR") ? 88.f : 56.f);
     // Flight clubs and research outposts each get an organised, sparse landside yard.
     // Vehicles are stationary; there is no pedestrian/vehicle animation infrastructure.
     P.detail(EK_TRUCK, L.termU - 56.f, L.bldV + 19.f, 0, -1, .8f, .8f, .8f);

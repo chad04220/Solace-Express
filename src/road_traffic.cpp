@@ -13,7 +13,7 @@ bool drives(int cls) { return cls == RC_HIGHWAY || cls == RC_ROAD || cls == RC_L
 float density(int cls) { return cls == RC_HIGHWAY ? 20.f : cls == RC_ROAD ? 10.f : cls == RC_STREET ? 14.f : 2.f; }
 const float kCell = 500.f;
 const int kCells = (int)(2.f * WORLD_HALF / kCell);
-int cellOf(float v) { return std::clamp((int)floorf((v + WORLD_HALF) / kCell), 0, kCells - 1); }
+int cellOf(float v) { return (int)std::clamp(floorf((v + WORLD_HALF) / kCell), 0.f, float(kCells - 1)); }
 uint32_t next(uint32_t& s) { s ^= s << 13; s ^= s >> 17; s ^= s << 5; return s; }
 float unit(uint32_t& s) { return (next(s) & 0xFFFFFF) / 16777216.f; }
 }  // namespace
@@ -109,7 +109,7 @@ void RoadTraffic::update(const World& world, vec3 cam, float dt) {
   const auto& P = world.roads.paths;
   if (P.empty()) { cars.clear(); return; }
   if (netKey != (const void*)P.data() || netN != P.size()) index(world);
-  cam.x = wrapCoord(cam.x); cam.z = wrapCoord(cam.z);
+  cam.x = world.wrap(cam.x); cam.z = world.wrap(cam.z);
   if (length(vec2(cam.x, cam.z) - lastCam) > 400.f) filled = false;
   lastCam = vec2(cam.x, cam.z);
   dt = std::clamp(dt, 0.f, 0.25f);

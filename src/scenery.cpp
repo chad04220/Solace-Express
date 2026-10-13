@@ -124,8 +124,8 @@ int communityAt(float x, float z) {
     return share < 1.f ? town : -1;
   }
   int best = -1; float distance = 1.f;
-  for (int i = 0; i < kNumTowns; i++) {
-    const Town& t = kTowns[i];
+  for (int i = 0; i < (int)g_world.towns.size(); i++) {
+    const Town& t = g_world.towns[i];
     float d = hypotf(x - t.x, z - t.z) / t.r;
     if (d < distance) { best = i; distance = d; }
   }
@@ -174,11 +174,11 @@ void sceneryBaseMod(float x, float z, float& h, float& amp) {
 }
 
 // ---------------------------------------------------------------- world integration
-extern float airportInfluence(float x, float z);
-
 void World::bakeMask() {
+  generationCheckpoint();
   initRoads();
   sceneryBakeCommunityLots(*this);   // (first: a settlement's ground is as far as its buildings)
+  generationPhase(GenerationPhase::Mask);
   mask.assign((size_t)MASK_N * MASK_N * 4, 0);
   if (roadGrid.head.empty()) roadGrid.head.assign((size_t)MASK_N * MASK_N, 0);
   parallelFor(MASK_N, [&](int j) {
@@ -196,14 +196,14 @@ void World::bakeMask() {
       float dens = 0, urban = 0;
       int town = -1; const float share = settlementShare(settlements, x, z, &town);
       if (town >= 0 && share < 1.15f) {
-        std::vector<int> near; lotsIn(x - 70.f, z - 70.f, x + 70.f, z + 70.f, near);
+        std::vector<int> near; lotsIn(*this, x - 70.f, z - 70.f, x + 70.f, z + 70.f, near);
         float d = 1e9f;
-        for (int id : near) { const Lot& L = settlementLots()[id]; d = std::min(d, hypotf(L.cx - x, L.cz - z) - std::max(L.hw, L.hd)); }
-        const int kind = kTowns[town].kind;
+        for (int id : near) { const Lot& L = settlementLots(*this)[id]; d = std::min(d, hypotf(L.cx - x, L.cz - z) - std::max(L.hw, L.hd)); }
+        const int kind = towns[town].kind;
         dens = smoothstepf(45.f, 8.f, d) * (kind == 2 ? 0.95f : kind == 1 ? 0.85f : 0.65f) * (0.85f + 0.3f * valueNoise(x / 220.f, z / 220.f));
         urban = (kind == 2 ? smoothstepf(0.65f, 0.15f, share) : kind == 1 ? 0.62f * smoothstepf(0.5f, 0.05f, share) : 0.2f * smoothstepf(0.4f, 0.f, share)) * smoothstepf(0.f, 0.3f, dens);
       }
-      float ai = airportInfluence(x, z);
+      float ai = airportInfluence(*this, x, z);
       bool land = b[0] > 2.5f;
       dens *= (1.f - smoothstepf(0.02f, 0.12f, ai)) * (land ? 1.f : 0.f) * (b[1] < 90.f ? 1.f : 0.f);
       float a = 0;
@@ -225,9 +225,14 @@ void World::bakeMask() {
 }
 
 void World::sampleMask(float x, float z, float out[4]) const {
+  if (!repeating && (fabsf(x) > WORLD_HALF || fabsf(z) > WORLD_HALF)) {
+    out[0] = 1.f; out[1] = out[2] = out[3] = 0.f; return;
+  }
   float fx = (x + WORLD_HALF) / MASK_TEXEL - 0.5f, fz = (z + WORLD_HALF) / MASK_TEXEL - 0.5f;
   float flx = floorf(fx), flz = floorf(fz);
-  int i0 = (int)flx, j0 = (int)flz;
+  // Clamp the integer lookup, retaining the original interpolation fraction.
+  // Even a distant ocean coordinate must never overflow a float-to-int cast.
+  int i0 = (int)std::clamp(flx, -1.f, float(MASK_N)), j0 = (int)std::clamp(flz, -1.f, float(MASK_N));
   float tx = fx - flx, tz = fz - flz;
   auto at = [&](int i, int j, int c) { i = std::clamp(i, 0, MASK_N - 1); j = std::clamp(j, 0, MASK_N - 1); return mask[((size_t)j * MASK_N + i) * 4 + c] / 255.f; };
   for (int c = 0; c < 4; c++) {
@@ -237,15 +242,21 @@ void World::sampleMask(float x, float z, float out[4]) const {
 }
 
 void World::maskTexel(float x, float z, float out[4]) const {
-  int i = std::clamp((int)floorf((x + WORLD_HALF) / MASK_TEXEL), 0, MASK_N - 1);
-  int j = std::clamp((int)floorf((z + WORLD_HALF) / MASK_TEXEL), 0, MASK_N - 1);
+  if (!repeating && (fabsf(x) > WORLD_HALF || fabsf(z) > WORLD_HALF)) {
+    out[0] = 1.f; out[1] = out[2] = out[3] = 0.f; return;
+  }
+  int i = (int)std::clamp(floorf((x + WORLD_HALF) / MASK_TEXEL), 0.f, float(MASK_N - 1));
+  int j = (int)std::clamp(floorf((z + WORLD_HALF) / MASK_TEXEL), 0.f, float(MASK_N - 1));
   for (int c = 0; c < 4; c++) out[c] = mask[((size_t)j * MASK_N + i) * 4 + c] / 255.f;
 }
 
 float World::forestAt(float x, float z) const {
+  if (!repeating && (fabsf(x) > WORLD_HALF || fabsf(z) > WORLD_HALF)) return 0.f;
   float fx = (x + WORLD_HALF) / MASK_TEXEL - 0.5f, fz = (z + WORLD_HALF) / MASK_TEXEL - 0.5f;
   float flx = floorf(fx), flz = floorf(fz);
-  int i0 = (int)flx, j0 = (int)flz;
+  // Clamp the integer lookup, retaining the original interpolation fraction.
+  // Even a distant ocean coordinate must never overflow a float-to-int cast.
+  int i0 = (int)std::clamp(flx, -1.f, float(MASK_N)), j0 = (int)std::clamp(flz, -1.f, float(MASK_N));
   float tx = fx - flx, tz = fz - flz;
   auto at = [&](int i, int j) { i = std::clamp(i, 0, MASK_N - 1); j = std::clamp(j, 0, MASK_N - 1); return (roadGrid.head[(size_t)j * MASK_N + i] >> 25) / 127.f; };
   float a = at(i0, j0), b = at(i0 + 1, j0), c = at(i0, j0 + 1), d = at(i0 + 1, j0 + 1);
@@ -261,10 +272,6 @@ float World::groundHeight(float x, float z, int octaves) const { return height(x
 // road and the gap to the next as that kind has them; never on a road's platform, on another building, over the sea or
 // an airfield, nor on ground falling more than its footprint can take. Laid out once the world is built or loaded.
 namespace {
-std::vector<Lot> g_lots;
-std::vector<TreeSpot> g_trees;
-std::vector<PlacedEnt> g_civic;   // (the cities' landmarks: sceneryBakeCommunityLots)
-std::unordered_map<int64_t, std::vector<int>> g_lotCells, g_treeCells;
 const float kLotCell = 64.f;
 int64_t lotKey(int i, int j) { return (int64_t)i * 1000003 + j; }
 void cellsAdd(std::unordered_map<int64_t, std::vector<int>>& cells, float x, float z, int id) {
@@ -327,14 +334,32 @@ bool overlaps(const Footprint& a, const Footprint& b) {
 }
 }  // namespace
 
-const std::vector<Lot>& settlementLots() { return g_lots; }
-const std::vector<PlacedEnt>& civicLandmarks() { return g_civic; }
-const std::vector<TreeSpot>& settlementTrees() { return g_trees; }
-void lotsIn(float x0, float z0, float x1, float z1, std::vector<int>& out) { cellsIn(g_lotCells, x0, z0, x1, z1, out); }
-void treesIn(float x0, float z0, float x1, float z1, std::vector<int>& out) { cellsIn(g_treeCells, x0, z0, x1, z1, out); }
+const WorldSceneryState& sceneryState(const World& world) {
+  static const WorldSceneryState empty;
+  return world.sceneryState ? *world.sceneryState : empty;
+}
 
-void sceneryBakeCommunityLots(const World& world) {
-  g_lots.clear(); g_trees.clear(); g_lotCells.clear(); g_treeCells.clear(); g_civic.clear();
+WorldSceneryState& sceneryStateForBuild(World& world) {
+  if (!world.sceneryState) world.sceneryState = std::make_shared<WorldSceneryState>();
+  else if (!world.sceneryState.unique()) world.sceneryState = std::make_shared<WorldSceneryState>(*world.sceneryState);
+  return *world.sceneryState;
+}
+
+const std::vector<Lot>& settlementLots(const World& world) { return sceneryState(world).lots; }
+const std::vector<PlacedEnt>& civicLandmarks(const World& world) { return sceneryState(world).civic; }
+const std::vector<TreeSpot>& settlementTrees(const World& world) { return sceneryState(world).trees; }
+void lotsIn(const World& world, float x0, float z0, float x1, float z1, std::vector<int>& out) { cellsIn(sceneryState(world).lotCells, x0, z0, x1, z1, out); }
+void treesIn(const World& world, float x0, float z0, float x1, float z1, std::vector<int>& out) { cellsIn(sceneryState(world).treeCells, x0, z0, x1, z1, out); }
+const std::vector<Lot>& settlementLots() { return settlementLots(g_world); }
+const std::vector<PlacedEnt>& civicLandmarks() { return civicLandmarks(g_world); }
+const std::vector<TreeSpot>& settlementTrees() { return settlementTrees(g_world); }
+void lotsIn(float x0, float z0, float x1, float z1, std::vector<int>& out) { lotsIn(g_world, x0, z0, x1, z1, out); }
+void treesIn(float x0, float z0, float x1, float z1, std::vector<int>& out) { treesIn(g_world, x0, z0, x1, z1, out); }
+
+void sceneryBakeCommunityLots(World& world) {
+  generationPhase(GenerationPhase::CommunityLots);
+  WorldSceneryState& state = sceneryStateForBuild(world);
+  state.lots.clear(); state.trees.clear(); state.lotCells.clear(); state.treeCells.clear(); state.civic.clear();
   if (world.settlements.empty()) return;
   RoadIndex roads;
   for (size_t pi = 0; pi < world.roads.paths.size(); pi++) roads.addPath(world.roads.paths[pi], (int)pi);
@@ -350,7 +375,7 @@ void sceneryBakeCommunityLots(const World& world) {
       const vec2 p = f.c + f.u * a + v * b;
       const float g = ground(p.x, p.y);
       lo = std::min(lo, g); hi = std::max(hi, g);
-      if (g < 2.5f || airportInfluence(p.x, p.y) > 0.02f) return false;
+      if (g < 2.5f || airportInfluence(world, p.x, p.y) > 0.02f) return false;
       if (roads.nearest(p, 3.f, -1, nullptr, nullptr, true) < 1.f) return false;   // (a platform within a metre)
       int t = -1; const float share = settlementShare(world.settlements, p.x, p.y, &t);
       if (t != town || share > maxShare) return false;
@@ -379,15 +404,16 @@ void sceneryBakeCommunityLots(const World& world) {
     L.kind = kind; L.seed = seed; L.town = town; L.street = street; L.share = share;
     L.type = kind == EK_APARTMENT || kind == EK_OFFICE || (kind >= EK_TOWER && kind <= EK_MIDRISE) ? 1 : 0;
     L.wallH = kEntInfo[kind].h; L.roofH = 0.f; L.ridgeX = seed < 0.5f ? 1 : 0;
-    const int id = (int)g_lots.size(); g_lots.push_back(L); cellsAdd(g_lotCells, L.cx, L.cz, id);
+    const int id = (int)state.lots.size(); state.lots.push_back(L); cellsAdd(state.lotCells, L.cx, L.cz, id);
   };
   auto tree = [&](float x, float z, float key, float scale) {
     float base[4]; world.sampleBase(x, z, base);
     const int kind = base[3] > .45f ? EK_SPRUCE : base[2] > .85f && ground(x, z) < 70.f && key < 0.5f ? EK_PALM : key < 0.3f ? EK_BIRCH : EK_OAK;
-    const int id = (int)g_trees.size(); g_trees.push_back({x, z, scale, kind, key}); cellsAdd(g_treeCells, x, z, id);
+    const int id = (int)state.trees.size(); state.trees.push_back({x, z, scale, kind, key}); cellsAdd(state.treeCells, x, z, id);
   };
   // ---- each settlement's centre: a church on its main road, and in a town or a city a park beside it
   for (const SettlementField& F : world.settlements) {
+    generationCheckpoint();
     const vec2 g(F.gx, F.gz), u(F.axisC, F.axisS), v(-F.axisS, F.axisC);
     const float roadEdge = roadSpec(RC_ROAD).halfPlatform;
     for (float side : {1.f, -1.f}) {
@@ -425,7 +451,7 @@ void sceneryBakeCommunityLots(const World& world) {
         const vec2 p = f.c + f.u * a + v * b;
         const float g = ground(p.x, p.y);
         lo = std::min(lo, g); hi = std::max(hi, g);
-        if (g < lowest || g > highest || hi - lo > fall || airportInfluence(p.x, p.y) > 0.02f) return false;
+        if (g < lowest || g > highest || hi - lo > fall || airportInfluence(world, p.x, p.y) > 0.02f) return false;
         if (roads.nearest(p, 4.f, -1, nullptr, nullptr, true) < 2.f) return false;
       }
     std::vector<int> near;
@@ -434,11 +460,13 @@ void sceneryBakeCommunityLots(const World& world) {
     return true;
   };
   for (const SettlementField& F : world.settlements) {
-    if (!strcmp(kTowns[F.town].name, "Solace Capital")) {
+    generationCheckpoint();
+    if (!world.procedural && !strcmp(world.towns[F.town].name, "Solace Capital")) {
       const vec2 u(F.axisC, F.axisS);
       float bestShare = 1e9f, base = 0.f; Footprint best{};
       for (float dz = -2600.f; dz <= 2600.f; dz += 50.f)
         for (float dx = -2600.f; dx <= 2600.f; dx += 50.f) {
+          generationCheckpoint();
           const vec2 c(F.cx + dx, F.cz + dz);
           int t = -1; const float share = settlementShare(world.settlements, c.x, c.y, &t);
           if (t != F.town || share < 0.3f || share > 1.15f || share >= bestShare) continue;
@@ -447,14 +475,15 @@ void sceneryBakeCommunityLots(const World& world) {
           if (!open(f, 12.f, 2.5f, 1e9f, 5.f, lo, hi)) continue;
           bestShare = share; best = f; base = lo;
         }
-      if (bestShare < 1e8f) { claim(best, 6.f); g_civic.push_back({EK_STADIUM, {best.c.x, base - 0.1f, best.c.y, atan2f(-u.y, u.x), 1.f, 1.f, 1.f, 0.5f}}); }
+      if (bestShare < 1e8f) { claim(best, 6.f); state.civic.push_back({EK_STADIUM, {best.c.x, base - 0.1f, best.c.y, atan2f(-u.y, u.x), 1.f, 1.f, 1.f, 0.5f}}); }
     }
-    if (!strcmp(kTowns[F.town].name, "Port Verde")) {
+    if (!world.procedural && !strcmp(world.towns[F.town].name, "Port Verde")) {
       // (the city stands on its hill, its shore 4 km off: the terminal is reclaimed from the shallows there out to 8 m of
       // water at its berth - its apron's back on the land, the nearest such stretch to the city)
       float bestScore = 1e9f, top = 0.f; vec2 at, sea;
       for (float dz = -6000.f; dz <= 6000.f; dz += 25.f)
         for (float dx = -6000.f; dx <= 6000.f; dx += 25.f) {
+          generationCheckpoint();
           const vec2 P(F.cx + dx, F.cz + dz);
           const float dist = hypotf(dx, dz);
           if (dist >= bestScore) continue;
@@ -483,24 +512,25 @@ void sceneryBakeCommunityLots(const World& world) {
         claim(Footprint{at - sea * 62.f, a, 215.f, 62.f}, 8.f);
         const float yaw = atan2f(sea.x, sea.y);   // (local +z out to sea, along the quay +x)
         auto here = [&](float x, float z) { return at + vec2(sea.y, -sea.x) * x + sea * z; };
-        g_civic.push_back({EK_QUAY, {at.x, top, at.y, yaw, 1.f, 1.f, 1.f, 0.5f}});
-        for (float x : {-140.f, -50.f, 40.f, 130.f}) { const vec2 p = here(x, -18.f); g_civic.push_back({EK_GANTRY, {p.x, top, p.y, yaw, 1.f, 1.f, 1.f, hash2i((int)p.x, 3)}}); }
+        state.civic.push_back({EK_QUAY, {at.x, top, at.y, yaw, 1.f, 1.f, 1.f, 0.5f}});
+        for (float x : {-140.f, -50.f, 40.f, 130.f}) { const vec2 p = here(x, -18.f); state.civic.push_back({EK_GANTRY, {p.x, top, p.y, yaw, 1.f, 1.f, 1.f, hash2i((int)p.x, 3)}}); }
         for (float z : {-58.f, -78.f, -98.f})
           for (float x : {-160.f, -78.f, 4.f, 86.f}) {
             const vec2 p = here(x, z); const float h = hash2i((int)p.x, (int)p.y);
             if (h < 0.15f) continue;   // (a block or two away on the ships)
-            g_civic.push_back({EK_CONTAINERS, {p.x, top, p.y, yaw + (h < 0.55f ? 3.14159f : 0.f), 1.f, 1.f, 1.f, h}});
+            state.civic.push_back({EK_CONTAINERS, {p.x, top, p.y, yaw + (h < 0.55f ? 3.14159f : 0.f), 1.f, 1.f, 1.f, h}});
           }
         const vec2 ship = here(-20.f, 20.f);   // (alongside, her length along the quay)
-        g_civic.push_back({EK_CONTAINERSHIP, {ship.x, 0.f, ship.y, atan2f(sea.y, -sea.x), 1.f, 1.f, 1.f, 0.5f}});
+        state.civic.push_back({EK_CONTAINERSHIP, {ship.x, 0.f, ship.y, atan2f(sea.y, -sea.x), 1.f, 1.f, 1.f, 0.5f}});
       }
     }
   }
   // ---- along the roads, then the streets: each side walked, a lot wherever one fits. A city's first lot near its heart
   // is its landmark, the supertall, wherever the first site for one fits
-  std::vector<char> landmark(kNumTowns, 0);
+  std::vector<char> landmark(world.towns.size(), 0);
   for (int pass = 0; pass < 2; pass++)
     for (size_t pi = 0; pi < world.roads.paths.size(); pi++) {
+      generationCheckpoint();
       const RoadPath& P = world.roads.paths[pi];
       if (P.cls == RC_HIGHWAY || (P.cls >= RC_TRACK && P.cls != RC_STREET) || (pass == 0) != (P.cls != RC_STREET) || P.pts.size() < 2) continue;   // (no lots along a farm's track or in its yard, nor by the racetrack)
       const float half = roadSpec(P.cls).halfPlatform;
@@ -510,6 +540,7 @@ void sceneryBakeCommunityLots(const World& world) {
         const float side = sideI ? 1.f : -1.f;
         size_t k = 0;
         for (float s = 6.f + 8.f * hash2i((int)pi, sideI); s < along.back() - 4.f;) {
+          generationCheckpoint();
           while (k + 2 < P.pts.size() && along[k + 1] < s) k++;
           if (k < P.bridge.size() && P.bridge[k]) { s += 10.f; continue; }
           const RoadPoint &A = P.pts[k], &B = P.pts[k + 1];
@@ -521,8 +552,8 @@ void sceneryBakeCommunityLots(const World& world) {
           if (town < 0 || share >= reach) { s += 12.f; continue; }
           const int ix = (int)floorf(at.x / 3.f) * 7 + sideI, iz = (int)floorf(at.y / 3.f);
           const float h = hash2i(ix + 911, iz - 77), h2v = hash2i(ix - 31, iz + 503), sparse = hash2i(ix + 5, iz + 9);
-          LotPlan L = planLot(kTowns[town].kind, share, P.cls, h, h2v, at);
-          if (kTowns[town].kind == 2 && !landmark[town] && share < 0.08f) {
+          LotPlan L = planLot(world.towns[town].kind, share, P.cls, h, h2v, at);
+          if (world.towns[town].kind == 2 && !landmark[town] && share < 0.08f) {
             const EntKindInfo& I = kEntInfo[EK_SUPERTALL];
             L = LotPlan{EK_SUPERTALL, I.hx, I.hz, 10.f, 18.f};
           }
@@ -545,6 +576,7 @@ void sceneryBakeCommunityLots(const World& world) {
   // ---- street trees: along the streets of a town's or a city's centre, on the pavements every 14 m, clear of the
   // junctions and of the buildings' fronts
   for (size_t pi = 0; pi < world.roads.paths.size(); pi++) {
+    generationCheckpoint();
     const RoadPath& P = world.roads.paths[pi];
     if (P.cls != RC_STREET) continue;
     float acc = 0.f, arc = 0.f;
@@ -555,7 +587,7 @@ void sceneryBakeCommunityLots(const World& world) {
       for (float s = 14.f - acc; s < l; s += 14.f) {
         const vec2 at = a + d * s;
         int town = -1; const float share = settlementShare(world.settlements, at.x, at.y, &town);
-        if (town < 0 || kTowns[town].kind == 0 || share > 0.6f) continue;
+        if (town < 0 || world.towns[town].kind == 0 || share > 0.6f) continue;
         for (float side : {-1.f, 1.f}) {
           // (not on a street lamp: road_furniture.cpp stands them on the right, as it runs, 15 m on and every 30 m, on
           // the left every 30 m)

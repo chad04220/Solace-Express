@@ -1,0 +1,19 @@
+MODEL starling tank 2200 mtow 8000 full_payload 1380 full_payload_fuel 2020 idle 75.3 max_static 1674.0 nominal 365.2 kg/h range 4337 km reserve30 183 kg
+MODEL xr10_nightjar tank 2200 mtow 8800 full_payload 185 full_payload_fuel 2200 idle 213.8 max_static 23328.0 nominal 885.7 kg/h range 2146 km reserve30 443 kg
+MODEL xr30_specter tank 6000 mtow 15800 full_payload 85 full_payload_fuel 6000 idle 983.7 max_static 110246.4 nominal 2784.3 kg/h range 1939 km reserve30 1392 kg
+MODEL xr20_mantis tank 3200 mtow 10300 full_payload 85 full_payload_fuel 3200 idle 327.9 max_static 36748.8 nominal 993.4 kg/h range 2783 km reserve30 497 kg
+MODEL xr40_wraith tank 6000 mtow 18000 full_payload 85 full_payload_fuel 6000 idle 1166.4 max_static 134991.4 nominal 1552.5 kg/h range 3478 km reserve30 776 kg
+MODEL atlas_a180 tank 20000 mtow 79000 full_payload 21885 full_payload_fuel 15115 idle 527.3 max_static 11718.0 nominal 2852.4 kg/h range 5806 km reserve30 1426 kg
+RANGE_FLOWN starling duration 5.76 h distance 4148 km remaining 183 kg (30-minute reference reserve)
+CRUISE starling seconds 20740.1 crash 0 alt 11000 target 11000 speed 200.00 target 200.00 spool 0.5223 burn 2017.40 model 2017.41 kg steady 350.1 kg/h mean_burn_equivalent_range 4524 km nominal 4337 km
+RANGE_FLOWN xr10_nightjar duration 2.02 h distance 1745 km remaining 443 kg (30-minute reference reserve)
+CRUISE xr10_nightjar seconds 7272.8 crash 0 alt 10000 target 10000 speed 240.00 target 240.00 spool 0.2825 burn 1757.16 model 1757.16 kg steady 869.6 kg/h mean_burn_equivalent_range 2186 km nominal 2146 km
+RANGE_FLOWN xr20_mantis duration 2.87 h distance 2478 km remaining 497 kg (30-minute reference reserve)
+CRUISE xr20_mantis seconds 10326.4 crash 0 alt 10000 target 10000 speed 240.00 target 240.00 spool 0.1969 burn 2703.32 model 2703.33 kg steady 942.2 kg/h mean_burn_equivalent_range 2935 km nominal 2783 km
+RANGE_FLOWN xr30_specter duration 2.91 h distance 2617 km remaining 1392 kg (30-minute reference reserve)
+CRUISE xr30_specter seconds 10464.6 crash 0 alt 10000 target 10000 speed 250.07 target 250.00 spool 0.1198 burn 4607.86 model 4607.87 kg steady 1582.7 kg/h mean_burn_equivalent_range 3413 km nominal 1939 km
+RANGE_FLOWN xr40_wraith duration 3.82 h distance 3441 km remaining 776 kg (30-minute reference reserve)
+CRUISE xr40_wraith seconds 13765.5 crash 0 alt 10000 target 10000 speed 250.00 target 250.00 spool 0.0614 burn 5223.74 model 5223.74 kg steady 1364.3 kg/h mean_burn_equivalent_range 3958 km nominal 3478 km
+RANGE_FLOWN atlas_a180 duration 6.93 h distance 5739 km remaining 1426 kg (30-minute reference reserve)
+CRUISE atlas_a180 seconds 24950.9 crash 0 alt 11000 target 11000 speed 230.00 target 230.00 spool 0.5831 burn 18573.82 model 18573.84 kg steady 2679.5 kg/h mean_burn_equivalent_range 6180 km nominal 5806 km
+Jet fuel: 0 failures

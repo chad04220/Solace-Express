@@ -1,0 +1,2 @@
+QUOTE starling quick 112.2 kg actual 104.3 kg time 11.24 min ratio 1.076
+QUOTE atlas_a180 quick 760.9 kg actual 818.4 kg time 13.07 min ratio 0.930

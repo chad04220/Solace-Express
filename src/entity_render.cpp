@@ -13,6 +13,18 @@ EntLocalBounds closeEntityBounds[EK_COUNT],allEntityBounds[EK_COUNT];
 std::vector<EntChunkBoundsCache> entityChunkBounds;
 }
 
+void Renderer::resetWorldEntities(bool rebuildBridges) {
+  entityChunkBounds.assign(size_t(Scenery::NC) * Scenery::NC, EntChunkBoundsCache{});
+  entStage.clear(); entDrawn = entChunks = entPending = 0;
+  entFrame = entGenCount = 0;
+  groundShadowKey[0] = groundShadowKey[1] = 0;
+  shGen[0] = shGen[1] = -1;
+  shAge[0] = shAge[1] = 0;
+  // Streaming publication supplies prebuilt GPU bridge geometry; synchronous reloads still rebuild it.
+  if (rebuildBridges) uploadBridges();
+  shValid[0] = shValid[1] = false;
+}
+
 bool Renderer::initEntities() {
   std::vector<EVert> verts;
   buildEntityMeshes(verts, entRange);
@@ -97,7 +109,8 @@ void Renderer::drawEntities(const FrameParams& fp) {
   // chunks are the islands' own, looked up from where the camera is relative to that copy and drawn moved by its offset
   struct Copy { float ox, oz; };
   std::vector<Copy> copies;
-  for (int kz = -1; kz <= 1; kz++) for (int kx = -1; kx <= 1; kx++) {
+  const int copiesEachSide = g_world.repeating ? 1 : 0;
+  for (int kz = -copiesEachSide; kz <= copiesEachSide; kz++) for (int kx = -copiesEachSide; kx <= copiesEachSide; kx++) {
     const float ox = kx * WRAP_SPAN, oz = kz * WRAP_SPAN;
     const float ex = std::max(std::max(-WORLD_HALF + ox - cam.x, cam.x - (WORLD_HALF + ox)), 0.f), ez = std::max(std::max(-WORLD_HALF + oz - cam.z, cam.z - (WORLD_HALF + oz)), 0.f);
     if (ex * ex + ez * ez < farAll * farAll) copies.push_back({ox, oz});
@@ -562,9 +575,11 @@ void Renderer::drawEntities(const FrameParams& fp) {
   }
   // the ground's depth before the scenery (where it pays: renderer.h prepassNow): what a hill or a plateau's edge
   // hides - trees beyond it, most of a runway view's scenery - fails the depth test before it is shaded. The ground is
-  // shaded after the scenery, only where it shows (rasterWorld, drawTerrainMesh mode 2)
+  // shaded after the scenery, only where it shows (rasterWorld, drawTerrainMesh mode 2). Not while an Earth region's
+  // far blend is on: there the near terrain leaves a dither of its pixels to the distant mesh, and depth written for
+  // them here would hide it
   terrainPrepassed = false;
-  if ((prepassNow || (dbgOff & kDbgPrepassOn)) && (progTerrainDepth || !terrainDepthTried)) {
+  if ((prepassNow || (dbgOff & kDbgPrepassOn)) && (progTerrainDepth || !terrainDepthTried) && activeTerrainFarBlend(fp) <= 0.f) {
     drawTerrainMesh(fp, 1); terrainPrepassed = progTerrainDepth != 0;
     glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDepthMask(GL_TRUE); glDisable(GL_BLEND); glDisable(GL_CULL_FACE);
     glBindVertexArray(vaoEnt); glBindBuffer(GL_ARRAY_BUFFER, vboEntInst);

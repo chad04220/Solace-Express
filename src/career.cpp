@@ -413,7 +413,7 @@ void Career::useFlownTime(LaunchPlan& e, const Contract& c, float minutes, float
   else e.flownFailed = true;
 }
 
-// The fuel the quick estimate quotes. The engines burn Plane::fuelFlowMax at full power and 20% of it at idle, so a
+// Legacy non-jet quick estimate. These engines burn Plane::fuelFlowMax at full power and 20% at idle, so a
 // flight's fuel is its minutes at each share of full power: the climb at full power, en route at the share this type's
 // cruise on the autopilot (0.85 x cruise) takes - from where that speed sits against the speed 75% power holds
 // (PerfModel::cruiseV), measured level on the autopilot for every type: 1.25 r - 0.37, within 0.02 - and the take-off and
@@ -426,8 +426,22 @@ static float cruisePowerShare(const AircraftSpec& s) {
   const float r = 0.85f * s.cruise / std::max(Plane::perf(&s).cruiseV, 1.f);
   return clampf(1.25f * r - 0.37f, 0.3f, 1.f);
 }
-static float fullPowerFlow(const AircraftSpec& s) { return s.maxFuel / (s.rangeKm * 1000.f / s.cruise * 0.8f); }   // kg/s (Plane::fuelFlowMax)
+static float fullPowerFlow(const AircraftSpec& s) { Plane p; p.spec = &s; return p.fuelFlowMax(); }
+// Low-level local missions do not get the high-altitude brochure fuel economy.
+// Use the flight model's same TSFC curve for each phase; the background flown
+// quote replaces this approximation with actual integrated kilograms when ready.
+static float jetMissionFuel(const AircraftSpec& s, float cruiseMinutes, float climbMinutes, float approachMinutes) {
+  Plane p; p.spec = &s; p.soundSpeed = isa(1500.f).a;
+  const float rho = isaDensity(1500.f);
+  const float cruiseSpool = clampf((cruisePowerShare(s) - .2f) / .8f, .1f, .85f);
+  const float takeoff = p.fuelFlowAt(.65f, s.vref * 1.5f, 1.225f) * kEstK[0];
+  const float cruise = p.fuelFlowAt(cruiseSpool, .85f * s.cruise, rho) * kEstK[1] * cruiseMinutes;
+  const float climb = p.fuelFlowAt(.85f, s.vref * 1.8f, rho) * kEstK[2] * climbMinutes;
+  const float approach = p.fuelFlowAt(.32f, s.vref * 1.35f, rho) * kEstK[4] * approachMinutes;
+  return (takeoff + cruise + climb + approach) * 60.f * 1.15f;
+}
 static float quickFuelKg(const AircraftSpec& s, const Career::LaunchPlan& e) {
+  if (s.engineType == ENG_JET) return jetMissionFuel(s, e.tCruise, e.tClimb, e.tApproach);
   const float powerMinutes = 0.69f + cruisePowerShare(s) * kEstK[1] * e.tCruise + 0.24f * e.tClimb + 0.48f * e.tApproach;
   return fullPowerFlow(s) * 60.f * powerMinutes * 1.15f;
 }
@@ -438,7 +452,7 @@ void Career::finishPlan(LaunchPlan& e, const Contract& c, float minutes, float f
   e.minutesEst = minutes;
   e.minutesSigma = 0.15f * e.minutesEst;
   // (flown in the background: what the autopilot burned; else the quick estimate's, above)
-  e.fuelKgEst = s.special ? 0.f : fuelKg >= 0 ? fuelKg : quickFuelKg(s, e);
+  e.fuelKgEst = fuelKg >= 0 ? fuelKg : quickFuelKg(s, e);
   if (e.fuel == LaunchPlan::FUEL_PURCHASED) {   // bought at the departure: the estimate's fuel with a quarter to spare, less what the tanks hold
     int oi = ownedIndexFor(e.spec);
     float have = oi >= 0 ? fleet[oi].fuel : 0.f;
@@ -481,7 +495,9 @@ float simulateFlightMinutes(const Contract& c, int si, float* fuelKgOut, bool cl
     reverse = hw1 > hw0;
   }
   vec3 start = a.threshold(reverse) + (reverse ? -a.dir() : a.dir()) * 30.f;
-  Plane p; p.reset(&s, start, reverse ? h0 + 180.f : h0, s.maxFuel, (float)c.cargoKg + c.pax * 85.f + 85.f, c.startAirborne, s.cruise);
+  const float payload = (float)c.cargoKg + c.pax * 85.f + 85.f;
+  const float initialFuel = s.engineType == ENG_JET ? s.maxFuelForPayload(payload) : s.maxFuel;
+  Plane p; p.reset(&s, start, reverse ? h0 + 180.f : h0, initialFuel, payload, c.startAirborne, s.cruise);
   p.apComfort = c.gentle(); p.sceneryHits = false;
   if (!c.startAirborne) { p.engineRunning = true; p.engineSpool = 0.f; }
   const float dt = 1 / 30.f;
@@ -517,7 +533,7 @@ float simulateFlightMinutes(const Contract& c, int si, float* fuelKgOut, bool cl
     p.step(dt, wx, t);
     t += dt;
     if (p.ev.crashed) return -1.f;
-    if (phase == 2 && p.apDone) { if (fuelKgOut) *fuelKgOut = s.maxFuel - p.fuel; return t / 60.f; }
+    if (phase == 2 && p.apDone) { if (fuelKgOut) *fuelKgOut = initialFuel - p.fuel; return t / 60.f; }
   }
   return -1.f;
 }
@@ -534,7 +550,7 @@ int Career::netQuick(const Contract& c, int si, Source src) const {
   int fuel = 0;
   if (src == SRC_OWNED) {   // the owned aircraft's fuel for the distance at its cruise power, the take-off, climb and approach on top (as the plan's quick estimate)
     float minutes = (contractKm(c) + 6.f) * 1000.f / (s.cruise * 0.85f) / 60.f;
-    fuel = (int)(fullPowerFlow(s) * 60.f * (2.6f + cruisePowerShare(s) * minutes) * 1.15f * fuelPrice(c.from, si));
+    fuel = (int)((s.engineType == ENG_JET ? jetMissionFuel(s, minutes, 1.f, 3.f) : fullPowerFlow(s) * 60.f * (2.6f + cruisePowerShare(s) * minutes) * 1.15f) * fuelPrice(c.from, si));
   }
   return c.payout - fees - fuel;
 }
@@ -982,7 +998,7 @@ int Career::routeFuelCost(const Route& r) const {
   if (r.fleetIdx < 0 || r.fleetIdx >= (int)fleet.size()) return 0;
   const AircraftSpec& s = kAircraft[fleet[r.fleetIdx].spec];
   float km = g_world.distanceKm(r.from, r.to) + 8.f;
-  float kg = s.maxFuel / std::max(s.rangeKm, 1.f) * km * 1.1f;
+  float kg = s.engineType == ENG_JET ? jetMissionFuel(s, km * 1000.f / (s.cruise * .85f) / 60.f, 1.f, 3.f) : s.maxFuel / std::max(s.rangeKm, 1.f) * km * 1.1f;
   return (int)(kg * s.fuelPriceBase() * 1.1f);
 }
 std::vector<Career::Pilot> Career::pilotCandidates() const {

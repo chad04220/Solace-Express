@@ -1,0 +1,5 @@
+[0/2] Re-checking globbed directories...
+[1/5] Building CXX object CMakeFiles/distant_regions_test.dir/tests/distant_regions_test.cpp.o
+[2/5] Linking CXX executable distant_regions_test
+[3/5] Building CXX object CMakeFiles/ui_review_harness.dir/tests/ui_review_harness.cpp.o
+[4/5] Linking CXX executable ui_review_harness

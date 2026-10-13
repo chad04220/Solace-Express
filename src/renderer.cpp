@@ -32,6 +32,23 @@
 
 Renderer g_ren;
 
+// Opt-in driver/JIT diagnosis. Linux RSS is sampled only when requested; ordinary rendering has no I/O.
+static void regionRenderMarker(const char* pass, const char* boundary) {
+  static const bool enabled = getenv("REGION_RENDER_DIAG") != nullptr;
+  if (!enabled) return;
+  long rssKiB = -1;
+#if defined(__linux__)
+  if (FILE* f = fopen("/proc/self/status", "r")) {
+    char line[256];
+    while (fgets(line, sizeof line, f)) if (sscanf(line, "VmRSS: %ld kB", &rssKiB) == 1) break;
+    fclose(f);
+  }
+#endif
+  static const auto origin = std::chrono::steady_clock::now();
+  const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - origin).count();
+  fprintf(stderr, "REGION_RENDER %s %s rss_kib=%ld elapsed_s=%.6f\n", pass, boundary, rssKiB, elapsed); fflush(stderr);
+}
+
 // per thread: the intro thread draws with its own GL context, whose program names can repeat the main one's. Keyed by
 // the program and the name's address: every caller passes a string literal (static storage, so the address names the
 // spelling for the program's life), and a frame's few thousand lookups build no strings
@@ -265,7 +282,7 @@ static GLuint program(const std::string& vs, const std::string& fs, std::string&
 // shader cache with it, so it knows without compiling anything whether the cache holds this build's programs
 std::string shaderCacheStamp() {
   uint64_t h = 1469598103934665603ull;
-  for (const char* src : {hangarPreview::kVS, hangarPreview::kFS, hangarPreview::kClassifiedFS, kFullscreenVS, kCommonGLSL, kRtIO, kSceneUniforms, kRoads, kPlaneCommon, kCockpitLayout, kCockpitFittings, kResearchCockpitLayout, kPlaneParts, kPlaneSDF, kPlaneTrace, kTerrainTrace, kMaterialCommon, kLightCommon, kClouds, kTerrainMaterial, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRtPrims, kPlaneScreens, kFeeds, kPlaneFx, kWraithWeaponSDF, kWraithSDF, kWraithStoreMaterial, kWraithMaterial, kWraithFx, kWraithCockpitCommon, kCabinWindows, kWraithCockpitSDF, kWraithCockpitMaterial, kCockpitMaterial, kPlaneMaterial, kWater, kViewUniforms, kNoiseTex, kGBuffer, kGBWrite, kTerrainVS, kTerrainFS, kWaterVS, kWaterFS, kLightFS, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kPropellerGLSL, kPropDiscVS, kPropDiscFS, kDownFS, kUpFS, kRayMaskFS, kRayFS, kFeedRaysFS, kTaaFS, kPostFS, kGLens, kUIVS, kUIFS, kEntCommon, kEntVS, kEntFS1, kEntFS2, kEntShadowFS, kCloudMain, kCloudCompFS, kCloudAccFS, kHullBakeMain, kTShBakeMain, kAfShMap, kEnemyCommon, kEnemyNeedle, kEnemyBastion, kEnemyHeavyCommon, kEnemyCantor, kEnemyArchon, kEnemyMaterial, kEnemyMeshVS, kEnemyMeshFS, kEnemyShadow, kReleasedStoreVS, kReleasedStoreFS, kPlanet}) h = fnv1a(src, h);
+  for (const char* src : {hangarPreview::kVS, hangarPreview::kFS, hangarPreview::kClassifiedFS, kFullscreenVS, kCommonGLSL, kRtIO, kSceneUniforms, kRoads, kPlaneCommon, kCockpitLayout, kCockpitFittings, kResearchCockpitLayout, kPlaneParts, kPlaneSDF, kPlaneTrace, kTerrainTrace, kMaterialCommon, kLightCommon, kClouds, kTerrainMaterial, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRtPrims, kPlaneScreens, kFeeds, kPlaneFx, kWraithWeaponSDF, kWraithSDF, kWraithStoreMaterial, kWraithMaterial, kWraithFx, kWraithCockpitCommon, kCabinWindows, kWraithCockpitSDF, kWraithCockpitMaterial, kCockpitMaterial, kPlaneMaterial, kWater, kViewUniforms, kNoiseTex, kGBuffer, kGBWrite, kTerrainVS, kTerrainFS, kFarRegionVS, kFarRegionFS, kWaterVS, kWaterFS, kLightFS, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kPropellerGLSL, kPropDiscVS, kPropDiscFS, kDownFS, kUpFS, kRayMaskFS, kRayFS, kFeedRaysFS, kTaaFS, kPostFS, kGLens, kUIVS, kUIFS, kEntCommon, kEntVS, kEntFS1, kEntFS2, kEntShadowFS, kCloudMain, kCloudCompFS, kCloudAccFS, kHullBakeMain, kTShBakeMain, kAfShMap, kEnemyCommon, kEnemyNeedle, kEnemyBastion, kEnemyHeavyCommon, kEnemyCantor, kEnemyArchon, kEnemyMaterial, kEnemyMeshVS, kEnemyMeshFS, kEnemyShadow, kReleasedStoreVS, kReleasedStoreFS, kPlanet}) h = fnv1a(src, h);
   auto str = [](GLenum e) { const GLubyte* s = glGetString(e); return std::string(s ? (const char*)s : "?"); };
   h = fnv1a(str(GL_VENDOR) + "|" + str(GL_RENDERER) + "|" + str(GL_VERSION), h);
   char b[24]; snprintf(b, sizeof b, "%016llx", (unsigned long long)h);
@@ -566,14 +583,14 @@ void Renderer::bindEnvironmentMaterials(GLuint p, int baseColourUnit, int baseNo
 
 
 // (the whole of the map's period, the open sea round the islands with it: it repeats as the map does, world.h WRAP_HALF)
-void Renderer::genMinimap() {
+std::vector<uint8_t> Renderer::prepareWorldMinimap(const World& world) {
   const int N = 1280;
   std::vector<uint8_t> img((size_t)N * N * 4);
   parallelFor(N, [&](int j) { for (int i = 0; i < N; i++) {
     float x = -WRAP_HALF + (i + 0.5f) * WRAP_SPAN / N, z = -WRAP_HALF + (j + 0.5f) * WRAP_SPAN / N;
-    float h = g_world.groundHeight(x, z, 5);
-    float hx = g_world.groundHeight(x + 80, z, 5) - h;
-    float b[4]; g_world.sampleBase(x, z, b);
+    float h = world.groundHeight(x, z, 5);
+    float hx = world.groundHeight(x + 80, z, 5) - h;
+    float b[4]; world.sampleBase(x, z, b);
     vec3 c;
     if (h < 0) { float d = clampf(-h / 60.f, 0, 1); c = lerp(vec3(0.20f, 0.55f, 0.62f), vec3(0.05f, 0.16f, 0.30f), d); }
     else {
@@ -584,22 +601,33 @@ void Renderer::genMinimap() {
       c = c * shade;
       if (h < 4) c = lerp(c, vec3(0.85f, 0.80f, 0.62f), 0.6f);
     }
-    float mk[4]; g_world.sampleMask(x, z, mk);
+    float mk[4]; world.sampleMask(x, z, mk);
     if (h > 0 && mk[1] > 0.05f) c = lerp(c, vec3(0.78f, 0.72f, 0.66f), smoothstepf(0.05f, 0.4f, mk[1]));
     if (h > 0 && mk[3] > 0.2f) c = lerp(c, vec3(0.62f, 0.62f, 0.32f), mk[3] * 0.35f);
     if (mk[0] * ROAD_RANGE < 14.f) c = vec3(0.35f, 0.33f, 0.3f);
-    if (g_world.onRunway(x, z, 40) >= 0) c = vec3(0.12f, 0.12f, 0.14f);
+    if (world.onRunway(x, z, 40) >= 0) c = vec3(0.12f, 0.12f, 0.14f);
     size_t o = ((size_t)j * N + i) * 4;
     img[o] = (uint8_t)(clampf(c.x, 0, 1) * 255); img[o + 1] = (uint8_t)(clampf(c.y, 0, 1) * 255); img[o + 2] = (uint8_t)(clampf(c.z, 0, 1) * 255); img[o + 3] = 255;
   } });
-  glGenTextures(1, &minimapTex); glBindTexture(GL_TEXTURE_2D, minimapTex);
+  return img;
+}
+
+void Renderer::uploadMinimap(const std::vector<uint8_t>& img) {
+  const int N = 1280;
+  if (img.size() != (size_t)N * N * 4) return;
+  glActiveTexture(GL_TEXTURE0);
+  if (!minimapTex) glGenTextures(1, &minimapTex); glBindTexture(GL_TEXTURE_2D, minimapTex);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, N, N, 0, GL_RGBA, GL_UNSIGNED_BYTE, img.data());
   glGenerateMipmap(GL_TEXTURE_2D);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 10);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, g_world.repeating ? GL_REPEAT : GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, g_world.repeating ? GL_REPEAT : GL_CLAMP_TO_EDGE);
 }
+
+void Renderer::genMinimap() { uploadMinimap(prepareWorldMinimap()); }
+
 
 // The UI program, its vertex array and the font: enough to draw the intro screen while everything else is built
 bool Renderer::initUI(int w, int h) {
@@ -711,6 +739,7 @@ bool Renderer::compilePrograms(std::atomic<int>* done) {
 // Terrain sun shadow, baked in world space for the current sun direction (see kTShBakeMain): a band of rows a frame
 // into the back texture, swapped in when complete; a new bake starts only when the sun has moved ~0.25 degrees
 void Renderer::bakeTerrainShadow(const FrameParams& fp) {
+  terrainShadowRowsThisFrame = 0;
   if (!progTShBake || fp.sunDir.y < 0.02f) return;
   vec3 L = normalize(fp.sunDir);
   if (!tshBaking) {
@@ -729,13 +758,15 @@ void Renderer::bakeTerrainShadow(const FrameParams& fp) {
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
   GLenum b0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &b0);
   glViewport(0, 0, kTShN, kTShN);
-  // the very first bake in one go (it happens while loading), and the rest of one whenever the screen is black (the
-  // menu tour's cuts), so a new place never shows the last one's shadows
-  int rows = tshFront < 0 || fp.fade < 0.02f ? kTShN - tshRow : kTShRows;
+  // A first bake is bulk only during initial/menu loading. Streamed region publication and topology changes
+  // remain incremental even with no valid front map or a black fade; never hide a full 2048² bake in a flight frame.
+  const int rows = terrainShadowRowBudget(tshStreaming, tshFront < 0, fp.fade < .02f, kTShN - tshRow);
+  terrainShadowRowsThisFrame = rows;
   glEnable(GL_SCISSOR_TEST); glScissor(0, tshRow, kTShN, rows);
   glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
   GLuint p = progTShBake;
   glUseProgram(p);
+  glUniform1i(U(p, "uUnwrappedWorld"), g_world.repeating ? 0 : 1);
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texHM); glUniform1i(U(p, "uHM"), 0);
   glActiveTexture(GL_TEXTURE0 + 4); glBindTexture(GL_TEXTURE_2D, texRoadId); glUniform1i(U(p, "uRoadGrid"), 4);   // (the roads graded in)
   glActiveTexture(GL_TEXTURE0 + 5); glBindTexture(GL_TEXTURE_2D, texData); glUniform1i(U(p, "uData"), 5);
@@ -748,7 +779,7 @@ void Renderer::bakeTerrainShadow(const FrameParams& fp) {
   glDrawArrays(GL_TRIANGLES, 0, 3);
   glDisable(GL_SCISSOR_TEST);
   tshRow += rows;
-  if (tshRow >= kTShN) { tshFront = tshBack; tshSun = tshBakeSun; tshBaking = false; }
+  if (tshRow >= kTShN) { tshFront = tshBack; tshSun = tshBakeSun; tshBaking = false; tshStreaming = false; }
 }
 
 // Cockpit display atlas for this frame: the research jets' display pages, or the light aircraft's instrument panel
@@ -785,6 +816,7 @@ void Renderer::renderDisplays(const FrameParams& fp, bool panel, int half) {
   }
   GLuint p = progDisp;
   glUseProgram(p);
+  glUniform1i(U(p, "uUnwrappedWorld"), g_world.repeating ? 0 : 1);
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texHM); glUniform1i(U(p, "uHM"), 0);
   glActiveTexture(GL_TEXTURE0 + 4); glBindTexture(GL_TEXTURE_2D, texRoadId); glUniform1i(U(p, "uRoadGrid"), 4);
   glActiveTexture(GL_TEXTURE0 + 5); glBindTexture(GL_TEXTURE_2D, texData); glUniform1i(U(p, "uData"), 5);
@@ -847,6 +879,8 @@ void Renderer::renderMap(float cx, float cz, float half, int N) {
   glViewport(0, 0, N, N); glDisable(GL_BLEND);
   GLuint p = progMap;
   glUseProgram(p);
+  glUniform1i(U(p, "uUnwrappedWorld"), g_world.repeating ? 0 : 1);
+  glUniform1i(U(p, "uProceduralWorld"), g_world.procedural ? 1 : 0);
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texHM); glUniform1i(U(p, "uHM"), 0);
   glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D_ARRAY, texAlb); glUniform1i(U(p, "uAlb"), 1);
   glActiveTexture(GL_TEXTURE0 + 2); glBindTexture(GL_TEXTURE_2D_ARRAY, texNrm); glUniform1i(U(p, "uNrm"), 2);
@@ -879,6 +913,399 @@ void Renderer::renderMap(float cx, float cz, float half, int N) {
   glBindFramebuffer(GL_FRAMEBUFFER, 0); glViewport(0, 0, W, H);
 }
 
+// Pack the shader world table without depending on the active world or a GL context.
+std::vector<Renderer::V4> Renderer::prepareWorldData(const World& world) {
+  generationCheckpoint();
+  std::vector<V4> d(384, V4{0, 0, 0, 0});   // ([0, 3): the reservoir's lake, below; [3, 64): unused, the old roads' segments once)
+  for (int i = 0; i < (int)world.boxes.size() && i < 128; i++) {
+    const Box& b = world.boxes[i];
+    d[64 + i] = {b.c.x, b.c.y, b.c.z, (float)b.airport};
+    d[192 + i] = {b.h.x, b.h.y, b.h.z, (float)b.kind};
+  }
+  // (slots 320..383 held the settlements' street grids until their streets became the network's roads, v3.47: unused)
+  // [384,400) / [400,416): world bounds of each airport's buildings + their box range (lets the shader skip airports)
+  d.resize(416, V4{0, 0, 0, 0});
+  int nb = std::min(128, (int)world.boxes.size());
+  for (int ap = 0; ap < 16 && ap < (int)world.airports.size(); ap++) {
+    const Airport& A = world.airports[ap];
+    float s = sinf(A.heading * DEG), c = cosf(A.heading * DEG);
+    vec3 lo(1e9f, 1e9f, 1e9f), hi(-1e9f, -1e9f, -1e9f); int first = -1, count = 0;
+    for (int i = 0; i < nb; i++) {
+      const Box& b = world.boxes[i];
+      if (b.airport != ap) continue;
+      if (first < 0) first = i;
+      count = i - first + 1;
+      float r = length(vec3(b.h.x * 2.f, 0, b.h.z * 2.f)) + 2.f;   // generous: towers/radomes, rotation
+      for (int k = 0; k < 4; k++) {
+        float lx = b.c.x + ((k & 1) ? r : -r), lz = b.c.z + ((k & 2) ? r : -r);
+        // inverse of the shader's airport frame: local (x, z) -> world
+        float wx = A.x + lx * c + lz * s, wz = A.z + lx * s - lz * c;
+        lo.x = std::min(lo.x, wx); hi.x = std::max(hi.x, wx); lo.z = std::min(lo.z, wz); hi.z = std::max(hi.z, wz);
+      }
+      lo.y = std::min(lo.y, A.elev + b.c.y - b.h.y * 1.3f - 2.f); hi.y = std::max(hi.y, A.elev + b.c.y + b.h.y * 1.3f + 2.f);
+    }
+    if (first >= 0) { d[384 + ap] = {lo.x, lo.y, lo.z, (float)first}; d[400 + ap] = {hi.x, hi.y, hi.z, (float)count}; }
+  }
+  // rows 1.. : the road network's entries (roads.glsl roadTexel)
+  const int W = ROAD_DATA_W;
+  d.resize(W, V4{0, 0, 0, 0});
+  const std::vector<float> rows = roadEntryRows(world.roadGrid);
+  for (size_t i = 0; i < rows.size(); i += 4) {
+    if (i % 4096 == 0) generationCheckpoint();
+    d.push_back({rows[i], rows[i + 1], rows[i + 2], rows[i + 3]});
+  }
+  // then the Fjordhaven reservoir's lake (roads.glsl lakeMaskAt): row 0's first texels its level, its mask's square and
+  // the row its cells start on; the cells four to a texel from there
+  {
+    const LakeMask& L = world.lake;
+    d[0] = {0.f, 0.f, 0.f, world.reservoir.level};
+    d[1] = {L.x0, L.z0, L.cell, (float)L.n};
+    d[2] = {(float)(d.size() / W), 0.f, 0.f, 0.f};
+    for (size_t i = 0; i < L.m.size(); i += 4)
+      d.push_back({L.m[i], i + 1 < L.m.size() ? L.m[i + 1] : 0.f, i + 2 < L.m.size() ? L.m[i + 2] : 0.f, i + 3 < L.m.size() ? L.m[i + 3] : 0.f});
+    d.resize((d.size() + W - 1) / W * W, V4{0, 0, 0, 0});
+  }
+  // Preserve all texel addresses/content, padding at most two empty rows. A 16->17 row region transition
+  // otherwise changes the sampler's POT specialization and can lazily JIT several scene passes midflight.
+  // Initial and staged uploads both use this CPU builder, and all padding remains inside their byte budgets.
+  d.resize(worldDataStorageRows(d.size() / W) * W, V4{0, 0, 0, 0});
+  return d;
+}
+
+void Renderer::uploadWorldData() {
+  glActiveTexture(GL_TEXTURE0);
+  // heightmap
+  if (!texHM) glGenTextures(1, &texHM); glBindTexture(GL_TEXTURE_2D, texHM);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, HM_N, HM_N, 0, GL_RGBA, GL_FLOAT, g_world.hm.data());
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+  if (!texMask) glGenTextures(1, &texMask); glBindTexture(GL_TEXTURE_2D, texMask);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, MASK_N, MASK_N, 0, GL_RGBA, GL_UNSIGNED_BYTE, g_world.mask.data());
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  // the road network's grid with the forest noise (common.glsl uRoadId: R32UI, read with texelFetch alone)
+  if (!texRoadId) glGenTextures(1, &texRoadId); glBindTexture(GL_TEXTURE_2D, texRoadId);
+  {
+    std::vector<uint32_t> head = g_world.roadGrid.head;
+    head.resize((size_t)MASK_N * MASK_N, 0);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R32UI, MASK_N, MASK_N, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, head.data());
+  }
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+  // max-height mip chain: lets the terrain ray march skip cells it flies over
+  if (!texHMax) glGenTextures(1, &texHMax); glBindTexture(GL_TEXTURE_2D, texHMax);
+  for (int L = 0; L < HMAX_LEVELS; L++) glTexImage2D(GL_TEXTURE_2D, L, GL_R32F, HMAX_N >> L, HMAX_N >> L, 0, GL_RED, GL_FLOAT, g_world.hmax[L].data());
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, HMAX_LEVELS - 1);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glBindTexture(GL_TEXTURE_2D, texHM);
+  {
+    const std::vector<V4> d = prepareWorldData(g_world);
+    const int W = ROAD_DATA_W;
+    if (!texData) glGenTextures(1, &texData); glBindTexture(GL_TEXTURE_2D, texData);
+    regionWorldDataRows = int(d.size() / W);
+    if (getenv("REGION_RENDER_DIAG")) fprintf(stderr, "REGION_DATA active=%s rows=%d pot=%d\n", g_world.regionId.c_str(),
+      regionWorldDataRows, int((regionWorldDataRows & (regionWorldDataRows - 1)) == 0));
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, W, regionWorldDataRows, 0, GL_RGBA, GL_FLOAT, d.data());
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  }
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  maxH = 0;
+  for (size_t i = 0; i < g_world.hm.size(); i += 4) maxH = std::max(maxH, g_world.hm[i] + g_world.hm[i + 1] * 1.5f);
+  maxH += 20;
+  // The streamed dataset uses exactly these sampler states. World repetition is handled explicitly in shaders,
+  // not by GL_REPEAT, so replacing handles must not introduce a new lazy sampler specialization.
+  for (GLuint texture : {texHM, texMask, texRoadId, texHMax, texData}) {
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, texture == texHMax ? HMAX_LEVELS - 1 : 0);
+  }
+}
+
+Renderer::WorldUploadData Renderer::prepareWorldUpload(const World& world) {
+  generationCheckpoint();
+  WorldUploadData out;
+  generationCheckpoint();
+  prepareFarTerrain(world, out);
+  generationCheckpoint();
+  out.data = prepareWorldData(world);
+  generationCheckpoint();
+  out.roadHead = world.roadGrid.head;
+  out.roadHead.resize(size_t(MASK_N) * MASK_N, 0);
+  generationCheckpoint();
+  out.roadLod = prepareRoadLod(world);
+  generationCheckpoint();
+  buildBridgeMeshes(world.bridges, out.bridgeVertices, out.bridgeRanges);
+  out.ceiling = 0.f;
+  for (size_t i = 0; i + 1 < world.hm.size(); i += 4)
+    out.ceiling = std::max(out.ceiling, world.hm[i] + world.hm[i + 1] * 1.5f);
+  out.ceiling += 20.f;
+  // Navigation mipmaps are computed with the CPU candidate, never a glGenerateMipmap spike at publication.
+  generationCheckpoint();
+  out.minimapLevels.push_back(prepareWorldMinimap(world));
+  for (int n = 1280; n > 1;) {
+    const int next = std::max(n / 2, 1);
+    const auto& src = out.minimapLevels.back();
+    std::vector<uint8_t> dst(size_t(next) * next * 4);
+    for (int y = 0; y < next; ++y) for (int x = 0; x < next; ++x) for (int c = 0; c < 4; ++c) {
+      if (x == 0 && c == 0) generationCheckpoint();
+      unsigned sum = 0;
+      for (int dy = 0; dy < 2; ++dy) for (int dx = 0; dx < 2; ++dx)
+        sum += src[(size_t(std::min(y * 2 + dy, n - 1)) * n + std::min(x * 2 + dx, n - 1)) * 4 + c];
+      dst[(size_t(y) * next + x) * 4 + c] = uint8_t((sum + 2) / 4);
+    }
+    out.minimapLevels.push_back(std::move(dst)); n = next;
+  }
+  return out;
+}
+
+namespace {
+struct WorldStageTimer {
+  double& output; std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+  ~WorldStageTimer() { output = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count(); }
+};
+}
+
+bool Renderer::beginWorldUpload(const World& world, WorldUploadData&& data) {
+  WorldStageTimer timer{worldUploadBeginMs};
+  cancelWorldUpload();
+  worldStageError.clear();
+  worldUploadBytesThisFrame = worldUploadBytesTotal = 0;
+  worldUploadMsThisFrame = worldUploadMaxMs = 0;
+  worldUploadFrames = 0;
+  if (!ok) { worldStageError = "Renderer is not initialized"; return false; }
+  if (world.hm.size() != size_t(HM_N) * HM_N * 4 || world.mask.size() != size_t(MASK_N) * MASK_N * 4 ||
+      data.roadHead.size() != size_t(MASK_N) * MASK_N || data.data.empty() || data.data.size() % ROAD_DATA_W ||
+      data.minimapLevels.empty() || data.roadLod.empty() || data.bridgeRanges.size() != world.bridges.size()) {
+    worldStageError = "Incomplete candidate world upload data"; return false;
+  }
+  for (int level = 0; level < HMAX_LEVELS; ++level) {
+    const int n = HMAX_N >> level;
+    if (world.hmax[level].size() != size_t(n) * n) { worldStageError = "Incomplete candidate height bounds"; return false; }
+  }
+  size_t mapLevels = 0;
+  for (int n = 1280;; n = std::max(n / 2, 1)) {
+    if (mapLevels >= data.minimapLevels.size() || data.minimapLevels[mapLevels].size() != size_t(n) * n * 4) {
+      worldStageError = "Incomplete candidate navigation mip chain"; return false;
+    }
+    ++mapLevels; if (n == 1) break;
+  }
+  if (mapLevels != data.minimapLevels.size()) { worldStageError = "Unexpected navigation mip levels"; return false; }
+  auto& stage = worldStage;
+  stage.data = std::move(data); stage.repeating = world.repeating; stage.active = true;
+  regionStagedDataRows = int(stage.data.data.size() / ROAD_DATA_W);
+  if (getenv("REGION_RENDER_DIAG")) fprintf(stderr, "REGION_DATA staged=%s rows=%d pot=%d\n", world.regionId.c_str(),
+    regionStagedDataRows, int((regionStagedDataRows & (regionStagedDataRows - 1)) == 0));
+  stage.farProxy.origin = stage.data.origin; stage.farProxy.regionId = stage.data.regionId;
+  stage.farProxy.worldSeed = stage.data.worldSeed; stage.farProxy.generatorVersion = stage.data.generatorVersion;
+  stage.farProxy.surface = stage.data.surface;
+  stage.farProxy.count = int(stage.data.farVertices.size()); stage.farProxy.ready = stage.farProxy.count == 0;
+  auto slice = [&](unsigned texture, int level, int width, int height, GLenum internal, GLenum format, GLenum type,
+                   size_t texelBytes, const void* source) {
+    stage.slices.push_back({texture, level, width, height, 0, internal, format, type, size_t(width) * texelBytes, source, false});
+  };
+  slice(0, 0, HM_N, HM_N, GL_RGBA32F, GL_RGBA, GL_FLOAT, sizeof(float) * 4, world.hm.data());
+  slice(1, 0, MASK_N, MASK_N, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, 4, world.mask.data());
+  slice(2, 0, MASK_N, MASK_N, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, sizeof(uint32_t), stage.data.roadHead.data());
+  for (int level = 0; level < HMAX_LEVELS; ++level)
+    slice(3, level, HMAX_N >> level, HMAX_N >> level, GL_R32F, GL_RED, GL_FLOAT, sizeof(float), world.hmax[level].data());
+  slice(4, 0, ROAD_DATA_W, int(stage.data.data.size() / ROAD_DATA_W), GL_RGBA32F, GL_RGBA, GL_FLOAT, sizeof(V4), stage.data.data.data());
+  int n = 1280;
+  for (size_t level = 0; level < mapLevels; ++level) {
+    slice(5, int(level), n, n, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, 4, stage.data.minimapLevels[level].data());
+    n = std::max(n / 2, 1);
+  }
+  return true;
+}
+
+bool Renderer::worldUploadReady() const { return worldStage.active && worldStage.ready && worldStageError.empty(); }
+
+void Renderer::cancelWorldUpload(WorldUploadData* retired) {
+  WorldStageTimer timer{worldUploadCancelMs};
+  auto& stage = worldStage;
+  for (GLuint& texture : stage.textures) if (texture) { glDeleteTextures(1, &texture); texture = 0; }
+  if (stage.bridgeVao) glDeleteVertexArrays(1, &stage.bridgeVao);
+  if (stage.bridgeVbo) glDeleteBuffers(1, &stage.bridgeVbo);
+  if (stage.bridgeInst) glDeleteBuffers(1, &stage.bridgeInst);
+  // A ready candidate may already have replaced the analytic horizon fallback. Keep that coast visible
+  // when flight priority changes or later texture allocation fails; only its full-resolution staging is cancelled.
+  retainHorizonMesh(stage.farProxy);
+  destroyFarRegion(stage.farProxy);
+  if (retired) *retired = std::move(stage.data);
+  stage = WorldUploadStage{};
+  publishFarSurfaces();
+  refreshHorizonStats();
+}
+
+bool Renderer::pumpWorldUpload(size_t byteBudget, double timeBudgetMs) {
+  using Clock = std::chrono::steady_clock;
+  const auto started = Clock::now();
+  worldUploadBytesThisFrame = 0; worldUploadMsThisFrame = 0;
+  auto elapsed = [&] { return std::chrono::duration<double, std::milli>(Clock::now() - started).count(); };
+  auto finish = [&] {
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    worldUploadMsThisFrame = elapsed();
+    publishFarSurfaces(); refreshHorizonStats();
+    worldUploadMsThisFrame = elapsed();
+    worldUploadMaxMs = std::max(worldUploadMaxMs, worldUploadMsThisFrame);
+    return worldUploadReady();
+  };
+  // updateRegionHorizon may already have used part of this frame's common streaming allowance.
+  byteBudget = byteBudget > horizonUploadBytesThisFrame ? byteBudget - horizonUploadBytesThisFrame : 0;
+  timeBudgetMs = std::max(0.0, timeBudgetMs - horizonUploadMsThisFrame);
+  if (!worldStage.active || worldStage.ready || byteBudget == 0 || timeBudgetMs <= 0) return worldUploadReady();
+  ++worldUploadFrames;
+  glActiveTexture(GL_TEXTURE0); glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+  // The GL 3.3 allocation itself is driver-controlled. Only one allocation is attempted per pump; its actual
+  // cost is measured, and payload uploads are bounded both by bytes and by checks between 256 KiB batches.
+  bool allocatedThisFrame = false;
+  auto failed = [&](const char* operation) {
+    const GLenum e = glGetError();
+    if (e == GL_NO_ERROR) return false;
+    worldStageError = std::string("World staging ") + operation + " failed (GL " + std::to_string(e) + ")";
+    cancelWorldUpload(); return true;
+  };
+  auto& stage = worldStage;
+  // The small distant silhouette is uploaded first, so the approaching island can be seen while the resident
+  // terrain/map textures continue their bounded transfer over subsequent flight frames.
+  if (!stage.farProxy.ready) {
+    if (!stage.farProxy.vbo) {
+      allocateFarRegion(stage.farProxy); allocatedThisFrame = true;
+      if (failed("distant terrain allocation")) return finish();
+    }
+    const size_t total = stage.data.farVertices.size() * sizeof(FarTerrainVertex);
+    while (stage.farProxy.uploaded < total && elapsed() < timeBudgetMs && worldUploadBytesThisFrame < byteBudget) {
+      const size_t bytes = std::min({total - stage.farProxy.uploaded, byteBudget - worldUploadBytesThisFrame, size_t(256 * 1024)});
+      glBindBuffer(GL_ARRAY_BUFFER, stage.farProxy.vbo);
+      glBufferSubData(GL_ARRAY_BUFFER, stage.farProxy.uploaded, bytes,
+        reinterpret_cast<const uint8_t*>(stage.data.farVertices.data()) + stage.farProxy.uploaded);
+      if (failed("distant terrain upload")) return finish();
+      stage.farProxy.uploaded += bytes; worldUploadBytesThisFrame += bytes; worldUploadBytesTotal += bytes;
+    }
+    stage.farProxy.ready = stage.farProxy.uploaded == total;
+    if (!stage.farProxy.ready) return finish();
+  }
+  while (stage.nextSlice < stage.slices.size() && elapsed() < timeBudgetMs && worldUploadBytesThisFrame < byteBudget) {
+    auto& part = stage.slices[stage.nextSlice];
+    if (!part.allocated) {
+      if (allocatedThisFrame) break;
+      allocatedThisFrame = true;
+      GLuint& texture = stage.textures[part.texture];
+      if (!texture) glGenTextures(1, &texture);
+      glBindTexture(GL_TEXTURE_2D, texture);
+      glTexImage2D(GL_TEXTURE_2D, part.level, part.internalFormat, part.width, part.height, 0, part.format, part.type, nullptr);
+      if (failed("texture allocation")) return finish();
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, part.texture == 3 ? HMAX_LEVELS - 1 :
+        part.texture == 5 ? int(stage.data.minimapLevels.size()) - 1 : 0);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, part.texture == 3 ? GL_NEAREST_MIPMAP_NEAREST :
+        part.texture == 5 ? GL_LINEAR_MIPMAP_LINEAR : GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, part.texture == 5 ? GL_LINEAR : GL_NEAREST);
+      const GLint wrap = part.texture == 5 && stage.repeating ? GL_REPEAT : GL_CLAMP_TO_EDGE;
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap);
+      part.allocated = true;
+      if (elapsed() >= timeBudgetMs) break;
+    }
+    const size_t remaining = byteBudget - worldUploadBytesThisFrame;
+    const size_t batch = std::min(remaining, size_t(256 * 1024));
+    const int rows = int(std::min(size_t(part.height - part.row), batch / part.rowBytes));
+    if (rows == 0) break; // Never exceed the caller's byte budget, even when smaller than a full row.
+    glBindTexture(GL_TEXTURE_2D, stage.textures[part.texture]);
+    const auto* source = static_cast<const uint8_t*>(part.source) + size_t(part.row) * part.rowBytes;
+    glTexSubImage2D(GL_TEXTURE_2D, part.level, 0, part.row, part.width, rows, part.format, part.type, source);
+    if (failed("texture upload")) return finish();
+    const size_t bytes = size_t(rows) * part.rowBytes;
+    worldUploadBytesThisFrame += bytes; worldUploadBytesTotal += bytes; part.row += rows;
+    if (part.row == part.height) ++stage.nextSlice;
+  }
+  if (stage.nextSlice == stage.slices.size() && elapsed() < timeBudgetMs && worldUploadBytesThisFrame < byteBudget) {
+    if (!stage.bridgeAllocated && !allocatedThisFrame) {
+      allocatedThisFrame = true;
+      glGenVertexArrays(1, &stage.bridgeVao); glGenBuffers(1, &stage.bridgeVbo); glGenBuffers(1, &stage.bridgeInst);
+      glBindVertexArray(stage.bridgeVao); glBindBuffer(GL_ARRAY_BUFFER, stage.bridgeVbo);
+      glBufferData(GL_ARRAY_BUFFER, std::max<size_t>(stage.data.bridgeVertices.size(), 1) * sizeof(EVert), nullptr, GL_STATIC_DRAW);
+      glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(EVert), (void*)0);
+      glEnableVertexAttribArray(1); glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(EVert), (void*)12);
+      glEnableVertexAttribArray(2); glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(EVert), (void*)24);
+      glBindBuffer(GL_ARRAY_BUFFER, stage.bridgeInst);
+      glBufferData(GL_ARRAY_BUFFER, 9 * sizeof(Ent), nullptr, GL_STREAM_DRAW);
+      glEnableVertexAttribArray(3); glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(Ent), (void*)0); glVertexAttribDivisor(3, 1);
+      glEnableVertexAttribArray(4); glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(Ent), (void*)16); glVertexAttribDivisor(4, 1);
+      glBindVertexArray(0);
+      if (failed("bridge allocation")) return finish();
+      stage.bridgeAllocated = true;
+    }
+    const size_t total = stage.data.bridgeVertices.size() * sizeof(EVert);
+    while (stage.bridgeAllocated && stage.bridgeBytes < total && elapsed() < timeBudgetMs && worldUploadBytesThisFrame < byteBudget) {
+      const size_t bytes = std::min({total - stage.bridgeBytes, byteBudget - worldUploadBytesThisFrame, size_t(256 * 1024)});
+      glBindBuffer(GL_ARRAY_BUFFER, stage.bridgeVbo);
+      glBufferSubData(GL_ARRAY_BUFFER, stage.bridgeBytes, bytes,
+        reinterpret_cast<const uint8_t*>(stage.data.bridgeVertices.data()) + stage.bridgeBytes);
+      if (failed("bridge upload")) return finish();
+      stage.bridgeBytes += bytes; worldUploadBytesThisFrame += bytes; worldUploadBytesTotal += bytes;
+    }
+    stage.ready = stage.bridgeAllocated && stage.bridgeBytes == total;
+  }
+  return finish();
+}
+
+bool Renderer::commitWorldUpload(WorldUploadData* retired) {
+  WorldStageTimer timer{worldUploadCommitMs};
+  if (!worldUploadReady()) return false;
+  // Candidate CPU data has already been moved into g_world by the caller. The staged source pointers are not
+  // dereferenced here: this publication is handle/metadata swaps, without terrain packing, meshing, or uploads.
+  auto& stage = worldStage;
+  GLuint* active[] = {&texHM, &texMask, &texRoadId, &texHMax, &texData, &minimapTex};
+  for (size_t i = 0; i < 6; ++i) std::swap(*active[i], stage.textures[i]);
+  std::swap(vaoBridge, stage.bridgeVao); std::swap(vboBridge, stage.bridgeVbo); std::swap(vboBridgeInst, stage.bridgeInst);
+  roadLod.swap(stage.data.roadLod); bridgeRange.swap(stage.data.bridgeRanges);
+  // Retain only lightweight geometry from the region behind us; all its full-resolution textures and CPU World
+  // may be retired. The previous-previous silhouette is now in stage.farProxy and released by cancellation below.
+  std::swap(previousFarRegion, activeFarRegion);
+  std::swap(activeFarRegion, stage.farProxy);
+  retainHorizonMesh(stage.farProxy);
+  regionWorldDataRows = regionStagedDataRows;
+  maxH = stage.data.ceiling;
+  bridgeFrom = g_world.bridges.data(); bridgeFromN = g_world.bridges.size();
+  resetWorldEntities(false);
+  resetTemporal(true); depthValid = false;
+  for (bool& valid : feedValid) valid = false;
+  terrInst.clear(); terrInstCoarse.clear(); envInst.clear();
+  cancelWorldUpload(retired); // deletes the previous region's GPU objects; never more than active + one staged set
+  return true;
+}
+
+void Renderer::setWorldTopology() {
+  if (!ok) return;
+  glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, minimapTex);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, g_world.repeating ? GL_REPEAT : GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, g_world.repeating ? GL_REPEAT : GL_CLAMP_TO_EDGE);
+  const int priorShadow = tshFront;
+  resetTemporal(true);
+  // The terrain itself is unchanged when Solace joins Earth; keep its existing map while replacing it in bands.
+  if (priorShadow >= 0) { tshFront = priorShadow; tshSun = vec3(); }
+}
+
+void Renderer::reloadWorld(const std::vector<uint8_t>& minimap) {
+  if (!ok) return;
+  cancelWorldUpload();
+  uploadWorldData();
+  uploadMinimap(minimap);
+  reloadFarTerrain(g_world);
+  buildRoadLod();
+  resetWorldEntities();
+  resetTemporal();
+  depthValid = false;
+  for (bool& valid : feedValid) valid = false;
+  terrInst.clear(); terrInstCoarse.clear(); envInst.clear();
+}
+
 bool Renderer::init(int w, int h, const std::function<void(float, const std::string&)>& progress) {
   int completed = 0;
   auto ready = [&](const char* next) { if (progress) progress(++completed / 11.f, next); };
@@ -897,92 +1324,8 @@ bool Renderer::init(int w, int h, const std::function<void(float, const std::str
   glBindVertexArray(0);
 
   ready("Uploading terrain textures");
-  // heightmap
-  glGenTextures(1, &texHM); glBindTexture(GL_TEXTURE_2D, texHM);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, HM_N, HM_N, 0, GL_RGBA, GL_FLOAT, g_world.hm.data());
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-  glGenTextures(1, &texMask); glBindTexture(GL_TEXTURE_2D, texMask);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, MASK_N, MASK_N, 0, GL_RGBA, GL_UNSIGNED_BYTE, g_world.mask.data());
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  // the road network's grid with the forest noise (common.glsl uRoadId: R32UI, read with texelFetch alone)
-  glGenTextures(1, &texRoadId); glBindTexture(GL_TEXTURE_2D, texRoadId);
-  {
-    std::vector<uint32_t> head = g_world.roadGrid.head;
-    head.resize((size_t)MASK_N * MASK_N, 0);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R32UI, MASK_N, MASK_N, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, head.data());
-  }
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-  // max-height mip chain: lets the terrain ray march skip cells it flies over
-  glGenTextures(1, &texHMax); glBindTexture(GL_TEXTURE_2D, texHMax);
-  for (int L = 0; L < HMAX_LEVELS; L++) glTexImage2D(GL_TEXTURE_2D, L, GL_R32F, HMAX_N >> L, HMAX_N >> L, 0, GL_RED, GL_FLOAT, g_world.hmax[L].data());
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, HMAX_LEVELS - 1);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  glBindTexture(GL_TEXTURE_2D, texHM);
+  uploadWorldData();
   ready("Uploading world data");
-  {
-    std::vector<V4> d(384, V4{0, 0, 0, 0});   // ([0, 3): the reservoir's lake, below; [3, 64): unused, the old roads' segments once)
-    for (int i = 0; i < (int)g_world.boxes.size() && i < 128; i++) {
-      const Box& b = g_world.boxes[i];
-      d[64 + i] = {b.c.x, b.c.y, b.c.z, (float)b.airport};
-      d[192 + i] = {b.h.x, b.h.y, b.h.z, (float)b.kind};
-    }
-    // (slots 320..383 held the settlements' street grids until their streets became the network's roads, v3.47: unused)
-    // [384,400) / [400,416): world bounds of each airport's buildings + their box range (lets the shader skip airports)
-    d.resize(416, V4{0, 0, 0, 0});
-    int nb = std::min(128, (int)g_world.boxes.size());
-    for (int ap = 0; ap < 16 && ap < (int)g_world.airports.size(); ap++) {
-      const Airport& A = g_world.airports[ap];
-      float s = sinf(A.heading * DEG), c = cosf(A.heading * DEG);
-      vec3 lo(1e9f, 1e9f, 1e9f), hi(-1e9f, -1e9f, -1e9f); int first = -1, count = 0;
-      for (int i = 0; i < nb; i++) {
-        const Box& b = g_world.boxes[i];
-        if (b.airport != ap) continue;
-        if (first < 0) first = i;
-        count = i - first + 1;
-        float r = length(vec3(b.h.x * 2.f, 0, b.h.z * 2.f)) + 2.f;   // generous: towers/radomes, rotation
-        for (int k = 0; k < 4; k++) {
-          float lx = b.c.x + ((k & 1) ? r : -r), lz = b.c.z + ((k & 2) ? r : -r);
-          // inverse of the shader's airport frame: local (x, z) -> world
-          float wx = A.x + lx * c + lz * s, wz = A.z + lx * s - lz * c;
-          lo.x = std::min(lo.x, wx); hi.x = std::max(hi.x, wx); lo.z = std::min(lo.z, wz); hi.z = std::max(hi.z, wz);
-        }
-        lo.y = std::min(lo.y, A.elev + b.c.y - b.h.y * 1.3f - 2.f); hi.y = std::max(hi.y, A.elev + b.c.y + b.h.y * 1.3f + 2.f);
-      }
-      if (first >= 0) { d[384 + ap] = {lo.x, lo.y, lo.z, (float)first}; d[400 + ap] = {hi.x, hi.y, hi.z, (float)count}; }
-    }
-    // rows 1.. : the road network's entries (roads.glsl roadTexel)
-    const int W = ROAD_DATA_W;
-    d.resize(W, V4{0, 0, 0, 0});
-    const std::vector<float> rows = roadEntryRows(g_world.roadGrid);
-    for (size_t i = 0; i < rows.size(); i += 4) d.push_back({rows[i], rows[i + 1], rows[i + 2], rows[i + 3]});
-    // then the Fjordhaven reservoir's lake (roads.glsl lakeMaskAt): row 0's first texels its level, its mask's square and
-    // the row its cells start on; the cells four to a texel from there
-    {
-      const LakeMask& L = g_world.lake;
-      d[0] = {0.f, 0.f, 0.f, g_world.reservoir.level};
-      d[1] = {L.x0, L.z0, L.cell, (float)L.n};
-      d[2] = {(float)(d.size() / W), 0.f, 0.f, 0.f};
-      for (size_t i = 0; i < L.m.size(); i += 4)
-        d.push_back({L.m[i], i + 1 < L.m.size() ? L.m[i + 1] : 0.f, i + 2 < L.m.size() ? L.m[i + 2] : 0.f, i + 3 < L.m.size() ? L.m[i + 3] : 0.f});
-      d.resize((d.size() + W - 1) / W * W, V4{0, 0, 0, 0});
-    }
-    glGenTextures(1, &texData); glBindTexture(GL_TEXTURE_2D, texData);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, W, (GLsizei)(d.size() / W), 0, GL_RGBA, GL_FLOAT, d.data());
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  }
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  maxH = 0;
-  for (size_t i = 0; i < g_world.hm.size(); i += 4) maxH = std::max(maxH, g_world.hm[i] + g_world.hm[i + 1] * 1.5f);
-  maxH += 20;
   initFoveation();   // (NV_shading_rate_image where the driver has it: renderer.h)
   ready("Preparing surface materials");
   genMaterials([&](float fraction, const std::string& stage) {
@@ -996,7 +1339,12 @@ bool Renderer::init(int w, int h, const std::function<void(float, const std::str
   ready("Preparing terrain geometry");
   initTerrainMesh(); initStars(); ready("Allocating render targets");
   W = w; H = h;
-  createTargets(); ready("Renderer ready");
+  createTargets();
+  if (progress) progress(completed / 11.f, "Warming distant terrain");
+  regionRenderMarker("coarsePrewarm", "begin");
+  warmFarTerrain();
+  regionRenderMarker("coarsePrewarm", "end");
+  ready("Renderer ready");
   ok = true;
   return true;
 }
@@ -1232,6 +1580,8 @@ void Renderer::reportGLError(int stampIdx) {
 
 void Renderer::setRT(GLuint p, const FrameParams& fp) {
   glUseProgram(p);
+  glUniform1i(U(p, "uUnwrappedWorld"), g_world.repeating ? 0 : 1);
+  glUniform1i(U(p, "uProceduralWorld"), g_world.procedural ? 1 : 0);
   glUniform1f(U(p, "uPlanetR"), fp.pano > 0.f ? 0.f : planetRadius());   // (the round world: planet.h; a panorama feed's camera keeps it flat)
   glUniform1f(U(p, "uSunDim"), fp.sunDim);
   { const vec3 m = normalize(fp.moonDir); glUniform3f(U(p, "uMoonDir"), m.x, m.y, m.z); glUniform1f(U(p, "uMoonLit"), fp.moonLit); }   // (the moon: sky.h)
@@ -1249,7 +1599,10 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
   // 16 and 17 (every GL 3.3 GPU has at least 32)
   glActiveTexture(GL_TEXTURE0 + 16); glBindTexture(GL_TEXTURE_2D, texPages); glUniform1i(U(p, "uDispTex"), 16);
   glActiveTexture(GL_TEXTURE0 + 17); glBindTexture(GL_TEXTURE_2D, texPanel); glUniform1i(U(p, "uPanelTex"), 17);
-  glActiveTexture(GL_TEXTURE0 + 18); glBindTexture(GL_TEXTURE_2D, tshFront >= 0 ? texTSh[tshFront] : 0); glUniform1i(U(p, "uTSh"), 18);
+  // Keep the sampler's valid RG32F format during a streamed replacement: binding texture zero would force some
+  // software drivers to JIT a different sampler variant midflight. Its contents are disabled below until ready.
+  const GLuint terrainShadowTexture = tshFront >= 0 ? texTSh[tshFront] : (tshStreaming ? (texTSh[0] ? texTSh[0] : texTSh[1]) : 0);
+  glActiveTexture(GL_TEXTURE0 + 18); glBindTexture(GL_TEXTURE_2D, terrainShadowTexture); glUniform1i(U(p, "uTSh"), 18);
   static const bool tshOff = getenv("TSHOFF") != nullptr;   // (debug: compare with per-pixel shadow rays)
   glUniform1i(U(p, "uTShOn"), tshFront >= 0 && !tshOff ? 1 : 0);
   // (bound whenever any of its channels is in use: the hull channels are written whether or not the terrain envelope
@@ -1310,7 +1663,7 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
   glUniform1f(U(p, "uAspect"), (float)W / H);
   glUniform2f(U(p, "uPano"), fp.pano, fp.panoTanY);
   glUniform1f(U(p, "uMaxH"), maxH);
-  glUniform1i(U(p, "uQuality"), quality); glUniform1i(U(p, "uDbg"), dbgOff | (fp.hangarPreview ? (2 | 256) : 0));
+  glUniform1i(U(p, "uQuality"), quality); glUniform1i(U(p, "uDbg"), dbgOff | (fp.hangarPreview ? (2 | 256) : 0) | (tshStreaming && tshFront < 0 ? 2 : 0));
   glUniform1f(U(p, "uTime"), fp.time);
   glUniform3f(U(p, "uSunDir"), fp.sunDir.x, fp.sunDir.y, fp.sunDir.z); glUniform1f(U(p, "uPlaneTSh"), fp.planeTerrSh);
   glUniform3f(U(p, "uSunCol"), fp.sunCol.x, fp.sunCol.y, fp.sunCol.z);
@@ -1483,6 +1836,7 @@ void Renderer::cloudPass(const FrameParams& fp) {
     glViewport(0, 0, cw, ch);
     GLuint p = progCloudAcc;
     glUseProgram(p);
+  glUniform1i(U(p, "uUnwrappedWorld"), g_world.repeating ? 0 : 1);
     const GLuint tex[5] = {texCloud, texCloudT, texCloudD, texCloudAcc[cloudAccIdx], texCloudAccD[cloudAccIdx]};
     const char* nm[5] = {"uCur", "uCurT", "uCurD", "uHist", "uHistD"};
     for (int i = 0; i < 5; i++) { glActiveTexture(GL_TEXTURE0 + i); glBindTexture(GL_TEXTURE_2D, tex[i]); glUniform1i(U(p, nm[i]), i); }
@@ -1723,7 +2077,7 @@ void Renderer::renderScene(const FrameParams& fpFlat, const std::vector<SpriteVe
     int tag = -1;
     if (force) prepassNow = force[0] != '0';
     else if (terrainPrepass) prepassNow = true;
-    else if (prepassAutoOn && progTerrainDepth && !syncTiming && fp.pano <= 0.f) {
+    else if (prepassAutoOn && progTerrainDepth && !syncTiming && fp.pano <= 0.f && activeTerrainFarBlend(fp) <= 0.f) {
       const bool cut = length(fp.camPos - prepassCam) > 400.f;
       prepassNow = prepassAuto.frameChoice(renderScale * 16.f + foveation, cut, tag);
     } else prepassNow = false;
@@ -1747,29 +2101,50 @@ void Renderer::renderScene(const FrameParams& fpFlat, const std::vector<SpriteVe
   GLenum bufs[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
   float cr[9] = {fp.camRight.x, fp.camRight.y, fp.camRight.z, fp.camUp.x, fp.camUp.y, fp.camUp.z, fp.camBack.x, fp.camBack.y, fp.camBack.z};   // (this frame's camera, for the TAA)
   // ------------------------------------------------ the raster renderer: scenery, terrain and sea into the G-buffer, then one lighting pass
+  auto timedRegionPass = [&](const char* name, double& result, auto&& pass) {
+    if (profileRegionRender) regionRenderMarker(name, "begin");
+    if (profileRegionRender) glFinish();
+    const auto started = std::chrono::steady_clock::now();
+    pass();
+    if (profileRegionRender) glFinish();
+    result = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+    if (profileRegionRender) regionRenderMarker(name, "end");
+  };
+  auto marked = [&](size_t index, const char* name, auto&& pass) {
+    timedRegionPass(name, regionAuxRenderMs[index], pass);
+  };
+  regionAuxRenderMs.fill(0);
+  regionTerrainRenderMs = regionShadowRenderMs = regionLightingRenderMs = 0;
   if (fp.hangarPreview) rasterHangar(fp);
-  else { rasterWorld(fp); bakeTerrainShadow(fp); }
+  else {
+    timedRegionPass("rasterWorld", regionTerrainRenderMs, [&] { rasterWorld(fp); });
+    timedRegionPass("terrainShadow", regionShadowRenderMs, [&] { bakeTerrainShadow(fp); });
+  }
   if (classified) { shOn = 0; shMovOn = false; shCabOn = false; }
-  if (!classified) rasterShadowMaps(fp);   // (the airframe's shadow maps: the feeds' and the main view's proxy both read them)
-  if (!classified) rasterTrafficShadowMaps(fp);
-  if (!classified) { rasterEnemyShadowMaps(fp); prepareReleasedStores(fp); rasterReleasedStoreShadows(fp); } else { enemyShOn = 0; storeShOn=storeMeshOn=0; }
+  if (!classified) marked(0, "aircraftShadow", [&] { rasterShadowMaps(fp); });   // (the airframe's shadow maps: the feeds' and the main view's proxy both read them)
+  if (!classified) marked(1, "trafficShadow", [&] { rasterTrafficShadowMaps(fp); });
+  if (!classified) marked(2, "enemyStoreShadows", [&] { rasterEnemyShadowMaps(fp); prepareReleasedStores(fp); rasterReleasedStoreShadows(fp); }); else { enemyShOn = 0; storeShOn=storeMeshOn=0; }
   stamp(1);
   // the cockpit display atlases, before the objects pass samples them. The pages: half of those the cockpit shows each
   // frame, so each page at 30 Hz with the same cost every frame (the whole 9 Mpx atlas every other frame put ~3 ms on
   // alternate frames on an RTX 3070 Laptop: a stutter at 60 fps)
-  if (fp.dispMode & 1) renderDisplays(fp, false, texPages ? (int)(frameNo & 1) : -1);
-  if (fp.dispMode & 2) renderDisplays(fp, true);
+  marked(3, "displays", [&] {
+    if (fp.dispMode & 1) renderDisplays(fp, false, texPages ? (int)(frameNo & 1) : -1);
+    if (fp.dispMode & 2) renderDisplays(fp, true);
+  });
   stamp(2);
   // the research jets' cockpit cameras: the same passes on their own targets, before the objects pass draws the screens
-  renderFeeds(fp, [this](GLuint p, const FrameParams& f) { setRT(p, f); }, [this](const FrameParams& f, GLuint) { rasterShadowProxy(f); rasterLight(f); cloudPass(f); rasterEffects(f); }, [this](const FrameParams& f) { feedEffects(f); });
+  marked(4, "feeds", [&] { renderFeeds(fp, [this](GLuint p, const FrameParams& f) { setRT(p, f); }, [this](const FrameParams& f, GLuint) { rasterShadowProxy(f); rasterLight(f); cloudPass(f); rasterEffects(f); }, [this](const FrameParams& f) { feedEffects(f); }); });
   stamp(3);
-  rasterObjects(fp);
+  marked(5, "objects", [&] { rasterObjects(fp); });
   stamp(4);
-  if (!classified) rasterShadowProxy(fp);
+  if (!classified) marked(6, "shadowProxy", [&] { rasterShadowProxy(fp); });
   stamp(5);
   if (classified) lightClassifiedHangar(fp);
-  else { rasterLight(fp); cloudPass(fp); rasterEffects(fp); }
+  else timedRegionPass("lighting", regionLightingRenderMs, [&] { rasterLight(fp); cloudPass(fp); rasterEffects(fp); });
   stamp(6);
+  const auto postStarted = std::chrono::steady_clock::now();
+  if (profileRegionRender) regionRenderMarker("postprocessing", "begin");
   // ------------------------------------------------ temporal AA resolve (before the sprites: particles never smear)
   {
     int cur = histIdx ^ 1;
@@ -1893,6 +2268,9 @@ void Renderer::renderScene(const FrameParams& fpFlat, const std::vector<SpriteVe
   stampUsed[stampQi] = !syncTiming && stampQ[stampQi][0] != 0;   // syncStamp issues no GPU timestamps
   stampQi = (stampQi + 1) % kStampRing;
   gpuQUsed[gpuQi] = true; gpuQi = (gpuQi + 1) % 4;
+  if (profileRegionRender) glFinish();
+  regionAuxRenderMs[7] = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - postStarted).count();
+  if (profileRegionRender) regionRenderMarker("postprocessing", "end");
 }
 
 // ------------------------------------------------------------------ UI

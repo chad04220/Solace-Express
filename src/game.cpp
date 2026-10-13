@@ -7,10 +7,12 @@
 #include <chrono>
 #include <ctime>
 #include <thread>
+#include <stdexcept>
 #include "airport_layout.h"
 #include "entities.h"
 #include "hive_world_collision.h"
 #include "scenery.h"
+#include "regional_surface.h"
 #include "models.h"
 #include "menu_layout.h"
 #include "hangar_catalog.h"
@@ -211,6 +213,7 @@ void Game::updateBindCapture(float dt) {
 // ------------------------------------------------------------------ settings / save
 static std::string joinPath(const std::string& d, const char* f) { return d.empty() ? std::string(f) : d + "/" + f; }
 
+
 void Game::loadSettings() {
   FILE* f = fopen(joinPath(saveDir, "settings.cfg").c_str(), "r");
   if (!f) return;
@@ -374,8 +377,8 @@ bool Game::retryCommit() {
 // than an owned aircraft already holds, never more than the tanks)
 float Game::chosenFuel(const Contract& c, int spec, Career::Source src, const Career::LaunchPlan& p) const {
   const AircraftSpec& s = kAircraft[spec];
-  if (s.special) return s.maxFuel;
   if (launchFuelKg > 0) return std::min(launchFuelKg, s.maxFuel);
+  if (p.fuelLoadKg >= 0) return clampf(p.fuelLoadKg, 0.f, s.maxFuel);
   float have = 0.f;
   if (src == Career::SRC_OWNED) { int oi = career.ownedIndexFor(spec); if (oi >= 0) have = career.fleet[oi].fuel; }
   if (src != Career::SRC_OWNED) return s.maxFuel;   // a rental comes full (the weight limit may still ask for less)
@@ -501,9 +504,428 @@ void Game::practiseApproach(int spec, Career::Source src) {
   isolatedFlight = true;
 }
 
+void Game::initFreeRegions() {
+  if (!freeRegions.empty()) return;
+  freeRegions.push_back(procedural::solaceDescriptor());
+  for (const auto& region : procedural::recommendations())
+    if (!region.authored) freeRegions.push_back(region);
+}
+
+void Game::chooseFreeRegion(const procedural::Descriptor& region) {
+  initFreeRegions();
+  for (int i = 0; i < (int)freeRegions.size(); ++i)
+    if (freeRegions[i].id == region.id) { freeRegion = i; return; }
+  // A picker visit adds one descriptor, never a terrain map or an unbounded Earth catalog.
+  // Retain the small launch catalog and replace the previous ad-hoc choice.
+  const size_t fixed = 1 + procedural::recommendations().size();
+  if (freeRegions.size() > fixed) freeRegions.resize(fixed);
+  freeRegions.push_back(region); freeRegion = (int)freeRegions.size() - 1;
+}
+
+void Game::loadFreeRegion(int index, GameScreen after) {
+  initFreeRegions();
+  if (regionJob.valid() || index < 0 || index >= (int)freeRegions.size()) return;
+  const procedural::Descriptor target = freeRegions[index];
+  if (regionError.empty() && !quoteJob.valid() && g_world.regionId == target.id &&
+      !(target.authored && after != SCR_FREE_FLIGHT && !g_world.repeating)) {
+    freeRegion = index; screen = after; return;
+  }
+  // Initial/menu loads may wait on previous speculation, but the flight thread
+  // must never destroy a running async future (its destructor would join).
+  retireEarthPrefetch();
+  regionalSurface::clearFlightContext(); earthFacilitiesPending = earthPromotionDeferred = false;
+  freeRegion = index; loadingRegion = target; regionAfterLoad = after;
+  regionPoseChange.reset(); earthFlight = earthCourseHold = false; earthDestination.reset();
+  regionLoadTime = 0; regionLoadStage = 0; regionError.clear(); regionCancel = false;
+  freeRegionMap = false; screen = SCR_REGION_LOADING;
+  freeFlight = isolatedFlight = researchFlight = militaryFlight = false;
+  paused = showMap = showRadio = settingsFromPause = false;
+  atc.cancel(); commsPending.clear(); toasts.clear(); traffic.reset();
+  hiveCombat.reset(1, WRAP_SPAN);
+  g_audio.setParams(AudioParams{});
+  gpsMapValid = loadMap = false;
+  menuPlanCache = menuPlan::Cache{}; quoteFlown.clear();
+  focusList.clear(); focusPrev.clear();
+  in.pressed[K_ESC] = in.pressed[K_ENTER] = in.pressed[' '] = false;
+  in.mPressed[0] = false; in.buttonsPressed = 0;
+  const std::string path = diskless || cacheDir.empty() ? std::string() :
+    joinPath(cacheDir, target.authored ? "world.bin" : "procedural-world.bin");
+  const std::string stamp = buildStamp;
+  const bool save = !diskless, makeMap = g_ren.ok;
+  // A flown career quote may still be reading the original World. Moving its
+  // future here drains it without freezing the loading screen or publishing a stale quote.
+  regionJob = std::async(std::launch::async,
+    [this, target, path, stamp, save, makeMap, retired = std::move(earthRetireJob), quote = std::move(quoteJob)]() mutable {
+      if (retired.valid()) { try { retired.get(); } catch (...) {} }
+      if (quote.valid()) { try { quote.get(); } catch (...) {} }
+      sceneryResetWorldCaches(); // joins old-world scenery jobs before any global changes
+      g_roadTraffic = RoadTraffic{};
+      g_groundPits.clear();
+      regionLoadStage = 1;
+      // Release the old terrain first: a second full region is never resident.
+      g_world = World{};
+      if (target.authored) g_world.build(path, stamp, save);
+      else g_world.buildProcedural(target, path, stamp, save);
+      if (g_world.airports.empty()) throw std::runtime_error("This region has no usable airports.");
+      regionLoadStage = 2;
+      return makeMap ? Renderer::prepareWorldMinimap() : std::vector<uint8_t>{};
+    });
+}
+
+void Game::updateRegionLoading(float dt) {
+  regionLoadTime += dt;
+  // Cancellation is deferred until the builder joins. No reader may resume in a partial World.
+  if (in.pressed[K_ESC] || (in.buttonsPressed & PAD_B)) regionCancel = true;
+  if (!regionJob.valid() || regionJob.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+  try {
+    const auto map = regionJob.get();
+    regionLoadStage = 3;
+    if (g_ren.ok) g_ren.reloadWorld(map);
+    freeAirport = freeLaunchPending ? std::clamp(freeAirport, 0, (int)g_world.airports.size() - 1) : 0;
+    crashed = completed = landed = false;
+    dbgCam = dbgFollow = false;
+    wreck.clear(); debris.clear(); pops.clear(); particles.clear(); pits.clear();
+    bursts.clear(); trail.clear(); cloudWake.clear(); tipTrail[0].clear(); tipTrail[1].clear();
+    for (auto& smoke : pieceTrail) smoke.clear();
+    g_ren.entBudgetMs = 2.5f;
+    const bool launchAfterPreparation = freeLaunchPending && !regionCancel;
+    freeLaunchPending = false;
+    if (regionCancel && (!loadingRegion.authored || !g_world.repeating)) {
+      loadFreeRegion(0, SCR_MENU); return;
+    }
+    screen = regionCancel ? SCR_MENU : regionAfterLoad;
+    if (launchAfterPreparation && screen == SCR_FREE_FLIGHT) { launchFreeFlight(); return; }
+    if (screen == SCR_FREE_FLIGHT) toast(loadingRegion.name + " ready. Choose an airport and take flight.", vec3(.6f, 1.f, .8f), false);
+  } catch (const std::exception& e) {
+    regionError = e.what();
+  } catch (...) {
+    regionError = "The region could not be prepared.";
+  }
+}
+
+void Game::openEarthPicker() {
+  if (!freeFlight || crashed) return;
+  initFreeRegions();
+  earthPosition = regionTravel::Chart(flightRegion.origin).position(plane.pos);
+  // Nearby choices are descriptors only; every island is generated when reached.
+  freeRegions.clear(); freeRegions.push_back(procedural::solaceDescriptor(flightRegion.worldSeed));
+  for (const auto& region : procedural::nearby(earthPosition, 12, flightRegion.worldSeed))
+    if (!region.authored) freeRegions.push_back(region);
+  chooseFreeRegion(earthDestination ? *earthDestination : flightRegion);
+  freeRegionMap = true; showMap = showRadio = false; paused = true;
+}
+
+void Game::setEarthDestination(const procedural::Descriptor& region) {
+  if (!freeFlight || crashed || screen != SCR_FLIGHT) return;
+  const auto destination = region; // the picker may replace descriptor storage below
+  earthDestination = destination; earthFlight = true;
+  earthPrefetchFailedId.clear(); earthPrefetchError.clear(); // selecting a route explicitly retries a failed candidate
+  earthPosition = regionTravel::Chart(flightRegion.origin).position(plane.pos);
+  gpsMapValid = false;
+  earthCourseHold = !plane.onGround;
+  if (earthCourseHold) {
+    plane.apEngage(Plane::AP_HOLD, -1, wx);
+    earthCourseHold = plane.apOn;
+    if (auto heading = regionTravel::Chart(flightRegion.origin).bearing(plane.pos, destination.origin)) plane.apHeading = (float)*heading;
+    apDest = -1;
+  }
+  toast(destination.name + " route set. Nearby regions prepare in the background as you fly.", vec3(.6f, 1.f, .8f), false);
+  if (plane.spec && geo::surfaceDistance(earthPosition, destination.origin) / 1000. >
+      plane.nominalRangeKm())
+    toast("Route exceeds nominal fuel range. Choose a closer stop or a longer-range aircraft.", vec3(1.f, .7f, .3f), false);
+}
+
+void Game::retireEarthPrefetch() {
+  if (earthPrefetchCancel) earthPrefetchCancel->requested = true;
+  earthPrefetchCancel.reset();
+  Renderer::WorldUploadData retiredGpu;
+  if (g_ren.ok) g_ren.cancelWorldUpload(&retiredGpu);
+  if (earthSceneryDraining) { g_scenery.resumeStreaming(); earthSceneryDraining = false; }
+  earthPrefetchId.clear(); earthPrefetchFailedId.clear(); earthPrefetchError.clear();
+  if (!earthPrefetchJob.valid() && !earthPrefetch) return;
+  // A cancelled candidate may still be building. Transfer every owner into a
+  // worker instead of blocking on its future or freeing large arrays here.
+  earthRetireJob = std::async(std::launch::async,
+    [job = std::move(earthPrefetchJob), candidate = std::move(earthPrefetch), retired = std::move(earthRetireJob), gpu = std::move(retiredGpu)]() mutable {
+      if (retired.valid()) { try { retired.get(); } catch (...) {} }
+      if (job.valid()) { try { auto abandoned = job.get(); } catch (...) {} }
+      candidate.reset(); gpu = Renderer::WorldUploadData{};
+    });
+}
+
+void Game::updateEarthSurfaceContext() {
+  if (!freeFlight || !earthFlight || screen != SCR_FLIGHT || !plane.spec || flightRegion.id.empty()) {
+    if (regionalSurface::flightContextEnabled()) regionalSurface::clearFlightContext();
+    earthFacilitiesPending = earthPromotionDeferred = false;
+    return;
+  }
+  // Protect the airframe plus the next maximum replayed frame of travel. Time
+  // acceleration multiplies real geographic progress, including at low FPS.
+  const float bodyRadius = .6f * std::max(plane.spec->span, plane.spec->fusLen) + plane.gearHeight();
+  const float travel = length(vec3(plane.vel.x, 0, plane.vel.z)) * .25f * std::max(timeAccel, 1.f);
+  regionalSurface::setFlightContext(flightRegion, regionTravel::Chart(flightRegion.origin).position(plane.pos),
+    bodyRadius + travel, 50.f);
+}
+
+bool Game::earthPromotionSafe(const World& candidate, const regionTravel::Change& change) const {
+  if (plane.onGround || crashed || !plane.spec || regionalSurface::regionPinned(candidate.regionId)) return false;
+  if (g_ren.ok) {
+    // Textures may be uploaded while a contact-pinned proxy remains visible.
+    // The exact full-derived drawable surface must be safe before World moves.
+    const auto surface = g_ren.worldUploadSurface();
+    if (!surface || !regionalSurface::mayActivate(surface)) return false;
+  }
+  const float halfWidth = plane.spec->span * .6f, halfLength = plane.spec->fusLen * .6f;
+  const float bodyRadius = std::max(halfWidth, halfLength) + plane.gearHeight();
+  const float travel = length(vec3(plane.vel.x, 0, plane.vel.z)) * .25f * std::max(timeAccel, 1.f);
+  const float radius = (bodyRadius + travel) * 1.02f + 2.f; // local chart scale/float slack
+  const vec3 center = change.point(plane.pos);
+  const float x0 = center.x - radius, x1 = center.x + radius, z0 = center.z - radius, z1 = center.z + radius;
+  float incomingTop = 0.f;
+  if (x0 < WORLD_HALF + 3000.f && x1 > -WORLD_HALF - 3000.f &&
+      z0 < WORLD_HALF + 3000.f && z1 > -WORLD_HALF - 3000.f) {
+    if (candidate.hmax[0].size() != size_t(HMAX_N) * HMAX_N) return false;
+    auto cell = [](float v) { return std::clamp(int(std::floor((v + WORLD_HALF) * HMAX_N / (2.f * WORLD_HALF))), 0, HMAX_N - 1); };
+    for (int z = cell(z0); z <= cell(z1); ++z) for (int x = cell(x0); x <= cell(x1); ++x)
+      incomingTop = std::max(incomingTop, candidate.hmax[0][size_t(z) * HMAX_N + x]);
+  }
+  // hmax includes4m of crater allowance, even over perfectly flat sea. The
+  // incoming chart starts without craters. Any positive terrain also reserves
+  //350m for its ordinary generated building/tree skyline before clearance.
+  bool incomingWater = incomingTop <= 4.f;
+  if (!incomingWater) incomingTop += 350.f;
+  auto obstacle = [&](float loX, float loZ, float hiX, float hiZ, float top) {
+    if (hiX < x0 || loX > x1 || hiZ < z0 || loZ > z1) return;
+    incomingWater = false; incomingTop = std::max(incomingTop, top);
+  };
+  for (const auto& box : candidate.boxes) obstacle(box.c.x-box.h.x, box.c.z-box.h.z, box.c.x+box.h.x, box.c.z+box.h.z, box.c.y+box.h.y);
+  for (const auto& bridge : candidate.bridges) obstacle(bridge.minX, bridge.minZ, bridge.maxX, bridge.maxZ, bridge.maxY);
+  auto placed = [&](const auto& items) { for (const auto& item : items) {
+    const auto& info = kEntInfo[item.kind]; const auto& e = item.e;
+    const float reach = std::hypot(info.hx * e.sx, info.hz * e.sz);
+    obstacle(e.x-reach, e.z-reach, e.x+reach, e.z+reach, e.y+info.h*e.sy);
+  } };
+  placed(landmarks(candidate)); placed(civicLandmarks(candidate));
+  const float oldTop = regionalSurface::currentUpperBound(plane.pos, plane.pos, radius);
+  const bool boundClear = plane.pos.y - bodyRadius >= std::max(oldTop, incomingTop) + 250.f;
+  const bool boundedWater = incomingWater && oldTop <= 0.f;
+  const vec3 right = plane.right(), forward = plane.forward();
+  bool allWater = true, clearOfLand = true;
+  for (int x = -1; x <= 1; ++x) for (int z = -1; z <= 1; ++z) {
+    const vec3 contact = plane.pos + right * (x * halfWidth) + forward * (z * halfLength) - vec3(0, plane.gearHeight(), 0);
+    const vec3 mapped = change.point(contact);
+    // Non-global candidate Worlds explicitly bypass the regional fallback.
+    const float current = g_world.height(contact.x, contact.z);
+    const float incoming = candidate.height(mapped.x, mapped.z);
+    allWater &= current < 0.f && incoming < 0.f;
+    clearOfLand &= contact.y - std::max(current, 0.f) >= 250.f && mapped.y - std::max(incoming, 0.f) >= 250.f;
+  }
+  return (allWater && boundedWater) || (clearOfLand && boundClear);
+}
+
+void Game::updateEarthFlight() {
+  updateEarthSurfaceContext();
+  if (!freeFlight || !earthFlight || crashed || screen != SCR_FLIGHT) return;
+  const regionTravel::Chart chart(flightRegion.origin);
+  earthPosition = chart.position(plane.pos);
+  if (earthDestination && earthCourseHold) {
+    if (!plane.apOn || plane.apMode != Plane::AP_HOLD) earthCourseHold = false;
+    else if (geo::surfaceDistance(earthPosition, earthDestination->origin) < 2500.) {
+      earthCourseHold = false; plane.apDisengage();
+      toast(earthDestination->id == g_world.regionId ? "Destination region reached. Choose a local airport on the GPS map." :
+        "Destination region reached. Local airports remain unavailable while detailed terrain prepares.", vec3(.6f, 1.f, .8f), false);
+    } else if (auto heading = chart.bearing(plane.pos, earthDestination->origin)) plane.apHeading = (float)*heading;
+  }
+  // Authored Solace joins Earth travel without a loading screen. Quotes and
+  // chunk generators finish against the old topology before the flag changes.
+  if (g_world.repeating) {
+    if (quoteJob.valid()) {
+      if (quoteJob.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+      try { quoteJob.get(); } catch (...) {}
+      quoteFlown.clear(); menuPlanCache = menuPlan::Cache{};
+    }
+    if (!earthSceneryDraining) { g_scenery.beginDrain(); earthSceneryDraining = true; }
+    if (!g_scenery.isDrained()) return;
+    // Canonical scenery is unchanged by topology. Keep warm chunks so the
+    // next runway frame does not synchronously rebuild nearby detail.
+    g_world.repeating = false;
+    if (g_ren.ok) g_ren.setWorldTopology();
+    gpsMapValid = loadMap = false;
+    g_scenery.resumeStreaming(); earthSceneryDraining = false;
+  }
+  if (g_ren.ok) {
+    vec3 camera = dbgCam ? dbgCamPos : camPos;
+    if (!std::isfinite(camera.x) || !std::isfinite(camera.y) || !std::isfinite(camera.z)) camera = plane.pos;
+    g_ren.updateRegionHorizon(chart.position(camera), flightRegion.worldSeed);
+  }
+  auto owner = procedural::describe(earthPosition, flightRegion.worldSeed);
+  earthFacilitiesPending = owner.id != g_world.regionId; earthPromotionDeferred = false;
+  procedural::Descriptor wanted = owner;
+  if (owner.id == flightRegion.id) {
+    // Start a neighbor on the runway, not shortly before the seam. Even slow
+    // aircraft then provide minutes of ocean travel for CPU/GPU preparation.
+    vec3 horizontal(plane.vel.x, 0, plane.vel.z);
+    if (length(horizontal) < 10.f) horizontal = plane.forward();
+    auto heading = geo::initialBearing(earthPosition, chart.position(plane.pos + normalize(horizontal) * 1000.f));
+    if (earthDestination && (earthCourseHold || plane.onGround)) heading = geo::initialBearing(earthPosition, earthDestination->origin);
+    if (heading) for (double distance = 25000.; distance <= 700000.; distance += 25000.) {
+      auto ahead = procedural::describe(geo::destination(earthPosition, *heading, distance), flightRegion.worldSeed);
+      if (ahead.id != flightRegion.id) { wanted = ahead; break; }
+    }
+  }
+  if (earthRetireJob.valid()) {
+    if (earthRetireJob.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+    try { earthRetireJob.get(); } catch (...) {}
+  }
+  if (earthSceneryDraining && (!earthPrefetch || owner.id != earthPrefetch->region.id)) {
+    g_scenery.resumeStreaming(); earthSceneryDraining = false;
+  }
+  if (earthPrefetchJob.valid()) {
+    // Ask obsolete generation to stop at its next safe checkpoint, but retain
+    // its future until ready. Owner priority wins over a speculative heading.
+    if (wanted.id != earthPrefetchId && earthPrefetchCancel) earthPrefetchCancel->requested = true;
+    if (earthPrefetchJob.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+    try { earthPrefetch = earthPrefetchJob.get(); }
+    catch (const GenerationCancelled&) { earthPrefetchError.clear(); }
+    catch (const std::exception& e) { earthPrefetchError = e.what(); earthPrefetchFailedId = earthPrefetchId; }
+    catch (...) { earthPrefetchError = "Region preparation failed"; earthPrefetchFailedId = earthPrefetchId; }
+    earthPrefetchCancel.reset();
+    if (!earthPrefetchError.empty()) toast("Terrain preparation failed. Reselect the Earth route to retry.", vec3(1.f, .65f, .3f), false);
+  }
+  if (earthPrefetch && earthPrefetch->region.id != wanted.id) { retireEarthPrefetch(); return; }
+  if (!earthPrefetch) {
+    if (wanted.id == flightRegion.id || wanted.id == earthPrefetchFailedId) return;
+    earthPrefetchId = wanted.id; earthPrefetchError.clear();
+    const std::string path = diskless || cacheDir.empty() ? std::string() :
+      joinPath(cacheDir, wanted.authored ? "world.bin" : "procedural-world.bin");
+    const std::string stamp = buildStamp;
+    const bool save = !diskless, prepareGpu = g_ren.ok;
+    earthPrefetchCancel = std::make_shared<GenerationCancelState>();
+    earthPrefetchJob = std::async(std::launch::async, [wanted, path, stamp, save, prepareGpu, cancel = earthPrefetchCancel] {
+      ScopedParallelLimit threadBudget(2);
+      ScopedGenerationCancellation cancellation(cancel);
+      generationCheckpoint();
+      auto candidate = std::make_unique<PrefetchedRegion>();
+      candidate->region = wanted; candidate->world = std::make_unique<World>();
+      if (wanted.authored) candidate->world->build(path, stamp, save);
+      else candidate->world->buildProcedural(wanted, path, stamp, save);
+      generationCheckpoint();
+      candidate->world->repeating = false;
+      if (candidate->world->airports.empty()) throw std::runtime_error("Region has no usable airports");
+      if (prepareGpu) candidate->upload = Renderer::prepareWorldUpload(*candidate->world);
+      generationCheckpoint();
+      return candidate;
+    });
+    return;
+  }
+  if (g_ren.ok) {
+    if (!earthPrefetch->gpuStarted) {
+      if (!g_ren.beginWorldUpload(*earthPrefetch->world, std::move(earthPrefetch->upload))) {
+        const auto failedId = earthPrefetch->region.id, error = g_ren.worldUploadError();
+        retireEarthPrefetch(); earthPrefetchFailedId = failedId; earthPrefetchError = error;
+        toast("Terrain upload failed. Reselect the Earth route to retry.", vec3(1.f, .65f, .3f), false); return;
+      }
+      earthPrefetch->gpuStarted = true;
+    }
+    if (!g_ren.worldUploadReady() && !g_ren.pumpWorldUpload()) {
+      if (!g_ren.worldUploadError().empty()) {
+        const auto failedId = earthPrefetch->region.id, error = g_ren.worldUploadError();
+        retireEarthPrefetch(); earthPrefetchFailedId = failedId; earthPrefetchError = error;
+        toast("Terrain upload failed. Reselect the Earth route to retry.", vec3(1.f, .65f, .3f), false);
+      }
+      return;
+    }
+  }
+  if (owner.id == flightRegion.id || owner.id != earthPrefetch->region.id) return;
+  const regionTravel::Change promotionChange(chart, regionTravel::Chart(earthPrefetch->region.origin), plane.pos);
+  if (!earthPromotionSafe(*earthPrefetch->world, promotionChange)) {
+    earthPromotionDeferred = true;
+    if (earthSceneryDraining) { g_scenery.resumeStreaming(); earthSceneryDraining = false; }
+    return;
+  }
+  // Ownership has a 250 m hysteresis to prevent float round-trip ping-pong.
+  vec3 horizontal(plane.vel.x, 0, plane.vel.z);
+  if (length(horizontal) > .1f && procedural::describe(chart.position(plane.pos - normalize(horizontal) * 250.f),
+      flightRegion.worldSeed).id != owner.id) return;
+  // Start the scenery drain only far out over ocean. This is not a visibility
+  // cutoff: distant coastlines use the renderer's coarse overlap across handoff.
+  // Weather changes cannot delay the collision chart into the next island.
+  // If preparation is late, aircraft/physics keep going over open ocean.
+  const float dx = std::max(0.f, std::abs(plane.pos.x) - 40000.f);
+  const float dz = std::max(0.f, std::abs(plane.pos.z) - 40000.f);
+  if (std::sqrt(dx * dx + dz * dz) < 60000.f) return;
+  if (!earthSceneryDraining) { g_scenery.beginDrain(); earthSceneryDraining = true; }
+  if (!g_scenery.isDrained()) return;
+  sceneryResetWorldCaches(); // already drained: no hidden worker join
+  g_roadTraffic = RoadTraffic{}; g_groundPits.clear();
+  loadingRegion = earthPrefetch->region; regionResumePaused = paused;
+  regionPoseChange = promotionChange;
+  auto retired = std::make_unique<World>(std::move(g_world));
+  g_world = std::move(*earthPrefetch->world);
+  Renderer::WorldUploadData retiredGpu;
+  if (g_ren.ok) g_ren.commitWorldUpload(&retiredGpu); // staged resources only; no bulk upload
+  earthPrefetch.reset(); earthPrefetchId.clear();
+  earthRetireJob = std::async(std::launch::async, [old = std::move(retired), gpu = std::move(retiredGpu)]() mutable { old.reset(); gpu = Renderer::WorldUploadData{}; });
+  atc.cancel(); commsPending.clear(); traffic.reset(); hiveCombat.reset(1, WRAP_SPAN);
+  gpsMapValid = loadMap = false;
+  wreck.clear(); debris.clear(); pops.clear(); particles.clear(); pits.clear();
+  bursts.clear(); trail.clear(); cloudWake.clear(); tipTrail[0].clear(); tipTrail[1].clear();
+  for (auto& smoke : pieceTrail) smoke.clear();
+  continueEarthFlight();
+  g_scenery.resumeStreaming(); earthSceneryDraining = false;
+}
+
+void Game::continueEarthFlight() {
+  if (!regionPoseChange) throw std::runtime_error("Missing Earth-flight frame transition.");
+  const auto& change = *regionPoseChange;
+  // The aircraft is never reset/refuelled: body-space dynamics, engine state,
+  // controls, failures, fuel and clocks survive the chart handoff unchanged.
+  const vec3 oldPosition = plane.pos;
+  const vec3 airRelative = oldPosition - plane.wxAir;
+  const vec3 cloudRelative = oldPosition + vec3(cloudOff.x, 0, cloudOff.y);
+  plane.pos = change.point(plane.pos); plane.vel = change.vector(plane.vel); plane.q = change.attitude(plane.q);
+  plane.windVel = change.vector(plane.windVel); plane.windAvg = change.vector(plane.windAvg);
+  plane.wxAir = plane.pos - change.vector(airRelative); plane.wxl.draft = change.vector(plane.wxl.draft);
+  plane.apVelPrev = change.vector(plane.apVelPrev); plane.apHeading = change.heading(plane.apHeading);
+  plane.apStuntHdg = change.heading(plane.apStuntHdg); plane.apStuntRight0 = change.vector(plane.apStuntRight0);
+  plane.apLd = change.vector(plane.apLd); plane.apTd = change.point(plane.apTd); plane.apHoldC = change.point(plane.apHoldC);
+  plane.seamShift = vec3();
+  if (plane.apOn && (plane.apMode == Plane::AP_NAV || plane.apMode == Plane::AP_APPR)) {
+    plane.apMode = Plane::AP_HOLD; plane.apHeading = plane.heading(); plane.apAlt = plane.pos.y;
+    plane.apStatus = "HOLD / NEW REGION";
+  }
+  plane.apAirport = plane.apHoldFor = plane.apStuntWasAirport = -1;
+  if (plane.apStuntWasMode == Plane::AP_NAV || plane.apStuntWasMode == Plane::AP_APPR) plane.apStuntWasMode = Plane::AP_HOLD;
+  camPos = change.point(camPos); camQ = change.attitude(camQ); camVel = change.vector(camVel);
+  dbgCamPos = change.point(dbgCamPos); dbgCamLook = change.point(dbgCamLook);
+  // Chase/cockpit yaw is body-relative; only the orbit camera stores world yaw.
+  if (camMode == 2) camYaw -= (float)change.headingDelta() * DEG;
+  wx.windFrom = change.heading(wx.windFrom); wxStart.windFrom = change.heading(wxStart.windFrom);
+  contract.wx.windFrom = change.heading(contract.wx.windFrom); contract.wxEnd.windFrom = change.heading(contract.wxEnd.windFrom);
+  const vec3 drift = change.vector(cloudRelative) - plane.pos; cloudOff = vec2(drift.x, drift.z);
+  cloudDet = change.vector(cloudDet); wx.cloudDrift = cloudOff; wx.cloudDetail = cloudDet;
+  flightRegion = loadingRegion; earthFlight = true;
+  earthPosition = regionTravel::Chart(flightRegion.origin).position(plane.pos);
+  freeAirport = std::max(0, g_world.nearestAirport(plane.pos.x, plane.pos.z));
+  contract.from = contract.to = freeAirport; contract.wps.clear();
+  contract.title = "Free Flight / " + flightRegion.name;
+  launchPlan.startAirport = attemptFrom = freeAirport; wpIndex = 0; apDest = -1; tdRunway = -2;
+  atcF = AtcFlight{}; atcF.dep = atcF.arr = freeAirport; atcF.phase = plane.onGround ? 0 : 3;
+  wraith = WraithState{}; ufo = Ufo{}; ufo.next = 180.f;
+  tipOn = false; trailT = 0; wakeGap = true; wakeOdo = 0;
+  craterR = craterD = 0; boomT = -1;
+  regionPoseChange.reset();
+  freeFlight = isolatedFlight = true; paused = regionResumePaused; screen = SCR_FLIGHT;
+  earthFacilitiesPending = earthPromotionDeferred = false; updateEarthSurfaceContext();
+  toast("Entering " + flightRegion.name + ".", vec3(.6f, 1.f, .8f), false);
+}
+
 // Main-menu Free Flight never quotes, accepts, saves or settles a career job. A fresh
 // zero-fee plan supplies full tanks even without a licence, money or an owned aircraft.
 void Game::beginFreeFlightSetup() {
+  initFreeRegions();
+  if (auto region = procedural::find(g_world.regionId)) chooseFreeRegion(*region);
+  freeRegionMap = false;
   freeCraft = validCareerSelection(freeCraft);
   freeAirport = g_world.airports.empty() ? 0 : std::clamp(freeAirport, 0, (int)g_world.airports.size() - 1);
   freeFlight = isolatedFlight = researchFlight = militaryFlight = false;
@@ -516,18 +938,31 @@ void Game::beginFreeFlightSetup() {
 
 void Game::cancelFreeFlightSetup() {
   if (screen != SCR_FREE_FLIGHT) return;
+  freeRegionMap = false;
+  if (g_world.procedural || !g_world.repeating) { loadFreeRegion(0, SCR_MENU); return; }
   screen = SCR_MENU;
   // No hub return/save path: opening or closing this mode cannot create a career save.
 }
 
 void Game::launchFreeFlight() {
   if (screen != SCR_FREE_FLIGHT && !freeFlight) return;
+  if (freeFlight && !flightRegion.id.empty()) chooseFreeRegion(flightRegion);
+  if (!freeRegions.empty() && (freeRegion < 0 || freeRegion >= (int)freeRegions.size() ||
+      freeRegions[freeRegion].id != g_world.regionId)) return;
   // Validate at the boundary too: a stale selection or direct call must never unlock research.
   if (!isCareerAircraft(freeCraft) ||
       freeAirport < 0 || freeAirport >= (int)g_world.airports.size()) return;
+  if (!freeFlight && quoteJob.valid()) {
+    if (quoteJob.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+      // Initial launch preparation may wait; an already flying Earth session never does.
+      freeLaunchPending = true; loadFreeRegion(freeRegion); return;
+    }
+    try { quoteJob.get(); } catch (...) {}
+    quoteFlown.clear(); menuPlanCache = menuPlan::Cache{};
+  }
   const AircraftSpec& s = kAircraft[freeCraft];
   Contract c;
-  c.id = "FREE_FLIGHT"; c.title = "Free Flight"; c.type = CT_FERRY;
+  c.id = "FREE_FLIGHT"; c.title = g_world.procedural ? "Free Flight / " + freeRegions[freeRegion].name : "Free Flight"; c.type = CT_FERRY;
   c.from = c.to = freeAirport; c.startAirborne = freeAirborne;
   c.brief = "Fly anywhere. Full tanks, no fees, and no career progress or penalties.";
   c.wx = Weather(); c.wx.timeOfDay = 12.f; c.wx.windSpeed = 3.f;
@@ -538,6 +973,11 @@ void Game::launchFreeFlight() {
   startFlight(c, freeCraft, Career::SRC_NONE, &p);
   launchFuelKg = careerFuelChoice;
   freeFlight = isolatedFlight = true;
+  flightRegion = freeRegions.empty() ? procedural::solaceDescriptor() : freeRegions[freeRegion];
+  // Every Free Flight departure participates in Earth travel. Authored Solace
+  // switches topology through updateEarthFlight's reader-drain barrier.
+  earthFlight = true;
+  earthPosition = regionTravel::Chart(flightRegion.origin).position(plane.pos);
   failPlan = FailPlan();
   if (freeAirborne) {
     const Airport& a = g_world.airports[freeAirport];
@@ -548,12 +988,17 @@ void Game::launchFreeFlight() {
     engineAutoStarted = takeoffAnnounced = true;
     camQ = plane.q; camPos = plane.pos + plane.q.rotate(vec3(0, 3, 15));
   }
+  earthPosition = regionTravel::Chart(flightRegion.origin).position(plane.pos);
   toasts.clear();
   toast(std::string(s.name) + " / FREE FLIGHT", vec3(0.6f, 1.f, 0.8f), false);
   toast(freeAirborne ? "Already airborne. Fly anywhere, then return from the pause menu." : "Full tanks. Release the parking brake when ready.", vec3(0.8f, 0.9f, 1.f), false);
 }
 
 void Game::returnToFreeFlight() {
+  regionalSurface::clearFlightContext(); earthFacilitiesPending = earthPromotionDeferred = false;
+  retireEarthPrefetch();
+  if (!flightRegion.id.empty()) chooseFreeRegion(flightRegion);
+  earthFlight = earthCourseHold = false; earthDestination.reset(); freeRegionMap = false;
   freeFlight = isolatedFlight = researchFlight = militaryFlight = false;
   hiveCombat.reset(1,WRAP_SPAN);
   paused = showMap = showRadio = settingsFromPause = false;
@@ -637,7 +1082,14 @@ void Game::init(bool buildWorld, const std::function<void(float, const std::stri
   report(4 + kNumAircraft, "Voice library indexed");
 }
 
-void Game::initHeadless() { headless = true; career.newGame(); set.resMode = 0; failuresArmed = false; g_ren.foveation = 0.f; g_ren.prepassAutoOn = false; }   // tools and tests render at the full resolution; nothing breaks unless the test breaks it
+void Game::initHeadless() {
+  headless = true;
+  // Multi-scene diagnostics can start a fresh Game while another generated region
+  // is resident. Career board generation is authored-Solace-only.
+  if (g_world.procedural) { career = Career{}; career.location = 0; }
+  else career.newGame();
+  set.resMode = 0; failuresArmed = false; g_ren.foveation = 0.f; g_ren.prepassAutoOn = false;
+}   // tools and tests render at the full resolution; nothing breaks unless the test breaks it
 
 // ------------------------------------------------------------------ failures (C7)
 void Game::rollFailures(const Contract& c, int spec, Career::Source src) {
@@ -994,7 +1446,23 @@ void Game::updateFailures(float dt) {
   fireFailure(failPlan.kind, failPlan.engine);
 }
 
-void Game::shutdown() { saveSettings(); radio.shutdown(); }
+Game::~Game() {
+  regionalSurface::clearFlightContext();
+  if (earthPrefetchCancel) earthPrefetchCancel->requested = true;
+  // The loader captures this for its stage flag. Join before member destruction,
+  // even when the player closes the window halfway through generation.
+  if (regionJob.valid()) { try { regionJob.get(); } catch (...) {} }
+  if (earthPrefetchJob.valid()) { try { earthPrefetchJob.get(); } catch (...) {} }
+  if (earthRetireJob.valid()) { try { earthRetireJob.get(); } catch (...) {} }
+}
+
+void Game::shutdown() {
+  regionalSurface::clearFlightContext();
+  retireEarthPrefetch();
+  if (earthRetireJob.valid()) { try { earthRetireJob.get(); } catch (...) {} }
+  if (regionJob.valid()) { try { regionJob.get(); } catch (...) {} }
+  saveSettings(); radio.shutdown();
+}
 
 std::vector<Game::Annunciator> Game::hudAnnunciators() const {
   const Failures& F = plane.fail;
@@ -1052,6 +1520,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
   }
   static bool dispWarned = false;   // say once if the cockpit display shader could not be built on this GPU
   if (!g_ren.dispError.empty() && !dispWarned && !headless) { dispWarned = true; toast("Cockpit display shader failed on this GPU (details in startup.log)", vec3(1.f, 0.45f, 0.35f)); }
+  regionalSurface::clearFlightContext(); earthFacilitiesPending = earthPromotionDeferred = false;
   contract = c; specIdx = spec; source = src;
   launchPlan = finalized ? *finalized : finalizeLaunchPlan(c, spec, src);   // accepted quote, tank load and bill agree
   militaryFlight=isMilitaryContract(c.type); militarySettled=false; militaryHull=100; militarySiteLabels={};
@@ -1248,7 +1717,7 @@ void Game::cycleApDest(int dir) {
   int n = (int)g_world.airports.size();
   std::vector<int> order(n);
   for (int i = 0; i < n; i++) order[i] = i;
-  auto d2 = [&](int i) { float dx = wrapCoord(g_world.airports[i].x - plane.pos.x), dz = wrapCoord(g_world.airports[i].z - plane.pos.z); return dx * dx + dz * dz; };   // (the short way round the map)
+  auto d2 = [&](int i) { float dx = g_world.wrap(g_world.airports[i].x - plane.pos.x), dz = g_world.wrap(g_world.airports[i].z - plane.pos.z); return dx * dx + dz * dz; };   // (the short way round the map)
   std::sort(order.begin(), order.end(), [&](int a, int b) { return d2(a) < d2(b); });
   if (apDest < 0) apDest = (int)(&dest() - &g_world.airports[0]);   // first pick: the contract's destination
   else {
@@ -1428,7 +1897,7 @@ void Game::flightControls(float dt) {
   if (actPressed(ACT_ENGINE) && !plane.engineRunning && plane.fuel > 0) { plane.starterTime = 0.01f; toast("Engine start"); }
   // time acceleration
   if (actPressed(ACT_TIME)) {
-    float dd = length(vec3(wrapCoord(plane.pos.x - dest().x), 0, wrapCoord(plane.pos.z - dest().z)));
+    float dd = length(vec3(g_world.wrap(plane.pos.x - dest().x), 0, g_world.wrap(plane.pos.z - dest().z)));
     if(militaryFlight || hiveCombat.aliveCount()>0 || hiveCombat.mission.status==hive::MissionStatus::Active) { timeAccel=1; toast("Combat runs at real time"); }
     else if (!apCruising() && (plane.onGround || plane.agl() < 250.f || dd < 3500.f)) { timeAccel = 1; toast("Time acceleration only available in cruise", vec3(1, 0.7f, 0.4f)); }
     else { timeAccel = timeAccel >= 4 ? 1 : timeAccel * 2; toast(fmt("Time x%.0f", timeAccel)); }
@@ -1478,7 +1947,7 @@ void Game::updateFlight(float dt) {
   // (time acceleration is switched off before this frame's step, not after it: a 4x frame on the approach was one
   // too many)
   if (timeAccel > 1) {
-    float dd = length(vec3(wrapCoord(plane.pos.x - dest().x), 0, wrapCoord(plane.pos.z - dest().z)));
+    float dd = length(vec3(g_world.wrap(plane.pos.x - dest().x), 0, g_world.wrap(plane.pos.z - dest().z)));
     bool approach = plane.apOn && plane.apMode == Plane::AP_APPR && plane.apStage != Plane::APS_NAV;
     if ((!apCruising() && (plane.agl() < 250.f || dd < 3500.f)) || approach || plane.onGround || crashed) { timeAccel = 1; toast("Time acceleration off"); }
   }
@@ -2090,7 +2559,10 @@ void Game::launchResearch() {
   // (its own fuel, never the job card's choice: that stays for the career's next flight - the review of v3.44.0, CAR-7)
   const float careerFuelChoice = launchFuelKg;
   launchFuelKg = -1;
-  startFlight(c, resCraft, Career::SRC_OWNED);
+  Career::LaunchPlan researchPlan;
+  researchPlan.spec = resCraft; researchPlan.src = Career::SRC_OWNED;
+  researchPlan.startAirport = resAirport; researchPlan.fuelLoadKg = rs.maxFuel;
+  startFlight(c, resCraft, Career::SRC_OWNED, &researchPlan);
   launchFuelKg = careerFuelChoice;
   researchFlight = true;
   combatLoadout.reset(practiceForward,practiceBomb);
@@ -3389,7 +3861,7 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
   // the traffic's lamps at range (road_traffic.h): two headlights white, two tail lights red, a pixel's point each - up
   // close the modelled lamps are the light (ent_fs2.glsl)
   if (night > 0.05f) {
-    const vec2 off(fp.camPos.x - wrapCoord(fp.camPos.x), fp.camPos.z - wrapCoord(fp.camPos.z));   // (in the copy of the islands the camera is over)
+    const vec2 off(fp.camPos.x - g_world.wrap(fp.camPos.x), fp.camPos.z - g_world.wrap(fp.camPos.z));   // (in the copy of the islands the camera is over)
     for (const RoadCar& c : g_roadTraffic.all()) {
       vec3 at; vec2 h;
       if (!g_roadTraffic.place(g_world, c, at, h)) continue;
@@ -3999,6 +4471,18 @@ void Game::feedAudio() {
 
 // ------------------------------------------------------------------ main update / render
 void Game::update(float dt) {
+  g_ren.beginRegionUploadFrame(); // one shared detail + horizon GPU budget per displayed frame
+  if (screen != SCR_REGION_LOADING && (g_world.procedural || !g_world.repeating) &&
+      (screen == SCR_MENU || screen == SCR_HUB || screen == SCR_RESEARCH || screen == SCR_DEBRIEF))
+    loadFreeRegion(0, screen);
+  if (screen == SCR_REGION_LOADING) {
+    realTime += std::min(dt, .1f); lastDt = std::min(dt, .05f);
+    if (in.pressed[K_F11]) wantFullscreenToggle = true;
+    gamepadMenus(lastDt); focusNavigate(); radio.poll();
+    updateRegionLoading(std::min(dt, .25f));
+    return;
+  }
+  updateEarthSurfaceContext(); // establish the collision snapshot protection before physics reads World
   if (pendingCareer && (screen == SCR_HUB || screen == SCR_DEBRIEF || screen == SCR_MENU)) {   // a settlement or purchase that couldn't be saved: tried again now and then
     retryT += dt;
     if (retryT > 3.f) { retryT = 0; retryCommit(); }
@@ -4087,7 +4571,8 @@ void Game::update(float dt) {
   radio.poll();
   if (screen == SCR_FLIGHT) {
     if (in.pressed[K_ESC] || (in.buttonsPressed & PAD_START)) {
-      if (showMap) showMap = false; else if (showRadio) showRadio = false;
+      if (freeRegionMap) freeRegionMap = false;
+      else if (showMap) showMap = false; else if (showRadio) showRadio = false;
       else if (paused && settingsFromPause && !(in.buttonsPressed & PAD_START)) settingsFromPause = false;   // B / Esc: back to the pause menu
       else { paused = !paused; settingsFromPause = false; if (paused && !atcF.lastCall.empty()) atcF.lastBeforePause = true; }
     }
@@ -4128,11 +4613,20 @@ void Game::update(float dt) {
     cloudOff = cloudOff + vec2(dt * 8.f, dt * 3.f);
     wx.cloudDrift = cloudOff; wx.cloudDetail = cloudDet; wx.cloudBoil = cloudBoil;
   }
+  if (screen == SCR_REGION_LOADING) return;
+  updateEarthFlight(); // once per displayed frame, including paused background preparation
   updateComms(dt);
   feedAudio();
 }
 
 void Game::render() {
+  if (screen != SCR_REGION_LOADING && (g_world.procedural || !g_world.repeating) &&
+      (screen == SCR_MENU || screen == SCR_HUB || screen == SCR_RESEARCH || screen == SCR_DEBRIEF))
+    loadFreeRegion(0, screen);
+  if (screen == SCR_REGION_LOADING) {
+    g_ren.clearScreen(); g_ren.uiBegin(); drawRegionLoading(); drawPadCursor(); g_ren.uiEnd();
+    return;
+  }
   // every menu draws its scene live (the main menu's tour, the hub's airport, the research terminal's preview): the
   // scenery a flight opens with streams in while the player chooses. vid: a full-screen picture instead of the scene
   // (the research terminal's boot screen)
@@ -4175,7 +4669,7 @@ void Game::render() {
     std::vector<SpriteVert> a, b;
     if (!fp.hangarPreview) {
       buildSprites(fp, a, b);
-      const size_t own = a.size(); volcano::append(fp, g_ren.quality, a, b);
+      const size_t own = a.size(); if (!g_world.procedural) volcano::append(fp, g_ren.quality, a, b);
       if (a.size() != own) sortAlphaQuads(a, fp.camPos);   // (only with the plume in view: the rest comes sorted)
     }
     g_ren.renderScene(fp, a, b);
@@ -4240,6 +4734,34 @@ void Game::render() {
 static std::string s_wxScene;   // a debug scene's weather: "<scene>@<WX>" (as the WX variable), for the render server's shots
 void Game::debugScene(const std::string& name) {
   if (name.find('@') != std::string::npos) { s_wxScene = name.substr(name.find('@') + 1); debugScene(name.substr(0, name.find('@'))); s_wxScene.clear(); return; }
+  if (name.compare(0, 7, "region-") == 0) {
+    std::string regionId = name.substr(7);
+    const bool ocean = regionId.size() > 6 && regionId.compare(regionId.size() - 6, 6, "_ocean") == 0;
+    if (ocean) regionId.resize(regionId.size() - 6);
+    auto descriptor = procedural::find(regionId);
+    if (!descriptor) throw std::invalid_argument("Unknown region scene: " + name);
+    beginFreeFlightSetup(); chooseFreeRegion(*descriptor); loadFreeRegion(freeRegion);
+    while (screen == SCR_REGION_LOADING && regionJob.valid()) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(10)); updateRegionLoading(.01f);
+    }
+    if (!regionError.empty()) throw std::runtime_error(regionError);
+    freeCraft = 0; freeAirport = 0; freeAirborne = true; launchFreeFlight();
+    camMode = 2; camYaw = .65f; camPitch = .2f; camZoom = 3.f; hudOn = false;
+    if (ocean) {
+      // Explicit review fixture beyond the land chart, looking east away from it.
+      // No normal route-selection or region-transition code teleports a flight.
+      plane.pos = vec3(140000.f, 2000.f, 0);
+      plane.q = quat::axisAngle(vec3(0, 1, 0), -.5f * PI);
+      plane.vel = plane.forward() * plane.spec->cruise;
+      camYaw = -.5f * PI; camPitch = .15f;
+    }
+    if (getenv("REGION_ALT")) plane.pos.y = std::max(plane.pos.y, (float)atof(getenv("REGION_ALT")));
+    for (int i = 0; i < 8; ++i) updateCamera(.1f);
+    toasts.clear(); botControl = true;
+    printf("Region scene: %s / %s / %zu airports / %zu towns / actual Free Flight\n",
+      descriptor->id.c_str(), descriptor->name.c_str(), g_world.airports.size(), g_world.towns.size());
+    return;
+  }
   career.newGame(); career.license = LIC_ATP;
   if (name == "menu") { screen = SCR_MENU; realTime = 20; return; }
   if (name.compare(0, 5, "menuT") == 0) { screen = SCR_MENU; realTime = (float)atof(name.c_str() + 5); return; }   // the menu tour at t seconds
@@ -4335,10 +4857,10 @@ void Game::debugScene(const std::string& name) {
     // the analysis the flypast was over the city for some measurements and short of it for others, and a hover on the
     // pods climbed away from it)
     const bool pinTown = overTown == 2 && resAirborne;
-    if (overTown && resAirborne) {
+    if (overTown && resAirborne && !g_world.towns.empty()) {
       const Airport& a = g_world.airports[std::clamp(site, 0, (int)g_world.airports.size() - 1)];
-      const Town* T = &kTowns[0]; float best = 1e18f;
-      for (int i = 0; i < kNumTowns; i++) { const float d = (kTowns[i].x - a.x) * (kTowns[i].x - a.x) + (kTowns[i].z - a.z) * (kTowns[i].z - a.z); if (d < best) { best = d; T = &kTowns[i]; } }
+      const Town* T = &g_world.towns[0]; float best = 1e18f;
+      for (const Town& town : g_world.towns) { const float d = (town.x - a.x) * (town.x - a.x) + (town.z - a.z) * (town.z - a.z); if (d < best) { best = d; T = &town; } }
       const vec3 c(T->x, 0.f, T->z), from = c + normalize(vec3(a.x - T->x, 0.f, a.z - T->z)) * 3000.f;
       const float hdg = atan2f(c.x - from.x, -(c.z - from.z)) / DEG;
       const vec3 at = pinTown ? c : from;
@@ -5041,7 +5563,7 @@ void Game::setupMilitaryEncounter() {
   hive::MissionConfig m; m.extraction=origin; m.extractionRadius=300;
   vec3 f=plane.forward(); f.y=0; f=normalize(f+vec3(0,0,.0001f));
   vec3 right=cross(f,vec3(0,1,0));
-  auto point=[&](float distance,float side,float altitude) { vec3 p=origin+f*distance+right*side; p.x=wrapCoord(p.x); p.z=wrapCoord(p.z); p.y=std::max(altitude,g_world.height(p.x,p.z)+250.f); return p; };
+  auto point=[&](float distance,float side,float altitude) { vec3 p=origin+f*distance+right*side; p.x=g_world.wrap(p.x); p.z=g_world.wrap(p.z); p.y=std::max(altitude,g_world.height(p.x,p.z)+250.f); return p; };
   // Select the exact same authored airport entities the scenery generator renders and collides with.
   // Sensor aim points sit just above each roof, never inside a building or at an arbitrary airborne marker.
   auto site=[&](int airport,int preferred,int index) {
@@ -5095,7 +5617,7 @@ void Game::setupMilitaryEncounter() {
     for(int i=0;i<m.waveCount;++i) {
       auto& w=m.waves[i]; w.at=i*(heavy?32.f:28.f);
       w.position=m.objectives[0].position+f*(2600.f+i*150.f)+right*((i-1)*500.f);
-      w.position.x=wrapCoord(w.position.x); w.position.z=wrapCoord(w.position.z);
+      w.position.x=g_world.wrap(w.position.x); w.position.z=g_world.wrap(w.position.z);
       w.position.y=std::max(m.objectives[0].position.y+650.f,g_world.height(w.position.x,w.position.z)+300.f);
       // Four bomber-led waves, bounded to the supplied 48 heavy rounds and six Plasma stores.
       // Solo bomber, fighter escort, relay escort, fighter escort: no stacked blast damage is required.
@@ -5218,7 +5740,7 @@ void Game::prefetchCombatCollision() {
     vec3 p;
     if(slot==hive::MaxActors) p=plane.pos+plane.vel*2.f;
     else { const auto& a=hiveCombat.actors[slot]; if(!a.alive) continue; p=a.position+a.velocity*2.f; }
-    p.x=wrapCoord(p.x+(offset%3-1)*Scenery::CH); p.z=wrapCoord(p.z+(offset/3-1)*Scenery::CH);
+    p.x=g_world.wrap(p.x+(offset%3-1)*Scenery::CH); p.z=g_world.wrap(p.z+(offset/3-1)*Scenery::CH);
     const int cx=Scenery::chunkOf(p.x),cz=Scenery::chunkOf(p.z);
     const auto* chunk=g_scenery.get(cx,cz);
     if(!chunk || chunk->level<2) {

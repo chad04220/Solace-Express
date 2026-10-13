@@ -1,0 +1,5 @@
+Chart: roundtrip 0 m, independent oracle 2.8294373e-09 m, geographic narrowing 0.00256428233 m
+Transport: position jump 0.00102067087 m, direction chord 1.00340922e-05, speed 1.64259598e-05 m/s, attitude axis 4.8879443e-07
+Planar rotation sweep: speed 1.61304167e-05 m/s, independent polar oracle 1.61649775e-05 m/s
+Ownership edges: 180 face / 4 pole / 30 date-line crossings, max chart radius 251.564 km, jump 0.00752853708 m, direction chord 0.000225694765
+Regional surface travel: 76479 checks, 0 failures

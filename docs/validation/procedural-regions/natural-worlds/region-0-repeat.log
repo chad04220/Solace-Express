@@ -1,0 +1,8 @@
+BACKGROUND threads_limit=2 active_chart_populated=1 active_reads=1808 active_chunks=1 active_lots=26764 build_seconds=2.007
+REGION id=pr1-3-27-28 name=Tern Islands archetype=Archipelago from_cache=0 build_seconds=2.007
+AIRPORTS count=6 objects=641 solid_collisions=6 max_flatness_m=0.000008 max_approach_excess_m=-10.245834
+SETTLEMENTS towns=6 dry_lots=2070 road_paths=235 road_segments=2944 road_collision_probes=64
+MEMORY world_owned_capacity_bytes=141441717 recipe_bytes=15434 streamed_chunks=72
+FLIGHT chart_repeating=0 boundary_crossings=4
+PROCESS peak_rss_kib=397896
+procedural_world_test: 5908 checks, 0 failures

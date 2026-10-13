@@ -5,6 +5,10 @@
 #include "bridges.h"
 #include "settlements.h"
 #include <string>
+#include <memory>
+
+namespace procedural { struct Descriptor; class Recipe; }
+struct WorldSceneryState;
 
 static const float WORLD_HALF = 40000.0f;  // the islands span [-40km, 40km] on x and z
 // ...in 10 km of open sea all round, and there the map wraps: [-50 km, 50 km) repeats every 100 km on both axes, so
@@ -49,6 +53,8 @@ struct Airport {
   int rwyNumber(bool reverse) const { int n = (int)lroundf(wrapDeg360(heading + (reverse ? 180 : 0)) / 10.0f); return n == 0 ? 36 : n; }
 };
 
+struct Town { const char* name; float x, z, r; int kind; };  // kind 0 village, 1 town, 2 city
+
 struct Box { vec3 c, h; int airport; int kind; };  // kind 0 hangar 1 tower 2 terminal 3 shed 4 fuel tank 5 radome
 struct Lot;  // procedural town building (scenery.h)
 
@@ -89,6 +95,15 @@ struct LakeMask { float x0 = 0, z0 = 0, cell = 8.f; int n = 0; std::vector<float
 class World {
 public:
   std::vector<Airport> airports;
+  std::vector<Town> towns;
+  bool procedural = false;
+  bool repeating = true; // authored career chart wraps; Earth free-flight charts do not
+  float wrap(float v) const { return repeating ? wrapCoord(v) : v; }
+  float nearPoint(float v, float ref) const { return repeating ? nearCopy(v, ref) : v; }
+  std::string regionId = "solace";
+  // Owns procedural names/geometry for every Airport and Town pointer. Copies share immutable storage.
+  std::shared_ptr<const procedural::Recipe> regionRecipe;
+  std::shared_ptr<WorldSceneryState> sceneryState; // baked placement data belongs to this chart
   std::vector<Box> boxes;
   std::vector<float> hm;     // RGBA per texel: base height, detail amplitude, lushness, coldness
   // The road network (road_network.h): its paths (bridges, traffic) and the grid the terrain grades and the ground
@@ -109,6 +124,8 @@ public:
   // cachePath: the generated arrays are read from there when its stamp matches (a launch after the first skips the
   // generation), else generated and written there (save false: not written - the tests, reading the run's own islands)
   void build(const std::string& cachePath = std::string(), const std::string& stamp = std::string(), bool save = true);
+  void buildProcedural(const procedural::Descriptor& region, const std::string& cachePath = std::string(),
+                       const std::string& stamp = std::string(), bool save = true);
   bool loadCache(const std::string& path, const std::string& stamp);
   bool fromCache = false;   // the last build() read its cache (else it generated, and saved, the world)
   void saveCache(const std::string& path, const std::string& stamp) const;
@@ -130,11 +147,21 @@ public:
   vec3 normal(float x, float z) const;
   // Base layer sample (manual bilinear, matches the shader exactly)
   void sampleBase(float x, float z, float out[4]) const;
+  // Pure raw authored recipe for distant silhouettes only; no World arrays or
+  // road/settlement generation. The normal Solace build remains unchanged.
+  static void sampleAuthoredBase(float x, float z, float out[4]);
   // Returns airport index if (x,z) lies on a runway (with margin), else -1
   int onRunway(float x, float z, float margin = 0) const;
   float distanceKm(int a, int b) const;
   int nearestAirport(float x, float z, float* distOut = nullptr) const;
+private:
+  void buildConfigured(const std::string& cachePath, const std::string& stamp, bool save);
 };
+
+// World-explicit variants are required while building a different regional world.
+float airportInfluence(const World& world, float x, float z);
+void airportGroundsCap(const World& world, float x, float z, float& grounds, float& cap);
+float airportFunnelCeiling(const World& world, float x, float z);
 
 // Noise shared with GLSL (keep in sync with shaders.h)
 float hash2i(int x, int y);

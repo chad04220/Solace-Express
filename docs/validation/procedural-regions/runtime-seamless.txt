@@ -1,0 +1,34 @@
+Region runtime: baseline career saved: ok
+Region runtime: staged destination cannot fly the old resident terrain: ok
+Region runtime: loading gates simulation and waits for the prior quote without touching career: ok
+Region runtime: repeated load requests cannot replace an in-flight build: ok
+Region runtime: region loader reached ready state: ok
+Region runtime: Earth destination publishes the generated World and resets its airport selection: ok
+Region runtime: every generated airport supports real runway/airborne flight, restart and return with career intact: ok
+Region runtime: region loader reached ready state: ok
+Region runtime: second Earth destination replaces the first without career mutation: ok
+Region runtime: region loader reached ready state: ok
+Region runtime: A to B to A preserves deterministic geography and airport identity: ok
+Region runtime: restart with a pending Earth route uses the resident departure instead of rejecting or loading the target: ok
+Region runtime: setting a geographic route never moves the aircraft or turns the chart into a torus: ok
+Region runtime: crossing before candidate readiness keeps the active chart and never opens a loading screen or joins the worker: ok
+Region runtime: aircraft physics and flight clock continue while the next region is still building: ok
+Region runtime: reversing course does not destroy or join an unresolved prefetch future: ok
+Region runtime: completed obsolete candidate is retired off-thread without changing the resident chart: ok
+Region runtime: ready candidate publishes at an ocean frame boundary without any midflight loading screen: ok
+Region runtime: boundary continuation preserves Earth position, altitude, speed, fuel, engine/failure state, clock and turbulence frame: ok
+Region runtime: chase/cockpit preserve body-relative look; orbit alone rotates by chart convergence: ok
+Region runtime: new airport indices are valid and distant open ocean does not repeat islands: ok
+Region runtime: stationary post-transition evaluation does not ping-pong at a seam: ok
+Region runtime: main menu waits for authored Solace restoration: ok
+Region runtime: region loader reached ready state: ok
+Region runtime: Solace terrain and every legacy airport index restored before main menu: ok
+Region runtime: Escape queues a safe return while loading remains gated: ok
+Region runtime: region loader reached ready state: ok
+Region runtime: cancel joins loading, restores Solace and preserves the pending career transaction: ok
+Region runtime: same-Solace Earth route waits for background quote readers while keeping the flight screen active: ok
+Region runtime: focus loss while a region prepares pauses the active flight normally: ok
+Region runtime: authored Solace can join Earth travel without moving the plane or resuming after focus loss: ok
+Region runtime: region loader reached ready state: ok
+Region runtime: leaving an unwrapped authored Solace flight restores legacy topology before main menu: ok
+0 procedural region runtime failures

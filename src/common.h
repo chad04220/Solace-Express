@@ -11,6 +11,9 @@
 #include <algorithm>
 #include <atomic>
 #include <thread>
+#include <exception>
+#include <memory>
+#include <mutex>
 
 static const float PI = 3.14159265358979f;
 static const float DEG = PI / 180.0f;
@@ -107,14 +110,104 @@ inline std::string fmt(const char* f, ...) {
   char buf[1024]; va_list ap; va_start(ap, f); vsnprintf(buf, sizeof(buf), f, ap); va_end(ap); return buf;
 }
 
+// Background region generation can reserve CPU capacity for the live flight/render
+// thread. Thread-local scope leaves ordinary startup generation and tests unchanged.
+inline thread_local int parallelThreadLimit = 0;
+struct ScopedParallelLimit {
+  int previous;
+  explicit ScopedParallelLimit(int maximum) : previous(parallelThreadLimit) { parallelThreadLimit = std::max(1, maximum); }
+  ~ScopedParallelLimit() { parallelThreadLimit = previous; }
+  ScopedParallelLimit(const ScopedParallelLimit&) = delete;
+  ScopedParallelLimit& operator=(const ScopedParallelLimit&) = delete;
+};
+// Cancellation belongs to a candidate generation job, never the active World.
+// The scope is inherited explicitly by parallelFor's workers; ordinary startup
+// and flight queries have no token and retain their original behavior.
+struct GenerationCancelled : std::exception {
+  const char* what() const noexcept override { return "region generation cancelled"; }
+};
+// Diagnostic only: lets tests cancel actual build stages without reading a
+// partially built World from another thread. No generation decisions use this.
+enum class GenerationPhase { Configuring, CacheRead, Terrain, Roads, RoadRouting,
+  Settlements, RoadGrid, CommunityLots, Mask, HeightBounds, Envelope, Scenery,
+  Landmarks, CacheWrite, Complete };
+struct GenerationCancelState {
+  std::atomic<bool> requested{false};
+  std::atomic<GenerationPhase> phase{GenerationPhase::Configuring};
+  // Set before starting the job when deterministic diagnostic synchronization is
+  // needed. Production jobs do not pay for a contended counter at each row.
+  bool trackCheckpoints = false;
+  std::atomic<uint64_t> checkpoints{0};
+};
+// Function-local TLS avoids MinGW's duplicate TLS-init symbols for an inline
+// namespace-scope shared_ptr while still sharing one scope across translation units.
+inline std::shared_ptr<GenerationCancelState>& currentGenerationCancellation() {
+  static thread_local std::shared_ptr<GenerationCancelState> state;
+  return state;
+}
+struct ScopedGenerationCancellation {
+  std::shared_ptr<GenerationCancelState> previous;
+  explicit ScopedGenerationCancellation(std::shared_ptr<GenerationCancelState> state)
+      : previous(std::move(currentGenerationCancellation())) { currentGenerationCancellation() = std::move(state); }
+  ~ScopedGenerationCancellation() { currentGenerationCancellation() = std::move(previous); }
+  ScopedGenerationCancellation(const ScopedGenerationCancellation&) = delete;
+  ScopedGenerationCancellation& operator=(const ScopedGenerationCancellation&) = delete;
+};
+inline void generationCheckpoint() {
+  const auto& state = currentGenerationCancellation();
+  if (state) {
+    if (state->trackCheckpoints) state->checkpoints.fetch_add(1, std::memory_order_relaxed);
+    if (state->requested.load(std::memory_order_relaxed)) throw GenerationCancelled();
+  }
+}
+inline void generationPhase(GenerationPhase phase) {
+  generationCheckpoint();
+  const auto& state = currentGenerationCancellation();
+  if (state) state->phase.store(phase, std::memory_order_release);
+}
 // Runs f(i) for i in [0, n) across the CPU's cores (each index exactly once, in any order); returns when all are done
 template <class F> inline void parallelFor(int n, F&& f) {
+  generationCheckpoint();
   int nt = std::max(1, std::min((int)std::thread::hardware_concurrency(), n));
-  if (nt <= 1) { for (int i = 0; i < n; i++) f(i); return; }
+  if (parallelThreadLimit > 0) nt = std::min(nt, parallelThreadLimit);
+  if (nt <= 1) {
+    for (int i = 0; i < n; i++) { generationCheckpoint(); f(i); }
+    generationCheckpoint(); return;
+  }
   std::atomic<int> next{0};
-  auto run = [&]() { for (int i; (i = next.fetch_add(1)) < n;) f(i); };
+  std::atomic<bool> failed{false};
+  std::exception_ptr failure;
+  std::mutex failureMutex;
+  const auto cancellation = currentGenerationCancellation();
+  const int limit = parallelThreadLimit;
+  auto run = [&]() noexcept {
+    ScopedGenerationCancellation scope(cancellation);
+    const int previousLimit = parallelThreadLimit;
+    parallelThreadLimit = limit;
+    try {
+      for (int i; !failed.load(std::memory_order_relaxed) && (i = next.fetch_add(1)) < n;) {
+        generationCheckpoint();
+        f(i);
+      }
+    } catch (...) {
+      std::lock_guard<std::mutex> lock(failureMutex);
+      if (!failure) failure = std::current_exception();
+      failed.store(true, std::memory_order_relaxed);
+    }
+    parallelThreadLimit = previousLimit;
+  };
   std::vector<std::thread> ts;
-  for (int t = 1; t < nt; t++) ts.emplace_back(run);
+  ts.reserve(nt - 1);
+  try {
+    for (int t = 1; t < nt; t++) ts.emplace_back(run);
+  } catch (...) {
+    // Thread creation can fail too. Never unwind across a joinable std::thread.
+    failed.store(true, std::memory_order_relaxed);
+    for (auto& t : ts) t.join();
+    throw;
+  }
   run();
   for (auto& t : ts) t.join();
+  if (failure) std::rethrow_exception(failure);
+  generationCheckpoint();
 }

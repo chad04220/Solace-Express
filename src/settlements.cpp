@@ -7,8 +7,6 @@
 #include <queue>
 #include <unordered_map>
 
-float airportInfluence(float x, float z);   // world.cpp: how far into an airfield's surroundings (0: clear of them)
-
 namespace {
 
 inline float cross2(vec2 a, vec2 b) { return a.x * b.y - a.y * b.x; }
@@ -17,7 +15,8 @@ inline float cross2(vec2 a, vec2 b) { return a.x * b.y - a.y * b.x; }
 float alongRoad(int cls) { return cls == RC_HIGHWAY ? 0.7f : cls == RC_ROAD ? 0.45f : cls == RC_LANE ? 0.55f : 1.f; }
 
 SettlementField makeField(const World& w, const RoadIndex& roads, int town) {
-  const Town& T = kTowns[town];
+  generationCheckpoint();
+  const Town& T = w.towns[town];
   SettlementField F;
   F.town = town; F.kind = T.kind; F.cx = T.x; F.cz = T.z;
   F.budget = T.r * (T.kind == 2 ? 1.35f : T.kind == 1 ? 1.3f : 1.25f);
@@ -30,12 +29,16 @@ SettlementField makeField(const World& w, const RoadIndex& roads, int town) {
   auto cz = [&](int j) { return F.z0 + (j + 0.5f) * SETTLE_CELL; };
   std::vector<float> h((size_t)n * n), cost((size_t)n * n);
   // (the natural ground: the same whether the network's grid is built yet or loaded with its streets)
-  for (int j = 0; j < n; j++) for (int i = 0; i < n; i++) h[(size_t)j * n + i] = w.naturalHeight(cx(i), cz(j), 6);
+  for (int j = 0; j < n; j++) {
+    generationCheckpoint();
+    for (int i = 0; i < n; i++) h[(size_t)j * n + i] = w.naturalHeight(cx(i), cz(j), 6);
+  }
   for (int j = 0; j < n; j++)
     for (int i = 0; i < n; i++) {
+      if ((i & 63) == 0) generationCheckpoint();
       const size_t c = (size_t)j * n + i;
       const float x = cx(i), z = cz(j);
-      if (h[c] < 2.5f || airportInfluence(x, z) > 0.02f) { cost[c] = INFINITY; continue; }   // (the sea, the beach, an airfield)
+      if (h[c] < 2.5f || airportInfluence(w, x, z) > 0.02f) { cost[c] = INFINITY; continue; }   // (the sea, the beach, an airfield)
       auto H = [&](int a, int b) { return h[(size_t)std::clamp(b, 0, n - 1) * n + std::clamp(a, 0, n - 1)]; };
       const float sx = (H(i + 1, j) - H(i - 1, j)) / (2.f * SETTLE_CELL), sz = (H(i, j + 1) - H(i, j - 1)) / (2.f * SETTLE_CELL);
       const float s = sqrtf(sx * sx + sz * sz);
@@ -62,6 +65,7 @@ SettlementField makeField(const World& w, const RoadIndex& roads, int town) {
   if (std::isfinite(cost[c0])) { F.effort[c0] = 0.f; q.push({0.f, c0}); }
   const int nb[8][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}};
   while (!q.empty()) {
+    generationCheckpoint();
     const auto [e, c] = q.top(); q.pop();
     if (e > F.effort[c] || e > F.budget * 1.4f) continue;
     const int i = c % n, j = c / n;
@@ -144,12 +148,13 @@ float SettlementField::at(float x, float z) const {
 }
 
 std::vector<SettlementField> buildSettlementFields(const World& world) {
+  generationCheckpoint();
   // (the network's own roads: those before its first street - the streets, the racetrack and the farms come after
   // them, laid over the fields, and a world read from its cache has them all)
   RoadIndex roads;
   for (size_t pi = 0; pi < world.roads.paths.size() && world.roads.paths[pi].cls != RC_STREET; pi++) roads.addPath(world.roads.paths[pi], (int)pi);
-  std::vector<SettlementField> fields(kNumTowns);
-  parallelFor(kNumTowns, [&](int t) { fields[t] = makeField(world, roads, t); });
+  std::vector<SettlementField> fields(world.towns.size());
+  parallelFor((int)world.towns.size(), [&](int t) { fields[t] = makeField(world, roads, t); });
   return fields;
 }
 
@@ -227,19 +232,21 @@ static bool layPath(const World& world, RoadIndex& idx, RoadNetwork& net, RoadCl
 }
 
 void addSettlementStreets(const World& world, const std::vector<SettlementField>& fields, RoadNetwork& net) {
+  generationCheckpoint();
   RoadIndex idx;
   for (size_t pi = 0; pi < net.paths.size(); pi++) idx.addPath(net.paths[pi], (int)pi);
   auto ground = [&](vec2 p) { return world.groundHeight(p.x, p.y, 8); };
   // whether a place is in this settlement, within a share of its extent, on dry land clear of the airfields
   auto inside = [&](vec2 p, const SettlementField& F, float limit) {
     int t; const float share = settlementShare(fields, p.x, p.y, &t);
-    return t == F.town && share < limit && ground(p) >= 2.5f && airportInfluence(p.x, p.y) < 0.02f;
+    return t == F.town && share < limit && ground(p) >= 2.5f && airportInfluence(world, p.x, p.y) < 0.02f;
   };
   auto lay = [&](const std::vector<vec2>& line) { return layPath(world, idx, net, RC_STREET, line); };
   // ---- the cores: a grid of streets turned to the main road, blocks of 110 x 80 m in a city, 100 x 75 in a town;
   // each line of it built where it runs through the core over buildable ground, but not along a road there already
   std::vector<int> core;   // (the core's streets: the suburbs carry them on out)
   for (const SettlementField& F : fields) {
+    generationCheckpoint();
     if (F.kind == 0) continue;
     const vec2 c(F.gx, F.gz), u(F.axisC, F.axisS), v(-F.axisS, F.axisC);
     const float bu = F.kind == 2 ? 110.f : 100.f, bv = F.kind == 2 ? 80.f : 75.f, half = F.core * 1.2f, coreShare = F.core / F.budget;
@@ -247,6 +254,7 @@ void addSettlementStreets(const World& world, const std::vector<SettlementField>
       const vec2 along = family ? v : u, across = family ? u : v;
       const float spacing = family ? bu : bv;
       for (int k = -(int)(half / spacing); k <= (int)(half / spacing); k++) {
+        generationCheckpoint();
         std::vector<vec2> run;
         auto flush = [&]() { if (run.size() >= 8 && lay({run.front(), run.back()})) core.push_back((int)net.paths.size() - 1); run.clear(); };
         for (float s = -half; s <= half; s += 10.f) {
@@ -277,6 +285,7 @@ void addSettlementStreets(const World& world, const std::vector<SettlementField>
     const float step = 12.f;
     bool joined = false;
     while (run < maxLen && !joined) {
+      generationCheckpoint();
       const float wander = 5.f * DEG * sinf(seed * 0.37f + run / 70.f);
       float best = 1e9f; vec2 next; float nh = heading;
       for (float d : {0.f, -8.f, 8.f, -16.f, 16.f}) {
@@ -303,6 +312,7 @@ void addSettlementStreets(const World& world, const std::vector<SettlementField>
   };
   // the core's streets carried on out from its edge, wandering as the ground has them
   for (int pi : core) {
+    generationCheckpoint();
     const RoadPath P = net.paths[pi];
     for (int end = 0; end < 2; end++) {
       const RoadPoint &e = end ? P.pts.back() : P.pts.front(), &f = end ? P.pts[P.pts.size() - 2] : P.pts[1];
@@ -316,6 +326,7 @@ void addSettlementStreets(const World& world, const std::vector<SettlementField>
   for (int round = 0; round < 3; round++) {
     const size_t parents = net.paths.size();
     for (size_t pi = 0; pi < parents; pi++) {
+      generationCheckpoint();
       const RoadPath P = net.paths[pi];   // (a copy: the streets laid off it grow the list under it)
       if (P.cls == RC_HIGHWAY) continue;
       if (round > 0 && P.cls != RC_STREET) continue;
@@ -345,6 +356,7 @@ void addSettlementStreets(const World& world, const std::vector<SettlementField>
   // is reached from its streets and built on rather than left a field behind the houses
   const size_t parents = net.paths.size();
   for (size_t pi = 0; pi < parents; pi++) {
+    generationCheckpoint();
     const RoadPath P = net.paths[pi];
     if (P.cls != RC_STREET) continue;
     const float half = roadSpec(P.cls).halfPlatform;
@@ -378,6 +390,7 @@ void addSettlementStreets(const World& world, const std::vector<SettlementField>
 // bends a little on its way. Neither crosses another road nor bridges anything, the track keeps clear of the other
 // farms, and the yards keep 280 m apart.
 void addFarmsteads(const World& world, const std::vector<SettlementField>& fields, RoadNetwork& net) {
+  generationCheckpoint();
   RoadIndex idx;
   for (size_t pi = 0; pi < net.paths.size(); pi++) idx.addPath(net.paths[pi], (int)pi);
   auto commit = [&](RoadPath p) { const int pi = (int)net.paths.size(); idx.addPath(p, pi); net.paths.push_back(std::move(p)); };
@@ -394,6 +407,7 @@ void addFarmsteads(const World& world, const std::vector<SettlementField>& field
   const int n = (int)ceilf(2.f * WORLD_HALF / FC);
   for (int fj = 0; fj < n; fj++)
     for (int fi = 0; fi < n; fi++) {
+      if ((fi & 15) == 0) generationCheckpoint();
       if (hash2i(fi * 11 + 3, fj * 5 + 7) > 0.55f) continue;
       const vec2 site(-WORLD_HALF + (fi + 0.5f + (hash2i(fi * 7 + 1, fj * 3 - 2) - 0.5f) * 0.6f) * FC,
                       -WORLD_HALF + (fj + 0.5f + (hash2i(fi - 4, fj * 9 + 5) - 0.5f) * 0.6f) * FC);
@@ -401,7 +415,7 @@ void addFarmsteads(const World& world, const std::vector<SettlementField>& field
       if (b[0] < 5.f) continue;
       const float farm = smoothstepf(4.f, 15.f, b[0]) * smoothstepf(420.f, 260.f, b[0]) * smoothstepf(0.4f, 0.6f, b[2]) * smoothstepf(45.f, 25.f, b[1]) *
                          smoothstepf(0.32f, 0.5f, valueNoise(site.x / 3000.f + 7.7f, site.y / 3000.f - 3.3f));
-      if (farm < 0.35f || airportInfluence(site.x, site.y) > 0.001f || atRace(site)) continue;
+      if (farm < 0.35f || airportInfluence(world, site.x, site.y) > 0.001f || atRace(site)) continue;
       int town = -1; const float share = settlementShare(fields, site.x, site.y, &town);
       if (town >= 0 && share < 1.4f) continue;
       // the yard's ground: dry, and level enough (5 m at most across it and round it); no road within 80 m, no other
@@ -554,6 +568,7 @@ void addRacetrack(const World& world, const std::vector<SettlementField>& fields
   parallelFor(n, [&](int j) {
     std::vector<float> hs(nTrack), sm(nTrack);
     for (int i = 0; i < n; i++) {
+      if ((i & 63) == 0) generationCheckpoint();
       const vec2 o(-WORLD_HALF + (i + 0.5f) * step, -WORLD_HALF + (j + 0.5f) * step);
       if (base(o) < 6.f || base(o) > 350.f) continue;
       for (int d = 0; d < 24; d++) {
@@ -579,7 +594,7 @@ void addRacetrack(const World& world, const std::vector<SettlementField>& fields
         for (int k = 0; k < nTrack; k++) { earth += fabsf(hs[k] - sm[k]); steep = std::max(steep, fabsf(sm[(k + 1) % nTrack] - sm[k]) / 20.f); }
         if (steep > 0.05f) continue;
         float town = 1e9f;
-        for (int t = 0; t < kNumTowns; t++) if (kTowns[t].kind >= 1) town = std::min(town, length(vec2(kTowns[t].x, kTowns[t].z) - at(vec2(400.f, 300.f))));
+        for (const Town& t : world.towns) if (t.kind >= 1) town = std::min(town, length(vec2(t.x, t.z) - at(vec2(400.f, 300.f))));
         rows[j].push_back({earth / nTrack + 0.05f * (hi - lo) + 0.5f * straightRange + town / 5000.f, o, u});
       }
     }
@@ -598,13 +613,13 @@ void addRacetrack(const World& world, const std::vector<SettlementField>& fields
     bool ok = true;
     for (int k = 0; k < nTrack && ok; k++) {
       const vec2 p = at(track[k]);
-      ok = settlementShare(fields, p.x, p.y) >= 1.3f && airportInfluence(p.x, p.y) <= 0.f && idx.nearest(p, 80.f, -1) > 1e8f &&
+      ok = settlementShare(fields, p.x, p.y) >= 1.3f && airportInfluence(world, p.x, p.y) <= 0.f && idx.nearest(p, 80.f, -1) > 1e8f &&
            world.groundHeight(p.x, p.y, 8) >= 4.f;
       for (const Airport& a : world.airports) ok = ok && hypotf(p.x - a.x, p.y - a.z) >= 3000.f;
     }
     for (size_t k = 0; k < grounds.size() && ok; k++) {
       const vec2 p = at(grounds[k]);
-      ok = settlementShare(fields, p.x, p.y) >= 1.3f && airportInfluence(p.x, p.y) <= 0.f && idx.nearest(p, 40.f, -1) > 1e8f && world.groundHeight(p.x, p.y, 8) >= 4.f;
+      ok = settlementShare(fields, p.x, p.y) >= 1.3f && airportInfluence(world, p.x, p.y) <= 0.f && idx.nearest(p, 40.f, -1) > 1e8f && world.groundHeight(p.x, p.y, 8) >= 4.f;
     }
     if (!ok) continue;
     // the circuit, on the ground: within 5 m of it all the way round (its run-off's banks no higher than a road's)

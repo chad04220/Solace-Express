@@ -62,7 +62,8 @@ RoadPath layRoad(const World& world, RoadClass cls, const std::vector<vec2>& lin
 // Whether a stretch of road (A to B, of class cls) runs by an airfield's grounds - its platform or banks would reach
 // them: there it lies on the ground as it is, painted, never graded (an airfield's terrain is never reshaped), its
 // profile held on that ground
-bool roadByAirfield(const RoadPoint& A, const RoadPoint& B, int cls);
+bool roadByAirfield(const RoadPoint& A, const RoadPoint& B, int cls);   // original Solace airport bounds
+bool roadByAirfield(const World& world, const RoadPoint& A, const RoadPoint& B, int cls);
 
 // ---- the network as the terrain, the ground material and the scenery read it: straight graded segments (each path's
 // points with the collinear ones dropped), listed under every 39 m mask texel that their platform or banks reach
@@ -95,7 +96,8 @@ struct RoadGrid {
   static uint32_t count(uint32_t h) { return (h >> 19) & 63u; }
   static uint32_t first(uint32_t h) { return h & 0x7FFFFu; }
 };
-void buildRoadGrid(const RoadNetwork& net, RoadGrid& grid);
+void buildRoadGrid(const RoadNetwork& net, RoadGrid& grid);   // original Solace airport bounds
+void buildRoadGrid(const World& world, const RoadNetwork& net, RoadGrid& grid);
 // The ground at (x, z) with the roads built into it, from the natural ground g there: each road's platform level across
 // at its graded height, its cut or fill banks blending back to g. Exactly roads.glsl roadGrade.
 float roadGrade(const RoadGrid& grid, float x, float z, float g);

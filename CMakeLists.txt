@@ -36,7 +36,7 @@ add_custom_target(aircraft_geometry_gen DEPENDS ${AIRCRAFT_GEOMETRY_GEN})
 # renderer, the UI, the audio): each compiled once, as object libraries, for every program that links them besides the
 # game itself, which keeps its own build (on MSVC it links the static runtime, with its own flags). Before this every
 # test compiled the shared sources itself: the islands' five 39 times over (the review of v3.44.0, ENG-1).
-set(ENVIRONMENT_SOURCES src/world.cpp src/road_network.cpp src/bridges.cpp src/settlements.cpp src/road_furniture.cpp src/landmarks.cpp src/road_traffic.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp)
+set(ENVIRONMENT_SOURCES src/geo.cpp src/region_travel.cpp src/procedural_regions.cpp src/distant_regions.cpp src/regional_surface.cpp src/world.cpp src/road_network.cpp src/bridges.cpp src/settlements.cpp src/road_furniture.cpp src/landmarks.cpp src/road_traffic.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp)
 set(CORE_ONLY_SOURCES
   src/aircraft.cpp src/aircraft_perf.cpp src/aircraft_stunt.cpp src/aero.cpp src/aero_strips.cpp src/aero_wake.cpp src/breakup.cpp src/models.cpp src/career.cpp src/weather.cpp src/hive_combat.cpp src/hive_loadout.cpp src/hive_world_collision.cpp)
 set(CORE_SOURCES ${ENVIRONMENT_SOURCES} ${CORE_ONLY_SOURCES})
@@ -118,6 +118,14 @@ target_include_directories(material_dump PRIVATE src)
 
 # Headless tests (flight model + campaign progression validation)
 add_executable(flight_test tests/flight_test.cpp ${CORE_OBJS})
+add_executable(geo_test tests/geo_test.cpp src/geo.cpp)
+add_executable(geo_fastmath_test tests/geo_test.cpp src/geo.cpp)
+add_executable(geo_flight_test tests/geo_flight_test.cpp ${CORE_OBJS})
+if(MSVC)
+  target_compile_options(geo_fastmath_test PRIVATE /fp:fast)
+else()
+  target_compile_options(geo_fastmath_test PRIVATE -ffast-math)
+endif()
 add_executable(new_aircraft_performance_test tests/new_aircraft_performance_test.cpp ${CORE_OBJS})
 add_executable(new_aircraft_autoland_test tests/new_aircraft_autoland_test.cpp ${CORE_OBJS})
 target_include_directories(new_aircraft_autoland_test PRIVATE src)
@@ -298,6 +306,9 @@ add_executable(cockpit_focus_zoom_test tests/cockpit_focus_zoom_test.cpp)
 add_dependencies(gameplay_test cockpit_camera_test vtol_throttle_test hive_combat_test hive_combat_fastmath_test hive_loadout_test hive_loadout_fastmath_test enemy_surface_mesh_test hive_ordnance_visual_test wraith_loadout_clearance_test enemy_mesh_cache_test enemy_bake_guard_test enemy_fleet_validity_test)
 add_dependencies(shader_keyword_test cockpit_focus_zoom_test)
 enable_testing()
+add_test(NAME earth_geodesy COMMAND geo_test)
+add_test(NAME earth_geodesy_fastmath COMMAND geo_fastmath_test)
+add_test(NAME earth_rebase_flight COMMAND geo_flight_test)
 add_test(NAME menu_plan_cache COMMAND menu_plan_cache_test)
 add_test(NAME vtol_throttle COMMAND vtol_throttle_test)
 add_test(NAME wreck_pose COMMAND ${CMAKE_COMMAND} -E env SOMNIUM_WRECK_POSE_ONLY=1 $<TARGET_FILE:gameplay_test>)
@@ -440,6 +451,7 @@ add_test(NAME cockpit_layout COMMAND cockpit_layout_test)
 find_package(Python3 COMPONENTS Interpreter QUIET)
 add_test(NAME portable_mesh_adversarial COMMAND portable_mesh_adversarial_test)
 if(Python3_Interpreter_FOUND)
+  add_test(NAME earth_cube_parity COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/geo_cube_parity_test.py $<TARGET_FILE:geo_test>)
   add_test(NAME earth_pack COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/earth_pack_test.py)
   add_test(NAME earth_sampling COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/earth_sampling_test.py)
   add_test(NAME usgs_world_map COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/usgs_world_map_test.py)
@@ -697,7 +709,7 @@ endif()
 add_test(NAME test_world COMMAND test_world ${CMAKE_BINARY_DIR}/test_world.bin)
 set_tests_properties(test_world PROPERTIES FIXTURES_SETUP world COST 1000)
 foreach(t airport_environment airport_layouts cockpit_camera community_layout ufo_encounter entity_raycast terrain_envelope
-          environment_scale_audit flight_model_1 flight_model_2 flight_model_3 gameplay_loop_1 gameplay_loop_2 gameplay_loop_3
+          environment_scale_audit earth_rebase_flight flight_model_1 flight_model_2 flight_model_3 gameplay_loop_1 gameplay_loop_2 gameplay_loop_3
           gameplay_loop_4 campaign_progression_1 campaign_progression_2 campaign_progression_3 career_saves military_career military_career_fastmath military_gameplay hangar_preview_controls hive_world_collision hive_world_collision_fastmath terrain_shadow_bake
           volcano_effects new_aircraft_performance new_aircraft_autoland_larkspur new_aircraft_autoland_atlas new_aircraft_go_around
           vtol_throttle wreck_pose bridges roads landmarks road_traffic road_grade_gpu menu_plan_cache)
@@ -707,7 +719,7 @@ foreach(t airport_environment airport_layouts cockpit_camera community_layout uf
   endif()
 endforeach()
 foreach(t airport_environment_test airport_layout_test cockpit_camera_test community_layout_test encounter_timing_test
-          entity_raycast_test envelope_test environment_scale_audit flight_test gameplay_test progression_test save_test
+          entity_raycast_test envelope_test environment_scale_audit geo_flight_test flight_test gameplay_test progression_test save_test
           military_career_test military_career_fastmath_test military_gameplay_test hangar_preview_controls_test hive_world_collision_test hive_world_collision_fastmath_test
           terrain_shadow_test volcano_effects_test new_aircraft_performance_test new_aircraft_autoland_test vtol_throttle_test
           bridges_test roads_test landmarks_test road_traffic_test road_grade_gpu_test menu_plan_cache_test)
@@ -715,3 +727,87 @@ foreach(t airport_environment_test airport_layout_test cockpit_camera_test commu
     add_dependencies(${t} test_world)
   endif()
 endforeach()
+
+# Procedural destinations share the production terrain/scenery/flight implementation.
+add_executable(procedural_regions_test tests/procedural_regions_test.cpp ${CORE_OBJS})
+add_executable(procedural_world_test tests/procedural_world_test.cpp ${CORE_OBJS})
+add_test(NAME procedural_regions COMMAND procedural_regions_test)
+
+add_executable(procedural_landforms_test tests/procedural_landforms_test.cpp ${ENV_OBJS})
+add_test(NAME procedural_landforms COMMAND procedural_landforms_test)
+add_executable(procedural_landforms_fastmath_test tests/procedural_landforms_test.cpp src/procedural_regions.cpp src/geo.cpp
+  "$<FILTER:$<TARGET_OBJECTS:env_objs>,EXCLUDE,(^|/)(geo|procedural_regions)([.]cpp)?[.](o|obj)$>")
+if(MSVC)
+  target_compile_options(procedural_landforms_fastmath_test PRIVATE /fp:fast)
+else()
+  target_compile_options(procedural_landforms_fastmath_test PRIVATE -ffast-math)
+endif()
+add_test(NAME procedural_landforms_fastmath COMMAND procedural_landforms_fastmath_test)
+set_tests_properties(procedural_landforms procedural_landforms_fastmath PROPERTIES TIMEOUT 90 COST 10)
+
+add_executable(distant_regions_test tests/distant_regions_test.cpp ${ENV_OBJS})
+add_test(NAME distant_regions COMMAND distant_regions_test)
+
+add_executable(regional_surface_test tests/regional_surface_test.cpp ${CORE_OBJS})
+add_test(NAME regional_surface COMMAND regional_surface_test)
+set_tests_properties(regional_surface PROPERTIES TIMEOUT 90 COST 20)
+add_executable(regional_surface_fastmath_test tests/regional_surface_test.cpp src/regional_surface.cpp src/geo.cpp src/region_travel.cpp
+  "$<FILTER:$<TARGET_OBJECTS:env_objs>,EXCLUDE,(^|/)(geo|region_travel|regional_surface)([.]cpp)?[.](o|obj)$>" $<TARGET_OBJECTS:core_objs>)
+if(MSVC)
+  target_compile_options(regional_surface_fastmath_test PRIVATE /fp:fast)
+else()
+  target_compile_options(regional_surface_fastmath_test PRIVATE -ffast-math)
+endif()
+add_test(NAME regional_surface_fastmath COMMAND regional_surface_fastmath_test)
+set_tests_properties(regional_surface_fastmath PROPERTIES TIMEOUT 90 COST 20)
+
+add_executable(region_generation_cancellation_test tests/region_generation_cancellation_test.cpp ${ENV_OBJS})
+add_test(NAME region_generation_cancellation COMMAND region_generation_cancellation_test)
+set_tests_properties(region_generation_cancellation PROPERTIES TIMEOUT 90 COST 20)
+
+add_executable(region_scenery_test tests/region_scenery_test.cpp ${ENV_OBJS})
+add_test(NAME region_scenery COMMAND region_scenery_test)
+
+if(WIN32)
+  add_executable(procedural_region_runtime_test tests/procedural_region_runtime_test.cpp ${GAME_OBJS} src/radio_win.cpp)
+  target_link_libraries(procedural_region_runtime_test PRIVATE opengl32 gdi32 winmm mfplay mfplat mfuuid ole32 uuid)
+else()
+  add_executable(procedural_region_runtime_test tests/procedural_region_runtime_test.cpp ${GAME_OBJS} src/radio_stub.cpp)
+  target_link_libraries(procedural_region_runtime_test PRIVATE ${CMAKE_DL_LIBS})
+endif()
+add_dependencies(procedural_region_runtime_test shaders_gen test_world)
+add_test(NAME procedural_region_runtime COMMAND procedural_region_runtime_test)
+set_tests_properties(procedural_region_runtime PROPERTIES FIXTURES_REQUIRED world
+  ENVIRONMENT "SOMNIUM_TEST_WORLD=${CMAKE_BINARY_DIR}/test_world.bin" COST 180)
+add_test(NAME procedural_recipe_placement COMMAND procedural_world_test --recipe-only --region all)
+add_executable(nonrepeating_scenery_test tests/nonrepeating_scenery_test.cpp ${ENV_OBJS} src/hive_world_collision.cpp)
+add_test(NAME nonrepeating_scenery COMMAND nonrepeating_scenery_test)
+set_tests_properties(nonrepeating_scenery PROPERTIES TIMEOUT 30)
+add_executable(region_travel_test tests/region_travel_test.cpp ${CORE_OBJS})
+add_executable(region_travel_fastmath_test tests/region_travel_test.cpp src/geo.cpp src/region_travel.cpp
+  "$<FILTER:$<TARGET_OBJECTS:env_objs>,EXCLUDE,(^|/)(geo|region_travel)([.]cpp)?[.](o|obj)$>" $<TARGET_OBJECTS:core_objs>)
+if(MSVC)
+  target_compile_options(region_travel_fastmath_test PRIVATE /fp:fast)
+else()
+  target_compile_options(region_travel_fastmath_test PRIVATE -ffast-math)
+endif()
+add_test(NAME region_travel COMMAND region_travel_test)
+add_test(NAME region_travel_fastmath COMMAND region_travel_fastmath_test)
+
+add_executable(region_scenery_isolation_test tests/region_scenery_isolation_test.cpp ${ENV_OBJS})
+add_test(NAME region_scenery_isolation COMMAND region_scenery_isolation_test)
+if(WIN32)
+  add_executable(world_upload_budget_test tests/world_upload_budget_test.cpp ${GAME_OBJS} src/radio_win.cpp)
+  target_link_libraries(world_upload_budget_test PRIVATE opengl32 gdi32 winmm mfplay mfplat mfuuid ole32 uuid)
+else()
+  add_executable(world_upload_budget_test tests/world_upload_budget_test.cpp ${GAME_OBJS} src/radio_stub.cpp)
+  target_link_libraries(world_upload_budget_test PRIVATE ${CMAKE_DL_LIBS})
+endif()
+add_dependencies(world_upload_budget_test shaders_gen)
+add_test(NAME world_upload_budget COMMAND world_upload_budget_test)
+
+add_executable(jet_fuel_test tests/jet_fuel_test.cpp ${CORE_OBJS})
+add_dependencies(jet_fuel_test test_world)
+add_test(NAME jet_fuel COMMAND jet_fuel_test)
+set_tests_properties(jet_fuel PROPERTIES FIXTURES_REQUIRED world
+  ENVIRONMENT "SOMNIUM_TEST_WORLD=${CMAKE_BINARY_DIR}/test_world.bin" COST 30)

@@ -1,0 +1,8 @@
+BACKGROUND threads_limit=2 active_chart_populated=1 active_reads=1121 active_chunks=1 active_lots=26764 build_seconds=1.278
+REGION id=pr1-1-9-19 name=Aster Atolls archetype=Atolls from_cache=0 build_seconds=1.278
+AIRPORTS count=4 objects=96 solid_collisions=4 max_flatness_m=0.000000 max_approach_excess_m=-12.855804
+SETTLEMENTS towns=4 dry_lots=369 road_paths=58 road_segments=909 road_collision_probes=64
+MEMORY world_owned_capacity_bytes=140593113 recipe_bytes=15308 streamed_chunks=51
+FLIGHT chart_repeating=0 boundary_crossings=4
+PROCESS peak_rss_kib=392692
+procedural_world_test: 1983 checks, 0 failures

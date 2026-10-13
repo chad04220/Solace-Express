@@ -36,10 +36,10 @@ const AircraftSpec kAircraft[] = {
    0.30f, 5.2f, 1.50f, 0.80f, 0.026f, 0.010f, 0.060f, 0.80f, 1800000, 40, 52, 60, 140, 170, 1100, false, false, true,
    180000, 300000, 450000, 0.40f, 0.048f, 0.055f, LIC_ATP, 600000, 8000,
    26.0f, 1.35f, 0.93f, -0.38f, 1, 1, vec3(0.96f, 0.96f, 0.98f), vec3(0.08f, 0.18f, 0.45f)},
-  {"starling", "Starling 500 Jet", "Light business jet", ENG_JET, 2, 0, 0, 0, 0, 4600, 1100, 700, 7, 30.0f, 15.9f, 2.0f,
-   0.25f, 5.0f, 1.40f, 0.75f, 0.022f, 0.012f, 0.070f, 0.80f, 15000, 0, 55, 62, 200, 260, 1250, false, false, true,
+  {"starling", "Starling 500 Jet", "Light business jet", ENG_JET, 2, 0, 0, 0, 0, 4600, 2200, 700, 7, 30.0f, 15.9f, 2.0f,
+   0.25f, 5.0f, 1.40f, 0.75f, 0.022f, 0.012f, 0.070f, 0.80f, 15000, 0, 55, 62, 200, 4350, 1250, false, false, true,
    30000, 60000, 85000, 0.42f, 0.050f, 0.055f, LIC_ATP, 260000, 0,
-   14.0f, 0.95f, -0.58f, 1.0f, 2, 1, vec3(0.97f, 0.97f, 0.97f), vec3(0.55f, 0.08f, 0.12f)},
+   14.0f, 0.95f, -0.58f, 1.0f, 2, 1, vec3(0.97f, 0.97f, 0.97f), vec3(0.55f, 0.08f, 0.12f), 0, 0, 0, 0, false, 0, .2f, 0, 1.55e-5f, 0, 11000, 200, .547f, 8000},
   // ---- Codex's aircraft (docs/design/additional-aircraft, proposals on codex/*): Swift S6, Osprey C6, XR-10 Nightjar
   // Swift S6: four-seat retractable touring piston
   {"swift_s6", "Swift S6", "Retractable low-wing tourer", ENG_PISTON, 1, 6, 3, 700.0f, 2700.0f,
@@ -57,34 +57,34 @@ const AircraftSpec kAircraft[] = {
   // ---- the research craft (stable roster indices 9 through 12; excluded by kCareerAircraft)
   // XR-10 Nightjar: conventional twin-jet research demonstrator (special 0: the generic flight model and field)
   {"xr10_nightjar", "XR-10 Nightjar", "Tapered-wing research demonstrator", ENG_JET, 2, 0, 0, 0.0f, 0.0f,
-  5700.0f, 1300.0f, 100.0f, 0, 38.18f, 16.60f, 2.508f,
+  5700.0f, 2200.0f, 100.0f, 0, 38.18f, 16.60f, 2.508f,
   0.15f, 4.6f, 1.55f, 0.55f, 0.020f, 0.010f, 0.045f, 0.80f,
-  30000.0f, 0.0f, 43.0f, 50.0f, 260.0f, 240.0f, 1250.0f, false, false, true,
+  30000.0f, 0.0f, 43.0f, 50.0f, 260.0f, 2150.0f, 1250.0f, false, false, true,
   52000.0f, 80000.0f, 130000.0f, 0.33f, 0.085f, 0.065f, LIC_ATP, 340000, 0,
   16.30f, 0.80f, -0.9375f, -1.145f, 2, 0,
-  vec3(0.14f, 0.18f, 0.20f), vec3(0.20f, 0.78f, 0.70f), 0, 1.30f, 9.f, -4.f},
-  // hidden research model: thrust-to-weight ~2.2, supersonic, pitch thrust vectoring (see Plane::substep special path).
+  vec3(0.14f, 0.18f, 0.20f), vec3(0.20f, 0.78f, 0.70f), 0, 1.30f, 9.f, -4.f, false, 0, .2f, 0, 2.2e-5f, 5.4e-5f, 10000, 240, .288f, 8800},
+  // Supersonic research model with finite fuel and pitch thrust vectoring (see Plane::substep special path).
   // It lands fast and long on its small unflapped wing: 1,400 m of hard runway (250 m and rough fields once said here,
   // and the autoland took it to fields it overran or broke its gear on - the review of v3.33.0, A1)
-  {"xr30_specter", "XR-30 Specter", "Confidential research model", ENG_JET, 2, 0, 0, 0, 0, 9000, 3000, 0, 0, 46.0f, 11.2f, 4.6f,
-   0.05f, 3.6f, 1.70f, 0.0f, 0.013f, 0.010f, 0.0f, 0.75f, 132000, 0, 60, 70, 420, 4000, 1400, false, false, true,
+  {"xr30_specter", "XR-30 Specter", "Confidential research model", ENG_JET, 2, 0, 0, 0, 0, 9000, 6000, 0, 0, 46.0f, 11.2f, 4.6f,
+   0.05f, 3.6f, 1.70f, 0.0f, 0.013f, 0.010f, 0.0f, 0.75f, 132000, 0, 60, 70, 420, 1930, 1400, false, false, true,
    25000, 90000, 110000, 0.40f, 0.060f, 0.060f, LIC_STUDENT, 0, 0,
-   17.2f, 1.0f, -0.2f, 1.6f, 2, 1, vec3(0.11f, 0.12f, 0.14f), vec3(0.2f, 0.85f, 1.0f), 1, 2.7f, 40.f, -20.f},
+   17.2f, 1.0f, -0.2f, 1.6f, 2, 1, vec3(0.11f, 0.12f, 0.14f), vec3(0.2f, 0.85f, 1.0f), 1, 2.7f, 40.f, -20.f, false, 0, .2f, 0, 2.3e-5f, 5.8e-5f, 10000, 250, .216f, 15800},
   // XR-20 Mantis: forward-swept single-jet systems demonstrator (special 0: conventional flight model and controls).
   // One centerline 88 kN-rated engine preserves the prior pair's combined thrust (176 kN static at full reheat).
   // Its foreplanes are the model's horizontal tail placed forward; the two fins remain independently ruddered.
   {"xr20_mantis", "XR-20 Mantis", "Forward-swept systems demonstrator", ENG_JET, 1, 0, 0, 0.0f, 0.0f,
-   6100.0f, 1800.0f, 0.0f, 0, 30.0f, 13.2f, 2.27f,
+   6100.0f, 3200.0f, 0.0f, 0, 30.0f, 13.2f, 2.27f,
    0.25f, 5.0f, 1.55f, 0.60f, 0.026f, 0.012f, 0.070f, 0.78f,
-   88000.0f, 0.0f, 55.0f, 62.0f, 330.0f, 750.0f, 1350.0f, false, false, true,
+   88000.0f, 0.0f, 55.0f, 62.0f, 330.0f, 2800.0f, 1350.0f, false, false, true,
    30000.0f, 70000.0f, 100000.0f, 0.45f, 0.070f, 0.070f, LIC_ATP, 480000, 0,
-   16.0f, 1.05f, -0.62f, 0.65f, 2, 0, vec3(0.105f, 0.125f, 0.15f), vec3(0.92f, 0.43f, 0.08f), 0, 1.9f, 14.f, -6.f},
-  // hidden stealth aerobatic research model: four tilting thruster pods (power = one pod's dry thrust), T/W ~2.2 dry
-  // and ~4.6 boosted, structure good for +90 / -45 g (see Plane::wraithThrust)
-  {"xr40_wraith", "XR-40 Wraith", "Stealth aerobatic research model", ENG_JET, 4, 0, 0, 0, 0, 10500, 3000, 0, 0, 52.0f, 12.4f, 5.2f,
-   0.03f, 3.4f, 1.60f, 0.0f, 0.012f, 0.010f, 0.0f, 0.72f, 72000, 0, 60, 70, 480, 5000, 200, true, false, true,
+   16.0f, 1.05f, -0.62f, 0.65f, 2, 0, vec3(0.105f, 0.125f, 0.15f), vec3(0.92f, 0.43f, 0.08f), 0, 1.9f, 14.f, -6.f, false, 0, .2f, 0, 2.3e-5f, 5.8e-5f, 10000, 240, .208f, 10300},
+  // Stealth aerobatic research model: four tilting pods (power = one pod's rated thrust).
+  // Finite fuel; fictional +90 / -45 g structure (see Plane::wraithThrust).
+  {"xr40_wraith", "XR-40 Wraith", "Stealth aerobatic research model", ENG_JET, 4, 0, 0, 0, 0, 10500, 6000, 0, 0, 52.0f, 12.4f, 5.2f,
+   0.03f, 3.4f, 1.60f, 0.0f, 0.012f, 0.010f, 0.0f, 0.72f, 72000, 0, 60, 70, 480, 3400, 200, true, false, true,
    30000, 80000, 100000, 0.90f, 0.090f, 0.070f, LIC_STUDENT, 0, 0,
-   16.5f, 1.0f, -0.15f, 0.8f, 2, 1, vec3(0.075f, 0.08f, 0.09f), vec3(0.72f, 0.3f, 1.0f), 2, 4.3f, 90.f, -45.f},
+   16.5f, 1.0f, -0.15f, 0.8f, 2, 1, vec3(0.075f, 0.08f, 0.09f), vec3(0.72f, 0.3f, 1.0f), 2, 4.3f, 90.f, -45.f, false, 0, .2f, 0, 2.5e-5f, 6.2e-5f, 10000, 250, .070f, 18000},
   // Larkspur L4: a four-seat cantilever shoulder-wing touring single. Full payload includes passengers
   // in maxMass(); cargo is baggage, not an additional four-seat cabin. Range is intentionally game-scaled.
   {"larkspur_l4", "Larkspur L4", "Four-seat shoulder-wing tourer", ENG_PISTON, 1, 6, 3, 700, 2700,
@@ -95,15 +95,15 @@ const AircraftSpec kAircraft[] = {
    8.80f, 0.72f, 1.305556f, -1.90f, 0, 0,
    vec3(0.88f, 0.92f, 0.86f), vec3(0.18f, 0.34f, 0.22f), 0, 0, 3.8f, -1.52f, true, 0, .2f, 0},
   // Atlas A180: the fleet's largest conventional transport. Two 105 kN underwing turbofans,
-  // 180 passengers plus hold cargo, 74.4 t design maximum, transport-category +2.5/-1 g.
-  // Cruise is subsonic (the ordinary jet thrust path); game-range compression is not physical fuel efficiency.
+  // 180 passengers plus hold cargo, 79 t design maximum, transport-category +2.5/-1 g.
+  // Cruise is subsonic (the ordinary jet thrust path); fuel burn uses the shared thrust-specific model, not range compression.
   {"atlas_a180", "Atlas A180", "180-seat twin-engine transport", ENG_JET, 2, 0, 0, 0, 0,
-   42000, 14000, 6500, 180, 138.0f, 39.80f, 3.4673f,
+   42000, 20000, 6500, 180, 138.0f, 39.80f, 3.4673f,
    0.23f, 5.0f, 1.55f, 1.05f, 0.022f, 0.015f, 0.070f, 0.83f,
-   105000, 0, 73, 68, 235, 350, 1900, false, false, true,
+   105000, 0, 73, 68, 235, 5800, 1900, false, false, true,
    2800000, 4600000, 6800000, 0.34f, 0.040f, 0.050f, LIC_ATP, 1600000, 18000,
    42.60f, 2.05f, -0.487805f, -3.55f, 1, 0,
-   vec3(0.94f, 0.95f, 0.96f), vec3(0.08f, 0.28f, 0.40f), 0, 0.78f, 2.5f, -1.0f, true, 3.65f, .5f, 3.45f},
+   vec3(0.94f, 0.95f, 0.96f), vec3(0.08f, 0.28f, 0.40f), 0, 0.78f, 2.5f, -1.0f, true, 3.65f, .5f, 3.45f, 1.55e-5f, 0, 11000, 230, .625f, 79000},
 };
 // clang-format on
 static_assert(sizeof(kAircraft) / sizeof(kAircraft[0]) == kAircraftCount, "Aircraft table must match roster count");
@@ -125,7 +125,7 @@ float Plane::thrustAt(float spool, float V, float vf, float rho) const {
     float ab = smoothstepf(0.85f, 1.0f, spool);
     return s.engines * s.power * powf(sigmaRho, 0.5f) * (0.85f * spool + 1.25f * ab) * (1.f + 0.3f * std::min(V / 330.f, 4.f));
   } else if (s.special) {
-    // two afterburning turbofans: dry up to 85% throttle, reheat above (2x thrust at 100%, T/W ~4.4)
+    // two afterburning turbofans: dry up to 85% throttle, reheat above (2x rated thrust at 100%)
     float ab = smoothstepf(0.85f, 1.0f, spool);
     return s.engines * s.power * powf(sigmaRho, 0.6f) * (0.82f * spool + 1.18f * ab);   // full reheat doubles thrust
   } else if (s.engineType == ENG_JET && s.designMach > 1.f) {
@@ -149,11 +149,61 @@ float Plane::thrustAt(float spool, float V, float vf, float rho) const {
 // The thrust it can turn straight down to hold itself up (N): the XR-40's pods tilt to the vertical; nothing else can
 float Plane::liftThrustMax() const { return spec->special == 2 ? thrustAt(1.f, 0.f, 0.f) : 0.f; }
 
-float Plane::fuelFlowMax() const {
-  float rangeS = spec->rangeKm * 1000.f / spec->cruise;
-  return spec->maxFuel / (rangeS * 0.8f);
+float Plane::fuelFlowAt(float spool, float tas, float rho, float live) const {
+  const AircraftSpec& s = *spec;
+  spool = clampf(spool, 0.f, 1.f); live = clampf(live, 0.f, 1.f);
+  if (live <= 0.f) return 0.f;
+  if (s.engineType != ENG_JET || s.jetDryTsfc <= 0.f) {
+    const float rangeS = s.rangeKm * 1000.f / s.cruise;
+    return s.maxFuel / (rangeS * .8f) * (.2f + .8f * spool) * live;
+  }
+  const float dens = rho > 0.f ? rho : density;
+  const float sigma = clampf(dens / 1.225f, .001f, 1.3f);
+  const float m = std::max(0.f, tas) / std::max(soundSpeed, 1.f);
+  const float reheat = s.jetWetTsfc > 0.f ? smoothstepf(.85f, 1.f, spool) : 0.f;
+  // TSFC grows with flight speed, partial-power inefficiency and reheat. The modest
+  // temperature benefit with height never cancels the fuel cost of producing thrust.
+  const float correction = powf(sigma, .06f) * (1.f + .35f * std::min(m, 4.5f))
+                         * (1.f + .18f * (1.f - spool));
+  const float wetTsfc = s.jetWetTsfc > 0.f ? s.jetWetTsfc : s.jetDryTsfc;
+  const float tsfc = (s.jetDryTsfc + (wetTsfc - s.jetDryTsfc) * reheat) * correction;
+  // Core idle flow is finite even with zero commanded net thrust. Scale by total
+  // installed thrust so splitting one engine into two does not change its burn.
+  const float idle = s.engines * s.power * s.jetDryTsfc * .045f * powf(sigma, .65f);
+  // Spool already contains engine-health scaling in the flight model. Only idle
+  // receives live-engine scaling; multiplying thrust by live again would underbill failures.
+  return std::max(idle * live, std::max(0.f, thrustAt(spool, tas, tas, dens)) * tsfc);
 }
-float Plane::rangeLeftKm() const { return fuel / (fuelFlowMax() * 0.8f) * spec->cruise / 1000.f; }
+float Plane::fuelFlowMax() const {
+  if (spec->engineType != ENG_JET || spec->jetDryTsfc <= 0.f) {
+    const float rangeS = spec->rangeKm * 1000.f / spec->cruise;
+    return spec->maxFuel / (rangeS * .8f);
+  }
+  Plane reference; reference.spec = spec; reference.soundSpeed = isa(0).a;
+  return reference.fuelFlowAt(1.f, 0.f, 1.225f);
+}
+float Plane::fuelFlowKgS() const {
+  if (!engineRunning || fuel <= 0.f) return 0.f;
+  const float live = spec->engines > 0 ? float(spec->engines - fail.enginesOut(spec->engines)) / spec->engines : 1.f;
+  return fuelFlowAt(spec->engineType == ENG_JET ? engineSpool : ctl.throttle, airspeed, density, live);
+}
+float Plane::nominalFuelFlowKgS() const {
+  if (spec->engineType != ENG_JET || spec->jetDryTsfc <= 0.f) return fuelFlowMax() * .8f;
+  Plane reference; reference.spec = spec; const Atmosphere at = isa(spec->fuelCruiseAlt);
+  reference.soundSpeed = at.a;
+  return reference.fuelFlowAt(spec->fuelCruiseSpool, spec->fuelCruiseTas, at.rho);
+}
+float Plane::nominalRangeKm() const {
+  const float tas = spec->fuelCruiseTas > 0.f ? spec->fuelCruiseTas : spec->cruise;
+  return std::max(0.f, fuel) / std::max(nominalFuelFlowKgS(), .00001f) * tas / 1000.f;
+}
+float Plane::rangeLeftKm() const {
+  // Jets show still-air distance at present burn/TAS once airborne. Hover consumes
+  // fuel but has zero range; on the ground use the separately labelled nominal cruise.
+  if (spec->engineType == ENG_JET && !onGround && engineRunning && fuel > 0.f)
+    return fuel / std::max(fuelFlowKgS(), .00001f) * std::max(0.f, airspeed) / 1000.f;
+  return nominalRangeKm();
+}
 float Plane::glideRatio() const {   // clean best L/D from the aircraft's own drag build-up (gear as it is)
   if (!spec) return 8.f;
   if (spec->special == 0) {   // (the strip model's, engines stopped: aero_strips.cpp; ice adds its drag at the best glide's lift)
@@ -182,7 +232,7 @@ bool Plane::failNow(int kind, int engine) {
 }
 
 void Plane::reset(const AircraftSpec* s, vec3 position, float headingDeg, float fuelKg, float payloadKg, bool airborne, float speed) {
-  spec = s; pos = position; fuel = fuelKg; payload = payloadKg;
+  spec = s; pos = position; fuel = s->engineType == ENG_JET ? clampf(fuelKg, 0.f, s->maxFuel) : fuelKg; payload = payloadKg; fuelBurnRemainder = 0;
   for (auto& wheel : wheelMotion) wheel.reset();
   q = quat::axisAngle(vec3(0, 1, 0), -headingDeg * DEG);
   w = vec3(); ctl = Controls(); ev = FlightEvents(); apComfort = false; sceneryHits = true; brakeHold = 0;
@@ -289,7 +339,7 @@ void Plane::step(float dt, const Weather& wx, float time) {
   flightTime += dt;
   // the map wraps (world.h): over its seam it comes back in from the other side, and the air it flies in with it (the
   // eddies and gusts go on as they were); the autopilot's plan stays where the field is
-  const vec3 seam(wrapCoord(pos.x) - pos.x, 0.f, wrapCoord(pos.z) - pos.z);
+  const vec3 seam(g_world.wrap(pos.x) - pos.x, 0.f, g_world.wrap(pos.z) - pos.z);
   if (seam.x != 0.f || seam.z != 0.f) { pos += seam; wxAir += seam; seamShift += seam; }
 }
 
@@ -356,7 +406,11 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     thrust = thrustAt(engineSpool, V, std::max(0.f, -va.z));
     // (the engines still running burn it: a twin on one engine burns half - the review of v3.44.0, FLT-7)
     const float live = s.engines > 0 ? float(s.engines - fail.enginesOut(s.engines)) / (float)s.engines : 1.f;
-    if (!s.special) fuel = std::max(0.f, fuel - fuelFlowMax() * (0.2f + 0.8f * ctl.throttle) * live * dt);
+    if (s.engineType == ENG_JET) {
+      const double burn = double(fuelFlowAt(engineSpool, V, density, live)) * dt + fuelBurnRemainder;
+      if (burn >= fuel) { thrust *= burn > 0 ? float(fuel / burn) : 0.f; fuel = 0; fuelBurnRemainder = 0; engineRunning = false; }
+      else { const double exact = double(fuel) - burn; fuel = float(exact); fuelBurnRemainder = double(fuel) - exact; }
+    } else fuel = std::max(0.f, fuel - fuelFlowMax() * (0.2f + 0.8f * ctl.throttle) * live * dt);
   }
 
   // ---------------- configuration
@@ -880,7 +934,7 @@ void Plane::apEngage(int mode, int airport, const Weather& wx) {
         const Airport& a = g_world.airports[ai];
         const vec3 ld = rv ? -a.dir() : a.dir(), thr = a.threshold(rv);
         vec3 rel = pos - thr; rel.y = 0;
-        rel.x = wrapCoord(rel.x); rel.z = wrapCoord(rel.z);   // (the short way round the map)
+        rel.x = g_world.wrap(rel.x); rel.z = g_world.wrap(rel.z);   // (the short way round the map)
         const float along = rel.x * ld.x + rel.z * ld.z, cross = fabsf(rel.x * ld.z - rel.z * ld.x);
         vec3 v = vel; v.y = 0; const float vl = length(v);
         const float align = vl > 1.f ? (v.x * ld.x + v.z * ld.z) / vl : 0.f;
@@ -1053,7 +1107,7 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   const ApEnvelope& E = apEnv;
   const Airport& a = g_world.airports[airport];
   auto H = [](vec3 q) { return g_world.height(q.x, q.z); };
-  const vec3 P(nearCopy(pos.x, a.x), pos.y, nearCopy(pos.z, a.z));   // (where the aircraft is, the short way round the map from the field)
+  const vec3 P(g_world.nearPoint(pos.x, a.x), pos.y, g_world.nearPoint(pos.z, a.z));   // (where the aircraft is, the short way round the map from the field)
   vec3 ld = rev ? a.dir() * -1.f : a.dir(), rr(-ld.z, 0, ld.x);
   vec3 td = a.threshold(rev) + ld * clampf(a.length * 0.12f, 80.f, 300.f); td.y = a.elev;
   // glidepath: 3 degrees, steepened (up to what the type can fly) to clear the ground and trees under the final
@@ -1221,7 +1275,7 @@ void Plane::apGuidance(float dt) {
   switch (apStage) {
     case APS_NAV: {
       vec3 C = apHoldC; C.y = pos.y;
-      C.x = nearCopy(C.x, pos.x); C.z = nearCopy(C.z, pos.z);   // (the short way there, across the map's seam if that is shorter)
+      C.x = g_world.nearPoint(C.x, pos.x); C.z = g_world.nearPoint(C.z, pos.z);   // (the short way there, across the map's seam if that is shorter)
       float dc = len2(C - pos);
       const float vh = apHoldSpeed(vref, s.cruise, apPro || transportPathControl(s));
       apUseVS = false;
@@ -1590,7 +1644,7 @@ void Plane::apGuidance(float dt) {
   // any plan reaches it turns back for the field (the review of v3.33.0, A1: a passenger Starling flew off the chart
   // from Palm Bay and was lost. The map wraps now, but the plan's patterns stay on this side of its seam)
   if ((apStage == APS_NAV || apStage == APS_GOAROUND) && std::max(fabsf(pos.x), fabsf(pos.z)) > WORLD_HALF * 1.12f)
-    apHeading = atan2f(nearCopy(apTd.x, pos.x) - pos.x, -(nearCopy(apTd.z, pos.z) - pos.z)) / DEG;
+    apHeading = atan2f(g_world.nearPoint(apTd.x, pos.x) - pos.x, -(g_world.nearPoint(apTd.z, pos.z) - pos.z)) / DEG;
   // terrain safety while en route and in the go-around: never let the target sit below the ground ahead
   if (apStage == APS_NAV || apStage == APS_GOAROUND) {
     const float hi = terrainAround();
@@ -1684,12 +1738,12 @@ void Plane::apRates(float qT, float pT, float rollCap, float nzMin, float nzMax,
   // (and held in: what a steady yaw needs - a dead engine's thrust, the slipstream's swirl at climb power - builds up
   // as rudder trim, so the sideslip is flown out instead of standing at what the sideslip term alone would answer)
   if (!fbw) {
-    // With symmetric engines in a transport missed approach and its low-speed
-    // terminal return, the coordinated-rate and sideslip damper supplies the yaw
-    // correction. Let accumulated trim decay rather than winding the integral
-    // through the low-speed Dutch-roll cycle.
-    if (transportGoAroundControl(*this) && apMode == AP_APPR &&
-        (apStage == APS_GOAROUND || apTerminalRejoin))
+    // Symmetric transports use the coordinated-rate/sideslip damper rather than
+    // persistent rudder trim. With real fuel burn the Atlas stays heavy through
+    // a whole approach; the former integral winds into Dutch roll there and after
+    // ~15 minutes at 11 km cruise. Preserve trim for degraded/asymmetric engines
+    // and flap failures, as well as every non-transport type.
+    if (transportGoAroundControl(*this))
       apYawI = approach(apYawI, 0.f, 1.f / std::max(apPathLag(), 0.1f), dt);
     else apYawI = clampf(apYawI + beta * qn * dt * 1.5f, -0.8f, 0.8f);
   }
