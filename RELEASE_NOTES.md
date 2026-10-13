@@ -1,3 +1,8 @@
+## What's new in v3.49.5
+
+### Fixed
+- **The README in the v3.49.3 and v3.49.4 downloads had the folder names wrong** in its note on keeping your career: it named the new `SomniumVolandi` folder twice and said the "old" folders could be deleted. Don't follow that copy of it. The right way round, as the release notes said: copy your files from `%APPDATA%\SolaceExpress` into `%APPDATA%\SomniumVolandi`, and only then can the `SolaceExpress` folders go. The README is corrected.
+
 ## What's new in v3.49.4
 
 ### Faster on the ground at night
