@@ -34,5 +34,6 @@ void main(){
     float rr, th, beat, px;
     float gX = gLensShape(gl_FragCoord.xy/uScreen, uScreen, uGLoad, uTime, rr, th, beat, px);
     oColor.rgb = gLensColour(oColor.rgb, uGLoad, gX, rr, th, beat, px);
+    oColor.a *= 1.0 - gLensCover(uGLoad, gX);   // (hidden under the iris, as the view is)
   }
 }

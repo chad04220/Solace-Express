@@ -2087,8 +2087,8 @@ void Game::updateFlight(float dt) {
     }
   }
   {
-    // g-force lens (g_lens.glsl): a clear view up to 80% of the airframe's limit load either way; from there a red lens
-    // closes over it, most of the way by the limit itself and the rest as the airframe takes the overstress that breaks
+    // g-force lens (g_lens.glsl): a clear view up to 80% of the airframe's limit load either way; from there a dark red
+    // iris closes over it, most of the way by the limit itself and the rest as the airframe takes the overstress that breaks
     // it (Plane::step: overG fails it at 1, twice the limit at once), so it is fully over the view as the airframe lets go
     const float frac = plane.gLoad >= 0.f ? plane.gLoad / plane.spec->gLimitPos() : plane.gLoad / plane.spec->gLimitNeg();
     const float stress = clampf(std::max(plane.overG, frac - 1.f), 0.f, 1.f);
