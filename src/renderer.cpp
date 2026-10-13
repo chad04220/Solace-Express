@@ -1173,6 +1173,62 @@ void Renderer::resize(int w, int h) {
   if (w < 16 || h < 16) return;
   W = w; H = h;
   if (ok) createTargets();
+  // Keep the last card usable if the window changes size while a launch is queued. It has its own
+  // aspect ratio; the next preview capture resizes the same bounded texture without leaking objects.
+}
+
+bool Renderer::retainLoadingPreview(const FrameParams& fp, int mission) {
+  auto& preview = retainedLoadingPreview;
+  preview.ready = false;
+  preview.classified = fp.hangarClassified;
+  if (!ok || !fp.plane.on || fp.hangarClassified || !validAircraft(fp.plane.model) || mission < 0 || W < 1 || H < 1)
+    return false;
+  // Bounded GPU storage/copy only. No CPU readback, image decoder, mesh preparation or additional scene render.
+  const float scale = std::min(1.f, std::min(1280.f / W, 720.f / H));
+  const int width = std::max(1, int(W * scale)), height = std::max(1, int(H * scale));
+  GLint oldRead = 0, oldDraw = 0, oldTexture = 0, scissor = 0, sourceReadBuffer = 0, sourceColourBuffer = 0;
+  glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &oldRead);
+  glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &oldDraw);
+  glGetIntegerv(GL_TEXTURE_BINDING_2D, &oldTexture);
+  glGetIntegerv(GL_SCISSOR_TEST, &scissor);
+  glGetIntegerv(GL_DRAW_BUFFER, &sourceColourBuffer); // window backbuffer, or a single-buffered capture surface
+  if (!preview.texture) glGenTextures(1, &preview.texture);
+  glBindTexture(GL_TEXTURE_2D, preview.texture);
+  if (preview.width != width || preview.height != height) {
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    preview.width = width; preview.height = height;
+  }
+  if (!loadingPreviewFbo) glGenFramebuffers(1, &loadingPreviewFbo);
+  glBindFramebuffer(GL_READ_FRAMEBUFFER, screenFbo);
+  glGetIntegerv(GL_READ_BUFFER, &sourceReadBuffer);
+  glReadBuffer(screenFbo ? GL_COLOR_ATTACHMENT0 : (GLenum)sourceColourBuffer);
+  glBindFramebuffer(GL_DRAW_FRAMEBUFFER, loadingPreviewFbo);
+  glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, preview.texture, 0);
+  const GLenum colour = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &colour);
+  const bool complete = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+  if (complete) {
+    glDisable(GL_SCISSOR_TEST);
+    glBlitFramebuffer(0, 0, W, H, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+  }
+  const bool copied = complete && glGetError() == GL_NO_ERROR;
+  glReadBuffer((GLenum)sourceReadBuffer);
+  glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint)oldRead);
+  glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)oldDraw);
+  glBindTexture(GL_TEXTURE_2D, (GLuint)oldTexture);
+  if (scissor) glEnable(GL_SCISSOR_TEST);
+  if (!copied) { preview.width = preview.height = 0; return false; }
+  preview.craft = fp.plane.model; preview.mission = mission; preview.ready = true;
+  return true;
+}
+
+void Renderer::releaseLoadingPreview() {
+  if (loadingPreviewFbo) glDeleteFramebuffers(1, &loadingPreviewFbo);
+  if (retainedLoadingPreview.texture) glDeleteTextures(1, &retainedLoadingPreview.texture);
+  loadingPreviewFbo = 0; retainedLoadingPreview = LoadingPreview{};
 }
 
 void Renderer::setOffscreen(bool on) {
@@ -1634,6 +1690,7 @@ void Renderer::rasterHangar(const FrameParams& fp) {
   glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LESS); glDepthMask(GL_TRUE);
   glClearColor(0, 0, 0, 0); glClearDepth(1.0); glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glUseProgram(progHangar);
+  glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texFont); glUniform1i(U(progHangar, "uFont"), 0);
   const mat4 vp = viewProjRel(fp, .1f, 40000.f);
   glUniformMatrix4fv(U(progHangar, "uVP"), 1, GL_FALSE, vp.m);
   glUniform3f(U(progHangar, "uOrigin"), fp.hangarOrigin.x, fp.hangarOrigin.y, fp.hangarOrigin.z);
@@ -1641,6 +1698,40 @@ void Renderer::rasterHangar(const FrameParams& fp) {
   glUniform3f(U(progHangar, "uBack"), fp.camBack.x, fp.camBack.y, fp.camBack.z);
   glUniform2f(U(progHangar, "uJit"), jitX, jitY); glUniform1f(U(progHangar, "uSize"), size);
   glBindVertexArray(vaoHangar); glDrawArrays(GL_TRIANGLES, 0, hangarVertexCount);
+  // Dimension paint shares the real floor's depth, light, shadow and TAA path.
+  // It follows the parked aircraft, while the room and metre-scale props stay
+  // fixed. Never substitute nominal physics dimensions for unavailable geometry.
+  const auto mesh = planeMeshes.find(hullKey(fp, 0));
+  if (!fp.hangarClassified && fp.plane.on && mesh != planeMeshes.end() && mesh->second.ok && mesh->second.previewBounds.valid) {
+    const auto& bounds = mesh->second.previewBounds;
+    hangarPreview::DimensionInput input;
+    input.minX = bounds.left.x; input.maxX = bounds.right.x;
+    input.noseZ = bounds.nose.z; input.tailZ = bounds.tail.z;
+    input.wingTipY = (bounds.left.y + bounds.right.y) * .5f;
+    input.wingTipZ = (bounds.left.z + bounds.right.z) * .5f;
+    input.noseY = bounds.nose.y; input.tailY = bounds.tail.y;
+    input.position = fp.plane.pos - fp.hangarOrigin;
+    const float* rot = fp.plane.rot;
+    input.spanAxis = vec3(rot[0], rot[1], rot[2]);
+    input.upAxis = vec3(rot[3], rot[4], rot[5]);
+    input.lengthAxis = vec3(rot[6], rot[7], rot[8]);
+    input.eye = fp.camPos - fp.hangarOrigin; input.cameraRight = fp.camRight;
+    input.visible = true;
+    const auto dimensions = hangarPreview::dimensionGeometry(input);
+    if (!dimensions.empty()) {
+      if (!vaoHangarDimensions) {
+        glGenVertexArrays(1, &vaoHangarDimensions); glGenBuffers(1, &vboHangarDimensions);
+        glBindVertexArray(vaoHangarDimensions); glBindBuffer(GL_ARRAY_BUFFER, vboHangarDimensions);
+        for (int i = 0; i < 4; ++i) {
+          glEnableVertexAttribArray(i);
+          glVertexAttribPointer(i, i == 3 ? 1 : 3, GL_FLOAT, GL_FALSE, sizeof(hangarPreview::Vertex), (void*)(size_t)(i * sizeof(vec3)));
+        }
+      }
+      glBindVertexArray(vaoHangarDimensions); glBindBuffer(GL_ARRAY_BUFFER, vboHangarDimensions);
+      glBufferData(GL_ARRAY_BUFFER, dimensions.size() * sizeof(hangarPreview::Vertex), dimensions.data(), GL_STREAM_DRAW);
+      glDrawArrays(GL_TRIANGLES, 0, (GLsizei)dimensions.size());
+    }
+  }
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 

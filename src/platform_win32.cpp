@@ -114,9 +114,12 @@ static LRESULT CALLBACK wndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
       if (in && wp < 256) in->down[wp] = false;
       if (wp == VK_F10 || wp == VK_MENU) return 0;
       break;
+    case WM_SETFOCUS:
+      if (g_game) g_game->focusGained();
+      return 0;
     case WM_KILLFOCUS:   // switched away: nothing stays held, and a flight in progress pauses
-      if (in) { memset(in->down, 0, sizeof(in->down)); for (int b = 0; b < 3; b++) { if (in->mDown[b]) in->mReleased[b] = true; in->mDown[b] = false; } }
       if (g_game) g_game->focusLost();
+      if (GetCapture() == h) ReleaseCapture();
       break;
     case WM_MOUSEMOVE: if (in) { float x = (float)(short)LOWORD(lp), y = (float)(short)HIWORD(lp); in->mdx += x - in->mx; in->mdy += y - in->my; in->mx = x; in->my = y; } return 0;
     case WM_LBUTTONDOWN: if (in) { in->mDown[0] = in->mPressed[0] = true; SetCapture(h); } return 0;
@@ -1422,12 +1425,13 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     float dt = (float)(now.QuadPart - prev.QuadPart) / freq.QuadPart;
     prev = now;
     pollPad(game.in);
+    game.filterControllerFocus();
     RECT rc; GetClientRect(g_hwnd, &rc);
     if (rc.right > 0 && rc.bottom > 0) {
       if (rc.right != g_ren.W || rc.bottom != g_ren.H) g_ren.resize(rc.right, rc.bottom);
       game.update(dt);
       game.render();
-      SwapBuffers(g_hdc);
+      if (SwapBuffers(g_hdc)) game.framePresented();
       if (s_limitHz > 0) {   // software limiter: sleep most of the way, spin the last ~2 ms
         static LONGLONG deadline = 0;
         const LONGLONG period = freq.QuadPart / s_limitHz;

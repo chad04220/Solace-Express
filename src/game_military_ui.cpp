@@ -48,8 +48,8 @@ Game::ResLayout Game::militaryLayout() const {
   L.top=138*s;L.bot=H-112*s;
   L.px0=L.lx+L.lw+18*s;L.px1=L.rx-18*s;
   L.cx=(L.px0+L.px1)*.5f;
-  L.cy=(L.top+70*s+L.bot-132*s)*.5f;
-  L.r=std::max(32*s,.43f*std::min(L.px1-L.px0,L.bot-L.top-202*s));
+  L.cy=(L.top+79*s+L.bot-56*s)*.5f;
+  L.r=std::max(32*s,.43f*std::min(L.px1-L.px0,L.bot-L.top-135*s));
   return L;
 }
 
@@ -79,7 +79,7 @@ bool Game::militaryButton(uint32_t id,float x,float y,float w,float h,const std:
 }
 
 void Game::drawMilitary(const FrameParams& fp) {
-  if(in.pressed[K_ESC]) { in.pressed[K_ESC]=false;in.pressed[K_ENTER]=false;hubList=0;resDrag=false;return; }
+  if(in.pressed[K_ESC]) { in.pressed[K_ESC]=false;in.pressed[K_ENTER]=false;hubList=0;militaryView.release();return; }
   (void)fp; // The live aircraft is rendered by militaryPreviewCamera before the UI.
   const float s=militaryScale(S()),W=float(g_ren.W),H=float(g_ren.H);
   const ResLayout L=militaryLayout();
@@ -95,6 +95,7 @@ void Game::drawMilitary(const FrameParams& fp) {
   const std::string prerequisite=fmt("Complete sortie %02d to unlock.",std::max(1,selectedRow));
   const AircraftSpec& aircraft=kAircraft[m.aircraft];
   const Contract missionContract=career.militaryContract(displayedMission);
+  militaryView.select(m.aircraft,displayedMission);
   const bool ready=unlocked && !commitBlocked() && career.canFly(missionContract,m.aircraft)==Career::SRC_MILITARY;
   uiGlass=false;
   showRadio=false; // A hidden civilian radio overlay must not intercept terminal input.
@@ -155,7 +156,7 @@ void Game::drawMilitary(const FrameParams& fp) {
     const bool rowCompleted=career.militaryMissionCompleted(entry.id);
     if(militaryButton(rowId(row),x,y,w,rowH,"",true,false)) {
       nextSelection=entry.id;
-      resIdleT=0;
+      militaryView.idle=0;
       // Detail and the live rendered aircraft update together next frame.
     }
     if(selected) {
@@ -184,7 +185,7 @@ void Game::drawMilitary(const FrameParams& fp) {
   label(L.px0+6*s,L.top+1*s,stageW-12*s,s,unlocked?"ASSIGNED AIRFRAME":"RESTRICTED HANGAR");
   g_ren.text(L.px0+6*s,L.top+23*s,25*s,fit(unlocked?aircraft.name:"CLASSIFIED",stageW-12*s,25*s),M_TEXT,1,0,false);
   g_ren.text(L.px0+6*s,L.top+56*s,11.5f*s,fit(unlocked?m.role:prerequisite,stageW-12*s,11.5f*s),M_ACCENT,1,0,false);
-  const float stageTop=L.top+79*s,stageBot=L.bot-134*s;
+  const float stageTop=L.top+79*s,stageBot=L.bot-56*s;
   // Small reference corners frame the real rendered model, not a diagram.
   for(int side=0;side<2;++side) {
     const float xx=side?L.px1-6*s:L.px0+6*s;
@@ -194,24 +195,8 @@ void Game::drawMilitary(const FrameParams& fp) {
       g_ren.line(xx,yy,xx,yy+(yy==stageTop?10*s:-10*s),s,M_EDGE,.75f);
     }
   }
-  const bool inStage=hovered(L.px0,stageTop,stageW,stageBot-stageTop);
-  if(inStage&&!focusNav&&in.mPressed[0]) { resDrag=true;in.mPressed[0]=false; }
-  if(!in.mDown[0]) resDrag=false;
-  if(resDrag) { resYaw+=in.mdx*.008f;resPitch=clampf(resPitch+in.mdy*.006f,-.4f,.95f);resIdleT=0; }
-  else resIdleT+=uiDt;
-  if(inStage&&in.wheel!=0) { resZoom=clampf(resZoom*(1.f+in.wheel*.10f),.7f,1.5f);in.wheel=0; }
-  if(resIdleT>3.f) resYaw+=uiDt*.10f;
-  const float controlsY=L.bot-124*s,space=6*s,cw=(stageW-4*space)/5;
-  if(militaryButton(0x6D0020u,L.px0,controlsY,cw,28*s,"Rotate <")) { resYaw-=.24f;resIdleT=0; }
-  if(militaryButton(0x6D0021u,L.px0+cw+space,controlsY,cw,28*s,"Zoom -")) resZoom=clampf(resZoom-.1f,.7f,1.5f);
-  if(militaryButton(0x6D0022u,L.px0+2*(cw+space),controlsY,cw,28*s,"Reset")) { resYaw=.7f;resPitch=.15f;resZoom=1.f;resIdleT=0; }
-  if(militaryButton(0x6D0023u,L.px0+3*(cw+space),controlsY,cw,28*s,"Zoom +")) resZoom=clampf(resZoom+.1f,.7f,1.5f);
-  if(militaryButton(0x6D0024u,L.px0+4*(cw+space),controlsY,cw,28*s,"> Rotate")) { resYaw+=.24f;resIdleT=0; }
-  surface(L.px0,L.bot-82*s,stageW,82*s,s,.93f);
-  g_ren.text(L.px0+14*s,L.bot-70*s,10.5f*s,unlocked?"SUPPLIED MISSION KIT":"EQUIPMENT ACCESS",M_DIM,1,0,false);
-  auto kitLines=wrap(unlocked?m.loadout:"CLASSIFIED. Assignment released when this sortie is unlocked.",stageW-28*s,12.5f*s);
-  for(size_t i=0;i<kitLines.size()&&i<2;++i)
-    g_ren.text(L.px0+14*s,L.bot-49*s+float(i)*18*s,12.5f*s,kitLines[i],M_TEXT,1,0,false);
+  updateMenuPreview(militaryView,L.px0,stageTop,stageW,stageBot-stageTop,0x6D0020u);
+  drawMenuPreviewControls(militaryView,0x6D0020u,L.px0,L.bot-56*s,stageW,s,M_PANEL,M_ACCENT,M_TEXT,M_DIM,3*s);
 
   // Briefing is a real scrollable document: no dropped requirements at large scale.
   surface(L.rx,L.top,L.rw,L.bot-L.top,s);
@@ -242,6 +227,8 @@ void Game::drawMilitary(const FrameParams& fp) {
     paragraph(m.title,M_TEXT,20,25);by+=12*s;
     paragraph(objectiveName(m),M_ACCENT,11.5f,17);by+=8*s;
     paragraph(m.brief,M_TEXT,13,19);by+=19*s;
+    label(bx,by,bw,s,"SUPPLIED MISSION KIT");by+=24*s;
+    paragraph(m.loadout,M_DIM,12.5f,18);by+=19*s;
     rule(bx,by,bw,s);by+=18*s;
     label(bx,by,bw,s,"SORTIE ORDERS");by+=24*s;
     if(m.objective==hive::MissionKind::Recon) {
@@ -302,7 +289,7 @@ void Game::drawMilitary(const FrameParams& fp) {
   if(militaryButton(0x6D0042u,L.rx+L.rw-104*s,L.bot-34*s,88*s,23*s,"Read down",briefScroll<actualMax)) briefScroll=std::min(actualMax,briefScroll+120*s);
 
   rule(24*s,H-94*s,W-48*s,s);
-  if(militaryButton(0x6D0001u,24*s,H-75*s,150*s,42*s,"< Civilian work")) { hubList=0;resDrag=false;return; }
+  if(militaryButton(0x6D0001u,24*s,H-75*s,150*s,42*s,"< Civilian work")) { hubList=0;militaryView.release();return; }
   const float noteX=195*s,noteW=L.rx-noteX-20*s;
   const std::string status=!unlocked?"CLASSIFIED / LAUNCH LOCKED":commitBlocked()?"SAVE REQUIRED BEFORE LAUNCH":ready?(completed?"COMPLETED / READY TO REPLAY":"AVAILABLE / READY TO DEPLOY"):"SORTIE UNAVAILABLE";
   g_ren.text(noteX,H-76*s,11.5f*s,fit(status,noteW,11.5f*s),unlocked&&commitBlocked()?M_WARN:M_ACCENT,1,0,false);

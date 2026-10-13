@@ -61,6 +61,111 @@ struct GameTest {
     };
     const float dt=1.f/60.f;
 
+    // Retained scene identity is independent of the current UI selection and never admits classified art.
+    // The native Deploy diagnostic separately proves the matching texture contains the real rendered scene.
+    {
+      Renderer::LoadingPreview preview;
+      preview.texture=17;preview.width=1280;preview.height=720;preview.craft=kNightjar;
+      preview.mission=military::LocalSurvey;preview.ready=true;
+      check(preview.matches(kNightjar,military::LocalSurvey) &&
+        !preview.matches(kMantis,military::LocalSurvey) && !preview.matches(kNightjar,military::RouteRecon),
+        "first loading artwork requires both the assigned aircraft and the exact rendered mission identity");
+      preview.classified=true;
+      check(!preview.matches(kNightjar,military::LocalSurvey),"classified aircraft snapshots cannot appear as deployed loading artwork");
+      preview.classified=false;preview.ready=false;
+      check(!preview.matches(kNightjar,military::LocalSurvey),"unfinished GPU snapshots cannot be used as loading artwork");
+      preview.ready=true;preview.texture=0;
+      check(!preview.matches(kNightjar,military::LocalSurvey),"missing GPU snapshot never masquerades as an available aircraft image");
+      FrameParams fp{};fp.plane.on=true;fp.plane.model=kNightjar;
+      check(!g_ren.retainLoadingPreview(fp,military::LocalSurvey) && !g_ren.loadingPreview().ready,
+        "snapshot capture requires an initialized renderer and cannot trigger GL work from CPU-only loading tests");
+    }
+
+    // Interactive military launch: exercise the production card-only render branch with CPU UI geometry.
+    // A renderer submission and an actual platform presentation are distinct events. No GL scene is needed
+    // to prove that saves, mission initialization, collision warmup and readiness all wait for presentation.
+    {
+      auto q=make();Game& g=*q;g.headless=false;g.screen=SCR_HUB;g.hubTab=TAB_CONTRACTS;g.hubList=2;
+      const std::string before=snapshot(g.career),civil=snapshot(g.career,true);
+      const uint32_t attempt=g.career.attempt;
+      const auto* oldSpec=g.plane.spec;const vec3 oldPos=g.plane.pos;
+      const int oldBakes=g_ren.bakeCount,oldChunks=g_ren.entChunks;
+      const auto oldSceneSerial=g_ren.gpuFrameSerial;
+      const auto oldPreview=g_ren.loadingPreview();
+      g.in.pressed[K_ENTER]=g.in.pressed[' ']=g.in.mPressed[0]=true;g.in.buttonsPressed=PAD_A|PAD_START;
+      g.launchMilitary(military::LocalSurvey);
+      check(g.screen==SCR_LOADING && g.pendingMilitaryLaunch && !g.militaryFlight &&
+        !g.career.attemptOpen && g.plane.spec==oldSpec && length(g.plane.pos-oldPos)==0 &&
+        !g.combatCollisionWarm && g.loadFrames==0 && g.loadReadyT<0 && snapshot(g.career)==before,
+        "interactive Deploy changes to loading immediately without saving, resetting the aircraft or preparing the mission");
+      check(!g.in.pressed[K_ENTER] && !g.in.pressed[' '] && !g.in.mPressed[0] && !(g.in.buttonsPressed&(PAD_A|PAD_START)),
+        "queued Deploy consumes mouse, keyboard and controller activation edges");
+      const std::string queued=g.pendingMilitaryLaunch->id;
+      g.launchMilitary(military::LocalSurvey);g.launchMilitary(military::RouteRecon);
+      g.framePresented();g.updateLoading(10.f);
+      check(g.pendingMilitaryLaunch && g.pendingMilitaryLaunch->id==queued && !g.militaryLaunchFramePresented &&
+        g.career.attempt==attempt && snapshot(g.career)==before,
+        "repeated Deploy, elapsed time and a presentation without a loading draw cannot start or replace the queued sortie");
+      g.render();   // Same early-return path as the native renderer, with no initialized GPU.
+      const bool rendered=g.militaryLaunchFrameDrawn;
+      g.updateLoading(dt);
+      check(rendered && g.pendingMilitaryLaunch && !g.militaryLaunchFramePresented &&
+        g.loadImg.empty() && !g.loadMap && g.loadFrames==0 && g.loadReadyT<0 &&
+        g_ren.bakeCount==oldBakes && g_ren.entChunks==oldChunks && g_ren.gpuFrameSerial==oldSceneSerial &&
+        g_ren.loadingPreview().texture==oldPreview.texture && g_ren.loadingPreview().ready==oldPreview.ready &&
+        !g.combatCollisionWarm && snapshot(g.career)==before,
+        "submitted loading card skips image decode, scene rendering, collision setup and saves until it is presented");
+      g.framePresented();g.updateLoading(dt);
+      check(!g.pendingMilitaryLaunch && g.screen==SCR_LOADING && g.militaryFlight &&
+        g.specIdx==kNightjar && g.career.attempt==attempt+1 && g.career.military.activeAttempt==g.career.attempt &&
+        g.hiveCombat.mission.config.objectiveCount==2 && !g.combatCollisionWarm && g.loadFrames==0 &&
+        g.loadReadyT<0 && g.loadShown==0 && snapshot(g.career,true)==civil,
+        "only the update after presentation saves one loaner attempt and initializes the real mission while keeping readiness locked");
+      const uint32_t token=g.career.military.activeAttempt;
+      g.launchMilitary(military::LocalSurvey);g.framePresented();
+      check(!g.pendingMilitaryLaunch && g.career.military.activeAttempt==token && g.career.attempt==attempt+1,
+        "duplicate activation after preparation cannot queue or commit another attempt");
+      g.in.pressed[K_ESC]=true;g.updateLoading(dt);
+      check(g.screen==SCR_HUB && !g.career.attemptOpen && !g.combatCollisionWarm && snapshot(g.career,true)==civil,
+        "Back after prepared loading closes the token before expensive collision warmup and preserves the civilian career");
+      printf("Military launch ordering trace: request -> loading card submitted -> presented -> saved attempt -> scene preparation\n");
+    }
+    // Cancellation before and after presentation must not save an unflown attempt or resurrect a stale card.
+    for(bool pad:{false,true}) for(bool presented:{false,true}) {
+      auto q=make();Game& g=*q;g.headless=false;g.screen=SCR_HUB;g.hubList=2;
+      const std::string before=snapshot(g.career);
+      g.launchMilitary(military::LocalSurvey);g.render();if(presented)g.framePresented();
+      if(pad)g.in.buttonsPressed=PAD_B;else g.in.pressed[K_ESC]=true;
+      g.updateLoading(dt);g.framePresented();
+      check(g.screen==SCR_HUB && !g.pendingMilitaryLaunch && !g.militaryLaunchFrameDrawn &&
+        !g.militaryLaunchFramePresented && !g.militaryFlight && !g.combatCollisionWarm && snapshot(g.career)==before,
+        std::string(pad?"controller":"keyboard")+" Back cancels queued launch "+(presented?"after":"before")+" presentation without saving");
+      g.launchMilitary(military::LocalSurvey);g.framePresented();g.updateLoading(dt);
+      check(g.pendingMilitaryLaunch && !g.militaryLaunchFramePresented && snapshot(g.career)==before,
+        "relaunch after cancellation requires its own newly rendered and presented loading card");
+      g.in.pressed[K_ESC]=true;g.updateLoading(dt);
+    }
+    // Failed save is discovered behind the presented card; it returns to the board with no pending launch,
+    // encounter or token. A subsequent retry must present a fresh loading card before it can do any work.
+    {
+      auto q=make();Game& g=*q;g.headless=false;g.screen=SCR_HUB;g.hubList=2;
+      const std::string before=snapshot(g.career);const uint32_t attempt=g.career.attempt;
+      const fs::path blocked=root/"blocked_deferred_launch";{std::ofstream f(blocked);f<<"block";}
+      g.diskless=false;g.saveDir=blocked.string();g.launchMilitary(military::LocalSurvey);g.render();
+      check(g.pendingMilitaryLaunch && g.hubMsg.empty() && snapshot(g.career)==before,
+        "even failing storage is not touched before the loading card has been presented");
+      g.framePresented();g.updateLoading(dt);
+      check(g.screen==SCR_HUB && !g.pendingMilitaryLaunch && !g.pendingCareer && !g.militaryFlight &&
+        !g.combatCollisionWarm && !g.hubMsg.empty() && snapshot(g.career)==before,
+        "deferred launch save failure returns to military board without committing or retaining an attempt");
+      g.diskless=true;g.launchMilitary(military::LocalSurvey);g.updateLoading(dt);
+      check(g.pendingMilitaryLaunch && g.career.attempt==attempt,"retry after storage failure waits for a fresh presentation");
+      g.render();g.framePresented();g.updateLoading(dt);
+      check(g.screen==SCR_LOADING && g.militaryFlight && !g.pendingMilitaryLaunch && g.career.attempt==attempt+1,
+        "retry after storage failure starts exactly one mission after its own presentation");
+      g.in.pressed[K_ESC]=true;g.updateLoading(dt);
+    }
+
     // Genuine fresh service record: every entry point must enforce the displayed sequence.
     // These cases deliberately use no prerequisite fixture, including the direct/private launch paths.
     {
@@ -142,8 +247,8 @@ struct GameTest {
         };
         bool clearOrbit=true;
         for(int id:{military::RouteRecon,military::HighAltitudeIntel,military::HoverScan})
-          for(float zoom:{.6f,1.4f})for(float pitch:{-.4f,.45f,.95f})for(int angle=0;angle<8;++angle) {
-            g.militarySelection=id;g.resZoom=zoom;g.resPitch=pitch;g.resYaw=angle*PI*.25f;
+          for(float zoom:{.75f,1.35f})for(float pitch:{-.5f,.45f,1.f})for(int angle=0;angle<8;++angle) {
+            g.militarySelection=id;g.militaryView.select(military::mission(id)->aircraft,id);g.militaryView.zoom=zoom;g.militaryView.pitch=pitch;g.militaryView.yaw=angle*PI*.25f;
             FrameParams fp{};g.militaryPreviewCamera(fp);const auto room=hangarPreview::geometry(fp.hangarSize);
             const auto& sp=kAircraft[military::mission(id)->aircraft];const float* r=fp.plane.rot;
             for(vec3 local:{vec3(),vec3(sp.span*.5f,0,0),vec3(-sp.span*.5f,0,0),vec3(0,0,sp.fusLen*.5f),vec3(0,0,-sp.fusLen*.5f)}) {
@@ -1034,7 +1139,7 @@ struct GameTest {
       for(const auto size:sizes) {
         g_ren.W=size.w;g_ren.H=size.h;
         auto q=make();Game& g=*q;g.set.uiScale=size.scale;g.debugScene("research40");
-        g.uiDt=dt;g.resIdleT=0;g.focusScreen=SCR_RESEARCH*4;g.in.mx=g.in.my=-100;
+        g.uiDt=dt;g.researchView.idle=0;g.focusScreen=SCR_RESEARCH*4;g.in.mx=g.in.my=-100;
         const std::string label=" at "+std::to_string(size.w)+"x"+std::to_string(size.h)+"/"+std::to_string(int(size.scale*100))+"%";
         const std::string before=snapshot(g.career);
         auto frame=[&]() {
@@ -1067,14 +1172,14 @@ struct GameTest {
           g.in.pad=device==2;g.padActive=device==2;
           for(int n=0;n<count;++n) {
             g.focusNav=true;g.focusId=kitIds[selected];frame();frame();
-            const auto prior=values();const auto f=control(kitIds[selected]);const float yaw=g.resYaw;
+            const auto prior=values();const auto f=control(kitIds[selected]);const float yaw=g.researchView.yaw;
             if(device==0) {
               g.focusNav=false;g.in.mx=f.x+f.w*.5f;g.in.my=f.y+f.h*.5f;
               g.in.mPressed[0]=g.in.mDown[0]=true;g.in.mdx=7;g.in.mdy=3;
             } else if(device==1)g.in.pressed[K_ENTER]=true;
             else g.in.buttonsPressed=PAD_A;
             frame();const auto now=values();
-            cycled&=now[selected]==(prior[selected]+1)%count && g.screen==SCR_RESEARCH && !g.resDrag && near(g.resYaw,yaw);
+            cycled&=now[selected]==(prior[selected]+1)%count && g.screen==SCR_RESEARCH && !g.researchView.drag && near(g.researchView.yaw,yaw);
             for(int k=0;k<3;++k)if(k!=selected)cycled&=now[k]==prior[k];
             if(device)cycled&=g.focusNav && g.focusId==kitIds[selected];
             cycled&=control(kitIds[selected]).id==kitIds[selected] && previewMatches();
@@ -1136,7 +1241,7 @@ struct GameTest {
           bool actions=true;
           for(int i=0;i<5;++i) {
             g.in.pad=device==2;g.padActive=device==2;g.focusNav=true;g.focusId=viewIds[i];frame();
-            g.resYaw=1.1f;g.resPitch=.25f;g.resZoom=1.2f;g.resIdleT=1.f;
+            g.researchView.yaw=1.1f;g.researchView.pitch=.25f;g.researchView.zoom=1.2f;g.researchView.idle=1.f;
             if(device==0) {
               const auto f=control(viewIds[i]);g.focusNav=false;
               g.in.mx=f.x+f.w*.5f;g.in.my=f.y+f.h*.5f;
@@ -1145,9 +1250,9 @@ struct GameTest {
             else g.in.buttonsPressed=PAD_A;
             frame();
             const float expectedYaw=i==0?1.1f-15*DEG:i==1?1.1f+15*DEG:i==4?.7f:1.1f;
-            const float expectedZoom=i==2?1.08f:i==3?1.32f:i==4?1.f:1.2f;
-            actions&=near(g.resYaw,expectedYaw) && near(g.resZoom,expectedZoom) && near(g.resPitch,i==4?.15f:.25f) &&
-              near(g.resIdleT,0) && !g.resDrag && g.screen==SCR_RESEARCH && values()==beforeView &&
+            const float expectedZoom=i==2?1.1f:i==3?1.3f:i==4?1.f:1.2f;
+            actions&=near(g.researchView.yaw,expectedYaw) && near(g.researchView.zoom,expectedZoom) && near(g.researchView.pitch,i==4?.15f:.25f) &&
+              near(g.researchView.idle,0) && !g.researchView.drag && g.screen==SCR_RESEARCH && values()==beforeView &&
               g.resAirport==viewAirport && near(g.resTime,viewTime);
             if(device)actions&=g.focusNav && g.focusId==viewIds[i];
             g.in.mDown[0]=false;frame();
@@ -1159,32 +1264,32 @@ struct GameTest {
         for(int i:{2,3}) {
           g.focusNav=true;g.focusId=viewIds[i];
           for(int n=0;n<24;++n){g.in.pressed[K_ENTER]=true;frame();}
-          check(near(g.resZoom,i==2?.6f:1.8f),std::string(i==2?"zoom-out":"zoom-in")+" clamps repeated preview clicks at its limit"+label);
+          check(near(g.researchView.zoom,i==2?.75f:1.35f),std::string(i==2?"zoom-out":"zoom-in")+" clamps repeated preview clicks at its limit"+label);
         }
         g.focusNav=true;g.focusId=viewIds[4];g.in.pressed[K_ENTER]=true;frame();
-        g.in.pad=false;g.padActive=false;g.focusNav=false;g.resIdleT=0;
-        const auto kit=values();const float yaw=g.resYaw,pitch=g.resPitch;
+        g.in.pad=false;g.padActive=false;g.focusNav=false;g.researchView.idle=0;
+        const auto kit=values();const float yaw=g.researchView.yaw,pitch=g.researchView.pitch;
         g.in.mx=(L.px0+L.px1)*.5f;g.in.my=stageBot-20*s;
         g.in.mPressed[0]=g.in.mDown[0]=true;g.in.mdx=25;g.in.mdy=5;frame();
-        check(g.resDrag && near(g.resYaw,yaw+.2f) && near(g.resPitch,pitch+.03f) && values()==kit,
+        check(g.researchView.drag && near(g.researchView.yaw,yaw+.2f) && near(g.researchView.pitch,pitch+.03f) && values()==kit,
           "lower preview stage accepts the complete drag gesture after equipment moves out"+label);
-        g.in.mDown[0]=false;frame();const float zoom=g.resZoom;
+        g.in.mDown[0]=false;frame();const float zoom=g.researchView.zoom;
         g.in.wheel=-1;frame();
-        check(!g.resDrag && near(g.resZoom,zoom*.9f) && values()==kit,"preview wheel zoom retains its full lower-stage target"+label);
+        check(!g.researchView.drag && near(g.researchView.zoom,zoom-.1f) && values()==kit,"preview wheel zoom retains its full lower-stage target"+label);
 
-        const float railYaw=g.resYaw,railZoom=g.resZoom;
+        const float railYaw=g.researchView.yaw,railZoom=g.researchView.zoom;
         g.in.mx=L.rx+L.rw*.5f;g.in.my=(top+bottom)*.5f;g.in.wheel=1000;frame();frame();
         g.in.wheel=-.25f;frame();const auto partial=control(kitIds[0]);
         g.in.mx=partial.x+partial.w*.5f;g.in.my=top+2*s;g.in.mPressed[0]=g.in.mDown[0]=true;frame();g.in.mDown[0]=false;
-        check(partial.y<top && partial.y+partial.h>top && values()==kit && !g.resDrag,
+        check(partial.y<top && partial.y+partial.h>top && values()==kit && !g.researchView.drag,
           "partially clipped selector rejects clicks even on its remaining visible pixels"+label);
         g.in.mx=L.rx+L.rw*.5f;g.in.my=(top+bottom)*.5f;g.in.wheel=-1000;frame();frame();
         const auto hidden=control(kitIds[0]);
-        check(hidden.id && !visible(hidden) && near(g.resZoom,railZoom) && near(g.resYaw,railYaw) && values()==kit,
+        check(hidden.id && !visible(hidden) && near(g.researchView.zoom,railZoom) && near(g.researchView.yaw,railYaw) && values()==kit,
           "scrolling full specifications clips equipment without changing loadout or preview"+label);
         g.in.mx=hidden.x+hidden.w*.5f;g.in.my=hidden.y+hidden.h*.5f;g.in.mPressed[0]=g.in.mDown[0]=true;
         frame();g.in.mDown[0]=false;
-        check(values()==kit && !g.resDrag,"clipped selector is mouse-inert outside the rail viewport"+label);
+        check(values()==kit && !g.researchView.drag,"clipped selector is mouse-inert outside the rail viewport"+label);
         g.in.mx=g.in.my=-100;g.focusNav=true;g.focusId=kitIds[0];g.in.pressed[K_ENTER]=true;frame();
         check(values()==kit,"offscreen focused selector defers activation until its row is visible"+label);
         frame();frame();
@@ -1194,10 +1299,10 @@ struct GameTest {
 
         // Controller scroll follows the focused rail scrollbar, not a stale mouse location over the aircraft.
         g.focusNav=false;g.in.mx=L.rx+L.rw*.5f;g.in.my=(top+bottom)*.5f;g.in.wheel=1000;frame();frame();
-        const float firstY=control(kitIds[0]).y,stickZoom=g.resZoom;const auto beforeStick=values();
+        const float firstY=control(kitIds[0]).y,stickZoom=g.researchView.zoom;const auto beforeStick=values();
         g.in.pad=true;g.padActive=true;g.focusNav=true;g.focusId=0x7E5F0020u;g.in.mx=L.cx;g.in.my=L.cy;
         g.in.ry=-1;for(int n=0;n<30;++n)frame();g.in.ry=0;
-        check(control(kitIds[0]).y<firstY && near(g.resZoom,stickZoom) && values()==beforeStick,
+        check(control(kitIds[0]).y<firstY && near(g.researchView.zoom,stickZoom) && values()==beforeStick,
           "right stick scrolls focused specification rail without changing preview zoom or kit"+label);
 
         g.in.pad=false;g.padActive=false;g.focusNav=false;g.in.mx=g.in.my=-100;
@@ -1208,11 +1313,11 @@ struct GameTest {
           preserved&=values()==chosen && fp.plane.model==g.resCraft &&
             (g.resCraft==kWraith ? visible(control(kitIds[0])) : !control(kitIds[0]).id);
           for(uint32_t id:viewIds)preserved&=control(id).id==id;
-          g.resYaw=.7f;g.resZoom=1;g.resIdleT=0;g.focusNav=true;g.focusId=viewIds[1];g.in.pressed[K_ENTER]=true;frame();
-          preserved&=near(g.resYaw,.7f+15*DEG);
-          g.focusId=viewIds[3];g.in.pressed[K_ENTER]=true;frame();preserved&=near(g.resZoom,1.1f);
+          g.researchView.yaw=.7f;g.researchView.zoom=1;g.researchView.idle=0;g.focusNav=true;g.focusId=viewIds[1];g.in.pressed[K_ENTER]=true;frame();
+          preserved&=near(g.researchView.yaw,.7f+15*DEG);
+          g.focusId=viewIds[3];g.in.pressed[K_ENTER]=true;frame();preserved&=near(g.researchView.zoom,1.1f);
           g.focusId=viewIds[4];g.in.pressed[K_ENTER]=true;frame();
-          preserved&=near(g.resYaw,.7f) && near(g.resPitch,.15f) && near(g.resZoom,1) && values()==chosen;
+          preserved&=near(g.researchView.yaw,.7f) && near(g.researchView.pitch,.15f) && near(g.researchView.zoom,1) && values()==chosen;
         }
         for(int card=0;card<Game::kNumResCards;++card)if(Game::kResCards[card].craft==kWraith) {
           const uint32_t cardId=0x7E5D0000u+uint32_t(card+1);

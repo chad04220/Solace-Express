@@ -1,0 +1,72 @@
+DIAGNOSTIC: production startup and rendering programs; pre-baked actual selected meshes and availability assertions. UI_VERIFY_PREVIEWS also checks actual GPU aircraft pixels and classified outline privacy. Not native Windows startup validation.
+GL: llvmpipe (LLVM 19.1.7, 256 bits); 1280x720; UI scale 1.00; actual full scene
+INIT 9.1% Allocating geometry buffers
+INIT 18.2% Uploading terrain textures
+INIT 27.3% Uploading world data
+INIT 36.4% Preparing surface materials
+INIT 40.5% Preparing photographed environment materials
+INIT 40.5% Decoding 512 px grass
+INIT 40.7% Decoding 512 px asphalt
+INIT 40.9% Decoding 512 px concrete
+INIT 41.1% Decoding 512 px brick
+INIT 41.3% Decoding 512 px plaster
+INIT 41.6% Decoding 512 px tiles
+INIT 41.8% Decoding 512 px bark
+INIT 42.0% Uploading photographed environment materials
+INIT 42.3% Photographed environment materials ready
+INIT 42.3% Decoding 2K grass
+INIT 42.6% Decoding 2K asphalt
+INIT 42.9% Decoding 2K concrete
+INIT 43.3% Decoding 2K brick
+INIT 43.6% Decoding 2K plaster
+INIT 44.0% Decoding 2K tiles
+INIT 44.3% Decoding 2K bark
+INIT 44.6% Uploading photographed environment materials
+INIT 45.4% Photographed environment materials ready
+INIT 45.5% Preparing cloud textures
+INIT 54.5% Preparing ocean spectrum
+INIT 63.6% Preparing navigation map
+INIT 72.7% Preparing scenery meshes
+INIT 81.8% Preparing terrain geometry
+INIT 90.9% Allocating render targets
+INIT 100.0% Renderer ready
+DIAGNOSTIC pre-baking selected production mesh
+mesh outside: from the cache (16145 vertices)
+preview dimensions model=0: rigid exterior span=10.315 m length=7.678 m, x=[-5.158,5.158] z=[-3.961,3.717]
+PREVIEW VERIFIED model=0 classified=0 aircraft_pixels=5223 outline_pixels=0 hidden_pixels=0 bounds=500,389,720,479
+PREVIEW VERIFIED model=0 classified=0 aircraft_pixels=5246 outline_pixels=0 hidden_pixels=0 bounds=499,388,720,478
+PREVIEW VERIFIED model=0 classified=0 aircraft_pixels=5234 outline_pixels=0 hidden_pixels=0 bounds=500,388,720,479
+PREVIEW VERIFIED model=0 classified=0 aircraft_pixels=5248 outline_pixels=0 hidden_pixels=0 bounds=499,389,720,479
+PREVIEW VERIFIED model=0 classified=0 aircraft_pixels=5236 outline_pixels=0 hidden_pixels=0 bounds=501,388,720,479
+WROTE ../menu-standardize-evidence/dimensions-sdf/hangar0.png
+DIAGNOSTIC pre-baking selected production mesh
+mesh outside: from the cache (221453 vertices)
+preview dimensions model=14: rigid exterior span=40.016 m length=42.667 m, x=[-20.008,20.008] z=[-21.300,21.367]
+PREVIEW VERIFIED model=14 classified=0 aircraft_pixels=5626 outline_pixels=0 hidden_pixels=0 bounds=478,384,714,469
+PREVIEW VERIFIED model=14 classified=0 aircraft_pixels=5646 outline_pixels=0 hidden_pixels=0 bounds=479,384,715,469
+PREVIEW VERIFIED model=14 classified=0 aircraft_pixels=5616 outline_pixels=0 hidden_pixels=0 bounds=479,383,714,469
+PREVIEW VERIFIED model=14 classified=0 aircraft_pixels=5601 outline_pixels=0 hidden_pixels=0 bounds=479,383,715,469
+PREVIEW VERIFIED model=14 classified=0 aircraft_pixels=5645 outline_pixels=0 hidden_pixels=0 bounds=478,384,714,469
+WROTE ../menu-standardize-evidence/dimensions-sdf/hangar14.png
+PREVIEW VERIFIED model=0 classified=0 aircraft_pixels=13126 outline_pixels=0 hidden_pixels=0 bounds=362,277,823,450
+METRIC CONTEXT: model=0 room=12.00 m bench top=(-11.76,0.90,8.88) projected=(870.55,303.64)
+PREVIEW VERIFIED model=0 classified=0 aircraft_pixels=13079 outline_pixels=0 hidden_pixels=0 bounds=362,277,822,450
+METRIC CONTEXT: model=0 room=12.00 m bench top=(-11.76,0.90,8.88) projected=(870.55,303.64)
+PREVIEW VERIFIED model=0 classified=0 aircraft_pixels=13070 outline_pixels=0 hidden_pixels=0 bounds=362,277,823,450
+METRIC CONTEXT: model=0 room=12.00 m bench top=(-11.76,0.90,8.88) projected=(870.55,303.64)
+PREVIEW VERIFIED model=0 classified=0 aircraft_pixels=13126 outline_pixels=0 hidden_pixels=0 bounds=361,277,822,450
+METRIC CONTEXT: model=0 room=12.00 m bench top=(-11.76,0.90,8.88) projected=(870.55,303.64)
+PREVIEW VERIFIED model=0 classified=0 aircraft_pixels=13075 outline_pixels=0 hidden_pixels=0 bounds=362,277,823,450
+METRIC CONTEXT: model=0 room=12.00 m bench top=(-11.76,0.90,8.88) projected=(870.55,303.64)
+WROTE ../menu-standardize-evidence/dimensions-sdf/hangar0_bench.png
+PREVIEW VERIFIED model=14 classified=0 aircraft_pixels=16232 outline_pixels=0 hidden_pixels=0 bounds=370,262,792,483
+METRIC CONTEXT: model=14 room=42.60 m bench top=(-41.75,0.90,31.52) projected=(869.23,319.76)
+PREVIEW VERIFIED model=14 classified=0 aircraft_pixels=16249 outline_pixels=0 hidden_pixels=0 bounds=371,263,793,483
+METRIC CONTEXT: model=14 room=42.60 m bench top=(-41.75,0.90,31.52) projected=(869.23,319.76)
+PREVIEW VERIFIED model=14 classified=0 aircraft_pixels=16221 outline_pixels=0 hidden_pixels=0 bounds=370,262,792,483
+METRIC CONTEXT: model=14 room=42.60 m bench top=(-41.75,0.90,31.52) projected=(869.23,319.76)
+PREVIEW VERIFIED model=14 classified=0 aircraft_pixels=16245 outline_pixels=0 hidden_pixels=0 bounds=371,262,793,483
+METRIC CONTEXT: model=14 room=42.60 m bench top=(-41.75,0.90,31.52) projected=(869.23,319.76)
+PREVIEW VERIFIED model=14 classified=0 aircraft_pixels=16237 outline_pixels=0 hidden_pixels=0 bounds=370,262,792,483
+METRIC CONTEXT: model=14 room=42.60 m bench top=(-41.75,0.90,31.52) projected=(869.23,319.76)
+WROTE ../menu-standardize-evidence/dimensions-sdf/hangar14_bench.png

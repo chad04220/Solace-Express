@@ -20,6 +20,7 @@
 #include "exhaust.h"
 #include "enemy_fleet.h"
 #include "prepass_auto.h"
+#include "aircraft_preview_bounds.h"
 
 // Logarithmic depth (every raster pass: gl_Position.z from log2(1 + w)): 0.3 m to the far side of the round world's
 // horizon from a thousand kilometres up (planet.h) at the 32-bit depth's precision - a millionth of the distance
@@ -240,6 +241,18 @@ public:
   void warmWraithStores(const FrameParams& fp); // explicit exterior hardware warmup even from cockpit view
   void warmEnemyTypes(); // explicit loading bake: no scene actors or phantom shadows
   void renderScene(const FrameParams& fp, const std::vector<SpriteVert>& alphaSprites, const std::vector<SpriteVert>& addSprites);
+  // A UI-free scene already rendered on this context, retained wholly on the GPU for instant loading cards.
+  struct LoadingPreview {
+    GLuint texture = 0;
+    int width = 0, height = 0, craft = -1, mission = -1;
+    bool ready = false, classified = false;
+    bool matches(int model, int assignment) const {
+      return ready && !classified && texture && width > 0 && height > 0 && craft == model && mission == assignment;
+    }
+  };
+  bool retainLoadingPreview(const FrameParams& fp, int mission); // call immediately after renderScene, before any UI
+  const LoadingPreview& loadingPreview() const { return retainedLoadingPreview; }
+  void releaseLoadingPreview(); // main thread, before the GL context is destroyed
   mat4 viewProj(const FrameParams& fp, float zNear = 0.5f, float zFar = 90000.f) const;
   mat4 viewProjRel(const FrameParams& fp, float zNear, float zFar) const;   // the same from the camera at the origin
   mat4 viewMat(const FrameParams& fp) const;   // world -> camera (x right, y up, z back)
@@ -389,7 +402,7 @@ private:
   // the aircraft mesh (aircraft_mesh.cpp): the static part of the airframe baked from its field, and the hull of the
   // part that moves (the march's start on the raster path, where the mesh leaves off)
   struct PartMesh { int type = 0; GLuint vao = 0, vbo = 0, ibo = 0; int idx = 0; vec3 c; };   // (c: its middle, in its own frame)   // a cockpit's rigid moving part, in its own frame (plane_parts.glsl)
-  struct PlaneMesh { std::vector<PartMesh> parts; uint64_t key = 0; GLuint vao = 0, vbo = 0, ibo = 0; int idx = 0; bool ok = false; uint64_t movKey = 0; bool eyeInMov = false; };
+  struct PlaneMesh { std::vector<PartMesh> parts; uint64_t key = 0; GLuint vao = 0, vbo = 0, ibo = 0; int idx = 0; bool ok = false; uint64_t movKey = 0; bool eyeInMov = false; AircraftPreviewBounds previewBounds; };
   std::unordered_map<uint64_t, PlaneMesh> planeMeshes;
   struct EnemyMesh { GLuint vao=0, vbo=0, ebo=0, material=0; int indices=0; bool attempted=false; };
   EnemyMesh enemyMeshes[kEnemyCraftTypes];
@@ -444,6 +457,7 @@ private:
   void updatePartPoses(const FrameParams& fp);
   void drawPlaneParts(const PlaneMesh& pm, GLuint prog, int trafK);   // (the program bound, its uniforms set: each part instance at its pose)
   GLuint progHangar = 0, progClassifiedHangar = 0, vaoHangar = 0, vboHangar = 0;
+  GLuint vaoHangarDimensions = 0, vboHangarDimensions = 0;
   int hangarVertexCount = 0, previousPreviewModel = -1; float hangarGeometrySize = 0;
   bool previousHangar = false, previousClassifiedHangar = false;
   void rasterHangar(const FrameParams& fp);
@@ -531,6 +545,8 @@ public:
   }
 private:
   GLuint screenFbo = 0;
+  LoadingPreview retainedLoadingPreview;
+  GLuint loadingPreviewFbo = 0;
   void drawEntities(const FrameParams& fp);
   void createGBuffer();
   // ---- the passes of a frame (renderer.cpp)

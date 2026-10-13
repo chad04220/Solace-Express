@@ -81,7 +81,7 @@ struct GameTest {
   }
   static void checkResearchLoadout(Game& g) {
     auto require=[](bool ok,const char* why){if(!ok){fprintf(stderr,"FAIL: %s\n",why);exit(3);}};
-    g.debugScene("research40");g.in=Input{};g.uiDt=1.f/60;g.focusNav=false;g.resIdleT=0;
+    g.debugScene("research40");g.in=Input{};g.uiDt=1.f/60;g.focusNav=false;g.researchView.idle=0;
     auto frame=[&](){g.gamepadMenus(1.f/60);g.focusNavigate();g_ren.uiBegin();FrameParams fp{};
       g.researchPreviewCamera(fp);g.drawResearch(fp);g_ren.uiEnd();g.in.endFrame();};
     auto control=[&](uint32_t id){for(const auto& f:g.focusList)if(f.id==id)return f;return Game::Focusable{};};
@@ -90,9 +90,9 @@ struct GameTest {
       const auto f=control(id);
       require(f.id==id && f.x>=L.rx && f.x+f.w<=L.rx+L.rw && f.y>=L.top+36*s && f.y+f.h<=L.bot-24*s,
         "research equipment is visible inside right rail, outside aircraft stage");
-      const float yaw=g.resYaw;g.focusNav=false;g.in.mx=f.x+f.w*.5f;g.in.my=f.y+f.h*.5f;
+      const float yaw=g.researchView.yaw;g.focusNav=false;g.in.mx=f.x+f.w*.5f;g.in.my=f.y+f.h*.5f;
       g.in.mPressed[0]=g.in.mDown[0]=true;g.in.mdx=12;frame();
-      require(!g.resDrag && std::fabs(g.resYaw-yaw)<.001f,"research rail click cannot drag aircraft preview");
+      require(!g.researchView.drag && std::fabs(g.researchView.yaw-yaw)<.001f,"research rail click cannot drag aircraft preview");
       g.in.mDown[0]=false;frame();
     }
     FrameParams equipped{};g.researchPreviewCamera(equipped);
@@ -104,9 +104,9 @@ struct GameTest {
       require(f.id==id && f.x>=L.px0 && f.x+f.w<=L.px1+.01f && f.y>=L.bot-56*s && f.y+f.h<=L.bot,
         "research preview controls fit a dedicated strip outside aircraft stage and equipment rail");
     }
-    const float yaw=g.resYaw;g.focusNav=false;g.in.mx=L.cx;g.in.my=L.bot-76*s;
+    const float yaw=g.researchView.yaw;g.focusNav=false;g.in.mx=L.cx;g.in.my=L.bot-76*s;
     g.in.mPressed[0]=g.in.mDown[0]=true;g.in.mdx=20;frame();
-    require(g.resDrag && std::fabs(g.resYaw-yaw-.16f)<.001f,"lower aircraft stage accepts drag across former equipment overlay");
+    require(g.researchView.drag && std::fabs(g.researchView.yaw-yaw-.16f)<.001f,"lower aircraft stage accepts drag across former equipment overlay");
     g.in.mDown[0]=false;frame();g.in.mx=L.rx+L.rw*.5f;g.in.my=L.bot-40*s;g.in.wheel=-1000;frame();frame();
     require(control(0x7E5F0010u).y<L.top+36*s,"research specifications scroll beneath their clipped rail");
     g.focusNav=true;g.focusId=0x7E5F0010u;frame();frame();
@@ -208,8 +208,18 @@ struct GameTest {
       g.launchMilitary(id); g.paused=pause;
       if(!pause) g.endFlight(false,"Military sortie aborted",OUT_ABANDONED);
       g.toasts.clear();g.in=Input{};
+    } else if(sc.rfind("military_launch",0)==0) {
+      const int id=atoi(sc.c_str()+15);militaryPrerequisites(g,id);
+      g.screen=SCR_HUB;g.hubTab=TAB_CONTRACTS;g.hubList=2;g.militarySelection=id;
+      g.headless=false;g.diskless=true;g.in=Input{};
+      const auto L=g.militaryLayout();const float s=std::min(g.S(),std::min(g_ren.H/720.f,g_ren.W/1120.f));
+      g.in.mx=L.rx+L.rw*.5f;g.in.my=g_ren.H-55*s;g.in.mPressed[0]=g.in.mDown[0]=true;
     } else if(sc.rfind("military_loading",0)==0) {
-      const int id=atoi(sc.c_str()+16);militaryPrerequisites(g,id);g.launchMilitary(id);g.screen=SCR_LOADING;
+      const int id=atoi(sc.c_str()+16);militaryPrerequisites(g,id);
+      // _first captures the production draw-only card before any saved attempt or flight setup.
+      // Other captures retain the deliberate headless fixture for an already initialized scene.
+      if(sc.find("_first")!=std::string::npos) { g.headless=false;g.diskless=true; }
+      g.launchMilitary(id);g.screen=SCR_LOADING;
       g.toasts.clear(); g.in=Input{};
       if(sc.find("live")!=std::string::npos) g.loadImg[fmt("air_%d",g.specIdx)]=0;
     } else if(sc.rfind("military",0)==0) {
@@ -222,11 +232,11 @@ struct GameTest {
     }
     if(sc.rfind("freeflight",0)==0){g.beginFreeFlightSetup();g.freeCraft=atoi(sc.c_str()+10);g.freeAirborne=sc.find("airborne")!=std::string::npos;}
     if(sc.rfind("research40",0)==0) {
-      g.debugScene("research40");
+      g.debugScene("research40");g.researchView.select(g.resCraft);
       if(sc.find("kinetic_emp")!=std::string::npos){g.practiceForward=hive::ForwardSet::Kinetic;g.practiceBomb=hive::BombSet::EMP;g.practiceWave=3;}
       if(sc.find("heavy_penetrator")!=std::string::npos){g.practiceForward=hive::ForwardSet::Heavy;g.practiceBomb=hive::BombSet::Penetrator;g.practiceWave=1;}
       if(sc.find("testcard")!=std::string::npos)for(int i=0;i<Game::kNumResCards;++i)if(Game::kResCards[i].craft==kWraith){g.resCard=i;break;}
-      if(sc.find("underside")!=std::string::npos){g.resPitch=-.35f;g.resYaw=2.15f;g.resZoom=1.1f;}
+      if(sc.find("underside")!=std::string::npos){g.researchView.pitch=-.35f;g.researchView.yaw=2.15f;g.researchView.zoom=1.1f;}
       if(sc.find("focus")!=std::string::npos){g.focusScreen=SCR_RESEARCH*4;g.focusNav=true;g.focusId=0x7E5F0011u;}
       if(sc.find("face")!=std::string::npos)g.realTime=61;
       if(sc.find("helix")!=std::string::npos)g.realTime=43;
@@ -237,7 +247,7 @@ struct GameTest {
     if((sc.rfind("hangar",0)==0 || sc.rfind("freeflight",0)==0) &&
        (sc.find("rotated")!=std::string::npos || sc.find("zoomed")!=std::string::npos)) {
       FrameParams selected{};g.hangarPreviewCamera(selected);
-      if(sc.find("rotated")!=std::string::npos)g.hangarView.yaw=90*DEG;
+      if(sc.find("rotated")!=std::string::npos)g.hangarView.yaw=MenuPreviewView::defaultYaw+90*DEG;
       if(sc.find("zoomed")!=std::string::npos)g.hangarView.zoom=1.35f;
     }
     if(sc.find("airline_active")!=std::string::npos){g.career.money=1000000;g.career.license=LIC_ATP;g.career.storyIndex=(int)g_story.size();for(int i=0;i<5;i++){g.career.fleet.push_back({i,g.career.location,50,.9f});g.career.airline.pilots.push_back({"Review pilot "+std::to_string(i+1),2,200});}}
@@ -254,6 +264,38 @@ struct GameTest {
       if(sc.find("ready")!=std::string::npos){g.loadReadyT=g.loadT;g.loadShown=1;g.loadStableFrames=2;g_ren.entPending=0;}
       // No map shader is initialized in UI-only mode. Real packaged photographs remain available.
     }
+  }
+  // Context-only review camera: production metre-scale room, aircraft and
+  // rendering are unchanged. Omit menu rails so the real workbench is visible.
+  static void renderBenchContext(Game& g) {
+    FrameParams fp=g.buildFrame();const float size=fp.hangarSize;
+    fp.camPos=vec3(.15f,.45f,-1.35f)*size;
+    const vec3 target=vec3(-.10f,.08f,.10f)*size, forward=normalize(target-fp.camPos);
+    fp.camBack=-forward;fp.camRight=normalize(cross(forward,vec3(0,1,0)));fp.camUp=cross(fp.camRight,forward);
+    fp.fovY=55*DEG;g_ren.renderScene(fp,{},{});
+    g_ren.uiBegin();g_ren.rect(18,18,610,68,vec3(.015f,.025f,.035f),.88f,4);
+    g_ren.text(32,30,23,kAircraft[fp.plane.model].name,vec3(.95f,.95f,.90f),1);
+    g_ren.text(32,63,13,"SAME 0.90 m WORKBENCH / 2.40 m TOP / 3 m FLOOR GRID",svui::amber,1);
+    float bx=0,by=0;const bool shown=g_ren.project(fp,vec3(-.98f*size,.9f,.74f*size),bx,by);
+    if(!shown||bx<0||bx>g_ren.W||by<0||by>g_ren.H){fprintf(stderr,"FAIL: contextual workbench must be visible\n");exit(3);}
+    g_ren.line(bx,by-3,bx,by-28,1.5f,svui::amber,.95f);
+    g_ren.text(bx,by-44,12,"0.90 m WORKBENCH",svui::amber,1,1,true);
+    g_ren.uiEnd();
+    printf("METRIC CONTEXT: model=%d room=%.2f m bench top=(%.2f,0.90,%.2f) projected=(%.2f,%.2f)\n",fp.plane.model,size,-.98f*size,.74f*size,bx,by);
+  }
+  static void checkImmediateLaunch(const Game& g) {
+    if(g.screen!=SCR_LOADING || !g.pendingMilitaryLaunch || !g.militaryLaunchFrameDrawn ||
+        g.militaryLaunchFramePresented || g.career.attemptOpen || g.career.military.activeAttempt ||
+        g.militaryFlight || g.loadFrames!=0 || g.loadReadyT>=0) {
+      fprintf(stderr,"FAIL: Deploy must replace its own menu frame with the loading card before any save/mission setup\n");exit(3);
+    }
+    const auto& c=*g.pendingMilitaryLaunch;const auto& preview=g_ren.loadingPreview();
+    if(!preview.matches(c.forceAircraft,c.type-CT_MIL_RECON) || preview.width>1280 || preview.height>720 ||
+        !g.loadImg.empty() || preview.matches((c.forceAircraft+1)%kAircraftCount,c.type-CT_MIL_RECON)) {
+      fprintf(stderr,"FAIL: first loading card must reuse the matching unclassified aircraft scene without image decoding\n");exit(3);
+    }
+    printf("PASS real Deploy replaced the same menu frame with matching aircraft snapshot %dx%d (model=%d mission=%d); setup still waits for presentation\n",
+      preview.width,preview.height,preview.craft,preview.mission);
   }
   static void scrollSetup(Game& g,const std::string& sc,int frame) {
     g.focusList.clear();
@@ -311,7 +353,7 @@ int main(int argc,char**argv){
     if(sc=="interactions"){GameTest::checkInteractions(*g);GameTest::checkResearchLoadout(*g);GameTest::checkScrollFocus(*g);GameTest::checkLoading(*g);GameTest::checkHangarFraming(*g);GameTest::checkCatalog(*g);GameTest::checkFreeFlightUI(*g);delete g;continue;}
     for(int f=0;f<(full?(getenv("FRAMES")?atoi(getenv("FRAMES")):1):3);f++){
       GameTest::scrollSetup(*g,sc,f);
-      if(full){if(sc.rfind("military_loading",0)==0) g->update(1.f/30.f); g->render();}else{
+      if(full){if(sc.rfind("military_loading",0)==0) g->update(1.f/30.f); if(sc.find("_bench")!=std::string::npos)GameTest::renderBenchContext(*g);else g->render();if(sc.rfind("military_launch",0)==0)GameTest::checkImmediateLaunch(*g);}else{
         glBindFramebuffer(GL_FRAMEBUFFER,0);glViewport(0,0,W,H);glClearColor(.014f,.025f,.042f,1);glClear(GL_COLOR_BUFFER_BIT);
         g_ren.uiBegin();GameTest::draw(*g,sc);g_ren.uiEnd();
       }
@@ -320,5 +362,6 @@ int main(int argc,char**argv){
     if(!g_ren.screenshotPNG(path.c_str()))return 1;
     printf("WROTE %s\n",path.c_str());delete g;
   }
+  g_ren.releaseLoadingPreview();
   return 0;
 }

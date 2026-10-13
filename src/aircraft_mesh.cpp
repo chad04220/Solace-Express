@@ -1071,6 +1071,15 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
   }
 
   // ---- to the GPU: the mesh, and the moving hull under its own key in the hull table
+  // Preserve metric extrema from the exact rigid exterior, including authored
+  // tips/spinners. Nominal flight-model dimensions can differ (notably XR-40).
+  // Cockpit geometry is never a source of aircraft size annotations.
+  PM.previewBounds = inside ? AircraftPreviewBounds{} : aircraftPreviewBounds(vb);
+  if (getenv("HULLDBG") && PM.previewBounds.valid) {
+    const auto& b = PM.previewBounds;
+    printf("preview dimensions model=%d: rigid exterior span=%.3f m length=%.3f m, x=[%.3f,%.3f] z=[%.3f,%.3f]\n",
+      fp.plane.model, b.right.x-b.left.x, b.tail.z-b.nose.z, b.left.x,b.right.x,b.nose.z,b.tail.z);
+  }
   if (!PM.vao) glGenVertexArrays(1, &PM.vao);
   if (!PM.vbo) glGenBuffers(1, &PM.vbo);
   if (!PM.ibo) glGenBuffers(1, &PM.ibo);
