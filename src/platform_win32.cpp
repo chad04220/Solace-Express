@@ -959,6 +959,14 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
                     shaded * 1e-6, kept * 1e-6, kept / px * 100.0, px * 1e-6, kept > 0 ? shaded / kept : 0.0);
           else fprintf(af, "  its fragments: %.2f M kept (%.0f%% of the %.2f M pixels); the card doesn't count those shaded\n",
                        kept * 1e-6, kept / px * 100.0, px * 1e-6);
+          // the same frame with the ground's depth in first: its shading pass then tests the depth before it shades on
+          // any card, so what it shades beyond the kept is the shading's own excess (the 2 x 2 blocks it works in, at
+          // the triangles' edges), not hidden ground
+          g_ren.dbgOff = Renderer::kDbgPrepassOn; g_ren.countGround = true; frames(1); g_ren.countGround = false; g_ren.dbgOff = 0; glFinish();
+          double kept2 = -1, shaded2 = -1;
+          if (g_ren.readGroundCounts(kept2, shaded2) && shaded2 >= 0)
+            fprintf(af, "  with the ground's depth first: %.2f M shaded, %.2f M kept; %.1f shaded for each kept\n",
+                    shaded2 * 1e-6, kept2 * 1e-6, kept2 > 0 ? shaded2 / kept2 : 0.0);
           const Game::BenchAircraft A = g->benchmarkAircraft();
           const vec3 c = g_ren.prepassCam;
           fprintf(af, "  camera (%.0f, %.0f, %.0f), aircraft (%.0f, %.0f, %.0f), fuel %.0f kg, engine %s; %.1f s into the scene\n",

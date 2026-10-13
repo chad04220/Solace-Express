@@ -334,6 +334,20 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
   and the camera, the aircraft and its fuel. Many more shaded than kept: the card shading hidden ground (its depth
   test after the shader, not before); more kept: more ground in view; the aircraft's depth missing: the cockpit no
   longer hiding it.
+- **The v3.49.6 diagnostics** (the same card and settings): the XR-40 hover is back to v3.49.4's 17.5 ms and holds
+  still through its measurements (15.8 and 16.9 ms at its start and end, the ground the same both times), its ground
+  rows at v3.49.4's costs: with the same code, v3.49.5's run was disturbed from outside the game. What the ground
+  lines found instead: in every scene the card ran the ground's shader for 1.3 to 19.5 times the fragments it kept -
+  the night runway 4.66 M for 1.47 M, with its ground's materials 4.05 ms of 14 - and the software renderer exactly
+  once for each. The terrain shader had two discards (the sea floor seen from above, and since v3.49.5 the Earth
+  regions' far-blend dither). A discard in a shader that writes depth can keep a card from testing the depth before
+  the shader runs, and the counts read as if it did: the ground hidden behind nearer ground, the scenery or the
+  cockpit shaded and then thrown away. (Ground depth first's shading pass writes no depth, and paid 2.7 ms there.)
+  Some of the excess may be the shading's own 2 x 2 blocks at the triangles' edges; the next run tells them apart. Now the sea floor is
+  cut away by a clip plane at sea level in the vertex shader (`gl_ClipDistance`, exactly where the discard cut it),
+  and the dither's discard is in a program of its own (`FAR_REGION_DITHER`, built on a Free Flight's loading
+  screen) used only while a far blend is on. The analysis counts the ground a second time with its depth in first,
+  which separates hidden ground shaded from the shading's own excess at the triangles' edges.
 - The islands sit in 10 km of open sea, and the map wraps every 100 km (v3.45).
 
 ## Phase A - the road network

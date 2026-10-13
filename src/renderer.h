@@ -754,6 +754,7 @@ private:
   // the depth test before it is shaded). 2: after the prepass, the ground shaded where its depth went in, then the sea
   void drawTerrainMesh(const FrameParams& fp, int mode = 0);
   GLuint progTerrainDepth = 0; bool terrainDepthTried = false;
+  GLuint progTerrainDither = 0; bool terrainDitherTried = false;   // (the ground with an Earth region's far blend: prepareTerrainDither)
  public:
   // Whether the prepass pays depends on the view and the card: in play it is kept on or off by measurement
   // (prepass_auto.h), once its program is built (prepareTerrainDepth, on a flight's loading screen: never mid-flight).
@@ -765,6 +766,9 @@ private:
   bool prepassNow = false;         // (this frame's choice: renderScene)
   bool terrainPrepassed = false;   // (drawEntities ran the prepass: rasterWorld shades the ground in mode 2)
   void prepareTerrainDepth();      // (builds the prepass's program, once)
+  // The ground's program for while an Earth region's far blend dithers it out (FAR_REGION_DITHER: the one with a
+  // discard), built once on a Free Flight's loading screen. Without it the blend shows the near ground whole
+  void prepareTerrainDither();
   vec3 prepassCam = vec3(0, 0, 0);
   // The main view's ground, for the analysis (platform_win32.cpp --analyze): the chunks drawn, and whether the player's
   // airframe's depth (earlyMesh: the cockpit's walls, half the screen from inside) and the ground's own (the prepass)

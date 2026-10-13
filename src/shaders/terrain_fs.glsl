@@ -12,13 +12,12 @@ float regionLodDither() {
 }
 
 void main(){
-  vec2 pixelDx = dFdx(vW.xz), pixelDy = dFdy(vW.xz);   // before divergent LOD and sea-floor discards
+  vec2 pixelDx = dFdx(vW.xz), pixelDy = dFdy(vW.xz);   // before the divergent LOD discard
+#ifdef FAR_REGION_DITHER
+  // (a program of its own, for while an Earth region's far blend is on: without a discard the card tests the depth
+  // before it shades - the sea floor is cut away by kTerrainVS's clip plane - Renderer::drawTerrainMesh)
   if (uFarRegionBlend >= 1.0 || regionLodDither() < uFarRegionBlend) discard;
-  // the sea floor, from above the sea: the sea is drawn over it. Left in, a shallow bank a few decimetres down fought
-  // the sea's surface for the depth buffer - each pass's logarithmic depth is exact only at the vertices, off by more
-  // than that across the far chunks' large triangles - and a few kilometres off it broke through in a lattice of pale
-  // sandy dashes laid out like the chunks' grid
-  if (vW.y < 0.0 && uCamPos.y > 0.0) discard;
+#endif
   vec3 p = vW; float t = length(vC - uCamPos);   // (t: the distance to where it is drawn, the lighting pass's)
   vec2 pw = wrapW(p.xz);
   RoadHit road = noRoad();

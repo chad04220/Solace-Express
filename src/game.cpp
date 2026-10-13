@@ -2339,6 +2339,7 @@ void Game::updateLoading(float dt) {
   warmCombatCollision();
   loadT += dt;
   if (!headless) g_ren.prepareTerrainDepth();   // (ground depth first's program, for its trials in flight: renderer.h)
+  if (!headless && earthFlight) g_ren.prepareTerrainDither();   // (the ground's program for the Earth regions' far blends)
   if (loadReadyT < 0) {
     dbgCam = false;
     updateCamera(dt);   // stream around the camera the flight will open with

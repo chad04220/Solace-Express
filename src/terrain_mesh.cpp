@@ -709,6 +709,11 @@ void Renderer::prepareTerrainDepth() {
   terrainDepthTried = true;
   std::string de; progTerrainDepth = linkProgramCached(terrainVSAssembly(""), terrainDepthFSAssembly(), de);
 }
+void Renderer::prepareTerrainDither() {
+  if (progTerrainDither || terrainDitherTried || !progTerrain) return;
+  terrainDitherTried = true;
+  std::string de; progTerrainDither = linkProgramCached(terrainVSAssembly(""), terrainFSAssembly("#define FAR_REGION_DITHER\n"), de);
+}
 
 // The analysis's count of the ground's shading (renderer.h countGround): the fragments that passed the depth test, and
 // where the card counts them the fragment shader's runs. Many more runs than fragments kept is ground shaded for
@@ -766,9 +771,12 @@ void Renderer::drawTerrainMesh(const FrameParams& fp, int mode) {
   glDisable(GL_BLEND); glDisable(GL_CULL_FACE);
   if (pre) glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
   mat4 vp = viewProj(fp), view = viewMat(fp);
-  GLuint p = pre ? progTerrainDepth : progTerrain;
+  // the shading pass's program: the one without a discard (the card tests the depth before it shades), unless an
+  // Earth region's far blend is dithering the ground out (prepareTerrainDither)
+  const float farBlend = activeTerrainFarBlend(fp);
+  GLuint p = pre ? progTerrainDepth : farBlend > 0.f && progTerrainDither ? progTerrainDither : progTerrain;
   setRT(p, fp);
-  glUniform1f(U(p, "uFarRegionBlend"), activeTerrainFarBlend(fp));
+  glUniform1f(U(p, "uFarRegionBlend"), farBlend);
   glUniformMatrix4fv(U(p, "uVP"), 1, GL_FALSE, vp.m);
   glUniformMatrix4fv(U(p, "uPanoView"), 1, GL_FALSE, view.m);
   glUniform2f(U(p, "uPano"), fp.pano, fp.panoTanY);
@@ -785,6 +793,7 @@ void Renderer::drawTerrainMesh(const FrameParams& fp, int mode) {
   }
   const bool counted = countGround && !pre && !feedPass && fp.pano <= 0.f;   // (the main view's shading: the analysis)
   if (counted) beginGroundCount();
+  glEnable(GL_CLIP_DISTANCE0);   // (the sea floor cut away at sea level: kTerrainVS)
   if (!(dbgOff & kProbeTerrain)) {
     if (terrChunks) glDrawElementsInstanced(GL_TRIANGLES, kChunkVerts, GL_UNSIGNED_SHORT, nullptr, terrChunks);
     if (terrChunksCoarse) {
@@ -794,6 +803,7 @@ void Renderer::drawTerrainMesh(const FrameParams& fp, int mode) {
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iboTerrain); glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 16, (void*)0);
     }
   }
+  glDisable(GL_CLIP_DISTANCE0);
   if (counted) endGroundCount();
   glDepthFunc(GL_LESS); glDepthMask(GL_TRUE);
   if (pre) { glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE); glBindVertexArray(0); glDisable(GL_DEPTH_TEST); return; }   // (the sea comes with the shading pass)

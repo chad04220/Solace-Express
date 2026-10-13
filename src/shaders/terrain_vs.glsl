@@ -11,6 +11,7 @@ uniform float uSplit;                         // a chunk is split while the came
 out vec3 vW; out vec3 vN;
 out vec3 vC;   // where it is drawn: on the round world (kPlanet)
 invariant gl_Position;   // (the depth prepass and the shading pass, two programs on this one shader, meet at exactly equal depth: Renderer::drawTerrainMesh)
+out float gl_ClipDistance[1];   // the sea floor cut away at sea level (below; Renderer::drawTerrainMesh enables it)
 const int C = 32;
 int octAt(float d){ return d < 600.0 ? 11 : (d < 3000.0 ? 9 : (d < 12000.0 ? 7 : 5)); }   // (terrainNormal's thresholds)
 float hAt(vec2 xz, float d){ return terrainH(xz, octAt(d)); }
@@ -55,6 +56,14 @@ void main(){
   vec3 n = normalize(vec3(hAt(xz - vec2(e, 0.0), d) - hAt(xz + vec2(e, 0.0), d), 2.0*e, hAt(xz - vec2(0.0, e), d) - hAt(xz + vec2(0.0, e), d)));
   vec3 wp = vec3(xz.x, h, xz.y);
   vW = wp; vN = n;
+  // the sea floor, from above the sea: the sea is drawn over it. Left in, a shallow bank a few decimetres down fought
+  // the sea's surface for the depth buffer - each pass's logarithmic depth is exact only at the vertices, off by more
+  // than that across the far chunks' large triangles - and a few kilometres off it broke through in a lattice of pale
+  // sandy dashes laid out like the chunks' grid. Cut away by a clip plane at sea level, exactly where the fragment
+  // shader's discard of vW.y < 0 cut it before: a discard anywhere in a shader that writes depth costs its draws the
+  // early depth test on some cards (v3.49.6's diagnostics, RTX 3070 Laptop: 2 to 13 times the ground's fragments
+  // shaded as kept - the night runway's 4.7 M for 1.5 M - the hidden ground shaded, then thrown away)
+  gl_ClipDistance[0] = uCamPos.y > 0.0 ? wp.y : 1.0;
   vec3 cp = planetPos(wp, uCamPos); vC = cp;
   gl_Position = uVP*vec4(cp, 1.0);
   bool behind = false;

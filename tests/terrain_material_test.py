@@ -47,6 +47,13 @@ if arg not in ('p','vW'):
     assert len(parts)==3 and re.fullmatch(r'(p|vW)\.y',parts[1]), 'terrain FS: the material position must keep the height in y, got '+built.group(1)
 assert fs.index('dFdx(vW.xz)') < fs.index('discard;')
 assert fs.index('dFdy(vW.xz)') < fs.index('discard;')
+# no discard in the ground's common program: with one, a card may test the depth only after shading (v3.49.6's
+# diagnostics: the RTX ran the ground's shader for 2 to 13 times the fragments it kept). The far blend's dither is
+# its own program's; the sea floor is cut away by the vertex shader's clip plane
+vs=(ROOT/'src/shaders/terrain_vs.glsl').read_text()
+common=re.sub(r'#ifdef FAR_REGION_DITHER.*?#endif','',fs,flags=re.S)
+assert 'discard' not in re.sub(r'//[^\n]*','',common), 'terrain FS: a discard outside FAR_REGION_DITHER'
+assert 'gl_ClipDistance[0] = uCamPos.y > 0.0 ? wp.y : 1.0;' in vs, 'terrain VS: the sea floor clip plane'
 assert 'dFdx(' not in terrain and 'dFdy(' not in terrain and 'fwidth(' not in terrain
 assert 'vec2(foot, 0.0), vec2(0.0, foot)' in mp, 'Map must supply its analytic footprint'
 assert 'terrainBumpStrength(t)' in fs and 't < 2000.0 ? 0.6 : 0.25' not in fs

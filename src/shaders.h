@@ -59,10 +59,10 @@ inline std::string terrainVSAssembly(const std::string& defines) { return std::s
 inline std::string terrainFSAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + "#define ENV_MATERIALS\n#define GROUND_ROADS\n" + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kRoads + kMaterialCommon + kTerrainMaterial + kGBuffer + kGBWrite + kTerrainFS;
 }
-// the ground's depth prepass (Renderer::drawTerrainMesh mode 1): terrainVSAssembly's vertices and no colour; the sea
-// floor seen from above dropped as terrain_fs drops it
+// the ground's depth prepass (Renderer::drawTerrainMesh mode 1): terrainVSAssembly's vertices and no colour (the sea
+// floor seen from above cut away by the vertex shader's clip plane, as for the shading pass)
 inline std::string terrainDepthFSAssembly() {
-  return "#version 330 core\nin vec3 vW; uniform vec3 uCamPos;\nvoid main(){ if (vW.y < 0.0 && uCamPos.y > 0.0) discard; }\n";
+  return "#version 330 core\nvoid main(){}\n";
 }
 inline std::string waterVSAssembly(const std::string& defines) { return std::string("#version 330 core\n") + defines + "#define ROUND_WORLD\n" + kPlanet + kWaterVS; }
 inline std::string waterFSAssembly(const std::string& defines) {
