@@ -1,3 +1,19 @@
+## What's new in v3.49.6
+
+This one is for the diagnostics; nothing in the game itself changes.
+
+### What v3.49.5's diagnostics showed (RTX 3070 Laptop, High)
+- **Faster nearly everywhere:** the forest 11.4 -> 9.9 ms, the storm 9.5 -> 8.0 ms, the night runway 14.1 -> 13.0 ms, the cockpit 10.4 -> 9.9 ms.
+- **The gentler foveated shading looks clean.** At its strongest it now saves 1.1 ms on the night runway (it was 2.1 ms with the coarser edges), and the staircase in the corners is gone.
+- **Ground depth first chose well:** on for the night runway and the XR-40 hover, off in the six scenes where it would have cost time.
+- **One slower scene:** the XR-40 hovering over Solace Capital at night went from 17.4 to 19.3 ms, and got heavier still while it was being measured. Its ground costs three to four times what it did in v3.49.4, with the picture exactly the same. In play, ground depth first switches on there and wins back about 2 ms of it. It can't be reproduced on the software renderer here: flown on for 50 seconds there, the scene holds perfectly still.
+- The first launch after updating to v3.49.5 compiled the new aircraft shaders once: about 7 s per aircraft type the first time it's flown. This update changes no shaders, so there's no wait this time.
+
+### New in the diagnostics
+- **The analysis now looks at the ground in every scene, at its start and again at its end:** the frame time, how much ground is drawn, whether the cockpit and the ground's own depth were in before the ground was shaded, how many ground pixels the graphics card shaded against how many it kept, and where the camera and the aircraft are. A scene that holds still should read the same both times; where the XR-40 hover doesn't, these lines show why.
+
+Please run `diagnostics.bat` on this version.
+
 ## What's new in v3.49.5
 
 ### Free Flight: the whole planet
