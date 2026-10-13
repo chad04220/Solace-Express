@@ -1,7 +1,22 @@
 ## What's new in v3.49.5
 
+### Free Flight: the whole planet
+- **Free Flight can now take you beyond the Solace Islands.** There are 6,143 regions round the planet, each an invented landscape at its own place on the globe: archipelagos, chains of volcanoes, fjords, atolls and pieces of continent, each with four to six airfields and the towns and roads between them. Pick one of the recommended regions, or enter a latitude and longitude.
+- **Fly from one to the next.** Head out across the ocean and the region ahead is built in the background and comes up over the horizon as you fly, with no loading screen on the way.
+- The career and the research terminal stay on the Solace Islands, and Free Flight never touches your career save. (Prepared by Codex.)
+- This is a first version, tested on the software renderer here. How smoothly the crossings go on your graphics card is the thing to watch.
+
+### Jet fuel
+- **Jets now burn fuel the way jets do:** by the thrust they make, much more at full power and in reheat, much less high up. On full tanks and with no reserve, a Starling now reaches about 4,300 km and an Atlas about 5,800 km. Their tanks are bigger: 2,200 kg and 20 t.
+- **Full tanks and a full load don't always go together.** Each jet has a maximum take-off weight: with a full cabin, the tanks can't be filled to the top.
+- **The research jets burn fuel too.** The XR-30 and XR-40 start with full tanks, and an XR-40 hovering empties them in about 25 minutes.
+- On ordinary short flights, a jet's fuel bill is smaller than before.
+- The autopilot no longer lets an airliner slowly wallow from side to side in long, high cruise.
+
 ### Fixed
 - **The README in the v3.49.3 and v3.49.4 downloads had the folder names wrong** in its note on keeping your career: it named the new `SomniumVolandi` folder twice and said the "old" folders could be deleted. Don't follow that copy of it. The right way round, as the release notes said: copy your files from `%APPDATA%\SolaceExpress` into `%APPDATA%\SomniumVolandi`, and only then can the `SolaceExpress` folders go. The README is corrected.
+
+Please fly Free Flight beyond Solace on this version, and run `diagnostics.bat`.
 
 ## What's new in v3.49.4
 

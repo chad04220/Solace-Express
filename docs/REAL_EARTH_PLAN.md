@@ -25,6 +25,17 @@ comes from real data, with the game's procedural detail only on top of it where 
 
 ## 0. Status and notes for Codex (2026-10-12, after v3.49.2)
 
+**Update (2026-10-13): the owner changed course after Phase 0.** The global data packs and their size measurement
+were stopped; instead Codex built seeded *procedural* regions round the planet for Free Flight
+(`codex/procedural-earth-regions-20261012`, merged into `claude/compassionate-davinci-4cfo20` at d829de5, for
+v3.49.5): `src/geo.*` (this plan's Phase 1 geodesy, on the sphere), 6,143 generated regions plus authored Solace,
+background generation with bounded GPU staging, distant terrain with a paired collision fallback, and ocean-crossing
+handoffs between nonrepeating charts. Its own design note is `docs/PROCEDURAL_EARTH.md`, its review
+`docs/CLAUDE_PROCEDURAL_EARTH_REVIEW.md`. Phases 2 to 5 below (the real ground, roads, airports and land cover from
+the data) are on hold unless the owner asks for them again; the career stays on Solace (Phase 6 not started).
+What the merge kept from the game's side: the ground's depth prepass (`prepass_auto.h`) never runs while a region's
+far blend dithers the near terrain out, and the loading screen's progress follows only the active world.
+
 **Phase 0 is merged** (`codex/earth-data-phase0-20261011`, `codex/usgs-global-source-prep`), and so is the NumPy
 sampler (`codex/earth-sampling-performance-review-20261012`). One Phase 0 deliverable is still open:
 
