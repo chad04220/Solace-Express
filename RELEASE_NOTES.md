@@ -13,6 +13,10 @@
 - On ordinary short flights, a jet's fuel bill is smaller than before.
 - The autopilot no longer lets an airliner slowly wallow from side to side in long, high cruise.
 
+### Cockpits
+- **XR-30:** the top edge of the main display is straight again. The curved frame of the wraparound windows cut into its upper corners in a row of small teeth.
+- **Atlas:** the small display in the overhead panel (heading, flaps, gear, fuel) reads the right way round; its text was mirrored. (Both prepared by Codex.)
+
 ### Fixed
 - **The README in the v3.49.3 and v3.49.4 downloads had the folder names wrong** in its note on keeping your career: it named the new `SomniumVolandi` folder twice and said the "old" folders could be deleted. Don't follow that copy of it. The right way round, as the release notes said: copy your files from `%APPDATA%\SolaceExpress` into `%APPDATA%\SomniumVolandi`, and only then can the `SolaceExpress` folders go. The README is corrected.
 

@@ -422,8 +422,7 @@ vec2 mapJetCockpit(vec3 p){
   // missed them in long strips along their curve, and the pod's shell showed through as shards across the view)
   float scr = max(max(abs(r - 0.667) - 0.033, abs(ang) - 1.25), abs(q.y - 0.02) - 0.30);
   res = opU(res, vec2(scr, 41.0));
-  float bez = max(max(abs(r - 0.675) - 0.02, abs(ang) - 1.3), abs(q.y - 0.02) - 0.345);
-  bez = max(bez, -max(max(r - 0.66, abs(ang) - 1.25), abs(q.y - 0.02) - 0.30));   // window cut-out
+  float bez = specterPanoramaBezel(q);
   res = opU(res, vec2(bez, 44.0));
   res = opU(res, vec2(max(max(abs(r - 0.664) - 0.02, abs(ang) - 0.62), abs(q.y - 0.348) - 0.016), 49.0));
   // Stepped arc of five canted modules, with a deliberately wider central primary flight display.
