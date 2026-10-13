@@ -12,6 +12,7 @@
 #include "procedural_regions.h"
 #include "region_travel.h"
 #include <algorithm>
+#include <cstring>
 #include <functional>
 #include <stdexcept>
 #include <unordered_set>
@@ -709,6 +710,40 @@ void Renderer::prepareTerrainDepth() {
   std::string de; progTerrainDepth = linkProgramCached(terrainVSAssembly(""), terrainDepthFSAssembly(), de);
 }
 
+// The analysis's count of the ground's shading (renderer.h countGround): the fragments that passed the depth test, and
+// where the card counts them the fragment shader's runs. Many more runs than fragments kept is ground shaded for
+// nothing: hidden, but found so only after its shader ran (or thrown away by the shader's own discards)
+void Renderer::beginGroundCount() {
+  if (!qGround[0]) glGenQueries(2, qGround);
+  if (qShadedAvail < 0) {
+    bool ext = false;
+    if (glGetIntegerv && glGetStringi) {
+      GLint ne = 0; glGetIntegerv(GL_NUM_EXTENSIONS, &ne);
+      for (GLint i = 0; i < ne && !ext; i++) { const GLubyte* e = glGetStringi(GL_EXTENSIONS, (GLuint)i); ext = e && !strcmp((const char*)e, "GL_ARB_pipeline_statistics_query"); }
+    }
+    for (int i = 0; i < 16 && glGetError() != 0; i++) {}
+    qShadedAvail = ext ? 1 : 0;
+  }
+  glBeginQuery(GL_SAMPLES_PASSED, qGround[0]);
+  if (qShadedAvail == 1) {
+    glBeginQuery(GL_FRAGMENT_SHADER_INVOCATIONS_ARB, qGround[1]);
+    if (glGetError() != 0) qShadedAvail = 0;   // (listed, but refused: kept counted alone)
+  }
+}
+void Renderer::endGroundCount() {
+  glEndQuery(GL_SAMPLES_PASSED);
+  if (qShadedAvail == 1) glEndQuery(GL_FRAGMENT_SHADER_INVOCATIONS_ARB);
+  qGroundIssued = true;
+}
+bool Renderer::readGroundCounts(double& keptPx, double& shadedPx) {
+  keptPx = shadedPx = -1.0;
+  if (!qGroundIssued) return false;
+  qGroundIssued = false;
+  GLuint64 n = 0; glGetQueryObjectui64v(qGround[0], GL_QUERY_RESULT, &n); keptPx = (double)n;
+  if (qShadedAvail == 1) { n = 0; glGetQueryObjectui64v(qGround[1], GL_QUERY_RESULT, &n); shadedPx = (double)n; }
+  return true;
+}
+
 // Draws the terrain and the sea into the bound G-buffer (depth-tested against what is there already)
 void Renderer::drawTerrainMesh(const FrameParams& fp, int mode) {
   if (!progTerrain || !vaoTerrain) return;
@@ -748,6 +783,8 @@ void Renderer::drawTerrainMesh(const FrameParams& fp, int mode) {
     if (fineBytes) glBufferSubData(GL_ARRAY_BUFFER, 0, fineBytes, terrInst.data());
     if (coarseBytes) glBufferSubData(GL_ARRAY_BUFFER, fineBytes, coarseBytes, terrInstCoarse.data());
   }
+  const bool counted = countGround && !pre && !feedPass && fp.pano <= 0.f;   // (the main view's shading: the analysis)
+  if (counted) beginGroundCount();
   if (!(dbgOff & kProbeTerrain)) {
     if (terrChunks) glDrawElementsInstanced(GL_TRIANGLES, kChunkVerts, GL_UNSIGNED_SHORT, nullptr, terrChunks);
     if (terrChunksCoarse) {
@@ -757,6 +794,7 @@ void Renderer::drawTerrainMesh(const FrameParams& fp, int mode) {
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iboTerrain); glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 16, (void*)0);
     }
   }
+  if (counted) endGroundCount();
   glDepthFunc(GL_LESS); glDepthMask(GL_TRUE);
   if (pre) { glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE); glBindVertexArray(0); glDisable(GL_DEPTH_TEST); return; }   // (the sea comes with the shading pass)
   // the sea

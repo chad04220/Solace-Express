@@ -937,6 +937,34 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         auto timed = [&](int n) { frames(8); glFinish(); LARGE_INTEGER t0, t1; QueryPerformanceCounter(&t0); frames(n); glFinish(); QueryPerformanceCounter(&t1); return qpcMs(t0, t1) / n; };
         frames(30);
         fprintf(af, "\n==================== %s ====================\n", sc.c_str());
+        // the ground over one frame (renderer.h groundStats): its chunks, what depth was in before it was shaded (the
+        // airframe's - from inside, the cockpit's walls - and the ground's own, the prepass), and its fragments: those
+        // its shader ran for against those kept (that passed the depth test; the rest were hidden, found so only after
+        // they were shaded). With the camera, the aircraft and its fuel, at the scene's start and again at its end: a
+        // scene that holds still should read the same twice (v3.49.5's XR-40 hover over the city grew 19 to 24 ms
+        // through its measurements, its ground's materials 0.9 to 4.1 ms against v3.49.4's, the picture unchanged)
+        const float sceneT0 = g->benchmarkAircraft().clock;
+        auto groundLine = [&](const char* when) {
+          const double ms = timed(20);
+          g_ren.countGround = true; frames(1); g_ren.countGround = false; glFinish();
+          double kept = -1, shaded = -1;
+          const bool got = g_ren.readGroundCounts(kept, shaded);
+          const Renderer::GroundStats& gs = g_ren.groundStats;
+          const double px = (double)(int)(g_ren.W * g_ren.renderScale) * (int)(g_ren.H * g_ren.renderScale);
+          fprintf(af, "Ground %s (frame %.2f ms): %d chunks + %d coarse; depth in before it: %s%s\n", when, ms, gs.chunks, gs.coarse,
+                  gs.cockpitFirst ? "the aircraft's (its mesh)" : "not the aircraft's", gs.prepassed ? ", the ground's own" : "");
+          if (!got) fprintf(af, "  its fragments: not counted (no ground drawn)\n");
+          else if (shaded >= 0)
+            fprintf(af, "  its fragments: %.2f M shaded, %.2f M kept (%.0f%% of the %.2f M pixels); %.1f shaded for each kept\n",
+                    shaded * 1e-6, kept * 1e-6, kept / px * 100.0, px * 1e-6, kept > 0 ? shaded / kept : 0.0);
+          else fprintf(af, "  its fragments: %.2f M kept (%.0f%% of the %.2f M pixels); the card doesn't count those shaded\n",
+                       kept * 1e-6, kept / px * 100.0, px * 1e-6);
+          const Game::BenchAircraft A = g->benchmarkAircraft();
+          const vec3 c = g_ren.prepassCam;
+          fprintf(af, "  camera (%.0f, %.0f, %.0f), aircraft (%.0f, %.0f, %.0f), fuel %.0f kg, engine %s; %.1f s into the scene\n",
+                  c.x, c.y, c.z, A.pos.x, A.pos.y, A.pos.z, A.fuel, A.engine ? "running" : "stopped", A.clock - sceneT0);
+        };
+        groundLine("at the start");
         // 1. CPU vs GPU
         {
           double tu = 0, tr = 0, tw = 0; const int N = 30;
@@ -1045,6 +1073,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
           else fprintf(af, "Ground depth first, measured as in play: no result (%s)\n", pa.trials ? "too few GPU timestamps came back" : "no trial ran");
           g_ren.prepassAutoOn = false; g_ren.prepassAuto = PrepassAuto();
         }
+        groundLine("at the end");
         // a picture of the scene for reference; and where the card has it, the same with foveated shading at its
         // strongest, to see what it costs the picture
         frames(3); glFinish();

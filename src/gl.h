@@ -19,6 +19,8 @@ typedef unsigned long long GLuint64; typedef double GLdouble;
 #define GL_TIMESTAMP 0x8E28
 #define GL_QUERY_RESULT 0x8866
 #define GL_QUERY_RESULT_AVAILABLE 0x8867
+#define GL_SAMPLES_PASSED 0x8914
+#define GL_FRAGMENT_SHADER_INVOCATIONS_ARB 0x82F4
 #define GL_TRUE 1
 #define GL_TRIANGLES 0x0004
 #define GL_UNSIGNED_BYTE 0x1401

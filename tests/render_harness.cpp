@@ -375,6 +375,20 @@ void main(){
     if (seq > 0 && i >= n - seq) { char b[256]; snprintf(b, sizeof b, "/tmp/claude-0/sp/seq_%s_%d.ppm", scene.c_str(), i - (n - seq)); glFinish(); g_ren.screenshot(b); }
   }
   if (getenv("TAAF")) for (int i = 0, n = atoi(getenv("TAAF")); i < n; i++) game.render();   // extra static frames: let TAA converge
+  if (getenv("SIMFRAMES")) {   // the scene flown on first, simulated but not drawn (a timing scene should hold still)
+    for (int i = 0, n = atoi(getenv("SIMFRAMES")); i < n; i++) game.update(1.f / 60.f);
+    for (int i = 0; i < 3; i++) game.render();
+  }
+  if (getenv("GROUNDCOUNT")) {   // the main view's ground over one frame, as the analysis counts it (renderer.h groundStats)
+    g_ren.countGround = true; game.render(); g_ren.countGround = false; glFinish();
+    double kept = -1, shaded = -1; const bool got = g_ren.readGroundCounts(kept, shaded);
+    const Renderer::GroundStats& gs = g_ren.groundStats;
+    const Game::BenchAircraft A = game.benchmarkAircraft();
+    printf("ground: %d chunks + %d coarse, aircraft depth first %d, own depth first %d; counted %d: %.0f shaded, %.0f kept\n"
+           "  camera (%.0f, %.0f, %.0f), aircraft (%.0f, %.0f, %.0f), fuel %.0f kg, engine %d, clock %.1f s\n",
+           gs.chunks, gs.coarse, (int)gs.cockpitFirst, (int)gs.prepassed, (int)got, shaded, kept,
+           g_ren.prepassCam.x, g_ren.prepassCam.y, g_ren.prepassCam.z, A.pos.x, A.pos.y, A.pos.z, A.fuel, (int)A.engine, A.clock);
+  }
   glFinish();
   if (getenv("BENCH")) {
     printf("bench scene: %zu particles, %zu wreck pieces, %zu fragments\n", GameTest::particleCount(game), GameTest::wreckCount(game), GameTest::debrisCount(game));

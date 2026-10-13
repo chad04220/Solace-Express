@@ -766,7 +766,18 @@ private:
   bool terrainPrepassed = false;   // (drawEntities ran the prepass: rasterWorld shades the ground in mode 2)
   void prepareTerrainDepth();      // (builds the prepass's program, once)
   vec3 prepassCam = vec3(0, 0, 0);
+  // The main view's ground, for the analysis (platform_win32.cpp --analyze): the chunks drawn, and whether the player's
+  // airframe's depth (earlyMesh: the cockpit's walls, half the screen from inside) and the ground's own (the prepass)
+  // were in before the ground was shaded. While countGround, the ground's shading draws are counted too: the fragments
+  // the shader ran for and those that passed the depth test, read after a glFinish (readGroundCounts)
+  struct GroundStats { int chunks = 0, coarse = 0; bool cockpitFirst = false, prepassed = false; } groundStats;
+  bool countGround = false;
+  // false: nothing counted since the last read. shadedPx < 0: the card can't count the shader's runs
+  // (GL_ARB_pipeline_statistics_query)
+  bool readGroundCounts(double& keptPx, double& shadedPx);
  private:
+  GLuint qGround[2] = {0, 0}; bool qGroundIssued = false; int qShadedAvail = -1;   // (-1: not yet asked)
+  void beginGroundCount(); void endGroundCount();
   void rasterWorld(const FrameParams& fp);
   void rasterObjects(const FrameParams& fp);
   void rasterShadowProxy(const FrameParams& fp);

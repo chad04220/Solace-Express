@@ -125,6 +125,8 @@ public:
   const Weather& benchmarkWeather() const { return wx; }   // final preset state, read-only diagnostics
   float benchmarkTimeOfDay() const { return timeOfDay; }
   int benchmarkSceneStatus() const { return crashed ? -1 : (int)screen; }
+  struct BenchAircraft { vec3 pos; float fuel; bool engine; float clock; };   // (the analysis's ground lines)
+  BenchAircraft benchmarkAircraft() const { return {plane.pos, plane.fuel, plane.engineRunning, gameTime}; }
   void update(float dt);
   void render();
   void framePresented();   // platform calls only after swapping a rendered frame onto the window

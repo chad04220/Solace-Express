@@ -143,6 +143,7 @@ void Renderer::rasterWorld(const FrameParams& fp) {
   const bool fovea = !feedPass && fp.pano <= 0.f && beginFoveation();   // (the main view's ground and sea foveated where the card can: renderer.h)
   drawTerrainMesh(fp, terrainPrepassed ? 2 : 0);   // (its depth already in, before the scenery: drawEntities)
   if (fovea) endFoveation();
+  if (!feedPass && fp.pano <= 0.f) groundStats = {terrChunks, terrChunksCoarse, earlyMesh != nullptr, terrainPrepassed};
   terrainPrepassed = false;
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }

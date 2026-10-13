@@ -319,6 +319,21 @@ Each phase ships as a version, measured on the owner's RTX 3070 laptop through `
     from f = 0.75, beyond R + 0.35: the corners).
   - The city's fixed cost at High (the scenery's draw, not its pixels) is what keeps that scene under 60 fps; Medium
     quality draws about a quarter fewer instances there.
+- **The v3.49.5 diagnostics** (RTX 3070 Laptop, High): the bench's scenes 0.1 to 1.6 ms faster than v3.49.4 (forest
+  11.4 -> 9.9, storm 9.5 -> 8.0, night 14.1 -> 13.0); the gentler foveation's strongest saves 1.1 ms on the night runway
+  (2.1 before) with the corners' staircase gone; ground depth first switched itself on for the night runway and the
+  XR-40 hover, off elsewhere. The update's new aircraft shaders took 275 s to compile once (40 programs, about 7 s per
+  aircraft type the first time it is flown). One regression, not understood: the XR-40 hovering over Solace Capital at
+  night, 17.4 -> 19.3 ms, and heavier through its own measurements (19.3, 22.0, 23.7 ms; v3.49.4's held at 17.4 to
+  18.3), every ground row 3 to 4 times its v3.49.4 cost (materials 0.9 -> 4.1 ms, the terrain probe 3.2 -> 7.3 ms) with
+  the picture unchanged; ground depth first now saves 2.3 ms there where it cost 1.4. Not reproducible on the software
+  renderer: flown on 50 s there the scene holds still (ground chunks 296 -> 310, ground fragments 44k -> 46k, the
+  cockpit's depth in first throughout). So the analysis now prints, at each scene's start and end, the frame time, the
+  ground's chunks, whether the aircraft's depth (from inside, the cockpit's walls) and the ground's own were in before
+  it was shaded, its fragments shaded (`GL_ARB_pipeline_statistics_query`) against those kept (`GL_SAMPLES_PASSED`),
+  and the camera, the aircraft and its fuel. Many more shaded than kept: the card shading hidden ground (its depth
+  test after the shader, not before); more kept: more ground in view; the aircraft's depth missing: the cockpit no
+  longer hiding it.
 - The islands sit in 10 km of open sea, and the map wraps every 100 km (v3.45).
 
 ## Phase A - the road network
