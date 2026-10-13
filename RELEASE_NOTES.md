@@ -1,3 +1,22 @@
+## What's new in v3.49.7
+
+### No more frozen menus when a flight starts
+- **The loading screen now comes up the moment you start any flight:** Initiate in the research terminal, Fly or Continue on the job board, Practise, Try again after a flight, Take flight in Free Flight, and Restart from the pause menu. Until now the menu stayed frozen on screen while the flight's first scene was prepared behind it, most of all in the research terminal. Now the loading card shows straight away, with the flight's title, aircraft, airports and weather, and the save, the flight's setup and the first scene all happen behind it. (Military Deploy already worked this way.)
+- **Back on the loading card returns you to where you started**, and nothing of the flight has been set up or saved yet.
+
+### The g-force effect, redesigned
+- **Pulling too hard now looks like your eye's iris closing in.** A dark red iris closes from the edges of the screen towards the middle as the load builds, until only a pinhole is left as the airframe nears breaking. Its tissue looks like a real iris: fine radial fibres, the ring round the opening, crypts and furrows, black towards the edges. Near the opening you can still just see the world through it; further out you can't, and the HUD fades away under it too.
+- **The view through the opening turns dark red** and loses its colour, darkening towards the opening's edge.
+- **Veins** branch in from the edges and reach just past the opening, so they creep in as it closes.
+- **A racing heartbeat:** with each beat (a lub and its dub) the iris tightens, the veins swell and a dark flush runs over the view.
+
+### Faster ground on NVIDIA cards (to be confirmed)
+- **v3.49.6's diagnostics showed the graphics card working out the ground's colour for up to 19 times more pixels than end up on screen.** On the night runway it shaded 4.7 million to keep 1.5 million. The software renderer here shades each pixel once. The cause looks like how the ground shader dropped the sea floor under the water: done that way, the card can't skip ground hidden behind hills, buildings or the cockpit before shading it. The sea floor is now cut off before shading instead, and the picture is the same: on coastal scenes before and after, at most 2 pixels in half a million differ noticeably.
+- The ground should cost noticeably less on your card, most of all low down and on runways. **Please run `diagnostics.bat`:** each scene now also counts the ground with "ground depth first" switched on, which shows whether this was the cause.
+
+### Good to know
+- The first launch after updating compiles the ground's and the screen's shaders again, once (the startup screen shows it). The aircraft's own shaders are unchanged.
+
 ## What's new in v3.49.6
 
 This one is for the diagnostics; nothing in the game itself changes.
