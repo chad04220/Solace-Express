@@ -444,6 +444,7 @@ void Game::drawResearch(const FrameParams& fp) {
   float dt = uiDt;
   ResLayout L = researchLayout();
   // selection changes re-run the scan and the decryption
+  researchView.select(resCraft);
   if (resCraft != resLastCraft) { resLastCraft = resCraft; resSelT = realTime; g_audio.trigger(SFX_BEEP, 0.4f); }
   float selT = realTime - resSelT;
   // a click, or with id a stop in the D-pad's walk too (A takes it); id 0: the mouse's only (an arrow beside a control
@@ -562,15 +563,7 @@ void Game::drawResearch(const FrameParams& fp) {
   {
     float cx = L.cx, cy = L.cy, R = L.r;
     const float stageBot = L.bot - kPreviewControlsHeight * s;
-    // interaction: drag to turn, wheel to zoom, right stick turns
-    bool inStage = hovered(L.px0, L.top, L.px1 - L.px0, stageBot - L.top);
-    if (inStage && in.mPressed[0]) resDrag = true;
-    if (!in.mDown[0]) resDrag = false;
-    if (resDrag) { resYaw += in.mdx * 0.008f; resPitch = clampf(resPitch + in.mdy * 0.006f, -0.5f, 1.0f); resIdleT = 0; }
-    else resIdleT += dt;
-    if (in.pad && fabsf(in.rx) > 0.15f) { resYaw += in.rx * dt * 2.f; resIdleT = 0; }
-    if (inStage && in.wheel != 0) { resZoom = clampf(resZoom * (1.f + in.wheel * 0.1f), 0.6f, 1.8f); in.wheel = 0; }
-    if (set.menuMotion && resIdleT > 2.5f) resYaw += dt * 0.18f;   // slow turntable when left alone
+    updateMenuPreview(researchView,L.px0,L.top,L.px1-L.px0,stageBot-L.top,0x7E5F0030u);
     // stage graphics
     dashRing(cx, cy, R * 1.0f, 1.5f * s, ACC, 0.55f * e, 90, 0.5f, realTime * 0.05f);
     dashRing(cx, cy, R * 1.05f, 3 * s, ACC, 0.35f * e, 8, 0.12f, -realTime * 0.2f);
@@ -579,8 +572,8 @@ void Game::drawResearch(const FrameParams& fp) {
       float th = i / 72.f * 6.2832f - 1.5708f, L1 = i % 6 == 0 ? 12 * s : 5 * s;
       g_ren.line(cx + cosf(th) * (R * 1.1f), cy + sinf(th) * (R * 1.1f), cx + cosf(th) * (R * 1.1f + L1), cy + sinf(th) * (R * 1.1f + L1), 1 * s, ACC, 0.5f * e);
     }
-    float brg = fmodf(fmodf(resYaw / DEG, 360.f) + 360.f, 360.f);
-    const std::string viewText = fmt("VIEW  %03.0f  //  ELEV %+03.0f  //  ZOOM %.1fx", brg, resPitch / DEG, resZoom);
+    float brg = fmodf(fmodf(researchView.yaw / DEG, 360.f) + 360.f, 360.f);
+    const std::string viewText = fmt("VIEW  %03.0f  //  ELEV %+03.0f  //  ZOOM %.1fx", brg, researchView.pitch / DEG, researchView.zoom);
     const float viewSize = 11 * s * std::min(1.f, (L.px1 - L.px0 - 24 * s) / std::max(1.f, g_ren.textWidth(viewText, 11 * s)));
     g_ren.text(cx, std::min(cy + R * 1.1f + 14 * s, stageBot - 16 * s), viewSize, viewText, R_DIM, e, 1, false);
     // brackets on the stage
@@ -625,24 +618,8 @@ void Game::drawResearch(const FrameParams& fp) {
       g_ren.text(lx, ly - 15 * s, 10.5f * s, ellipsize(decrypt(c.t, selT - 0.8f - ci * 0.1f, 0.01f), callWidth, 10.5f * s), R_TEXT, ca, c.side > 0 ? 2 : 0, false);
       ci++;
     }
-    // Dedicated view controls sit below the stage. The same reduced stage dimensions feed
-    // researchPreviewCamera, so the native model is framed above these buttons too.
-    const float gap = 6 * s, bw = (sw - 4 * gap) / 5.f, by = stageBot + 10 * s, bh = 32 * s;
-    const float fs = std::min(10.5f * s, bw / 7.5f);
-    const char* labels[] = {"< ROTATE", "ROTATE >", "ZOOM -", "ZOOM +", "RESET"};
-    for (int i = 0; i < 5; ++i) {
-      const float bx = sx0 + i * (bw + gap);
-      const bool hov = hovered(bx, by, bw, bh), focused = focusNav && focusId == 0x7E5F0030u + uint32_t(i);
-      g_ren.rectGrad(bx, by, bw, bh, R_VIOLET * (hov || focused ? .19f : .10f), R_INK, .85f * e);
-      g_ren.rectOutline(bx, by, bw, bh, R_VIOLET, (hov || focused ? .85f : .36f) * e, 0, s);
-      g_ren.text(bx + bw * .5f, by + (bh - fs) * .5f, fs, labels[i], focused ? R_TEXT : R_VIOLET, e, 1, false);
-      if (click(bx, by, bw, bh, 0x7E5F0030u + uint32_t(i))) {
-        if (i < 2) resYaw += (i ? 1.f : -1.f) * 15.f * DEG;
-        else if (i < 4) resZoom = clampf(resZoom * (i == 2 ? .9f : 1.1f), .6f, 1.8f);
-        else { resYaw = .7f; resPitch = .15f; resZoom = 1.f; }
-        resIdleT = 0; resDrag = false;
-      }
-    }
+    drawMenuPreviewControls(researchView,0x7E5F0030u,sx0,stageBot,sw,s,R_INK,ACC,R_TEXT,R_DIM,0.f,e);
+
   }
   // ------------------------------------------------------------------ right: specification, envelope, notes
   {
@@ -791,7 +768,7 @@ void Game::drawResearch(const FrameParams& fp) {
       g_ren.rect(c4, by, tw, 3 * s, ACC, 0.15f * e);
       g_ren.rect(c4, by, tw * f, 3 * s, ACC, 0.9f * e);
       g_ren.rect(c4 + tw * f - 5 * s, by - 6 * s, 10 * s, 15 * s, ACC, e, 2 * s);
-      if (hovered(c4 - 6 * s, cy + 12 * s, tw + 12 * s, 36 * s) && in.mDown[0] && !resDrag) resTime = floorf(5.f + clampf((in.mx - c4) / tw, 0, 1) * 16.f + 0.5f);
+      if (hovered(c4 - 6 * s, cy + 12 * s, tw + 12 * s, 36 * s) && in.mDown[0] && !researchView.drag) resTime = floorf(5.f + clampf((in.mx - c4) / tw, 0, 1) * 16.f + 0.5f);
       int step = 0; focusAdjust(0x7E5E0020u, c4 - 6 * s, cy + 12 * s, tw + 12 * s, 36 * s, &step);   // (left / right: an hour)
       if (step) resTime = clampf(resTime + step, 5.f, 21.f);
     }
@@ -812,11 +789,11 @@ void Game::drawResearch(const FrameParams& fp) {
   }
   const bool range = displayedRange;
   const bool viewFocus = focusNav && focusId >= 0x7E5F0030u && focusId <= 0x7E5F0034u;
-  const char* prompts = padPrompts() ? (range ? "D-PAD MOVE / STEP   A SELECT   X AIRFRAME   R-STICK ROTATE / SCROLL   LB / RB SITE   START INITIATE   B ABORT"
-                                                          : "D-PAD MOVE / STEP   A SELECT   X SWITCH AIRFRAME   R-STICK ROTATE   LB / RB SITE   START INITIATE   B ABORT")
-                                     : (viewFocus ? "ARROWS MOVE FOCUS   ENTER SELECT   TAB AIRFRAME   DRAG ROTATE   WHEEL ZOOM / SCROLL   ESC ABORT"
-                                                  : range ? "UP / DOWN FOCUS   ENTER SELECT / INITIATE   TAB AIRFRAME   <- / -> SITE   DRAG ROTATE   WHEEL ZOOM / SCROLL   ESC ABORT"
-                                                          : "UP / DOWN FOCUS   ENTER SELECT / INITIATE   TAB AIRFRAME   <- / -> SITE   DRAG ROTATE   WHEEL ZOOM   ESC ABORT");
+  const char* prompts = padPrompts() ? (range ? "D-PAD MOVE / STEP   A SELECT   X AIRFRAME   R-STICK VIEW / SCROLL   LB / RB SITE   START INITIATE   B ABORT"
+                                                          : "D-PAD MOVE / STEP   A SELECT   X SWITCH AIRFRAME   R-STICK VIEW   LB / RB SITE   START INITIATE   B ABORT")
+                                     : (viewFocus ? "ARROWS MOVE FOCUS   ENTER SELECT   TAB AIRFRAME   DRAG VIEW   WHEEL ZOOM / SCROLL   ESC ABORT"
+                                                  : range ? "UP / DOWN FOCUS   ENTER SELECT / INITIATE   TAB AIRFRAME   <- / -> SITE   DRAG VIEW   WHEEL ZOOM / SCROLL   ESC ABORT"
+                                                          : "UP / DOWN FOCUS   ENTER SELECT / INITIATE   TAB AIRFRAME   <- / -> SITE   DRAG VIEW   WHEEL ZOOM   ESC ABORT");
   const float promptLeft = 24 * s, promptRight = W - 44 * s - g_ren.textWidth("CLASSIFIED", 10.5f * s);
   const float promptSize = 10.5f * s * std::min(1.f, (promptRight - promptLeft) / std::max(1.f, g_ren.textWidth(prompts, 10.5f * s)));
   g_ren.text((promptLeft + promptRight) * .5f, H - 22 * s, promptSize, prompts, R_DIM, 0.75f * e, 1, false);

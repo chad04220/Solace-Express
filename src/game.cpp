@@ -1010,6 +1010,8 @@ void Game::returnToFreeFlight() {
 // Return a service loaner without leaving weapon effects or damaged scenery behind on the civilian hub.
 // Closing an unflown attempt is saved transactionally; a failed save remains pending and blocks another launch.
 void Game::returnToMilitary() {
+  pendingMilitaryLaunch.reset();
+  militaryLaunchFrameDrawn = militaryLaunchFramePresented = false;
   if (career.military.activeAttempt && !commitBlocked())
     commit([](Career& k) { k.abandonMilitaryAttempt(); });
   militaryFlight = militarySettled = researchFlight = freeFlight = isolatedFlight = false;
@@ -1461,8 +1463,34 @@ void Game::shutdown() {
   retireEarthPrefetch();
   if (earthRetireJob.valid()) { try { earthRetireJob.get(); } catch (...) {} }
   if (regionJob.valid()) { try { regionJob.get(); } catch (...) {} }
-  saveSettings(); radio.shutdown();
+  saveSettings(); radio.shutdown(); g_ren.releaseLoadingPreview();
 }
+
+void Game::focusLost() {
+  windowFocused = false; controllerFocusRearm = true;
+  if (screen == SCR_FLIGHT && !crashed) paused = true;
+  hangarView.release(); researchView.release(); militaryView.release();
+  std::memset(in.down, 0, sizeof(in.down));
+  in.endFrame();
+  for (int i = 0; i < 3; ++i) { in.mReleased[i] = in.mDown[i]; in.mDown[i] = false; }
+  in.buttons = in.buttonsPressed = 0;
+  in.lx = in.ly = in.rx = in.ry = in.lt = in.rt = 0;
+  padHoldA = false;
+}
+
+void Game::filterControllerFocus() {
+  if (windowFocused && !controllerFocusRearm) return;
+  const bool neutral = !in.pad || (!in.buttons && std::fabs(in.lx) <= .15f && std::fabs(in.ly) <= .15f &&
+    std::fabs(in.rx) <= .15f && std::fabs(in.ry) <= .15f && in.lt <= .15f && in.rt <= .15f);
+  // Read the raw neutral state before suppressing it. Run once after polling, so a held button cannot
+  // turn into a new edge on return, nor can this frame's filtered zeroes prematurely re-arm it.
+  if (windowFocused && neutral) controllerFocusRearm = false;
+  else controllerFocusRearm = true;
+  in.buttons = in.buttonsPressed = 0;
+  in.lx = in.ly = in.rx = in.ry = in.lt = in.rt = 0;
+  if (padHoldA) { in.mDown[0] = in.mPressed[0] = false; in.mReleased[0] = true; padHoldA = false; }
+}
+
 
 std::vector<Game::Annunciator> Game::hudAnnunciators() const {
   const Failures& F = plane.fail;
@@ -2287,6 +2315,17 @@ bool Game::loadingShadowPending() const {
   return g_ren.tshRequiredPending(direction.y);
 }
 void Game::updateLoading(float dt) {
+  // Back always wins over setup, including the update immediately after the first presented card.
+  if (pendingMilitaryLaunch) {
+    if (in.pressed[K_ESC] || (in.buttonsPressed & PAD_B)) { returnToMilitary(); return; }
+    loadT += dt;
+    if (!militaryLaunchFramePresented) return;
+    const Contract c = *pendingMilitaryLaunch;
+    pendingMilitaryLaunch.reset();
+    militaryLaunchFrameDrawn = militaryLaunchFramePresented = false;
+    if (!beginMilitaryLaunch(c)) returnToMilitary();
+    return;   // the first real scene and collision warmup still use the normal readiness path
+  }
   if (militaryFlight || isMilitaryContract(contract.type)) {
     const auto& m = career.military;
     if (!militaryFlight || source != Career::SRC_MILITARY || commitBlocked() ||
@@ -2296,6 +2335,7 @@ void Game::updateLoading(float dt) {
       returnToMilitary(); return;
     }
   }
+  if (militaryFlight && (in.pressed[K_ESC] || (in.buttonsPressed & PAD_B))) { returnToMilitary(); return; }
   warmCombatCollision();
   loadT += dt;
   if (!headless) g_ren.prepareTerrainDepth();   // (ground depth first's program, for its trials in flight: renderer.h)
@@ -2438,6 +2478,7 @@ void Game::updateCamera(float dt) {
 // Outside active flight the left stick drives an on-screen cursor: A clicks, B backs out (same as Esc),
 // the right stick scrolls lists. Any real mouse movement hands control back to the mouse.
 void Game::gamepadMenus(float dt) {
+  if (!windowFocused) return;
   if (fabsf(in.mdx) + fabsf(in.mdy) > 0.5f) padCursorT = -100.f;
   bool menus = screen != SCR_FLIGHT || paused || crashed;
   if (!in.pad || !menus) { if (padHoldA && !(in.buttons & PAD_A)) { in.mDown[0] = false; padHoldA = false; } return; }
@@ -2459,7 +2500,7 @@ void Game::gamepadMenus(float dt) {
     if (screen == SCR_DEBRIEF) in.pressed[K_ENTER] = true;   // B on the results screen continues to the hub
   }
   float ry = dz(in.ry);
-  if (ry != 0) { static float acc = 0; acc += ry * dt * 8.f; while (fabsf(acc) >= 1.f) { in.wheel += acc > 0 ? 1.f : -1.f; acc -= acc > 0 ? 1.f : -1.f; } }
+  if (ry != 0 && !menuPreviewTarget()) { static float acc = 0; acc += ry * dt * 8.f; while (fabsf(acc) >= 1.f) { in.wheel += acc > 0 ? 1.f : -1.f; acc -= acc > 0 ? 1.f : -1.f; } }
   // research menu: D-pad also steps through launch sites, Start launches
   if (screen == SCR_RESEARCH) {
     int n = (int)g_world.airports.size();
@@ -2480,7 +2521,7 @@ void Game::focusNavigate() {
   bool menus = screen != SCR_FLIGHT || paused || crashed;
   int scr = screen * 4 + (paused ? 1 : 0) + (screen == SCR_HUB ? hubTab * 8 : 0);
   if (!menus) { focusNav = false; return; }
-  if (scr != focusScreen) { focusScreen = scr; focusNav = false; }
+  if (scr != focusScreen) { focusScreen = scr; focusNav = false; hangarView.release(); researchView.release(); militaryView.release(); }
   if (fabsf(in.mdx) + fabsf(in.mdy) > 0.5f || in.mPressed[0]) focusNav = false;
   const bool researchViewFocus = screen == SCR_RESEARCH && focusNav &&
     focusId >= 0x7E5F0030u && focusId < 0x7E5F0035u;
@@ -3647,7 +3688,7 @@ void Game::hangarPreviewCamera(FrameParams& fp) {
   }
   // Turn the parked airframe about world-up, rather than orbiting through the
   // showroom's opaque walls. Yaw after parking pitch preserves all tyre heights.
-  demo.q = quat::axisAngle(vec3(0, 1, 0), hangarView.yaw) * quat::axisAngle(vec3(1, 0, 0), pitch);
+  demo.q = quat::axisAngle(vec3(0, 1, 0), -(hangarView.yaw-MenuPreviewView::defaultYaw)) * quat::axisAngle(vec3(1, 0, 0), pitch);
   demo.pos = vec3(0, height, 0);
   demo.vel = vec3(0); demo.onGround = true; demo.engineRunning = false;
   demo.gear = 1.f; demo.flaps = 0; demo.nozzle = 0; demo.rpm = 0; demo.engineSpool = 0; demo.n1 = 0;
@@ -3682,21 +3723,23 @@ void Game::hangarPreviewCamera(FrameParams& fp) {
   const float radius = std::max(sp.span, sp.fusLen) * 0.65f;
   const float pixels = std::max(1.f, std::min(L.previewWidth, L.previewHeight) * 0.40f);
   const vec3 focus = demo.pos + vec3(0, sp.fusRad * 0.45f, 0);
-  const vec3 viewingRay = normalize(vec3(0.40f, 0.24f, -1.f));
+  const float elevation = clampf(hangarView.pitch,.04f,.35f);
+  const vec3 viewingRay(sinf(MenuPreviewView::defaultYaw)*cosf(elevation),sinf(elevation),-cosf(MenuPreviewView::defaultYaw)*cosf(elevation));
   // Keep the eye below the lowest roof beams and inside the side walls even on
   // tall/narrow windows. Zoom changes only the lens, never this safe position.
   const float roomDistance = std::min((fp.hangarSize * .54f - focus.y) / viewingRay.y,
                                       fp.hangarSize * 1.10f / viewingRay.x);
   const float fitDistance = H * .5f * radius / (pixels * tanf(17.f * DEG));
   const float distance = std::max(radius * 1.25f, std::min(fitDistance, roomDistance));
-  const float th = H * .5f * radius / (pixels * distance * clampf(hangarView.zoom, .75f, 1.35f));
+  // A close camera needs the sphere's angular radius, not its flat radius/distance.
+  // This keeps elevated views inside the stage even near the showroom roof.
+  const float tangentDistance=std::sqrt(std::max(distance*distance-radius*radius,radius*radius*.25f));
+  const float th = H * .5f * radius / (pixels * tangentDistance * clampf(hangarView.zoom, MenuPreviewView::minZoom, MenuPreviewView::maxZoom));
   fp.fovY = 2.f * atanf(th);
   const vec3 C = focus + viewingRay * distance;
-  const vec3 f0 = normalize(focus - C), r0 = normalize(cross(f0, vec3(0, 1, 0))), u0 = cross(r0, f0);
-  const float nx = (cx - W*0.5f)/(W*0.5f), ny = (H*0.5f-cy)/(H*0.5f);
-  const vec3 aim = focus - r0*(nx*distance*th*(W/H)) - u0*(ny*distance*th);
-  const vec3 fwd = normalize(aim-C);
-  fp.camPos = C; fp.camBack = -fwd; fp.camRight = normalize(cross(fwd, vec3(0,1,0))); fp.camUp = cross(fp.camRight,fwd);
+  const float nx = (cx-W*.5f)/(W*.5f), ny = (H*.5f-cy)/(H*.5f);
+  const auto axes=menuPreviewAxes(focus-C,nx*th*W/H,ny*th);
+  fp.camPos=C;fp.camBack=-axes.forward;fp.camRight=axes.right;fp.camUp=axes.up;
   fp.exposure = 1.f; fp.vignette = 0.32f;
 }
 
@@ -3706,6 +3749,7 @@ void Game::militaryPreviewCamera(FrameParams& fp) {
   const Contract c = career.militaryContract(militarySelection);
   const bool classified = !career.militaryMissionUnlocked(militarySelection);
   const int craft = c.forceAircraft >= 0 && c.forceAircraft < kAircraftCount ? c.forceAircraft : 0;
+  militaryView.select(craft,militarySelection);
   const AircraftSpec& sp = kAircraft[craft];
   const Airport& a = g_world.airports[std::clamp(c.from, 0, (int)g_world.airports.size()-1)];
   Plane demo; demo.reset(&sp, a.pos(), a.heading+180.f, sp.maxFuel, 85, true, sp.cruise);
@@ -3716,13 +3760,13 @@ void Game::militaryPreviewCamera(FrameParams& fp) {
   const ResLayout L = militaryLayout();
   const float W = std::max(g_ren.W,1), H = std::max(g_ren.H,1);
   fp.fovY = 32.f*DEG; const float th = tanf(fp.fovY*.5f);
-  const float D = H*.5f*std::max(sp.span,sp.fusLen)*.36f / (std::max(L.r,1.f)*th*std::clamp(resZoom,.6f,1.4f));
-  const float yaw = resYaw+a.heading*DEG, pitch = std::clamp(resPitch,.04f,.85f);
-  const vec3 P = demo.pos, C = P+vec3(sinf(yaw)*cosf(pitch),sinf(pitch),-cosf(yaw)*cosf(pitch))*D;
-  const vec3 f = normalize(P-C), r = normalize(cross(f,vec3(0,1,0))), u = cross(r,f);
-  const vec3 aim = P-r*((L.cx-W*.5f)/(W*.5f)*D*th*W/H)-u*((H*.5f-L.cy)/(H*.5f)*D*th);
-  const vec3 look = normalize(aim-C);
-  fp.camPos=C; fp.camBack=-look; fp.camRight=normalize(cross(look,vec3(0,1,0))); fp.camUp=cross(fp.camRight,look);
+  const float s=std::min(S(),std::min(H/720.f,W/1120.f));
+  const float pixels=std::max(1.f,.40f*std::min(L.px1-L.px0,L.bot-L.top-135*s));
+  const float D=H*.5f*std::max(sp.span,sp.fusLen)*.65f/(pixels*th*clampf(militaryView.zoom,MenuPreviewView::minZoom,MenuPreviewView::maxZoom));
+  const float yaw = militaryView.yaw, pitch = clampf(militaryView.pitch,-.5f,1.f);
+  const vec3 P = demo.pos, C = P+demo.q.rotate(vec3(sinf(yaw)*cosf(pitch),sinf(pitch),-cosf(yaw)*cosf(pitch)))*D;
+  const auto axes=menuPreviewAxes(P-C,(L.cx-W*.5f)/(W*.5f)*th*W/H,(H*.5f-L.cy)/(H*.5f)*th);
+  fp.camPos=C;fp.camBack=-axes.forward;fp.camRight=axes.right;fp.camUp=axes.up;
   fp.vignette=.45f; fp.prefetchOn=true; fp.prefetchPos=demo.pos;
   fp.trafficN=0; fp.ufoOn=false; fp.feedRig=fp.dispMode=0;
   // Reuse the hangar's geometry-only outline. Registrations, paint, cockpit
@@ -3770,6 +3814,7 @@ void Game::militaryLoadingCamera(FrameParams& fp) {
 // camera orbits it (drag to turn, wheel to zoom) framed so it sits in the middle of the terminal's preview ring
 int resCraftCount(); int resCraftAt(int k);   // game_research_ui.cpp
 void Game::researchPreviewCamera(FrameParams& fp) {
+  researchView.select(resCraft);
   static Plane demo;
   const AircraftSpec& sp = kAircraft[resWarmCraft >= 0 ? resWarmCraft : resCraft];   // (warming up: every craft in turn)
   if (demo.spec != &sp) demo.reset(&sp, vec3(0, 600, 0), 0, 50, 85, true, 150);
@@ -3807,19 +3852,17 @@ void Game::researchPreviewCamera(FrameParams& fp) {
   // orbit
   ResLayout L = researchLayout();
   float W = (float)g_ren.W, H = (float)g_ren.H;
-  float ext = std::max(sp.span, sp.fusLen) * 0.46f;   // (the craft fills the ring)
+  float ext = std::max(sp.span, sp.fusLen) * 0.65f;   // (the craft fills the ring)
   fp.fovY = 32.f * DEG;
   float th = tanf(fp.fovY * 0.5f);
-  float D = (H * 0.5f / L.r) * ext / th / std::clamp(resZoom, 0.6f, 1.8f);
-  float yaw = resYaw + a.heading * DEG, pit = std::clamp(resPitch, -0.6f, 1.1f);
+  const float pixels=std::max(1.f,.40f*std::min(L.px1-L.px0,L.bot-L.top-56*S()));
+  float D = (H * 0.5f / pixels) * ext / th / clampf(researchView.zoom,MenuPreviewView::minZoom,MenuPreviewView::maxZoom);
+  float yaw = researchView.yaw, pit = clampf(researchView.pitch,-.5f,1.f);
   if (!resAirborne) pit = std::max(pit, 0.04f);   // (on the ground the camera never dips below the apron)
-  vec3 C = P + vec3(sinf(yaw) * cosf(pit), sinf(pit), -cosf(yaw) * cosf(pit)) * D;
+  vec3 C = P + demo.q.rotate(vec3(sinf(yaw) * cosf(pit), sinf(pit), -cosf(yaw) * cosf(pit))) * D;
   if (!resAirborne) C.y = std::max(C.y, g_world.height(C.x, C.z) + 1.6f);
-  vec3 f0 = normalize(P - C), r0 = normalize(cross(f0, vec3(0, 1, 0))), u0 = cross(r0, f0);
-  float nx = (L.cx - W * 0.5f) / (W * 0.5f), ny = (H * 0.5f - L.cy) / (H * 0.5f);
-  vec3 T = P - r0 * (nx * D * th * (W / H)) - u0 * (ny * D * th);   // aim off-centre so the craft lands in the ring
-  vec3 fwd = normalize(T - C);
-  fp.camPos = C; fp.camBack = -fwd; fp.camRight = normalize(cross(fwd, vec3(0, 1, 0))); fp.camUp = cross(fp.camRight, fwd);
+  const auto axes=menuPreviewAxes(P-C,(L.cx-W*.5f)/(W*.5f)*th*W/H,(H*.5f-L.cy)/(H*.5f)*th);
+  fp.camPos=C;fp.camBack=-axes.forward;fp.camRight=axes.right;fp.camUp=axes.up;
   fp.vignette = 0.75f;
 }
 
@@ -4376,7 +4419,7 @@ void Game::updateAtc(float dt) {
 // Nothing stale is ever said: the queue is dropped on pause, at the end of the flight and when the aircraft
 // crashes (then only the crash itself is announced).
 void Game::updateComms(float dt) {
-  bool live = (screen == SCR_FLIGHT || screen == SCR_LOADING) && !paused;
+  bool live = (screen == SCR_FLIGHT || screen == SCR_LOADING) && !paused && !pendingMilitaryLaunch;
   // (paused, or in the menus, nobody is talking: the music comes back up - it stayed at the duck when a pause cut a
   // call short: the review of v3.44.0, AUD-2)
   if (!live) { atc.cancel(); commsPending.clear(); commsCrashSeen = false; voiceDuck = approach(voiceDuck, 0.f, 1.5f, dt); return; }
@@ -4606,6 +4649,22 @@ void Game::update(float dt) {
   feedAudio();
 }
 
+void Game::renderMilitaryLoadingCard() {
+  // No buildFrame, scene streaming, mesh baking, collision queries or picture decoding on this path.
+  // CPU-only tests use the same card builder without issuing GL commands.
+  if (g_ren.ok) g_ren.clearScreen();
+  g_ren.uiBegin();
+  drawLoading();
+  if (g_ren.ok) g_ren.uiEnd();
+  militaryLaunchFrameDrawn = true;
+}
+
+void Game::framePresented() {
+  if (screen == SCR_LOADING && pendingMilitaryLaunch && militaryLaunchFrameDrawn)
+    militaryLaunchFramePresented = true;
+  militaryLaunchFrameDrawn = false;
+}
+
 void Game::render() {
   if (screen != SCR_REGION_LOADING && (g_world.procedural || !g_world.repeating) &&
       (screen == SCR_MENU || screen == SCR_HUB || screen == SCR_RESEARCH || screen == SCR_DEBRIEF))
@@ -4614,6 +4673,7 @@ void Game::render() {
     g_ren.clearScreen(); g_ren.uiBegin(); drawRegionLoading(); drawPadCursor(); g_ren.uiEnd();
     return;
   }
+  if (screen == SCR_LOADING && pendingMilitaryLaunch) { renderMilitaryLoadingCard(); return; }
   // every menu draws its scene live (the main menu's tour, the hub's airport, the research terminal's preview): the
   // scenery a flight opens with streams in while the player chooses. vid: a full-screen picture instead of the scene
   // (the research terminal's boot screen)
@@ -4660,6 +4720,10 @@ void Game::render() {
       if (a.size() != own) sortAlphaQuads(a, fp.camPos);   // (only with the plume in view: the rest comes sorted)
     }
     g_ren.renderScene(fp, a, b);
+    // The current, assigned aircraft is already rendered. Retain that clean scene before menu text or
+    // panels can cover it, so Deploy can show the same aircraft instantly without another render/decode.
+    if (screen == SCR_HUB && hubTab == TAB_CONTRACTS && hubList == 2)
+      g_ren.retainLoadingPreview(fp, militarySelection);
     if (screen == SCR_LOADING && loadReadyT < 0) ++loadFrames;
   } else g_ren.clearScreen();
   if(screen==SCR_RESEARCH){g_ren.onMeshProgress=nullptr;g_ren.onMeshBatch=nullptr;}
@@ -4715,6 +4779,9 @@ void Game::render() {
     g_ren.text(14 * s, 30 * s, 14 * s, t2, vec3(0.75f, 0.85f, 1.f), 1, 0, false);
   }
   g_ren.uiEnd();
+  // Deploy is handled by drawHub/drawDebrief, after this frame's scene was drawn. Replace that entire
+  // menu frame now, so the very next SwapBuffers shows the loading card, never another frozen menu.
+  if (screen == SCR_LOADING && pendingMilitaryLaunch) renderMilitaryLoadingCard();
 }
 
 // ------------------------------------------------------------------ development scenes for the render harness
@@ -5518,13 +5585,30 @@ void Game::debugScene(const std::string& name) {
 
 // Military sorties are career-backed loaners; research practice uses the same combat engine off the books.
 void Game::launchMilitary(int kind) {
-  if (!military::mission(kind)) return;
+  if (pendingMilitaryLaunch || !military::mission(kind)) return;
   Contract c = career.militaryContract(kind);
   if (career.canFly(c, c.forceAircraft) != Career::SRC_MILITARY) return;
+  if (commitBlocked()) { hubMsg = "Your last result isn't saved yet: retry the save first."; hubMsgTime = 5; return; }
+  if (career.attemptOpen || career.military.activeAttempt) return;
+  // Headless simulations deliberately bypass presentation. Interactive launches defer even the save:
+  // slow storage, encounter setup and the first renderer bake must all happen after a visible card.
+  if (headless) { beginMilitaryLaunch(c); return; }
+  pendingMilitaryLaunch = c;
+  militaryLaunchFrameDrawn = militaryLaunchFramePresented = false;
+  loadT = 0; loadReadyT = -1; loadShown = 0; loadPend0 = 0; loadFrames = 0;
+  loadStableFrames = 0; loadObservedFrame = -1; loadMap = false;
+  screen = SCR_LOADING;
+  in.pressed[K_ENTER] = in.pressed[' '] = false; in.mPressed[0] = false;
+  in.buttonsPressed &= ~(PAD_A | PAD_START);
+}
+
+bool Game::beginMilitaryLaunch(const Contract& c) {
+  if (career.canFly(c, c.forceAircraft) != Career::SRC_MILITARY) return false;
   bool begun=false;
-  if (!commitLaunch([&](Career& k) { begun=k.beginMilitary(c); }) || !begun) return;
+  if (!commitLaunch([&](Career& k) { begun=k.beginMilitary(c); }) || !begun) return false;
   const auto p = career.plan(c, c.forceAircraft, Career::SRC_MILITARY);
   startFlight(c, c.forceAircraft, Career::SRC_MILITARY, &p);
+  return militaryFlight && (screen == SCR_LOADING || screen == SCR_FLIGHT);
 }
 
 hive::WorldCallbacks Game::hiveWorld() {

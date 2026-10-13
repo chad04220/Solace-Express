@@ -19,6 +19,11 @@
 - **Foveated shading is much gentler.** At its strongest, the middle 55% of the screen stays sharp, the whole height of it, and only the corners get the coarsest shading. Halfway, only the far left and right edges are softened.
 - Settings shows what Auto is doing now: the full picture, or how far the edges and the resolution have stepped down.
 
+### Looking over the aircraft
+- **One set of preview controls everywhere:** the Hangar, Free Flight, the research terminal and military service all have the same strip: rotate left and right in 15° steps, zoom out and in, Reset. Hold a button and it repeats; drag with the mouse; on a controller, the right stick turns the aircraft and the triggers zoom. Each menu keeps its own look.
+- **The hangar is to scale.** The workbench, crates and safety stripe are their real size now, so a light aircraft and the Atlas look as big as they are beside them. Rulers on the floor give each aircraft's **wingspan and length in metres**, measured from the model itself (not shown for classified aircraft).
+- **Deploy goes straight to the loading screen.** In military service the loading card comes up on the frame you press Deploy, with the aircraft you were looking at, and the mission is prepared behind it. The supplied-equipment list moved into the scrolling briefing. (All prepared by Codex.)
+
 ### Cockpits
 - **XR-30:** the top edge of the main display is straight again. The curved frame of the wraparound windows cut into its upper corners in a row of small teeth.
 - **Atlas:** the small display in the overhead panel (heading, flaps, gear, fuel) reads the right way round; its text was mirrored. (Both prepared by Codex.)

@@ -416,39 +416,49 @@ void Game::drawLoading() {
     while (!text.empty() && g_ren.textWidth(text + "...", size) > room) text.pop_back();
     return text + "...";
   };
-  const bool military = militaryFlight;
+  const bool pending = pendingMilitaryLaunch.has_value();
+  const Contract& flight = pending ? *pendingMilitaryLaunch : contract;
+  const AircraftSpec& aircraft = pending ? kAircraft[flight.forceAircraft] : plane.spec ? *plane.spec : kAircraft[specIdx];
+  const Weather& weather = pending ? flight.wx : wx;
+  const bool military = pending || militaryFlight;
   const bool research = researchFlight;
   const vec3 accent = military ? svui::amber : research ? svui::code : C_ACCENT;
   const vec3 ink = military ? svui::field : research ? svui::codeInk : C_INK;
   const vec3 dim = military ? vec3(.69f,.73f,.64f) : research ? svui::codeDim : C_DIM;
-  bool air = !plane.onGround;
-  const Airport& ap = g_world.airports[air ? contract.to : contract.from];
+  bool air = pending ? flight.startAirborne : !plane.onGround;
+  const Airport& ap = g_world.airports[air ? flight.to : flight.from];
   // a picture rendered by render_loading.bat - the airport, or the aircraft in flight - when there is one on disk
   std::string key = g_world.procedural ? g_world.regionId + "/" + ap.code :
-    (military || air) ? fmt("air_%d", (int)(plane.spec - kAircraft)) : std::string(ap.code);
+    (military || air) ? fmt("air_%d", pending ? flight.forceAircraft : (int)(plane.spec - kAircraft)) : std::string(ap.code);
   auto li = loadImg.find(key);
-  if (li == loadImg.end()) {
+  if (li == loadImg.end() && !pending) {
     unsigned tex = 0; int w = 0, h = 0; std::vector<uint8_t> px;
     // a picture rendered on this PC by render_loading.bat (.png) wins over the one that ships with the game (.jpg)
     for (const char* ext : {".png", ".jpg"})
       if (!g_world.procedural && !tex && readImage((assetDir + "/loading/" + key + ext).c_str(), w, h, px)) tex = g_ren.makeTexture(px.data(), w, h);
     li = loadImg.emplace(key, tex).first;
   }
-  unsigned pic = li->second;
+  unsigned pic = li == loadImg.end() ? 0 : li->second;
+  const auto& preview = g_ren.loadingPreview();
+  const bool retained = pending && !pic && preview.matches(flight.forceAircraft, flight.type-CT_MIL_RECON);
+  if (retained) pic = preview.texture;
   if (!military && !loadMap && !pic) {   // otherwise the aerial image of the airport, rendered once from the real terrain
     loadMap = true; gpsMapValid = false;
     g_ren.renderMap(ap.x, ap.z, 2400.f, 1536);
   }
   float rt = loadReadyT >= 0 ? loadT - loadReadyT : 0.f;
   float cover = 1.f - smoothstepf(0.f, 1.4f, rt);   // the card fades out onto the live shot once the scenery is in
-  if (cover > 0.001f && (!military || pic)) {
+  if (cover > 0.001f && (!military || pic || pending)) {
     g_ren.rect(0, 0, W, H, vec3(0.01f, 0.02f, 0.035f), cover);
     if (pic) {   // slow push-in over the picture (cropped to fill the screen)
-      float z = 1.f - 0.06f * (set.menuMotion ? std::min(loadT, 12.f) / 12.f : 0.f), asp = (W / H) / (16.f / 9.f);
+      const float imageAspect = retained ? float(preview.width) / preview.height : 16.f / 9.f;
+      float z = 1.f - 0.06f * (set.menuMotion ? std::min(loadT, 12.f) / 12.f : 0.f), asp = (W / H) / imageAspect;
       float su = z * std::min(1.f, asp), sv = z * std::min(1.f, 1.f / asp);
-      g_ren.image(pic, 0, 0, W, H, 0.5f - su * 0.5f, 0.5f - sv * 0.5f, 0.5f + su * 0.5f, 0.5f + sv * 0.5f, cover);
+      // Framebuffer copies start at GL's bottom edge; packaged pictures use top-to-bottom image rows.
+      const float v0 = retained ? .5f + sv*.5f : .5f - sv*.5f, v1 = 1.f-v0;
+      g_ren.image(pic, 0, 0, W, H, 0.5f - su * 0.5f, v0, 0.5f + su * 0.5f, v1, cover);
       g_ren.flushUIPublic();
-    } else if (g_ren.mapTex()) {   // slow push-in over the aerial image
+    } else if (!military && g_ren.mapTex()) {   // slow push-in over the aerial image
       float z = 0.62f - 0.05f * (set.menuMotion ? std::min(loadT, 12.f) / 12.f : 0.f);
       float sv = z, su = z * W / H;
       if (su > 0.98f) { sv *= 0.98f / su; su = 0.98f; }
@@ -464,8 +474,8 @@ void Game::drawLoading() {
   if(research)svui::matrix(g_ren,0,0,W,H,realTime,.18f,set.menuMotion,W*.55f,(L.artTop+L.artBottom)*.5f,W*.32f,(L.artBottom-L.artTop)*.45f);
   if(military)svui::chevrons(g_ren,40*s,13*s,180*s,s,accent,.55f);
   g_ren.text(40*s,26*s,fs(12,11),"SOMNIUM VOLANDI",accent,1,0,false);
-  g_ren.text(W-40*s,26*s,fs(11,9),military?"DEFENSE COMMAND / SORTIE PREPARATION":research?"NIGHTGLASS / FLIGHT INITIALIZATION":freeFlight?"FREE FLIGHT / DEPARTURE PREPARATION":contract.type==CT_LESSON?"FLIGHT SCHOOL / PREPARATION":"FLIGHT OPERATIONS / PREPARATION",dim,1,2,false);
-  g_ren.text(40 * s, 50 * s, 30 * s, fitLoading(contract.title, W - 80 * s, 30 * s), C_TEXT, 1);
+  g_ren.text(W-40*s,26*s,fs(11,9),military?"DEFENSE COMMAND / SORTIE PREPARATION":research?"NIGHTGLASS / FLIGHT INITIALIZATION":freeFlight?"FREE FLIGHT / DEPARTURE PREPARATION":flight.type==CT_LESSON?"FLIGHT SCHOOL / PREPARATION":"FLIGHT OPERATIONS / PREPARATION",dim,1,2,false);
+  g_ren.text(40 * s, 50 * s, 30 * s, fitLoading(flight.title, W - 80 * s, 30 * s), C_TEXT, 1);
   // Mission details and four real readiness bars fit into a shallow bottom strip.
   const float cx=L.x+18*s, cy=L.y, cw=L.width-36*s;
   if(military)svui::fieldSurface(g_ren,L.x,cy,L.width,L.height,s);
@@ -473,17 +483,17 @@ void Game::drawLoading() {
     g_ren.rectGrad(L.x,cy,L.width,L.height,research?svui::codePanel:svui::panel,ink,.97f,5*s);
     g_ren.rectOutline(L.x,cy,L.width,L.height,accent,.28f,5*s,s);
   }
-  const Airport& from = g_world.airports[contract.from];
-  const Airport& to = g_world.airports[contract.to];
+  const Airport& from = g_world.airports[flight.from];
+  const Airport& to = g_world.airports[flight.to];
   const float aircraftX=cx+cw*.32f, weatherX=cx+cw*.60f;
   g_ren.text(cx,cy+12*s,fs(10,9),air?"IN FLIGHT / INBOUND":"DEPARTURE",dim,1,0,false);
   g_ren.text(cx,cy+29*s,fs(19,13),fitLoading(std::string(ap.code)+"  "+ap.name,cw*.32f-18*s,fs(19,13)),C_TEXT,1);
-  g_ren.text(cx,cy+53*s,fs(10,9),military?"Equipment and fuel included":contract.from!=contract.to?fmt("ROUTE  %s > %s",from.code,to.code):"Local flight / same departure and arrival",dim,1,0,false);
+  g_ren.text(cx,cy+53*s,fs(10,9),military?"Equipment and fuel included":flight.from!=flight.to?fmt("ROUTE  %s > %s",from.code,to.code):"Local flight / same departure and arrival",dim,1,0,false);
   g_ren.text(aircraftX,cy+12*s,fs(10,9),military?"SERVICE AIRCRAFT":"AIRCRAFT",dim,1,0,false);
-  g_ren.text(aircraftX,cy+29*s,fs(16,12),fitLoading(plane.spec->name,cw*.28f-18*s,fs(16,12)),C_TEXT,1);
-  if(military&&contract.from!=contract.to)g_ren.text(aircraftX,cy+53*s,fs(10,9),fmt("ROUTE  %s > %s",from.code,to.code),dim,1,0,false);
+  g_ren.text(aircraftX,cy+29*s,fs(16,12),fitLoading(aircraft.name,cw*.28f-18*s,fs(16,12)),C_TEXT,1);
+  if(military&&flight.from!=flight.to)g_ren.text(aircraftX,cy+53*s,fs(10,9),fmt("ROUTE  %s > %s",from.code,to.code),dim,1,0,false);
   g_ren.text(weatherX,cy+12*s,fs(10,9),"CONDITIONS",dim,1,0,false);
-  g_ren.text(weatherX,cy+29*s,fs(12,10),fitLoading(wx.describe(),cw*.40f,fs(12,10)),C_TEXT,1);
+  g_ren.text(weatherX,cy+29*s,fs(12,10),fitLoading(weather.describe(),cw*.40f,fs(12,10)),C_TEXT,1);
   // Separate measured stage bars reveal the work behind the overall percentage.
   const float scene=clampf(loadFrames/2.f,0.f,1.f);
   const float chunks=loadPend0>0?clampf(1.f-float(std::max(0,g_ren.entPending))/loadPend0,0.f,1.f):scene;
@@ -493,7 +503,7 @@ void Game::drawLoading() {
   const char* stages[]={"SCENE SETUP","NEARBY SCENERY","TERRAIN LIGHTING","READINESS CHECK"};
   for(int i=0;i<4;++i){const float xx=cx+cw*i/4,ww=cw/4-18*s,yy=cy+75*s;
     g_ren.text(xx,yy,fs(9,8),stages[i],dim,1,0,false);
-    g_ren.text(xx,yy+16*s,fs(10,9),fractions[i]>=1?"READY":i==1?fmt("%d remaining",std::max(0,g_ren.entPending)):i==3?fmt("%d / 2 stable frames",std::min(2,loadStableFrames)):"IN PROGRESS",fractions[i]>=1?accent:C_TEXT,1,0,false);
+    g_ren.text(xx,yy+16*s,fs(10,9),fractions[i]>=1?"READY":pending?"WAITING":i==1?fmt("%d remaining",std::max(0,g_ren.entPending)):i==3?fmt("%d / 2 stable frames",std::min(2,loadStableFrames)):"IN PROGRESS",fractions[i]>=1?accent:C_TEXT,1,0,false);
     svui::bar(g_ren,xx,yy+34*s,ww,3*s,fractions[i],accent);
   }
   // progress / ready prompt
@@ -503,7 +513,7 @@ void Game::drawLoading() {
     g_ren.text(cx + bw, by - 19 * s, fs(12,10), fmt("%d%%", std::min(99, (int)(clampf(loadShown, 0.f, 1.f) * 100.f))), accent, 1, 2, false);
     g_ren.rect(cx, by, bw, bh, accent, 0.12f, 2 * s);
     if (loadShown > 0.f) g_ren.rectGrad(cx, by, bw * loadShown, bh, accent * 0.7f, accent, 1, 2 * s);
-    const std::string detail=fmt("Elapsed %.1f s  /  %d scene frames  /  ",loadT,loadFrames)+(g_ren.entPending>0?fmt("%d scenery chunks remaining",g_ren.entPending):loadingShadowPending()?"Terrain shadow pass running":"Verifying two stable rendered frames");
+    const std::string detail=pending?"Preparing service assignment and supplied aircraft":fmt("Elapsed %.1f s  /  %d scene frames  /  ",loadT,loadFrames)+(g_ren.entPending>0?fmt("%d scenery chunks remaining",g_ren.entPending):loadingShadowPending()?"Terrain shadow pass running":"Verifying two stable rendered frames");
     g_ren.text(cx, by + 13 * s, fs(10,9), fitLoading(detail,bw,fs(10,9)),dim,.9f,0,false);
     float hx = cx + bw * loadShown;
     g_ren.glow(hx - 4 * s, by - 2 * s, 8 * s, bh + 4 * s, accent, 0.5f + 0.3f * sinf(realTime * 6.f), 4 * s, 14 * s);
@@ -1019,19 +1029,92 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   else if (!can) g_ren.text(px, y + h - 50 * s, 14 * s, "Tip: check the Hangar to buy an aircraft, or earn your next licence through the story.", C_DIM, 1);
 }
 
-void Game::drawHangarPreviewControls(float x, float y, float w) {
-  // A shared strip below both showroom stages. Native buttons preserve the
-  // existing palette, keyboard focus, mouse hit targets and controller A.
-  const float s = S(), controlW = (w - 48 * s) / 5.f, controlX = x + 12 * s;
-  const float controlY = y + 23 * s, controlStep = controlW + 6 * s;
-  g_ren.rect(x, y, w, 56 * s, C_PANEL, 0.9f, 4 * s);
-  g_ren.text(controlX + controlW + 3 * s, y + 8 * s, 9 * s, "ROTATE", C_DIM, 1, 1, false);
-  g_ren.text(controlX + 3 * controlW + 15 * s, y + 8 * s, 9 * s, fmt("ZOOM %.2fx", hangarView.zoom), C_DIM, 1, 1, false);
-  if (button(controlX, controlY, controlW, 26 * s, "<##hangar-rotate-left")) hangarView.rotate(-15 * DEG);
-  if (button(controlX + controlStep, controlY, controlW, 26 * s, ">##hangar-rotate-right")) hangarView.rotate(15 * DEG);
-  if (button(controlX + 2 * controlStep, controlY, controlW, 26 * s, "-##hangar-zoom-out")) hangarView.magnify(-.1f);
-  if (button(controlX + 3 * controlStep, controlY, controlW, 26 * s, "+##hangar-zoom-in")) hangarView.magnify(.1f);
-  if (button(controlX + 4 * controlStep, controlY, controlW, 26 * s, "Reset##hangar-reset")) hangarView.reset();
+bool Game::menuPreviewTarget() const {
+  uint32_t id = 0; float x=0,y=0,w=0,h=0;
+  if (screen == SCR_RESEARCH && resAuthed && !resWarm) {
+    const auto L=researchLayout(); id=0x7E5F0030u;
+    x=L.px0;y=L.top;w=L.px1-L.px0;h=L.bot-56*S()-y;
+  } else if (screen == SCR_HUB && hubTab == TAB_CONTRACTS && hubList == 2) {
+    const auto L=militaryLayout(); const float s=std::min(S(),std::min(g_ren.H/720.f,g_ren.W/1120.f));
+    id=0x6D0020u;x=L.px0;y=L.top+79*s;w=L.px1-L.px0;h=L.bot-56*s-y;
+  } else if (screen == SCR_FREE_FLIGHT || (screen == SCR_HUB && hubTab == TAB_HANGAR)) {
+    const float s=S(); const auto L=hangarLayout(24*s,126*s,g_ren.W-48*s,g_ren.H-146*s,s);
+    id=0x7E6F0030u;x=L.previewX;y=L.previewY;w=L.previewWidth;h=L.previewHeight;
+  }
+  if (!id) return false;
+  return focusNav ? focusId>=id && focusId<id+5 : hovered(x,y,w,h);
+}
+
+void Game::updateMenuPreview(MenuPreviewView& view,float x,float y,float w,float h,uint32_t firstId) {
+  if (!windowFocused) { view.release(); return; }
+  const bool room = &view == &hangarView;
+  const float minPitch = room || (&view == &researchView && !resAirborne) ? .04f : -.5f;
+  const float maxPitch = room ? .35f : 1.f;
+  // Store the angle the camera can actually display; reversing at a floor/roof limit has no hidden dead travel.
+  view.pitch = clampf(view.pitch, minPitch, maxPitch);
+  const bool over=hovered(x,y,w,h), focused=focusNav && focusId>=firstId && focusId<firstId+5;
+  if (over && !focusNav && in.mPressed[0]) { view.drag=true; view.held=-1; in.mPressed[0]=false; }
+  if (!in.mDown[0] || focusNav) view.drag=false;
+  if (view.drag) { view.rotate(in.mdx*.008f); view.elevate(in.mdy*.006f); }
+  // Wheel/analogue input is local to the stage or its focused controls. Lists and
+  // equipment rails retain the right stick's ordinary scrolling elsewhere.
+  if (over && in.wheel!=0) { view.magnify(in.wheel*.1f); in.wheel=0; }
+  if (in.pad && (focused || (!focusNav && over))) {
+    auto axis=[](float v) { return std::fabs(v)<.15f?0.f:(v-std::copysign(.15f,v))/.85f; };
+    const float dt=clampf(uiDt,0.f,.1f);
+    const float rx=axis(in.rx),ry=axis(in.ry),zoom=std::max(0.f,in.rt-.15f)-std::max(0.f,in.lt-.15f);
+    if (rx) view.rotate(rx*dt*2.f);
+    if (ry) view.elevate(-ry*dt*1.2f);
+    if (zoom) view.magnify(zoom*dt*.8f);
+  }
+  view.pitch = clampf(view.pitch, minPitch, maxPitch);
+}
+
+void Game::drawMenuPreviewControls(MenuPreviewView& view,uint32_t firstId,float x,float y,float w,
+    float s,vec3 panelColour,vec3 accent,vec3 textColour,vec3 dim,float radius,float alpha) {
+  const auto L=menuPreviewControls(x,y,w,s);
+  g_ren.rect(x,y,w,56*s,panelColour,.94f*alpha,radius);
+  const float labelSize=std::max(8.f,9*s);
+  g_ren.text(L.x+L.buttonWidth+3*s,y+8*s,labelSize,"ROTATE",dim,alpha,1,false);
+  g_ren.text(L.x+3*L.buttonWidth+15*s,y+8*s,labelSize,fmt("ZOOM %.2fx",view.zoom),dim,alpha,1,false);
+  const char* labels[]={"<",">","-","+","RESET"};
+  bool holding=false;
+  for (int i=0;i<5;++i) {
+    const uint32_t id=firstId+uint32_t(i); const float bx=L.x+i*L.step;
+    focusList.push_back({id,bx,L.buttonY,L.buttonWidth,L.buttonHeight});
+    const bool focus=focusNav && focusId==id, over=hovered(bx,L.buttonY,L.buttonWidth,L.buttonHeight);
+    const bool hot=focus || (!focusNav && over);
+    const float glow=anim(id,hot?1.f:0.f,14);
+    g_ren.rectGrad(bx,L.buttonY,L.buttonWidth,L.buttonHeight,panelColour+accent*(.07f+.13f*glow),panelColour,.98f*alpha,radius);
+    g_ren.rectOutline(bx,L.buttonY,L.buttonWidth,L.buttonHeight,accent,(.30f+.5f*glow)*alpha,radius,s);
+    if(focus)g_ren.rectOutline(bx-2*s,L.buttonY-2*s,L.buttonWidth+4*s,L.buttonHeight+4*s,accent,.95f*alpha,radius,1.5f*s);
+    const float fs=std::min({std::max(10.f,12.f*s),L.buttonHeight*.65f,(L.buttonWidth-6*s)/(i==4?3.2f:1.f)});
+    g_ren.text(bx+L.buttonWidth*.5f,L.buttonY+(L.buttonHeight-fs)*.5f,fs,labels[i],hot?textColour:accent,alpha,1,false);
+    const bool key=windowFocused && focus && (in.pressed[K_ENTER] || in.pressed[' ']);
+    const bool mouse=windowFocused && !focusNav && over && in.mPressed[0];
+    if (key || mouse) {
+      const int source=mouse?1:(in.pad && (in.buttons&PAD_A))?4:in.pressed[' ']?3:2;
+      view.action(i); g_audio.trigger(SFX_CLICK);
+      if(i<4) { view.held=i;view.heldSource=source;view.holdTime=-.35f; }
+      in.mPressed[0]=false;
+      if(key) in.pressed[K_ENTER]=in.pressed[' ']=false;
+    }
+    if (i==view.held) {
+      const bool down=windowFocused && (view.heldSource==1 ? !focusNav && over && in.mDown[0] : focus &&
+        (view.heldSource==4 ? bool(in.buttons&PAD_A) : view.heldSource==3 ? in.down[' '] : in.down[K_ENTER]));
+      if(down) {
+        holding=true;view.holdTime+=clampf(uiDt,0.f,.1f);
+        while(view.holdTime>=0.f) { view.action(i);view.holdTime-=.08f; }
+      }
+    }
+  }
+  if(!holding) { view.held=-1;view.heldSource=0;view.holdTime=0; }
+}
+
+void Game::drawHangarPreviewControls(float x,float y,float w) {
+  const float s=S();const auto L=hangarLayout(24*s,126*s,g_ren.W-48*s,g_ren.H-146*s,s);
+  updateMenuPreview(hangarView,L.previewX,L.previewY,L.previewWidth,L.previewHeight,0x7E6F0030u);
+  drawMenuPreviewControls(hangarView,0x7E6F0030u,x,y,w,s,C_PANEL,C_ACCENT,C_TEXT,C_DIM,4*s);
 }
 
 void Game::drawHubHangar(float x, float y, float w, float h) {

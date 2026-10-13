@@ -19,6 +19,7 @@
 #include "hive_combat.h"
 #include "hive_loadout.h"
 #include "menu_plan_cache.h"
+#include "menu_preview.h"
 #include "renderer.h"
 #include "entities.h"
 #include "audio.h"
@@ -100,9 +101,9 @@ public:
   bool wantPacing = false;       // the frame-rate target changed: the platform layer re-applies its pacing
   // sceneOnly: the scene without the menu on top (captures of the menu's scenery)
   bool sceneOnly = false;
-  void focusLost() {
-    if (screen == SCR_FLIGHT && !crashed) paused = true;
-  }   // the window lost focus: a flight pauses
+  void focusLost();   // pause flight and release every menu gesture when leaving the window
+  void focusGained() { windowFocused = true; }
+  void filterControllerFocus(); // once per raw platform poll; a returning controller must first be neutral
   Settings set;
   std::string saveDir;
   // A tool session (diagnostics.bat's --bench, --shots, --profile, --analyze, --loadshots): its flights - crashes among
@@ -126,6 +127,7 @@ public:
   int benchmarkSceneStatus() const { return crashed ? -1 : (int)screen; }
   void update(float dt);
   void render();
+  void framePresented();   // platform calls only after swapping a rendered frame onto the window
   void shutdown();
 
 private:
@@ -247,6 +249,7 @@ private:
   static constexpr float kResScan0 = 0.35f, kResScan1 = 3.75f;   // the stretch of the boot sequence the scans fill: the warm-up's work runs across it, ACCESS GRANTED at its end
   float resSeq = 0.f, resSeqAt = 0.f, resSeqOpened = -1.f;   // the boot sequence's own clock (the scans move as far as the warm-up has come), the realTime it last moved at, and the opening it belongs to
   bool headless = false;
+  bool windowFocused = true, controllerFocusRearm = false;
 
   // flight session
   Plane plane;
@@ -368,10 +371,15 @@ private:
   float militaryHull = 100, combatBasePayload = 85;
   std::array<std::string,hive::MaxObjectives> militarySiteLabels;
   bool militaryFlight = false, militarySettled = false;
+  // A queued service sortie has no saved attempt or initialized scene until its loading card is presented.
+  std::optional<Contract> pendingMilitaryLaunch;
+  bool militaryLaunchFrameDrawn = false, militaryLaunchFramePresented = false;
   bool combatCollisionWarm = false;
   double combatCollisionWarmMs = 0;
   int combatPrefetchCursor = 0;
   void launchMilitary(int kind);
+  bool beginMilitaryLaunch(const Contract& c);
+  void renderMilitaryLoadingCard();
   void setupMilitaryEncounter();
   void spawnPracticeWave();
   void clearPracticeEncounter();
@@ -421,18 +429,11 @@ private:
 
   // hub selections
   int selContract = 0, selAircraft = -1, selHangar = 0, freeDest = 0;
-  // Inspection-only turntable. Never shared with research, military or the flight camera.
-  struct HangarView {
-    float yaw = 0.f, zoom = 1.f;
-    int craft = -1;
-    bool freeFlight = false;
-    void reset() { yaw = 0.f; zoom = 1.f; }
-    void select(int model, bool free) {
-      if (craft != model || freeFlight != free) { craft = model; freeFlight = free; reset(); }
-    }
-    void rotate(float delta) { yaw = std::remainder(yaw + delta, 2.f * PI); }
-    void magnify(float delta) { zoom = clampf(zoom + delta, .75f, 1.35f); }
-  } hangarView;
+  MenuPreviewView hangarView, researchView, militaryView;
+  bool menuPreviewTarget() const;
+  void updateMenuPreview(MenuPreviewView& view, float x, float y, float w, float h, uint32_t firstId);
+  void drawMenuPreviewControls(MenuPreviewView& view, uint32_t firstId, float x, float y, float w,
+      float scale, vec3 panel, vec3 accent, vec3 text, vec3 dim, float radius = 0.f, float alpha = 1.f);
   bool freeFlightCard = false;
   std::string hubMsg; float hubMsgTime = 0;
 
@@ -608,8 +609,8 @@ private:
   std::set<std::string> resDone;   // finished card ids
   void updateResearchCard(float dt);
   std::string resStepText(const ResStep& st) const;   // "MACH 2.70 x 10 s" and the like
-  bool resAuthed = false, resDrag = false;   // biometric sequence passed this session; dragging the preview
-  float resYaw = 0.7f, resPitch = 0.15f, resZoom = 1.f, resSelT = -10.f, resIdleT = 10.f; int resLastCraft = -1;   // preview orbit, selection time
+  bool resAuthed = false;   // biometric sequence passed this session
+  float resSelT = -10.f; int resLastCraft = -1;   // selection scan time
   vec3 resPrevPos; quat resPrevQ;   // where the preview craft is (for the callouts)
   float prevMach = 0, prevAB = 0;
   // gamepad-driven menu cursor (left stick moves, A clicks, B backs out)
