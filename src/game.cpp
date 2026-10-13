@@ -412,6 +412,8 @@ Career::LaunchPlan Game::finalizeLaunchPlan(const Contract& c, int spec, Career:
   return p;
 }
 void Game::beginCareerFlight(const Contract& c, int spec, Career::Source src) {
+  // (the route's plan and the save, then the flight: all behind the loading card - Game::queueLaunch)
+  if (!commitBlocked() && queueLaunch(c, spec, LAUNCH_CAREER, [this, c, spec, src] { beginCareerFlight(c, spec, src); })) return;
   const Career::LaunchPlan p = finalizeLaunchPlan(c, spec, src);
   if (!commitLaunch([&](Career& k) {
     k.attempt++; k.attemptOpen = true;
@@ -423,6 +425,7 @@ void Game::beginCareerFlight(const Contract& c, int spec, Career::Source src) {
 }
 void Game::continueJob(int spec, Career::Source src) {
   if (!career.job || career.job->state != Career::JobState::RECOVERY) return;
+  if (!commitBlocked() && queueLaunch(career.job->continuation(), spec, LAUNCH_CAREER, [this, spec, src] { continueJob(spec, src); })) return;
   Contract c = career.job->continuation();
   Career::LaunchPlan p = finalizeLaunchPlan(c, spec, src);
   continuationWaivers(p, c, spec, src);
@@ -464,6 +467,7 @@ void Game::continuationWaivers(Career::LaunchPlan& p, const Contract& c, int spe
 void Game::restartFlight() {
   if (freeFlight) { launchFreeFlight(); return; }
   if (researchFlight) { launchResearch(); return; }
+  if (queueLaunch(contract, specIdx, LAUNCH_CAREER, [this] { restartFlight(); })) return;
   if (militaryFlight) { Contract c=contract; auto p=launchPlan; startFlight(c,specIdx,source,&p); return; }
   const bool iso = isolatedFlight, leg = jobLeg;
   Contract c = contract;
@@ -500,6 +504,7 @@ void Game::practiseApproach(int spec, Career::Source src) {
   if (!career.job) return;
   Contract c; c.id = "PRACTICE"; c.title = "Practice: " + career.job->c.title; c.type = CT_FERRY; c.from = career.job->at; c.to = career.job->c.to; c.wx = career.job->c.wx;
   c.brief = "An approach flown for practice: nothing here counts for the job or the career.";
+  if (queueLaunch(c, spec, LAUNCH_CAREER, [this, spec, src] { practiseApproach(spec, src); })) return;
   startFlight(c, spec, src);
   isolatedFlight = true;
 }
@@ -944,6 +949,16 @@ void Game::cancelFreeFlightSetup() {
   // No hub return/save path: opening or closing this mode cannot create a career save.
 }
 
+Contract Game::freeFlightContract() const {
+  Contract c;
+  c.id = "FREE_FLIGHT"; c.title = g_world.procedural && freeRegion >= 0 && freeRegion < (int)freeRegions.size() ? "Free Flight / " + freeRegions[freeRegion].name : "Free Flight"; c.type = CT_FERRY;
+  c.from = c.to = freeAirport; c.startAirborne = freeAirborne;
+  c.brief = "Fly anywhere. Full tanks, no fees, and no career progress or penalties.";
+  c.wx = Weather(); c.wx.timeOfDay = 12.f; c.wx.windSpeed = 3.f;
+  c.wx.gust = 0; c.wx.turbulence = 0.05f; c.wx.cloudCover = 0.15f; c.wx.visibility = 60000.f;
+  return c;
+}
+
 void Game::launchFreeFlight() {
   if (screen != SCR_FREE_FLIGHT && !freeFlight) return;
   if (freeFlight && !flightRegion.id.empty()) chooseFreeRegion(flightRegion);
@@ -961,12 +976,9 @@ void Game::launchFreeFlight() {
     quoteFlown.clear(); menuPlanCache = menuPlan::Cache{};
   }
   const AircraftSpec& s = kAircraft[freeCraft];
-  Contract c;
-  c.id = "FREE_FLIGHT"; c.title = g_world.procedural ? "Free Flight / " + freeRegions[freeRegion].name : "Free Flight"; c.type = CT_FERRY;
-  c.from = c.to = freeAirport; c.startAirborne = freeAirborne;
-  c.brief = "Fly anywhere. Full tanks, no fees, and no career progress or penalties.";
-  c.wx = Weather(); c.wx.timeOfDay = 12.f; c.wx.windSpeed = 3.f;
-  c.wx.gust = 0; c.wx.turbulence = 0.05f; c.wx.cloudCover = 0.15f; c.wx.visibility = 60000.f;
+  // (the flight's setup and its first scene behind the loading card: Game::queueLaunch)
+  if (queueLaunch(freeFlightContract(), freeCraft, LAUNCH_FREE, [this] { launchFreeFlight(); })) return;
+  Contract c = freeFlightContract();
   Career::LaunchPlan p;
   p.spec = freeCraft; p.src = Career::SRC_NONE; p.startAirport = freeAirport; p.fuelLoadKg = s.maxFuel;
   const float careerFuelChoice = launchFuelKg;
@@ -2316,6 +2328,24 @@ bool Game::loadingShadowPending() const {
 }
 void Game::updateLoading(float dt) {
   // Back always wins over setup, including the update immediately after the first presented card.
+  if (pendingLaunch) {
+    if (in.pressed[K_ESC] || (in.buttonsPressed & PAD_B)) {
+      cancelQueuedLaunch();
+      in.pressed[K_ESC] = false; in.buttonsPressed &= ~PAD_B;   // (the menu returned to doesn't take it as its own Back)
+      return;
+    }
+    loadT += dt;
+    if (!launchFramePresented) return;
+    PendingLaunch L = std::move(*pendingLaunch);
+    pendingLaunch.reset();
+    launchFrameDrawn = launchFramePresented = false;
+    // the launch runs from where it was asked for: one that doesn't take (a save that fails, a selection gone stale)
+    // leaves the player there with its message; one that does sets up the flight and its loading screen again
+    screen = L.from; paused = L.paused;
+    launchRunning = true; L.begin(); launchRunning = false;
+    if (L.kind == LAUNCH_CAREER && screen == SCR_DEBRIEF) { screen = SCR_HUB; hubTab = TAB_CONTRACTS; }   // (the debrief's retry didn't take: its message is on the hub)
+    return;
+  }
   if (pendingMilitaryLaunch) {
     if (in.pressed[K_ESC] || (in.buttonsPressed & PAD_B)) { returnToMilitary(); return; }
     loadT += dt;
@@ -2584,20 +2614,30 @@ void Game::drawPadCursor() {
 }
 
 // ------------------------------------------------------------------ XR-30 research flights
-void Game::launchResearch() {
+Contract Game::researchContract() const {
   Contract c;
-  bool wr = resCraft == kWraith;
   const AircraftSpec& rs = kAircraft[resCraft];
   std::string num = rs.name; num = num.substr(0, num.find(' '));   // "XR-30"
   c.id = num; c.id.erase(std::remove(c.id.begin(), c.id.end(), '-'), c.id.end()); c.title = num + " Research Flight"; c.type = CT_FERRY;
-  if (resCard >= 0 && kResCards[resCard].craft != resCraft) resCard = -1;
-  if (resCard >= 0) c.title = std::string(kResCards[resCard].id) + "  " + kResCards[resCard].title;
-  resStep = 0; resHold = 0; resBest = 0; resCardDone = false;
+  if (resCard >= 0 && kResCards[resCard].craft == resCraft) c.title = std::string(kResCards[resCard].id) + "  " + kResCards[resCard].title;
   c.from = c.to = resAirport; c.payout = 0;
   c.wx = Weather(); c.wx.timeOfDay = resTime; c.wx.windSpeed = 3; c.wx.turbulence = 0.05f;
   if (resWx == 0) { c.wx.cloudCover = 0.15f; c.wx.visibility = 60000; }
   else if (resWx == 1) { c.wx.cloudCover = 0.6f; c.wx.cloudBase = 1300; }
   else { c.wx.cloudCover = 0.95f; c.wx.cloudBase = 800; c.wx.precip = 1; c.wx.storm = true; c.wx.windSpeed = 9; c.wx.gust = 5; c.wx.turbulence = 0.5f; c.wx.visibility = 9000; }
+  return c;
+}
+
+void Game::launchResearch() {
+  // (the flight's setup and its first scene - the craft's programs compiled, its airfield streamed - behind the
+  // loading card, not behind a frozen terminal: Game::queueLaunch)
+  { Contract card = researchContract(); card.startAirborne = resAirborne;
+    if (queueLaunch(card, resCraft, LAUNCH_RESEARCH, [this] { launchResearch(); })) return; }
+  bool wr = resCraft == kWraith;
+  const AircraftSpec& rs = kAircraft[resCraft];
+  if (resCard >= 0 && kResCards[resCard].craft != resCraft) resCard = -1;
+  resStep = 0; resHold = 0; resBest = 0; resCardDone = false;
+  Contract c = researchContract();
   // (its own fuel, never the job card's choice: that stays for the career's next flight - the review of v3.44.0, CAR-7)
   const float careerFuelChoice = launchFuelKg;
   launchFuelKg = -1;
@@ -4420,7 +4460,7 @@ void Game::updateAtc(float dt) {
 // Nothing stale is ever said: the queue is dropped on pause, at the end of the flight and when the aircraft
 // crashes (then only the crash itself is announced).
 void Game::updateComms(float dt) {
-  bool live = (screen == SCR_FLIGHT || screen == SCR_LOADING) && !paused && !pendingMilitaryLaunch;
+  bool live = (screen == SCR_FLIGHT || screen == SCR_LOADING) && !paused && !launchCardPending();
   // (paused, or in the menus, nobody is talking: the music comes back up - it stayed at the duck when a pause cut a
   // call short: the review of v3.44.0, AUD-2)
   if (!live) { atc.cancel(); commsPending.clear(); commsCrashSeen = false; voiceDuck = approach(voiceDuck, 0.f, 1.5f, dt); return; }
@@ -4650,20 +4690,23 @@ void Game::update(float dt) {
   feedAudio();
 }
 
-void Game::renderMilitaryLoadingCard() {
+void Game::renderLaunchCard() {
   // No buildFrame, scene streaming, mesh baking, collision queries or picture decoding on this path.
   // CPU-only tests use the same card builder without issuing GL commands.
   if (g_ren.ok) g_ren.clearScreen();
   g_ren.uiBegin();
   drawLoading();
   if (g_ren.ok) g_ren.uiEnd();
-  militaryLaunchFrameDrawn = true;
+  if (pendingMilitaryLaunch) militaryLaunchFrameDrawn = true;
+  if (pendingLaunch) launchFrameDrawn = true;
 }
 
 void Game::framePresented() {
   if (screen == SCR_LOADING && pendingMilitaryLaunch && militaryLaunchFrameDrawn)
     militaryLaunchFramePresented = true;
-  militaryLaunchFrameDrawn = false;
+  if (screen == SCR_LOADING && pendingLaunch && launchFrameDrawn)
+    launchFramePresented = true;
+  militaryLaunchFrameDrawn = launchFrameDrawn = false;
 }
 
 void Game::render() {
@@ -4674,7 +4717,7 @@ void Game::render() {
     g_ren.clearScreen(); g_ren.uiBegin(); drawRegionLoading(); drawPadCursor(); g_ren.uiEnd();
     return;
   }
-  if (screen == SCR_LOADING && pendingMilitaryLaunch) { renderMilitaryLoadingCard(); return; }
+  if (screen == SCR_LOADING && launchCardPending()) { renderLaunchCard(); return; }
   // every menu draws its scene live (the main menu's tour, the hub's airport, the research terminal's preview): the
   // scenery a flight opens with streams in while the player chooses. vid: a full-screen picture instead of the scene
   // (the research terminal's boot screen)
@@ -4780,9 +4823,9 @@ void Game::render() {
     g_ren.text(14 * s, 30 * s, 14 * s, t2, vec3(0.75f, 0.85f, 1.f), 1, 0, false);
   }
   g_ren.uiEnd();
-  // Deploy is handled by drawHub/drawDebrief, after this frame's scene was drawn. Replace that entire
-  // menu frame now, so the very next SwapBuffers shows the loading card, never another frozen menu.
-  if (screen == SCR_LOADING && pendingMilitaryLaunch) renderMilitaryLoadingCard();
+  // Deploy, Fly, Initiate, Take flight and Restart are handled by the menus' UI, after this frame's scene was drawn.
+  // Replace that entire menu frame now, so the very next SwapBuffers shows the loading card, never a frozen menu.
+  if (screen == SCR_LOADING && launchCardPending()) renderLaunchCard();
 }
 
 // ------------------------------------------------------------------ development scenes for the render harness
@@ -5586,7 +5629,7 @@ void Game::debugScene(const std::string& name) {
 
 // Military sorties are career-backed loaners; research practice uses the same combat engine off the books.
 void Game::launchMilitary(int kind) {
-  if (pendingMilitaryLaunch || !military::mission(kind)) return;
+  if (launchCardPending() || !military::mission(kind)) return;
   Contract c = career.militaryContract(kind);
   if (career.canFly(c, c.forceAircraft) != Career::SRC_MILITARY) return;
   if (commitBlocked()) { hubMsg = "Your last result isn't saved yet: retry the save first."; hubMsgTime = 5; return; }
@@ -5601,6 +5644,26 @@ void Game::launchMilitary(int kind) {
   screen = SCR_LOADING;
   in.pressed[K_ENTER] = in.pressed[' '] = false; in.mPressed[0] = false;
   in.buttonsPressed &= ~(PAD_A | PAD_START);
+}
+
+bool Game::queueLaunch(const Contract& card, int spec, LaunchKind kind, std::function<void()> begin) {
+  if (headless || launchRunning) return false;
+  if (launchCardPending()) return true;   // (one launch at a time: a second press while the card is up does nothing)
+  PendingLaunch L; L.card = card; L.spec = spec; L.kind = kind; L.from = screen; L.paused = paused; L.begin = std::move(begin);
+  pendingLaunch = std::move(L);
+  launchFrameDrawn = launchFramePresented = false;
+  loadT = 0; loadReadyT = -1; loadShown = 0; loadPend0 = 0; loadFrames = 0;
+  loadStableFrames = 0; loadObservedFrame = -1; loadMap = false;
+  screen = SCR_LOADING;
+  in.pressed[K_ENTER] = in.pressed[' '] = false; in.mPressed[0] = false;
+  in.buttonsPressed &= ~(PAD_A | PAD_START);
+  return true;
+}
+void Game::cancelQueuedLaunch() {
+  if (!pendingLaunch) return;
+  screen = pendingLaunch->from; paused = pendingLaunch->paused;
+  pendingLaunch.reset();
+  launchFrameDrawn = launchFramePresented = false;
 }
 
 bool Game::beginMilitaryLaunch(const Contract& c) {

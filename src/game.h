@@ -376,12 +376,31 @@ private:
   // A queued service sortie has no saved attempt or initialized scene until its loading card is presented.
   std::optional<Contract> pendingMilitaryLaunch;
   bool militaryLaunchFrameDrawn = false, militaryLaunchFramePresented = false;
+  // Every other launch from a menu does the same (a career flight or a job's next leg, a practice approach, a research
+  // flight, a Free Flight, the pause menu's Restart): queueLaunch puts its loading card on the next frame shown and
+  // holds the launch itself - its save, the flight's setup, then the first scene with its scenery streamed and its
+  // aircraft's programs compiled - until that card has been presented (updateLoading then runs it). Back returns.
+  enum LaunchKind { LAUNCH_CAREER = 0, LAUNCH_RESEARCH, LAUNCH_FREE };
+  struct PendingLaunch {
+    Contract card; int spec = 0; LaunchKind kind = LAUNCH_CAREER;   // what the card shows, before the flight is set up
+    GameScreen from = SCR_HUB; bool paused = false;                  // where it was launched from (Back returns there)
+    std::function<void()> begin;                                     // the launch, called again with queueing off
+  };
+  std::optional<PendingLaunch> pendingLaunch;
+  bool launchFrameDrawn = false, launchFramePresented = false, launchRunning = false;
+  // true: queued (the caller returns; its launch runs once the card is shown). false: run it now (headless, or the
+  // queued launch itself running)
+  bool queueLaunch(const Contract& card, int spec, LaunchKind kind, std::function<void()> begin);
+  bool launchCardPending() const { return pendingMilitaryLaunch.has_value() || pendingLaunch.has_value(); }
+  void cancelQueuedLaunch();
+  Contract researchContract() const;     // a research flight's contract (launchResearch), for its card too
+  Contract freeFlightContract() const;   // a Free Flight's (launchFreeFlight)
   bool combatCollisionWarm = false;
   double combatCollisionWarmMs = 0;
   int combatPrefetchCursor = 0;
   void launchMilitary(int kind);
   bool beginMilitaryLaunch(const Contract& c);
-  void renderMilitaryLoadingCard();
+  void renderLaunchCard();
   void setupMilitaryEncounter();
   void spawnPracticeWave();
   void clearPracticeEncounter();

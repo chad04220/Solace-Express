@@ -165,6 +165,72 @@ struct GameTest {
         "retry after storage failure starts exactly one mission after its own presentation");
       g.in.pressed[K_ESC]=true;g.updateLoading(dt);
     }
+    // Every other launch from a menu shows the same card first (Game::queueLaunch): the research terminal used to
+    // freeze on its last frame while the flight's first scene was set up behind it.
+    {
+      auto q=make();Game& g=*q;g.headless=false;g.screen=SCR_RESEARCH;
+      g.resCraft=kWraith;g.resCard=-1;g.resAirborne=true;g.resAirport=g.career.location;
+      const vec3 oldPos=g.plane.pos;const int oldChunks=g_ren.entChunks,oldBakes=g_ren.bakeCount;
+      const auto oldSceneSerial=g_ren.gpuFrameSerial;
+      g.in.pressed[K_ENTER]=true;g.in.buttonsPressed=PAD_START;
+      g.launchResearch();
+      check(g.screen==SCR_LOADING && g.pendingLaunch && g.pendingLaunch->kind==Game::LAUNCH_RESEARCH && !g.researchFlight &&
+        length(g.plane.pos-oldPos)==0 && g.loadFrames==0 && !g.in.pressed[K_ENTER] && !(g.in.buttonsPressed&PAD_START),
+        "Initiate changes to the loading card at once, consuming its press, with nothing of the flight set up");
+      g.launchResearch();g.framePresented();g.updateLoading(10.f);
+      check(g.pendingLaunch && !g.researchFlight && !g.launchFramePresented,
+        "a second press, elapsed time and a presentation without the card drawn start nothing");
+      g.render();const bool drawn=g.launchFrameDrawn;g.updateLoading(dt);
+      check(drawn && g.pendingLaunch && !g.researchFlight && g.loadImg.empty() && !g.loadMap && g.loadFrames==0 &&
+        g_ren.entChunks==oldChunks && g_ren.bakeCount==oldBakes && g_ren.gpuFrameSerial==oldSceneSerial,
+        "the drawn card decodes no picture, renders no scene and bakes nothing before it is presented");
+      g.framePresented();g.updateLoading(dt);
+      check(!g.pendingLaunch && g.researchFlight && g.screen==SCR_LOADING && g.specIdx==kWraith && !g.plane.onGround &&
+        g.loadFrames==0 && g.loadReadyT<0,
+        "after presentation the research flight is set up, behind the card, its first scene still to come");
+    }
+    for(bool pad:{false,true}) {   // Back on the card: back where it was launched from, nothing set up
+      auto q=make();Game& g=*q;g.headless=false;g.screen=SCR_RESEARCH;
+      g.resCraft=kWraith;g.resCard=-1;g.resAirborne=false;g.resAirport=g.career.location;
+      g.launchResearch();g.render();g.framePresented();
+      if(pad)g.in.buttonsPressed=PAD_B;else g.in.pressed[K_ESC]=true;
+      g.updateLoading(dt);
+      check(g.screen==SCR_RESEARCH && !g.pendingLaunch && !g.researchFlight && !g.in.pressed[K_ESC] && !(g.in.buttonsPressed&PAD_B),
+        std::string(pad?"controller":"keyboard")+" Back on a research flight's card returns to the terminal, consumed");
+    }
+    {   // Free Flight's Take flight
+      auto q=make();Game& g=*q;g.headless=false;g.screen=SCR_FREE_FLIGHT;
+      g.freeCraft=1;g.freeAirport=0;g.freeAirborne=false;
+      g.launchFreeFlight();
+      check(g.screen==SCR_LOADING && g.pendingLaunch && g.pendingLaunch->kind==Game::LAUNCH_FREE && !g.freeFlight,
+        "Take flight shows the loading card before the Free Flight is set up");
+      g.render();g.framePresented();g.updateLoading(dt);
+      check(!g.pendingLaunch && g.freeFlight && g.screen==SCR_LOADING && g.specIdx==1,
+        "after presentation the Free Flight is set up behind the card");
+    }
+    {   // a career flight from the board: its plan and its save wait for the card too
+      auto q=make();Game& g=*q;g.headless=false;g.screen=SCR_HUB;g.hubTab=TAB_CONTRACTS;g.hubList=0;
+      const std::string before=snapshot(g.career);const uint32_t attempt=g.career.attempt;
+      Contract c=g_story[0];
+      g.beginCareerFlight(c,1,Career::SRC_OWNED);
+      check(g.screen==SCR_LOADING && g.pendingLaunch && g.pendingLaunch->card.id==c.id && !g.career.attemptOpen &&
+        g.career.attempt==attempt && snapshot(g.career)==before,
+        "Fly shows the loading card without saving the attempt");
+      g.render();g.framePresented();g.updateLoading(dt);
+      check(!g.pendingLaunch && g.screen==SCR_LOADING && g.contract.id==c.id && g.career.attemptOpen && g.career.attempt==attempt+1,
+        "after presentation the attempt is saved and the flight set up, once");
+    }
+    {   // a save that fails behind the card: back on the board with its message, nothing flown
+      auto q=make();Game& g=*q;g.headless=false;g.screen=SCR_HUB;g.hubTab=TAB_CONTRACTS;g.hubList=0;
+      const std::string before=snapshot(g.career);
+      const fs::path blocked=root/"blocked_queued_launch";{std::ofstream f(blocked);f<<"block";}
+      g.diskless=false;g.saveDir=blocked.string();
+      g.beginCareerFlight(g_story[0],1,Career::SRC_OWNED);g.render();
+      check(g.pendingLaunch && g.hubMsg.empty() && snapshot(g.career)==before,"storage isn't touched before the card is shown");
+      g.framePresented();g.updateLoading(dt);
+      check(g.screen==SCR_HUB && !g.pendingLaunch && !g.hubMsg.empty() && !g.career.attemptOpen && snapshot(g.career)==before,
+        "a queued career launch whose save fails returns to the board with its message");
+    }
 
     // Genuine fresh service record: every entry point must enforce the displayed sequence.
     // These cases deliberately use no prerequisite fixture, including the direct/private launch paths.

@@ -416,12 +416,17 @@ void Game::drawLoading() {
     while (!text.empty() && g_ren.textWidth(text + "...", size) > room) text.pop_back();
     return text + "...";
   };
-  const bool pending = pendingMilitaryLaunch.has_value();
-  const Contract& flight = pending ? *pendingMilitaryLaunch : contract;
-  const AircraftSpec& aircraft = pending ? kAircraft[flight.forceAircraft] : plane.spec ? *plane.spec : kAircraft[specIdx];
+  // a launch's card before its flight is set up (Game::queueLaunch; Deploy's pendingMilitaryLaunch): its own flight,
+  // aircraft and look, and nothing decoded from disk or rendered until it has been shown
+  const bool pendingService = pendingMilitaryLaunch.has_value();
+  const PendingLaunch* queued = pendingLaunch ? &*pendingLaunch : nullptr;
+  const bool pending = pendingService || queued;
+  const Contract& flight = pendingService ? *pendingMilitaryLaunch : queued ? queued->card : contract;
+  const AircraftSpec& aircraft = pendingService ? kAircraft[flight.forceAircraft] : queued ? kAircraft[queued->spec] : plane.spec ? *plane.spec : kAircraft[specIdx];
   const Weather& weather = pending ? flight.wx : wx;
-  const bool military = pending || militaryFlight;
-  const bool research = researchFlight;
+  const bool military = pendingService || (queued ? isMilitaryContract(flight.type) : militaryFlight);
+  const bool research = queued ? queued->kind == LAUNCH_RESEARCH : researchFlight;
+  const bool freeLook = queued ? queued->kind == LAUNCH_FREE : freeFlight;
   const vec3 accent = military ? svui::amber : research ? svui::code : C_ACCENT;
   const vec3 ink = military ? svui::field : research ? svui::codeInk : C_INK;
   const vec3 dim = military ? vec3(.69f,.73f,.64f) : research ? svui::codeDim : C_DIM;
@@ -429,7 +434,7 @@ void Game::drawLoading() {
   const Airport& ap = g_world.airports[air ? flight.to : flight.from];
   // a picture rendered by render_loading.bat - the airport, or the aircraft in flight - when there is one on disk
   std::string key = g_world.procedural ? g_world.regionId + "/" + ap.code :
-    (military || air) ? fmt("air_%d", pending ? flight.forceAircraft : (int)(plane.spec - kAircraft)) : std::string(ap.code);
+    (military || air) ? fmt("air_%d", pendingService ? flight.forceAircraft : queued ? queued->spec : (int)(plane.spec - kAircraft)) : std::string(ap.code);
   auto li = loadImg.find(key);
   if (li == loadImg.end() && !pending) {
     unsigned tex = 0; int w = 0, h = 0; std::vector<uint8_t> px;
@@ -440,9 +445,9 @@ void Game::drawLoading() {
   }
   unsigned pic = li == loadImg.end() ? 0 : li->second;
   const auto& preview = g_ren.loadingPreview();
-  const bool retained = pending && !pic && preview.matches(flight.forceAircraft, flight.type-CT_MIL_RECON);
+  const bool retained = pendingService && !pic && preview.matches(flight.forceAircraft, flight.type-CT_MIL_RECON);
   if (retained) pic = preview.texture;
-  if (!military && !loadMap && !pic) {   // otherwise the aerial image of the airport, rendered once from the real terrain
+  if (!military && !loadMap && !pic && !pending) {   // otherwise the aerial image of the airport, rendered once from the real terrain
     loadMap = true; gpsMapValid = false;
     g_ren.renderMap(ap.x, ap.z, 2400.f, 1536);
   }
@@ -474,7 +479,7 @@ void Game::drawLoading() {
   if(research)svui::matrix(g_ren,0,0,W,H,realTime,.18f,set.menuMotion,W*.55f,(L.artTop+L.artBottom)*.5f,W*.32f,(L.artBottom-L.artTop)*.45f);
   if(military)svui::chevrons(g_ren,40*s,13*s,180*s,s,accent,.55f);
   g_ren.text(40*s,26*s,fs(12,11),"SOMNIUM VOLANDI",accent,1,0,false);
-  g_ren.text(W-40*s,26*s,fs(11,9),military?"DEFENSE COMMAND / SORTIE PREPARATION":research?"NIGHTGLASS / FLIGHT INITIALIZATION":freeFlight?"FREE FLIGHT / DEPARTURE PREPARATION":flight.type==CT_LESSON?"FLIGHT SCHOOL / PREPARATION":"FLIGHT OPERATIONS / PREPARATION",dim,1,2,false);
+  g_ren.text(W-40*s,26*s,fs(11,9),military?"DEFENSE COMMAND / SORTIE PREPARATION":research?"NIGHTGLASS / FLIGHT INITIALIZATION":freeLook?"FREE FLIGHT / DEPARTURE PREPARATION":flight.type==CT_LESSON?"FLIGHT SCHOOL / PREPARATION":"FLIGHT OPERATIONS / PREPARATION",dim,1,2,false);
   g_ren.text(40 * s, 50 * s, 30 * s, fitLoading(flight.title, W - 80 * s, 30 * s), C_TEXT, 1);
   // Mission details and four real readiness bars fit into a shallow bottom strip.
   const float cx=L.x+18*s, cy=L.y, cw=L.width-36*s;
@@ -513,7 +518,7 @@ void Game::drawLoading() {
     g_ren.text(cx + bw, by - 19 * s, fs(12,10), fmt("%d%%", std::min(99, (int)(clampf(loadShown, 0.f, 1.f) * 100.f))), accent, 1, 2, false);
     g_ren.rect(cx, by, bw, bh, accent, 0.12f, 2 * s);
     if (loadShown > 0.f) g_ren.rectGrad(cx, by, bw * loadShown, bh, accent * 0.7f, accent, 1, 2 * s);
-    const std::string detail=pending?"Preparing service assignment and supplied aircraft":fmt("Elapsed %.1f s  /  %d scene frames  /  ",loadT,loadFrames)+(g_ren.entPending>0?fmt("%d scenery chunks remaining",g_ren.entPending):loadingShadowPending()?"Terrain shadow pass running":"Verifying two stable rendered frames");
+    const std::string detail=pendingService?"Preparing service assignment and supplied aircraft":queued?"Preparing the flight":fmt("Elapsed %.1f s  /  %d scene frames  /  ",loadT,loadFrames)+(g_ren.entPending>0?fmt("%d scenery chunks remaining",g_ren.entPending):loadingShadowPending()?"Terrain shadow pass running":"Verifying two stable rendered frames");
     g_ren.text(cx, by + 13 * s, fs(10,9), fitLoading(detail,bw,fs(10,9)),dim,.9f,0,false);
     float hx = cx + bw * loadShown;
     g_ren.glow(hx - 4 * s, by - 2 * s, 8 * s, bh + 4 * s, accent, 0.5f + 0.3f * sinf(realTime * 6.f), 4 * s, 14 * s);
