@@ -176,9 +176,9 @@ bool Game::button(float x, float y, float w, float h, const std::string& labelId
   { float tw = g_ren.textWidth(label, ts), room = w - 16 * s; if (tw > room && tw > 0.f) ts = std::max(ts * room / tw, 9 * s); }   // (a long label shrinks to fit)
   g_ren.text(x + w * 0.5f, y + (h - ts) * 0.5f - ts * 0.08f + pr * 1.f * s, ts, ellipsize(label, w - 12 * s, ts), tc, 1.f, 1, false);
   if (focused) g_ren.rectOutline(x - 3 * s, y - 3 * s, w + 6 * s, h + 6 * s, C_ACCENT, 0.7f + 0.3f * sinf(realTime * 6.f), r + 2 * s, 2.f * s);
-  if (focused && (in.pressed[K_ENTER] || in.pressed[' '])) { in.pressed[K_ENTER] = in.pressed[' '] = false; g_audio.trigger(SFX_CLICK); return true; }
-  if (hov && !focused && in.mPressed[0]) { g_audio.trigger(SFX_CLICK); return true; }
-  if (focused && in.mPressed[0] && hovered(x, y, w, h)) { g_audio.trigger(SFX_CLICK); return true; }
+  if (focused && (in.pressed[K_ENTER] || in.pressed[' '])) { in.pressed[K_ENTER] = in.pressed[' '] = false; g_audio.triggerUI(SFX_CLICK,2*(x+w*.5f)/std::max(g_ren.W,1)-1,1-2*(y+h*.5f)/std::max(g_ren.H,1)); return true; }
+  if (hov && !focused && in.mPressed[0]) { g_audio.triggerUI(SFX_CLICK,2*(x+w*.5f)/std::max(g_ren.W,1)-1,1-2*(y+h*.5f)/std::max(g_ren.H,1)); return true; }
+  if (focused && in.mPressed[0] && hovered(x, y, w, h)) { g_audio.triggerUI(SFX_CLICK,2*(x+w*.5f)/std::max(g_ren.W,1)-1,1-2*(y+h*.5f)/std::max(g_ren.H,1)); return true; }
   return false;
 }
 
@@ -192,7 +192,7 @@ bool Game::focusHere(uint32_t id, float x, float y, float w, float h, bool* acti
   if (f) g_ren.rectOutline(x - 3 * s, y - 3 * s, w + 6 * s, h + 6 * s, C_ACCENT, 0.7f + 0.3f * sinf(realTime * 6.f), 6 * s, 2.f * s);
   if (activated) {
     *activated = f && (in.pressed[K_ENTER] || in.pressed[' ']);
-    if (*activated) { in.pressed[K_ENTER] = in.pressed[' '] = false; g_audio.trigger(SFX_CLICK); }
+    if (*activated) { in.pressed[K_ENTER] = in.pressed[' '] = false; g_audio.triggerUI(SFX_CLICK,2*(x+w*.5f)/std::max(g_ren.W,1)-1,1-2*(y+h*.5f)/std::max(g_ren.H,1)); }
   }
   return f;
 }
@@ -203,7 +203,7 @@ bool Game::focusAdjust(uint32_t id, float x, float y, float w, float h, int* ste
   focusList.push_back({id, x, y, w, h, true});
   const bool f = focusNav && focusId == id;
   if (f) g_ren.rectOutline(x - 3 * s, y - 3 * s, w + 6 * s, h + 6 * s, C_ACCENT, 0.7f + 0.3f * sinf(realTime * 6.f), 6 * s, 2.f * s);
-  if (step) { *step = f ? focusStep : 0; if (*step) g_audio.trigger(SFX_CLICK); }
+  if (step) { *step = f ? focusStep : 0; if (*step) g_audio.triggerUI(SFX_CLICK,2*(x+w*.5f)/std::max(g_ren.W,1)-1,1-2*(y+h*.5f)/std::max(g_ren.H,1)); }
   return f;
 }
 

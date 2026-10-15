@@ -2,6 +2,7 @@
 #pragma once
 #include "common.h"
 #include <functional>
+#include <regex>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -26,7 +27,7 @@ public:
   // calls the game didn't already show); group: a newer call of the same group replaces a waiting one (levers);
   // tag: the caller's own marker, handed back when the transmission starts
   struct Tx { std::vector<std::string> ids; std::string text; int prio = 0; bool radio = true, subtitle = false; std::string group; int tag = 0, apt = -1;
-              int key = -1; };   // validity: the flight state the call was made for (Game::atcKey); stale when it starts -> dropped
+              float age = 0; int key = -1; };   // validity: the flight state the call was made for (Game::atcKey); stale when it starts -> dropped
   std::function<bool(const Tx&)> valid;   // the game's check, run when a queued transmission is about to start
   // the voice line (or the line assembled from fragments) for a message the game shows; mission picks the
   // instructor or examiner. Lesson hints use resolveLesson, independently of their displayed key/button names.
@@ -48,9 +49,13 @@ public:
   void cancel();
   bool busy() const;
   std::vector<std::string> history;   // every transmission started, in order; the towers' prefixed "TWR " (tests)
+  int missingAudio = 0;
   int dropped = 0;                    // stale transmissions never started
   size_t historyLimit = 64;           // the newest this many are kept (0: all, for tests)
 private:
+  bool resolveRecorded(const std::string&, const std::string&, bool, Tx&) const;
+  std::vector<std::pair<std::regex,std::string>> cues;
+  std::string playingText;
   struct Clip { std::string file, words, speaker, kind, mission; int prio = 40; std::vector<float> pcm; bool loaded = false; };
   std::unordered_map<std::string, Clip> clips;
   std::unordered_map<std::string, std::vector<std::string>> exact;   // shown text -> lines

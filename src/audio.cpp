@@ -50,7 +50,7 @@ struct PistonVoice {
     nz.s = seed * 7 + 1;
   }
   // returns {engine, prop} contributions
-  void tick(float sr, float rpm, float load, int cyl, int blades, float propRpm, bool running, bool cranking, float& eng, float& prop, int blockPos, float health = 1.f) {
+  void tick(float sr, float rpm, float load, int cyl, int blades, float propRpm, bool running, bool cranking, float& eng, float& prop, int blockPos, float health = 1.f, float timbre = 1.f) {
     float rps = rpm / 60.f;
     phase += rps / sr;
     if (phase >= 2.f) phase -= 2.f;  // full four-stroke cycle = 2 revolutions
@@ -60,7 +60,7 @@ struct PistonVoice {
     float exc = 0;
     if (k != lastK) {
       lastK = k;
-      int ci = k % cyl;
+      int ci = k % std::min(cyl, 8);
       if (running) {
         float irregular = 1.f + (nz.w() * 0.5f) * (0.25f * smoothstepf(1400.f, 650.f, rpm));
         float amp = (0.48f + 0.52f * load) * cylBias[ci] * irregular;
@@ -76,10 +76,10 @@ struct PistonVoice {
     }
     if (blockPos == 0) {
       // retune resonators with rpm/load (pipe gets "angrier" with power)
-      float f1 = 85.f + rpm * 0.012f;
+      float f1 = (85.f + rpm * 0.012f)*timbre;
       res[0].set(BP, f1, 1.6f, sr);
-      res[1].set(BP, 210.f + 40.f * load, 3.0f, sr);
-      res[2].set(BP, 560.f + 160.f * load, 2.5f, sr);
+      res[1].set(BP, (210.f + 40.f * load)*timbre, 3.0f, sr);
+      res[2].set(BP, (560.f + 160.f * load)*timbre, 2.5f, sr);
       res[3].set(BP, 1900.f + 600.f * load, 1.2f, sr);
       mech.set(BP, 3800.f, 2.f, sr);
       whoosh.set(BP, 420.f + propRpm * 0.25f, 0.8f, sr);
@@ -87,7 +87,7 @@ struct PistonVoice {
     }
     float n = nz.w();
     float x = exc * 30.f + n * noiseEnv * 0.9f;
-    noiseEnv *= 0.9965f;
+    noiseEnv *= expf(-168.f / sr);
     float y = res[0].p(x) * 1.0f + res[1].p(x) * 0.75f + res[2].p(x) * 0.42f + res[3].p(x) * (0.10f + 0.12f * load);
     y += mech.p(n) * 0.012f * (rpm / 2600.f) * (running ? 1.f : 0.3f);
     eng = tanhf(y * 1.6f) * 0.8f;
@@ -113,7 +113,7 @@ struct TurbineVoice {
   float ph1 = 0, ph2 = 0, ph3 = 0, propPh = 0;
   Noise nz; Biquad hiss, roarLP, roarLP2, rumble, propLP, propWhoosh, buzzBP;
   void init(uint32_t s) { nz.s = s; }
-  void tick(float sr, bool jet, float n1, float spool, float propRpm, int blades, float& eng, float& prop, int blockPos) {
+  void tick(float sr, bool jet, float n1, float spool, float propRpm, int blades, float& eng, float& prop, int blockPos, float timbre = 1.f) {
     float nn = clampf(n1 / 100.f, 0, 1.1f);
     if (blockPos == 0) {
       hiss.set(BP, 2500.f + 3000.f * nn, 1.2f, sr);
@@ -126,17 +126,17 @@ struct TurbineVoice {
     }
     float n = nz.w();
     // compressor / fan whine
-    float f1 = jet ? 300.f + 2900.f * nn : 600.f + 3600.f * nn;
+    float f1 = (jet ? 300.f + 2900.f * nn : 600.f + 3600.f * nn)*timbre;
     ph1 += f1 / sr; ph2 += f1 * 1.47f / sr; ph3 += (jet ? f1 * 0.5f : f1 * 2.03f) / sr;
     ph1 -= floorf(ph1); ph2 -= floorf(ph2); ph3 -= floorf(ph3);
     float whine = sinf(2 * PI * ph1) * 0.6f + sinf(2 * PI * ph2) * 0.25f + sinf(2 * PI * ph3) * 0.2f;
-    float whineAmp = (jet ? 0.16f : 0.035f) * smoothstepf(5.f, 60.f, n1) * (1.f - 0.4f * spool * (jet ? 1.f : 0.f));
+    float whineAmp = (jet ? 0.075f : 0.028f) * smoothstepf(5.f, 60.f, n1) * (1.f - 0.4f * spool * (jet ? 1.f : 0.f));
     float roar = roarLP2.p(roarLP.p(n)) * (jet ? (0.35f + 0.75f * powf(spool, 1.5f)) : (0.12f + 0.25f * spool));
     float rum = rumble.p(n) * (jet ? 1.6f * spool : 0.6f * spool);
     float hs = hiss.p(n) * 0.06f * nn;
     float buzzsaw = 0;
     if (jet && n1 > 82.f) buzzsaw = buzzBP.p(n) * 0.5f * smoothstepf(82.f, 98.f, n1);
-    eng = whine * whineAmp + roar * 1.2f + rum + hs + buzzsaw;
+    eng = (whine * whineAmp + roar * 1.2f + rum + hs + buzzsaw) * smoothstepf(0.f, 18.f, n1);
     prop = 0;
     if (!jet) {
       float bps = propRpm / 60.f * blades;
@@ -160,7 +160,7 @@ struct ResearchVoice {
   float ph[6] = {}, sub = 0, fanPh[2] = {}, liftPh = 0, vib = 0, crackEnv = 0, pulse = 0, pulseT = 0;
   Noise nz;
   Biquad roarA, roarB, roarHP, abLP, abBP, crackBP, subLP, liftBP, liftLP, airBP, warmL, warmR;
-  void init() { nz.s = 9119; }
+  void init(uint32_t seed = 9119) { nz.s = seed; }
   void tick(float sr, float spool, float ab, float nozzle, float mach, int bp, float& outL, float& outR) {
     if (bp == 0) {
       roarA.set(LP, 300.f + 2400.f * spool * spool, 0.6f, sr);
@@ -204,7 +204,7 @@ struct ResearchVoice {
       pulseT -= 1.f / sr;
       if (pulseT <= 0) { pulseT = 0.05f + 0.1f * (0.5f + 0.5f * nz.w()); pulse = 0.75f + 0.25f * nz.w(); }
       if ((nz.s & 0x7FF) < 3) crackEnv = 1.f;
-      crackEnv *= 0.995f;
+      crackEnv *= expf(-240.f/sr);
       abV = (abLP.p(n2) * 1.3f * pulse + abBP.p(n2) * 1.8f + crackBP.p(n) * crackEnv * 0.35f) * ab;
     }
     // the XR-40's pods in the hover
@@ -221,53 +221,120 @@ struct ResearchVoice {
   }
 };
 
-struct OneShot { int type; float t; float intensity; float ph; float ph2; Biquad f1, f2, f3, f4; Noise nz; bool active; };
-}  // namespace
+struct OneShot {
+  int type = 0; float t = 0, intensity = 1, ph = 0, ph2 = 0;
+  Biquad f1, f2, f3, f4; Noise nz; bool active = false, arrived = false;
+  AudioSource source; AudioBinaural spatial;
+  float age = 0, pitch = 1, variant = 1, size = 1, waveRadius = 0;
+};
+struct AmbientVoice {
+  uint32_t id = 0; AudioEmitter emitter; float fade = 0;
+  PistonVoice piston; TurbineVoice turbine; Noise noise; Biquad fireLP, crackBP;
+  AudioBinaural spatial; float pitch = 1, flame = 0; bool seen = false;
+};
+} // namespace
 
 struct AudioEngine::Impl {
   float sr = 48000;
   AudioParams P;
-  PistonVoice pv[2];
-  TurbineVoice tv[2];
-  ResearchVoice rv;
-  Smooth sRpm, sN1, sSpool, sAir, sGs, sLoad, sRain, sMuffle, sInterior, sVol, sStall, sCrank;
-  Noise nz;
-  Biquad windBP, windLP, rollLP, rollBP, gearRumble, rainHP, rainLP;
-  Biquad engL[2], engR[2], cabinBoom[2], muffleLP[2][2];
-  float delayL[2048] = {}, delayR[2048] = {}; int dpos = 0;
-  float stallPh = 0, motorPh = 0, seamDist = 0, bumpEnv = 0;
-  int block = 0;
-  OneShot shots[24];
-  float thunderEnv = 0;
-  Biquad thunderLP;
-  std::shared_ptr<const std::vector<float>> voice; size_t voicePos = 0;   // the radio transmission playing
+  PistonVoice pv[4]; TurbineVoice tv[4]; ResearchVoice rv[4];
+  AudioBinaural engines[4], wind[2], roll[2], rain[2], mechanisms[2], stall, voiceSpatial, music[2];
+  float enginePitch[4] = {1,1,1,1};
+  Smooth sRpm, sN1, sSpool, sAir, sGs, sLoad, sRain, sMuffle, sInterior, sVol, sStall, sGear, sFlap, sDuck;
+  Noise nz[2]; Biquad windBP[2], windLP[2], buffLP[2], rollLP[2], rainLP[2], engineLP[4];
+  float stallPh = 0, motorPh = 0, gustPhase = 0, gearPh = 0, flapPh = 0;
+  unsigned block = 0;
+  OneShot shots[64]; AmbientVoice ambient[20]; Rng variants{0x7b13a279};
+  std::shared_ptr<const std::vector<float>> voice; size_t voicePos = 0;
+  vec3 voiceSeat = vec3(-.22f,.05f,-.65f); float voiceFade = 0, voiceTail = 0, voiceLast = 0;
+  float limiter = 1, dcIn[2] = {}, dcOut[2] = {}, musicGain = 0;
 };
 
+AudioEngine::~AudioEngine() { delete impl; }
 void AudioEngine::init(int sr) {
-  sampleRate = sr;
-  impl = new Impl();
-  impl->sr = (float)sr;
-  impl->pv[0].init(1234); impl->pv[1].init(98765);
-  impl->tv[0].init(555); impl->tv[1].init(777); impl->rv.init();
-  for (auto& s : impl->shots) s.active = false;
-  impl->thunderLP.set(LP, 120, 0.7f, (float)sr);
+  // Called before the output thread starts (or by the offline harness).
+  delete impl; impl = new Impl(); sampleRate = std::clamp(sr, 8000, 192000); impl->sr = float(sampleRate);
+  for (int i = 0; i < 4; ++i) { impl->pv[i].init(1234 + i * 97531); impl->tv[i].init(555 + i * 31337); impl->rv[i].init(9119 + i * 8191); }
+  impl->nz[0].s = 7471; impl->nz[1].s = 87319;
+  acquire(); trigN = 0; hasPending = false; voiceNew = voiceCut = false; voicePending.reset(); voiceActive.store(false);
+  musicRead = musicWrite = 0; ++musicToken; worldReset = false; worldShift = vec3(); release();
 }
-
 void AudioEngine::setParams(const AudioParams& p) { acquire(); pending = p; hasPending = true; release(); }
-
-void AudioEngine::voicePlay(std::shared_ptr<const std::vector<float>> pcm) {
-  acquire(); voicePending = std::move(pcm); voiceNew = true; voiceCut = false; voiceActive.store(true); release();
+void AudioEngine::setView(vec3 position, vec3 right, vec3 up, vec3 forward) {
+  acquire(); pending.listener.position=position; pending.listener.right=right;
+  pending.listener.up=up; pending.listener.forward=forward; hasPending=true; release();
+}
+void AudioEngine::voicePlay(std::shared_ptr<const std::vector<float>> pcm, vec3 seat) {
+  acquire(); voicePending = std::move(pcm); voiceSeat = seat; voiceNew = true; voiceCut = false;
+  voiceActive.store(voicePending && !voicePending->empty()); release();
 }
 void AudioEngine::voiceStop() { acquire(); voicePending.reset(); voiceNew = false; voiceCut = true; voiceActive.store(false); release(); }
-
-void AudioEngine::trigger(int sfx, float intensity) {
-  acquire();
-  if (trigN < 32) { trigQ[trigN] = sfx; trigI[trigN] = intensity; trigN++; }
-  release();
+void AudioEngine::shiftWorld(vec3 d) { acquire(); worldShift += d; release(); }
+void AudioEngine::resetWorld() { acquire(); worldReset = true; release(); }
+uint32_t AudioEngine::musicBegin() { acquire(); ++musicToken; musicRead = musicWrite = 0; uint32_t t = musicToken; release(); return t; }
+void AudioEngine::musicStop() { musicBegin(); }
+void AudioEngine::musicVolume(float v) { acquire(); musicLevel = clampf(v, 0, 1); release(); }
+int AudioEngine::musicBuffered(uint32_t token) { acquire(); int n = token == musicToken ? int(musicWrite - musicRead) : -1; release(); return n; }
+int AudioEngine::musicPush(uint32_t token, const float* data, int frames) {
+  if (!data || frames <= 0) return 0;
+  acquire(); int n = token == musicToken ? std::min(frames, kMusicFrames - int(musicWrite - musicRead)) : 0;
+  for (int i = 0; i < n; ++i) {
+    unsigned k = (musicWrite++ % kMusicFrames) * 2;
+    for(int c=0;c<2;++c) { // reject non-finite decoder output even in /fp:fast builds
+      float v=data[i*2+c]; uint32_t bits; memcpy(&bits,&v,sizeof bits);
+      musicRing[k+c]=(bits&0x7f800000u)==0x7f800000u?0.f:clampf(v,-4.f,4.f);
+    }
+  }
+  release(); return n;
 }
 
-static void startShot(OneShot& s, int type, float inten, float sr) {
-  s = OneShot(); s.type = type; s.t = 0; s.intensity = inten; s.active = true; s.nz.s = 4321 + type * 17;
+static AudioSource effectSource(int type, vec3 position, vec3 velocity) {
+  AudioSource s; s.position = position; s.velocity = velocity;
+  switch (type) {
+    case SFX_CRASH: s.radius = 70; s.range = 6000; break;
+    case SFX_BOOM: s.radius = 160; s.range = 9000; s.propagation = false; break; // already at observer's Mach-cone crossing
+    case SFX_THUNDER: s.radius = 350; s.range = 15000; break;
+    case SFX_PLASMA: s.radius = 140; s.range = 8000; break;
+    case SFX_SPLASH: s.radius = 20; s.range = 1800; break;
+    case SFX_METAL: case SFX_IMPACT: s.radius = 12; s.range = 1600; break;
+    case SFX_FLYBY: s.radius = 35; s.range = 3200; break;
+    case SFX_UFO_ARRIVE: case SFX_UFO_ZOOM: case SFX_UFO_LAUGH: s.radius = 40; s.range = 4000; break;
+    case SFX_LASER: case SFX_CANNON: case SFX_EMP: case SFX_HEAVY: s.radius = 20; s.range = 2500; break;
+    default: s.radius = 5; s.range = 650; break;
+  }
+  return s;
+}
+void AudioEngine::triggerSource(int type, const AudioSource& source, float intensity) {
+  if (type < 0 || type >= SFX_COUNT || !std::isfinite(intensity) || intensity <= 0) return;
+  acquire();
+  if (trigN < 128) trigQ[trigN++] = {type, clampf(intensity, 0, 2), source};
+  release();
+}
+void AudioEngine::trigger(int type, float intensity) {
+  // UI and headset cues have near-field virtual emitters, never a mono bypass.
+  AudioSource source; source.space = AudioSpace::Listener; source.position = vec3(-.16f, .06f, -.8f);
+  source.radius = 1; source.range = 10; source.propagation = false;
+  if (type == SFX_BEEP || type == SFX_AP_DISC) { source.space = AudioSpace::Cabin; source.position = vec3(-.28f, -.18f, -.65f); }
+  else if(type>=SFX_TOUCHDOWN) {source=effectSource(type,vec3(),vec3());source.space=AudioSpace::Airframe;source.propagation=false;}
+  triggerSource(type, source, intensity);
+}
+void AudioEngine::triggerAt(int type, vec3 p, float intensity, vec3 v, uint32_t follow) {
+  auto s = effectSource(type, p, v); s.follow = follow; triggerSource(type, s, intensity);
+}
+void AudioEngine::triggerLocal(int type, vec3 p, float intensity) {
+  auto s = effectSource(type, p, vec3()); s.space = AudioSpace::Airframe; s.propagation = false; triggerSource(type, s, intensity);
+}
+void AudioEngine::triggerUI(int type, float x, float y, float intensity) {
+  AudioSource s; s.space = AudioSpace::Listener; s.position = vec3(clampf(x,-1,1)*.7f, clampf(y,-1,1)*.4f, -.9f);
+  s.radius = 2; s.range = 10; s.propagation = false; triggerSource(type, s, intensity);
+}
+
+static void startShot(OneShot& s, int type, float inten, float sr, const AudioSource& source, Rng& rng) {
+  s = OneShot(); s.type = type; s.intensity = inten; s.active = true; s.nz.s = rng.next(); s.source = source;
+  s.variant = rng.range(.86f, 1.15f); s.size = rng.range(.8f, 1.25f);
+  s.arrived = !source.propagation || source.space != AudioSpace::World;
+  // Independent noise, resonances, pitch and envelope for each physical event.
+  if (type >= SFX_TOUCHDOWN && type != SFX_BEEP && type != SFX_AP_DISC) sr /= s.variant;
   switch (type) {
     case SFX_TOUCHDOWN: s.f1.set(BP, 1700, 1.4f, sr); s.f2.set(LP, 90, 0.8f, sr); break;
     case SFX_CRASH: s.f1.set(LP, 900, 0.7f, sr); s.f2.set(BP, 2500, 1.0f, sr); break;
@@ -280,6 +347,14 @@ static void startShot(OneShot& s, int type, float inten, float sr) {
     case SFX_PLASMA: s.f1.set(LP, 180, 0.7f, sr); s.f2.set(LP, 60, 0.8f, sr); s.f3.set(HP, 26, 0.7f, sr); s.f4.set(BP, 1400, 0.8f, sr); break;
     case SFX_CLOAK: s.f1.set(BP, 2500, 0.6f, sr); break;
     case SFX_GEAR_CLUNK: s.f1.set(LP, 300, 1.0f, sr); break;
+    case SFX_HEAVY: s.f1.set(LP,350,.7f,sr); s.f2.set(BP,1500,.8f,sr); break;
+    case SFX_METAL: s.f1.set(BP, 780, 3.5f, sr); s.f2.set(BP, 1930, 5.f, sr); s.f3.set(LP, 5000, .6f, sr); break;
+    case SFX_IMPACT: s.f1.set(LP, 270, .7f, sr); s.f2.set(BP, 1100, 1.6f, sr); break;
+    case SFX_SPLASH: s.f1.set(LP, 2300, .6f, sr); s.f2.set(BP, 430, 1.3f, sr); break;
+    case SFX_REHEAT: s.f1.set(LP, 650, .7f, sr); s.f2.set(BP, 160, .8f, sr); break;
+    case SFX_TRANSONIC: s.f1.set(LP, 120, .7f, sr); break;
+    case SFX_CANNON: s.f1.set(LP, 2000, .7f, sr); s.f2.set(BP, 200, 1.8f, sr); break;
+    case SFX_EMP: s.f1.set(BP, 1700, .8f, sr); s.f2.set(LP, 240, .7f, sr); break;
     default: break;
   }
 }
@@ -304,32 +379,33 @@ static bool runShot(OneShot& s, float sr, float& out) {
     case SFX_AP_DISC: v = sinf(2 * PI * (880 + 220 * (fmodf(t, 0.2f) > 0.1f)) * t) * 0.1f * (t < 0.9f); alive = t < 0.9f; break;
     case SFX_GEAR_CLUNK: v = s.f1.p(s.nz.w()) * expf(-t * 25) * 1.5f + sinf(2 * PI * 70 * t) * expf(-t * 18) * 0.3f; alive = t < 0.4f; break;
     case SFX_TOUCHDOWN: {
-      float chirp = s.f1.p(s.nz.w()) * expf(-t * 9.f) * smoothstepf(0, 0.01f, t) * (0.4f + 0.8f * s.intensity);
-      float thump = (s.f2.p(s.nz.w()) * 3.f + sinf(2 * PI * 55 * t) * 0.5f) * expf(-t * 14.f) * s.intensity;
+      float chirp = s.f1.p(s.nz.w()) * expf(-t * 9.f) * smoothstepf(0, 0.01f, t) * (0.4f + 0.8f);
+      float thump = (s.f2.p(s.nz.w()) * 3.f + sinf(2 * PI * 55 * t) * 0.5f) * expf(-t * 14.f);
       v = chirp + thump; alive = t < 0.8f; break; }
     case SFX_CRASH: {
-      float env = expf(-t * 1.2f) * smoothstepf(0, 0.01f, t);
-      v = (s.f1.p(s.nz.w()) * 2.5f + s.f2.p(s.nz.w()) * 0.6f * expf(-t * 4.f)) * env + sinf(2 * PI * 40 * t) * expf(-t * 3) * 0.6f;
+      float env = expf(-t * (1.1f / s.size)) * smoothstepf(0, 0.01f, t);
+      v = (s.f1.p(s.nz.w()) * 2.5f + s.f2.p(s.nz.w()) * 0.6f * expf(-t * 4.f)) * env + sinf(2 * PI * (48.f * s.variant - 9.f * t) * t) * expf(-t * 3) * 0.6f;
       alive = t < 4.f; break; }
     case SFX_THUNDER: {
       float env = smoothstepf(0, 0.15f, t) * expf(-t * 0.7f) * (0.6f + 0.4f * sinf(t * 7.f) * sinf(t * 2.3f));
-      v = (s.f1.p(s.nz.w()) * 3.f + s.f2.p(s.nz.w()) * 4.f) * env * s.intensity; alive = t < 6.f; break; }
+      v = (s.f1.p(s.nz.w()) * 3.f + s.f2.p(s.nz.w()) * 4.f) * env; alive = t < 6.f; break; }
     case SFX_BOOM: {  // sonic boom: a deep double "ba-boom" (long bow and tail shock N-waves, low-passed) and a rolling rumble
       auto nwave = [&](float t0, float len) { float tt = t - t0; if (tt < 0 || tt > len) return 0.f; return (1.f - 2.f * tt / len) * smoothstepf(0, 0.012f, tt) * smoothstepf(len, len - 0.01f, tt); };
-      float shock = nwave(0.0f, 0.08f) + nwave(0.19f, 0.08f) * 0.85f;
+      float separation = .12f * s.size;
+      float shock = nwave(0.0f, .055f * s.size) + nwave(separation, .055f * s.size) * .85f;
       float body = s.f1.p(shock * 3.5f + s.nz.w() * expf(-t * 8.f) * 0.12f);
       auto thump = [&](float t0, float f, float a) { float tt = t - t0; if (tt < 0) return 0.f;
         float ph = 2 * PI * (f - 6.f * tt) * tt;
         return a * (sinf(ph) + 0.45f * sinf(2.f * ph) * expf(-tt * 4.f)) * expf(-tt * 2.4f) * smoothstepf(0, 0.025f, tt); };
-      float sub = thump(0.f, 36.f, 0.9f) + thump(0.19f, 31.f, 0.75f);
+      float sub = thump(0.f, 36.f, 0.9f) + thump(separation, 31.f * s.variant, 0.75f);
       float rumble = s.f2.p(s.nz.w()) * 7.f * expf(-t * 0.9f) * smoothstepf(0.05f, 0.4f, t);
-      v = s.f4.p(s.f3.p(body * 2.6f + sub * 0.8f + rumble)) * s.intensity;   // 24 dB/oct high-pass: no wasted infrasound
+      v = s.f4.p(s.f3.p(body * 2.6f + sub * 0.8f + rumble));   // 24 dB/oct high-pass: no wasted infrasound
       alive = t < 5.f; break; }
     case SFX_UFO_ARRIVE: {   // theremin warble over a low hum
       float env = smoothstepf(0.f, 0.4f, t) * smoothstepf(3.2f, 2.2f, t);
       float f = 520.f + 180.f * sinf(2 * PI * 5.5f * t) + 120.f * sinf(2 * PI * 0.6f * t);
       s.ph += 2 * PI * f * dt; s.ph2 += 2 * PI * 68.f * dt;
-      v = (sinf(s.ph) * 0.16f + (sinf(s.ph2) + 0.4f * sinf(s.ph2 * 2.01f)) * 0.12f) * env * s.intensity; alive = t < 3.3f; break; }
+      v = (sinf(s.ph) * 0.16f + (sinf(s.ph2) + 0.4f * sinf(s.ph2 * 2.01f)) * 0.12f) * env; alive = t < 3.3f; break; }
     case SFX_UFO_LAUGH: {    // two squeaky voices giggling "hee-hee-hee"
       float syl = 0.15f; int k = (int)(t / syl); float u = fmodf(t, syl) / syl;
       float voice = (k % 2) ? 1.22f : 1.f;
@@ -337,26 +413,26 @@ static bool runShot(OneShot& s, float sr, float& out) {
       float env = sinf(PI * clampf(u * 1.25f, 0.f, 1.f)) * (k < 12 ? 1.f : 0.f) * (1.f - 0.04f * k);
       s.ph += 2 * PI * f * dt;
       float saw = fmodf(s.ph / (2 * PI), 1.f) * 2.f - 1.f;
-      v = (sinf(s.ph) * 0.6f + saw * 0.25f) * env * 0.16f * s.intensity; alive = t < 1.9f; break; }
+      v = (sinf(s.ph) * 0.6f + saw * 0.25f) * env * 0.16f; alive = t < 1.9f; break; }
     case SFX_UFO_ZOOM: {     // rising whistle and a whoosh as it shoots away
       float f = 300.f * powf(14.f, clampf(t / 1.6f, 0.f, 1.f)) * (1.f + 0.03f * sinf(2 * PI * 9.f * t));
       s.ph += 2 * PI * f * dt;
       float env = smoothstepf(0.f, 0.08f, t) * smoothstepf(2.4f, 1.0f, t);
-      v = (sinf(s.ph) * 0.18f + s.f1.p(s.nz.w()) * 0.5f * smoothstepf(1.8f, 0.2f, t)) * env * s.intensity; alive = t < 2.5f; break; }
+      v = (sinf(s.ph) * 0.18f + s.f1.p(s.nz.w()) * 0.5f * smoothstepf(1.8f, 0.2f, t)) * env; alive = t < 2.5f; break; }
     case SFX_FLYBY: {        // jet fly-by: rising tearing roar, a doppler drop in the turbine whine as it passes, rumbling away
       float tp = 0.9f, x = t - tp;
       float env = expf(-x * x * (x < 0 ? 5.f : 1.6f)) * smoothstepf(0.f, 0.15f, t);
-      float dop = 1.f / (1.f + 0.55f * tanhf(x * 4.f));          // pitch ratio: high on approach, low going away
+      float dop = 1.f; // Doppler comes from the source/listener velocities in the spatial bus.          // pitch ratio: high on approach, low going away
       s.ph += 2 * PI * 1900.f * dop * dt; s.ph2 += 2 * PI * 3100.f * dop * dt;
       float hiss = s.f1.p(s.nz.w()) * (x < 0 ? 1.4f : 0.6f), roar = s.f2.p(s.nz.w()) * 3.2f, mid = s.f3.p(s.nz.w()) * 1.1f;
       float whine = (sinf(s.ph) * 0.05f + sinf(s.ph2) * 0.03f) * (x < 0.2f ? 1.f : 0.5f);
-      v = (hiss + roar + mid + whine) * env * 0.55f * s.intensity; alive = t < 4.5f; break; }
+      v = (hiss + roar + mid + whine) * env * 0.55f; alive = t < 4.5f; break; }
     case SFX_LASER: {        // pulse laser: a bright descending zap over a crackle of discharge
       float f = 2600.f * expf(-t * 18.f) + 380.f;
       s.ph += 2 * PI * f * dt; s.ph2 += 2 * PI * f * 1.51f * dt;
       float env = smoothstepf(0.f, 0.004f, t) * expf(-t * 22.f);
-      float sq = sinf(s.ph) > 0 ? 1.f : -1.f;
-      v = (sq * 0.35f + sinf(s.ph2) * 0.4f + s.f1.p(s.nz.w()) * 0.6f * expf(-t * 40.f)) * env * 0.32f * s.intensity; alive = t < 0.3f; break; }
+      float sq = sinf(s.ph) + .24f * sinf(3*s.ph); // band-limited pulse, no raw square-wave aliasing
+      v = (sq * 0.35f + sinf(s.ph2) * 0.4f + s.f1.p(s.nz.w()) * 0.6f * expf(-t * 40.f)) * env * 0.32f; alive = t < 0.3f; break; }
     case SFX_PLASMA: {       // dark-energy detonation: an inhaled rising whine, then a deep implosion-thump and a long rolling roar
       float suck = smoothstepf(0.f, 0.35f, t) * smoothstepf(0.45f, 0.38f, t);
       float fw = 200.f + 2400.f * smoothstepf(0.f, 0.42f, t);
@@ -365,150 +441,268 @@ static bool runShot(OneShot& s, float sr, float& out) {
       float tt = t - 0.42f;
       float thump = tt > 0 ? sinf(2 * PI * (42.f - 10.f * tt) * tt) * expf(-tt * 3.f) * smoothstepf(0.f, 0.02f, tt) : 0.f;
       float roar = tt > 0 ? (s.f1.p(s.nz.w()) * 5.f + s.f2.p(s.nz.w()) * 7.f) * expf(-tt * 0.7f) * smoothstepf(0.f, 0.08f, tt) : 0.f;
-      v = (whine + s.f3.p(thump * 1.4f + roar)) * s.intensity; alive = t < 6.f; break; }
+      v = (whine + s.f3.p(thump * 1.4f + roar)); alive = t < 6.f; break; }
     case SFX_CLOAK: {        // cloak: a shimmering, phasing sweep
       float env = smoothstepf(0.f, 0.15f, t) * smoothstepf(1.4f, 0.6f, t);
       float f = (s.intensity > 0.85f ? 300.f + 900.f * t : 1200.f - 700.f * t);
       s.ph += 2 * PI * f * dt; s.ph2 += 2 * PI * f * 1.007f * dt;
       v = ((sinf(s.ph) + sinf(s.ph2)) * 0.08f * (0.6f + 0.4f * sinf(t * 40.f)) + s.f1.p(s.nz.w()) * 0.25f) * env; alive = t < 1.5f; break; }
+    case SFX_METAL: {
+      float n = s.nz.w(), scrape = s.f3.p(n) * expf(-t * 12.f) * .22f;
+      float ring = (s.f1.p(n) * 1.7f + s.f2.p(n) * .8f) * expf(-t * 5.f / s.size);
+      v = (ring + scrape) * smoothstepf(0,.002f,t); alive = t < 1.5f; break; }
+    case SFX_IMPACT: {
+      v = (s.f1.p(s.nz.w()) * 2.2f + s.f2.p(s.nz.w()) * .4f * expf(-t*14)) * expf(-t*9.f/s.size)
+          + sinf(2*PI*(83*s.variant-24*t)*t)*.28f*expf(-t*18);
+      alive = t < 1.1f; break; }
+    case SFX_SPLASH: {
+      float env = smoothstepf(0,.012f,t)*expf(-t*2.8f/s.size);
+      float spray = s.f1.p(s.nz.w())*(.35f+.14f*sinf(t*51));
+      float water = s.f2.p(s.nz.w())*.65f + sinf(2*PI*(130*expf(-t*3)+45)*t)*.1f;
+      v = (spray+water)*env; alive = t < 2.6f; break; }
+    case SFX_REHEAT:
+      v = (s.f1.p(s.nz.w())*.9f+s.f2.p(s.nz.w())*.7f)*smoothstepf(0,.025f,t)*expf(-t*5);
+      alive=t<1.2f; break;
+    case SFX_TRANSONIC:
+      v = s.f1.p(s.nz.w())*.8f*smoothstepf(0,.08f,t)*expf(-t*4)*(1+.25f*sinf(t*90)); alive=t<1.1f; break;
+    case SFX_CANNON:
+      v = (s.f1.p(s.nz.w())*.45f+s.f2.p(s.nz.w())*1.8f)*expf(-t*32)+sinf(2*PI*110*t)*.22f*expf(-t*22);
+      alive=t<.4f; break;
+    case SFX_EMP:
+      s.ph += 2*PI*(600+2200*expf(-t*8))*dt;
+      v = (s.f1.p(s.nz.w())*.3f+s.f2.p(s.nz.w())*.8f+sinf(s.ph)*.15f)*smoothstepf(0,.003f,t)*expf(-t*5);
+      alive=t<1.6f; break;
+    case SFX_HEAVY:
+      s.ph += 2*PI*(75+1900*expf(-t*28))*dt;
+      v=(sinf(s.ph)*.25f+s.f1.p(s.nz.w())*.9f+s.f2.p(s.nz.w())*.18f)*expf(-t*6.f);
+      alive=t<1.4f; break;
     default: alive = false;
   }
   s.t += dt;
-  out = v;
+  out = v * smoothstepf(0.f, .0015f, t);
   return alive;
 }
 
-void AudioEngine::render(float* out, int frames) {
-  if (!impl) { memset(out, 0, sizeof(float) * frames * 2); return; }
-  Impl& I = *impl;
-  acquire();
-  if (hasPending) { I.P = pending; hasPending = false; }
-  for (int i = 0; i < trigN; i++) {
-    for (auto& s : I.shots) if (!s.active) { startShot(s, trigQ[i], trigI[i], I.sr); break; }
+namespace {
+AudioSpatialCue sourceCue(const AudioParams& p, const AudioSource& s, float age = 0) {
+  vec3 pos = s.position, vel = s.velocity;
+  AudioListener listener = p.listener;
+  if (s.space == AudioSpace::Listener || (s.space == AudioSpace::Cabin && !p.interior)) {
+    listener = AudioListener(); // source is already in head coordinates, +z behind
+  } else if (s.space == AudioSpace::Airframe || s.space == AudioSpace::Cabin) {
+    if(s.space == AudioSpace::Cabin) pos+=p.cabinEye;
+    pos = p.aircraftPosition + p.aircraftRotation.rotate(pos); vel = p.aircraftVelocity;
+  } else {
+    bool tracked = false;
+    if (s.follow) for (int i = 0; i < std::clamp(p.emitterCount,0,20); ++i) if (p.emitters[i].id == s.follow) {
+      pos = p.emitters[i].position; vel = p.emitters[i].velocity; tracked = true; break;
+    }
+    if (!tracked) pos += vel * std::min(age, 3.f);
   }
-  trigN = 0;
-  if (voiceNew) { I.voice = std::move(voicePending); I.voicePos = 0; voiceNew = false; }
-  if (voiceCut) { I.voice.reset(); voiceCut = false; }
-  release();
-  const AudioParams& P = I.P;
-  float sr = I.sr;
-  const float k = 1.f - expf(-1.f / (0.04f * sr));  // ~40ms smoothing
-  const float kSlow = 1.f - expf(-1.f / (0.25f * sr));
-  for (int f = 0; f < frames; f++) {
-    int bp = I.block++ & 63;
-    float rpm = I.sRpm.p(P.rpm, k), n1 = I.sN1.p(P.n1, k), spool = I.sSpool.p(P.spool, k);
-    float load = I.sLoad.p(clampf(P.throttle * 0.6f + P.spool * 0.4f, 0, 1), k);
-    float air = I.sAir.p(P.airspeed, k), gs = I.sGs.p(P.onGround ? P.groundSpeed : 0.f, k);
-    float muff = I.sMuffle.p(P.muffled ? 1.f : 0.f, kSlow), inter = I.sInterior.p(P.interior ? 1.f : 0.f, kSlow);
-    float vol = I.sVol.p(P.inFlight && !P.paused ? 1.f : 0.f, kSlow);
-    float stall = I.sStall.p(P.stallWarn, k);
-    float L = 0, R = 0;
-    if (vol > 0.001f) {
-      float eng[2] = {0, 0}, prop[2] = {0, 0};
-      int ne = std::min(P.engines, 2);
-      float resL = 0, resR = 0;
-      if (P.research) { I.rv.tick(sr, spool, smoothstepf(0.85f, 1.f, spool), P.nozzle, P.mach, bp, resL, resR); ne = 0; }
-      for (int e = 0; e < ne; e++) {
-        float det = e == 0 ? 1.f : 1.0065f;  // unsynchronised twins beat slowly
-        if (P.engineType == 0)
-          I.pv[e].tick(sr, rpm * det * (P.engineHealth[e] <= 0.f ? 0.f : 1.f), load, std::max(P.cylinders, 2), std::max(P.blades, 2), rpm * det, P.running && P.engineHealth[e] > 0.f, P.cranking, eng[e], prop[e], bp, P.engineHealth[e]);
-        else {
-          float propRpm = P.engineType == 1 ? rpm * det : 0.f;
-          float hn = P.engineHealth[e];   // a failed turbine's n1 rolls back to a windmill, a sick one sags and wavers
-          float n1e = hn <= 0.f ? std::min(n1, 12.f) : n1 * det * (hn < 0.999f ? 0.55f + 0.45f * hn + 0.04f * sinf(bp * 0.0007f) : 1.f);
-          I.tv[e].tick(sr, P.engineType == 2, n1e, spool * std::max(hn, 0.f), propRpm * std::max(hn, 0.f), std::max(P.blades, 2), eng[e], prop[e], bp);
+  return audioSpatialCue(listener, pos, vel, s.radius, s.range,
+                          s.space == AudioSpace::Listener ? 0 : p.wrapPeriod, p.soundSpeed);
+}
+AudioSource attached(vec3 p, float radius = 5, float range = 2500) {
+  AudioSource s; s.space = AudioSpace::Airframe; s.position = p; s.radius = radius; s.range = range; s.propagation = false; return s;
+}
+AudioSource headset(const AudioParams& p, vec3 seat) {
+  auto s = attached(p.cabinEye + seat, 2, 20);
+  if (!p.interior) { s.space = AudioSpace::Listener; s.position = seat; }
+  return s;
+}
+}
+
+void AudioEngine::render(float* out, int frames) {
+  if (!out || frames <= 0) return;
+  if (!impl) { memset(out, 0, sizeof(float) * size_t(frames) * 2); return; }
+  // Bound stack/ring copies even if an offline caller requests several seconds at once.
+  if (frames > 4096) { for (int i = 0; i < frames; i += 4096) render(out + i*2, std::min(4096, frames-i)); return; }
+  Impl& I = *impl; float musicBlock[8192] = {}; int musicN = 0;
+  // Never spin the realtime thread behind a UI/network producer. Keep the last snapshot for one buffer if busy.
+  if (!lock.test_and_set(std::memory_order_acquire)) {
+    bool clear = worldReset;
+    if (hasPending) { clear |= pending.sceneId != I.P.sceneId || (I.P.scene && !pending.scene) || (!I.P.paused && pending.paused); I.P = pending; hasPending = false; }
+    if (clear) { for (auto& s : I.shots) if (s.source.space != AudioSpace::Listener) s.active = false; for (auto& a : I.ambient) a.id = 0; }
+    worldReset = false;
+    if (length(worldShift) > 0) for (auto& s : I.shots) if (s.source.space == AudioSpace::World) s.source.position += worldShift;
+    worldShift = vec3();
+    for (int i = 0; i < trigN; ++i) {
+      const auto& e = trigQ[i];
+      if ((I.P.paused || !I.P.scene) && e.source.space == AudioSpace::World) continue;
+      OneShot* slot = nullptr; bool duplicate = false;
+      for (auto& s : I.shots) {
+        if (!s.active) { if (!slot) slot = &s; continue; }
+        // Coalesce only the same event at the same place in a 35ms window; separate parts remain distinct.
+        if (s.type == e.type && s.age < .035f && s.source.space == e.source.space && length(s.source.position-e.source.position) < 1.25f) {
+          s.intensity = std::max(s.intensity, e.intensity); duplicate = true; break;
         }
       }
-      // cabin/exterior tone shaping
-      if (bp == 0) {
-        for (int c = 0; c < 2; c++) {
-          float cab = P.research ? 5200.f : 2200.f;   // the XR-30's sealed pod passes more of the engine's character
-          I.engL[c].set(LP, lerpf(12000.f, cab, inter), 0.7f, sr);
-          I.engR[c].set(LP, lerpf(12000.f, cab, inter), 0.7f, sr);
-          I.cabinBoom[c].set(PK, P.research ? 60.f : 115.f, 1.2f, sr, (P.research ? 4.f : 6.f) * inter);
-          I.muffleLP[c][0].set(LP, lerpf(16000.f, 380.f, muff), 0.7f, sr);
-          I.muffleLP[c][1].set(LP, lerpf(16000.f, 380.f, muff), 0.7f, sr);
+      if (duplicate) continue;
+      if (!slot) { // Steal an inaudible/quiet tail, not the first (often loudest) impact or a warning.
+        float quiet = 1e9f;
+        for (auto& s : I.shots) if (s.type != SFX_AP_DISC && s.type != SFX_BEEP) {
+          float score = sourceCue(I.P, s.source, s.age).gain * s.intensity / (1+s.t*2);
+          if (score < quiet) { quiet=score; slot=&s; }
         }
-        I.windBP.set(BP, 300.f + air * 9.f, 0.6f, sr);
-        I.windLP.set(LP, 1500.f + air * 25.f, 0.7f, sr);
-        I.rollLP.set(LP, 120.f + gs * 6.f, 0.8f, sr);
-        I.rollBP.set(BP, 900.f + gs * 15.f, 1.0f, sr);
-        I.gearRumble.set(LP, 140.f, 0.8f, sr);
-        I.rainHP.set(HP, 2500.f, 0.7f, sr);
-        I.rainLP.set(LP, 9000.f, 0.7f, sr);
+        if (slot && quiet > sourceCue(I.P,e.source).gain*e.intensity) slot=nullptr;
       }
-      float engVol = P.engineVol * (P.engineType == 0 ? 0.55f : 0.6f);
-      float propW = lerpf(1.0f, 0.65f, inter);
-      float e0 = (eng[0] + prop[0] * propW), e1 = (eng[1] + prop[1] * propW);
-      float mono = (ne == 2) ? 0.f : e0;
-      float el = ne == 2 ? e0 * 0.8f + e1 * 0.45f : mono;
-      float er = ne == 2 ? e1 * 0.8f + e0 * 0.45f : mono;
-      if (P.research) { el = resL; er = resR; }
-      // Haas widening for single engines
-      I.delayL[I.dpos & 2047] = el; I.delayR[I.dpos & 2047] = er;
-      float wl = I.delayR[(I.dpos - 331) & 2047], wr = I.delayL[(I.dpos - 547) & 2047];
-      I.dpos++;
-      el = el + wl * 0.18f; er = er + wr * 0.18f;
-      el = I.cabinBoom[0].p(I.engL[0].p(el)) * engVol; er = I.cabinBoom[1].p(I.engR[0].p(er)) * engVol;
-      // wind & airframe
-      float n = I.nz.w();
-      float windAmp = clampf(air / 70.f, 0, 1.6f); windAmp *= windAmp;
-      float gust = 1.f + P.turbulence * 0.6f * sinf(I.motorPh * 0.0007f);
-      float wind = (I.windBP.p(n) * 0.35f + I.windLP.p(n) * 0.09f) * windAmp * gust * lerpf(1.0f, 0.55f, inter);
-      float gearR = I.gearRumble.p(I.nz.w()) * (P.gearDown * 0.4f + P.flaps * 0.5f) * windAmp * 0.6f;
-      // rolling
-      float roll = 0;
-      if (P.onGround && gs > 0.5f) {
-        I.seamDist += gs / sr;
-        if (P.rough < 0.3f && I.seamDist > 18.f) { I.seamDist = 0; I.bumpEnv = 0.6f; }
-        if (P.rough > 0.3f && (I.nz.s & 0xFFF) < (uint32_t)(gs * P.rough * 0.25f)) I.bumpEnv = 0.4f + 0.6f * P.rough;
-        float sp = clampf(gs / 30.f, 0, 1.5f);
-        roll = I.rollLP.p(I.nz.w()) * sp * (0.6f + 1.2f * P.rough) + I.rollBP.p(I.nz.w()) * 0.05f * sp * P.rough;
-        roll += sinf(I.motorPh * 2 * PI * 45.f / sr) * I.bumpEnv * 0.5f;
-        I.bumpEnv *= 0.9985f;
+      if (slot) startShot(*slot, e.type, e.intensity, I.sr, e.source, I.variants);
+    }
+    trigN = 0;
+    if (voiceNew || voiceCut) { I.voiceTail = I.voiceLast; I.voiceFade = 0; }
+    if (voiceNew) { I.voice=std::move(voicePending); I.voiceSeat=voiceSeat; I.voicePos=0; voiceNew=false; }
+    if (voiceCut) { I.voice.reset(); voiceCut=false; }
+    musicN = std::min(frames, int(musicWrite-musicRead));
+    for (int i=0; i<musicN; ++i) { unsigned k=(musicRead++ % kMusicFrames)*2; musicBlock[i*2]=musicRing[k]; musicBlock[i*2+1]=musicRing[k+1]; }
+    I.musicGain = musicLevel;
+    release();
+  }
+  const AudioParams& P=I.P; float sr=I.sr;
+  const float k=1-expf(-1/(.04f*sr)), slow=1-expf(-1/(.18f*sr));
+  for (auto& a : I.ambient) a.seen=false;
+  for (int n=0; n<std::clamp(P.emitterCount,0,20); ++n) {
+    const auto& e=P.emitters[n]; if (!e.id || e.kind==AudioEmitter::Track) continue;
+    AmbientVoice* slot=nullptr;
+    for (auto& a:I.ambient) if(a.id==e.id) {slot=&a;break;}
+    if(!slot) for(auto& a:I.ambient) if(!a.id || a.fade<.0001f) {slot=&a; *slot=AmbientVoice(); slot->id=e.id; slot->piston.init(e.id*7919+3); slot->turbine.init(e.id*373+1); slot->noise.s=e.id*191+17; break;}
+    if(slot) {slot->emitter=e;slot->seen=true;}
+  }
+  for(int f=0; f<frames; ++f) {
+    int bp=I.block++ & 63;
+    float rpm=I.sRpm.p(P.rpm,k), n1=I.sN1.p(P.n1,k), spool=I.sSpool.p(P.spool,k);
+    float load=I.sLoad.p(clampf(P.throttle*.6f+P.spool*.4f,0,1),k);
+    float air=I.sAir.p(P.airspeed,k), gs=I.sGs.p(P.onGround?P.groundSpeed:0.f,k);
+    float inter=I.sInterior.p(P.interior?1.f:0.f,slow), muff=I.sMuffle.p(P.muffled?1.f:0.f,slow);
+    float world=I.sVol.p(P.scene && !P.paused?1.f:0.f,slow);
+    float duck=I.sDuck.p(I.voice?1.f:0.f, I.voice?k:slow);
+    float L=0,R=0;
+    int ne=std::clamp(P.engines,0,4);
+    if(bp==0) {
+      for(int e=0;e<4;++e) {
+        auto cue=sourceCue(P,attached(P.enginePosition[e],P.engineRadius,6500));
+        vec3 toListener=audioDisplacement(P.aircraftPosition+P.aircraftRotation.rotate(P.enginePosition[e]),P.listener.position,P.wrapPeriod);
+        float aft=dot(normalize(toListener),P.aircraftRotation.rotate(P.engineDirection[e]));
+        float direct=P.interior?1.f:lerpf(.65f,1.15f,.5f+.5f*aft);
+        // Summed engine power stays comparable across single/twin/quad aircraft; each retains its own source.
+        float level=P.inFlight && e<ne ? P.engineVol*.65f/std::sqrt(float(std::max(1,ne)))*direct : 0;
+        I.engines[e].target(cue,level*(1-.3f*duck)*(1-.5f*muff),sr,clampf(.45f*inter+.42f*muff,0,.85f));
+        I.enginePitch[e]=cue.pitch;
+        I.engineLP[e].set(LP,lerpf(15000.f,3200.f,inter),.707f,sr);
       }
-      I.motorPh += 1.f; if (I.motorPh >= sr) I.motorPh -= sr;   // (45 Hz: whole cycles per second of samples, so the wrap is seamless; a float counting on loses its steps after six minutes)
-      float body = (wind + gearR + roll) * 0.9f;
-      el += body; er += body;
-      // muffle (headset ANR) on the engine/airframe bus
-      float gm = lerpf(1.f, 0.42f, muff);
-      el = I.muffleLP[0][0].p(I.muffleLP[0][1].p(el)) * gm;
-      er = I.muffleLP[1][0].p(I.muffleLP[1][1].p(er)) * gm;
-      L += el * vol; R += er * vol;
-      // cockpit cues (not muffled: they come through the headset)
-      if (stall > 0.05f) {
-        I.stallPh += (P.stallIsShaker ? 28.f : 1650.f) / sr; I.stallPh -= floorf(I.stallPh);
-        float s = P.stallIsShaker ? (I.stallPh < 0.5f ? 1.f : -1.f) * 0.08f * (0.5f + 0.5f * I.nz.w())
-                                   : (sinf(2 * PI * I.stallPh) + 0.35f * sinf(6 * PI * I.stallPh)) * 0.07f * (0.75f + 0.25f * sinf(I.motorPh * 2 * PI * 23.f / sr));
-        L += s * stall * vol; R += s * stall * vol;
+      for(int c=0;c<2;++c) {
+        float side=c?1.f:-1.f;
+        auto windPos=P.cabinEye+vec3(side*.8f,.12f,-.25f);
+        I.wind[c].target(sourceCue(P,attached(windPos,4)),P.sfxVol*(1-.35f*duck)*(1-.65f*muff)*lerpf(.65f,.32f,inter),sr,.25f*inter);
+        I.roll[c].target(sourceCue(P,attached(P.gearPosition+vec3(side*1.5f,0,0),6)),P.sfxVol*.55f*(1-.45f*muff),sr,.25f*inter);
+        I.rain[c].target(sourceCue(P,attached(windPos,4)),P.sfxVol*.35f*(1-.3f*duck),sr,.2f*inter);
+        I.windBP[c].set(BP,260+std::min(air,400.f)*4.5f,.55f,sr);
+        I.windLP[c].set(LP,1600+std::min(air,400.f)*12,.7f,sr);
+        I.buffLP[c].set(BP,46+c*7,.65f,sr);
+        I.rollLP[c].set(LP,120+gs*4,.75f,sr);
+        I.rainLP[c].set(BP,inter?1800.f:3800.f,.55f,sr);
       }
-      if (P.gearMoving || P.flapsMoving) {
-        float mf = P.gearMoving ? 380.f : 620.f;
-        float m = sinf(I.motorPh * 2 * PI * mf / sr) * 0.02f + sinf(I.motorPh * 2 * PI * mf * 2.01f / sr) * 0.01f;
-        L += m * vol; R += m * vol;
+      I.mechanisms[0].target(sourceCue(P,attached(P.gearPosition,6)),P.sfxVol*.8f,sr,.3f*inter);
+      I.mechanisms[1].target(sourceCue(P,attached(vec3(2,0,0),6)),P.sfxVol*.65f,sr,.3f*inter);
+      I.stall.target(sourceCue(P,headset(P,vec3(-.35f,-.25f,-.5f))),P.sfxVol,sr);
+      I.voiceSpatial.target(sourceCue(P,headset(P,I.voiceSeat)),P.voiceVol*1.15f,sr);
+      for(int c=0;c<2;++c) I.music[c].target(sourceCue(P,headset(P,vec3(c?.65f:-.65f,-.12f,-.7f))),.72f,sr);
+      for(auto& s:I.shots) if(s.active) {
+        auto cue=sourceCue(P,s.source,s.age);
+        if(!s.arrived) { // propagation from the emission point, before following any moving tail
+          float distance=length(audioDisplacement(P.listener.position,s.source.position,P.wrapPeriod));
+          s.arrived=s.waveRadius>=distance;
+          if(s.age>45.f || distance>s.source.range) s.active=false;
+        }
+        bool external=s.source.space!=AudioSpace::Listener;
+        s.spatial.target(cue,s.intensity*P.sfxVol*(external?(1-.4f*muff):1),sr,external?.25f*inter+.35f*muff:0);
+        s.pitch = s.type==SFX_BOOM || s.type==SFX_THUNDER ? 1.f : cue.pitch;
       }
-      // precipitation
-      float rain = I.sRain.p(P.rain, kSlow);
-      if (rain > 0.01f) {
-        float drops = I.rainLP.p(I.rainHP.p(I.nz.w())) * 0.10f * rain * lerpf(0.6f, 1.0f, inter);
-        if ((I.nz.s & 0x3FF) < (uint32_t)(rain * 6)) drops += I.nz.w() * 0.25f * rain;
-        L += drops * vol; R += drops * vol * 0.9f;
+      for(auto& a:I.ambient) if(a.id) {
+        auto& e=a.emitter; auto cue=audioSpatialCue(P.listener,e.position,e.velocity,e.radius,e.kind==AudioEmitter::Fire?1600.f:6500.f,P.wrapPeriod,P.soundSpeed);
+        float direct=e.kind==AudioEmitter::Engine ? .8f+.25f*dot(normalize(audioDisplacement(e.position,P.listener.position,P.wrapPeriod)),-e.forward) : 1;
+        a.spatial.target(cue,e.level*direct*(e.kind==AudioEmitter::Engine?P.engineVol:P.sfxVol)*(1-.35f*duck),sr,.5f*inter+.25f*muff);
+        a.pitch=cue.pitch; a.fireLP.set(LP,580,.65f,sr); a.crackBP.set(BP,2400,.8f,sr);
       }
     }
-    // one-shots
-    float sfx = 0;
-    for (auto& s : I.shots) {
-      if (!s.active) continue;
-      float v; s.active = runShot(s, sr, v);
-      bool muffles = s.type == SFX_TOUCHDOWN || s.type == SFX_CRASH || s.type == SFX_THUNDER || s.type == SFX_BOOM || s.type == SFX_FLYBY;
-      sfx += v * (muffles ? lerpf(1.f, 0.5f, muff) : 1.f);
+    if(world>.0001f) {
+      for(int e=0;e<ne;++e) {
+        float eng=0,prop=0,health=clampf(P.engineHealth[e],0,1), det=1.f+float(e)*.0037f;
+        float dsr=sr / I.enginePitch[e], prpm=rpm*det;
+        if(P.research) {
+          float a,b; float power=clampf(spool*P.enginePower[e]*health,0,1.2f);
+          I.rv[e].tick(dsr,power,smoothstepf(.85f,1.f,power),P.nozzle,P.mach,bp,a,b);
+          eng=(a+b)*.5f*smoothstepf(0,.12f,power); // no immortal core hum after shutdown/failure
+        } else if(P.engineType==0) {
+          I.pv[e].tick(dsr,prpm*(health>0?1:0),load,std::clamp(P.cylinders,2,8),std::clamp(P.blades,2,8),prpm,P.running&&health>0,P.cranking,eng,prop,bp,health,P.signature);
+          eng*=smoothstepf(0,120,rpm); prop*=smoothstepf(0,120,rpm);
+        } else {
+          I.tv[e].tick(dsr,P.engineType==2,n1*det*health,spool*health,P.engineType==1?prpm*health:0,std::clamp(P.blades,2,8),eng,prop,bp,P.signature);
+        }
+        I.engines[e].mix(I.engineLP[e].p(eng+prop*.8f)*world,L,R);
+      }
+      I.gustPhase += .73f/sr; if(I.gustPhase>=1) I.gustPhase-=1;
+      float pressure=std::min(2.1f,powf(std::max(0.f,air)/90.f,1.45f));
+      float gust=1+P.turbulence*.4f*sinf(2*PI*I.gustPhase);
+      float rain=I.sRain.p(P.rain,slow);
+      for(int c=0;c<2;++c) {
+        float noise=I.nz[c].w();
+        float wind=(I.windBP[c].p(noise)*.28f+I.windLP[c].p(noise)*.08f)*pressure*gust;
+        float buffet=I.buffLP[c].p(noise)*(P.buffet*.65f+P.gearDown*.08f+P.flaps*.12f)*pressure;
+        float slip=1+(c?1.f:-1.f)*clampf(P.slip,-1,1)*.3f;
+        I.wind[c].mix((wind+buffet)*slip*world*(P.inFlight?1:0),L,R);
+        float roll=I.rollLP[c].p(I.nz[c].w())*clampf(gs/30,0,1.3f)*(.4f+.9f*P.rough);
+        I.roll[c].mix(roll*world*(P.onGround && P.inFlight?1:0),L,R);
+        float drops=I.rainLP[c].p(I.nz[c].w())*.18f*rain;
+        I.rain[c].mix(drops*world*(P.inFlight?1:0),L,R);
+      }
+      float stall=I.sStall.p(P.inFlight?P.stallWarn:0,k);
+      I.stallPh+=(P.stallIsShaker?28.f:1650.f)/sr; I.stallPh-=floorf(I.stallPh);
+      float warning=P.stallIsShaker?sinf(2*PI*I.stallPh)*(.055f+.035f*I.nz[0].w()):sinf(2*PI*I.stallPh)*.065f;
+      I.stall.mix(warning*stall*world,L,R);
+      float gear=I.sGear.p(P.gearMoving&&P.inFlight?1.f:0.f,k), flap=I.sFlap.p(P.flapsMoving&&P.inFlight?1.f:0.f,k);
+      I.gearPh+=380.f/sr;I.gearPh-=floorf(I.gearPh);I.flapPh+=620.f/sr;I.flapPh-=floorf(I.flapPh);
+      I.mechanisms[0].mix((sinf(2*PI*I.gearPh)*.025f+I.nz[0].w()*.006f)*gear*world,L,R);
+      I.mechanisms[1].mix(sinf(2*PI*I.flapPh)*.02f*flap*world,L,R);
     }
-    L += sfx * P.sfxVol; R += sfx * P.sfxVol;
-    if (I.voice) {   // the radio voice, centred
-      if (I.voicePos < I.voice->size()) { float v = (*I.voice)[I.voicePos++] * P.voiceVol; L += v; R += v; }
-      else { I.voice.reset(); acquire(); if (!voiceNew) voiceActive.store(false, std::memory_order_relaxed); release(); }   // (a line queued meanwhile keeps the engine busy)
+    for(auto& a:I.ambient) if(a.id) {
+      a.fade=approach(a.fade,a.seen?1.f:0.f,12.f,1/sr);
+      if(!a.seen && a.fade<.0001f) {a.id=0;continue;}
+      float eng=0,prop=0;auto& e=a.emitter;
+      if(e.kind==AudioEmitter::Fire) {
+        float n=a.noise.w(); if((a.noise.s&8191)<3) a.flame=1; a.flame*=expf(-120/sr);
+        eng=a.fireLP.p(n)*.25f+a.crackBP.p(n)*a.flame*.2f;
+      } else if(e.engineType==0) a.piston.tick(sr/a.pitch,e.rpm,e.spool,std::clamp(e.cylinders,2,8),std::clamp(e.blades,2,8),e.rpm,true,false,eng,prop,bp);
+      else a.turbine.tick(sr/a.pitch,e.engineType==2,e.n1,e.spool,e.engineType==1?e.rpm:0,std::clamp(e.blades,2,8),eng,prop,bp);
+      a.spatial.mix((eng+prop*.7f)*a.fade*world*.45f,L,R);
     }
-    L = tanhf(L * P.master * 1.2f); R = tanhf(R * P.master * 1.2f);
-    out[f * 2] = L; out[f * 2 + 1] = R;
+    for(auto& s:I.shots) if(s.active) {
+      s.age+=1/sr; s.waveRadius+=P.soundSpeed/sr;
+      if(!s.arrived) continue;
+      float v=0; s.active=runShot(s,sr/s.pitch,v);
+      float gain=(s.source.space==AudioSpace::Listener || (s.source.space==AudioSpace::Cabin && !P.scene))?1.f:world;
+      s.spatial.mix(v*gain,L,R);
+    }
+    float speech=0;
+    if(I.voice) {
+      if(I.voicePos<I.voice->size()) {
+        I.voiceFade=std::min(1.f,I.voiceFade+1/(.006f*sr));
+        float remaining=float(I.voice->size()-I.voicePos)/(.006f*sr);
+        speech=(*I.voice)[I.voicePos++]*I.voiceFade*std::min(1.f,remaining);
+      } else {
+        I.voice.reset();
+        if (!lock.test_and_set(std::memory_order_acquire)) {if(!voiceNew)voiceActive.store(false);release();}
+      }
+    } else if(voiceActive.load() && !lock.test_and_set(std::memory_order_acquire)) {if(!voiceNew)voiceActive.store(false);release();}
+    I.voiceLast=speech; speech+=I.voiceTail; I.voiceTail*=expf(-1/(.003f*sr));
+    I.voiceSpatial.mix(speech,L,R);
+    L*=P.master;R*=P.master;
+    // Radio::setVolume already includes master/duck. It now goes through the same near-field speakers and limiter.
+    for(int c=0;c<2;++c) I.music[c].mix(musicBlock[f*2+c]*I.musicGain,L,R);
+    float v[2]={L,R};
+    for(int c=0;c<2;++c) {float y=v[c]-I.dcIn[c]+expf(-2*PI*22/sr)*I.dcOut[c];I.dcIn[c]=v[c];I.dcOut[c]=y;v[c]=y;}
+    // Stereo-linked peak protection preserves location; ordinary signals remain linear (no constant tanh distortion).
+    float peak=std::max(fabsf(v[0]),fabsf(v[1])); float target=peak>.92f?.92f/peak:1;
+    I.limiter=target<I.limiter?target:approach(I.limiter,target,5.f,1/sr);
+    out[f*2]=v[0]*I.limiter;out[f*2+1]=v[1]*I.limiter;
   }
 }

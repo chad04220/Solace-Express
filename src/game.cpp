@@ -634,10 +634,10 @@ void Game::setEarthDestination(const procedural::Descriptor& region) {
     if (auto heading = regionTravel::Chart(flightRegion.origin).bearing(plane.pos, destination.origin)) plane.apHeading = (float)*heading;
     apDest = -1;
   }
-  toast(destination.name + " route set. Nearby regions prepare in the background as you fly.", vec3(.6f, 1.f, .8f), false);
+  toast(destination.name + " route set. Nearby regions prepare in the background as you fly.", vec3(.6f, 1.f, .8f));
   if (plane.spec && geo::surfaceDistance(earthPosition, destination.origin) / 1000. >
       plane.nominalRangeKm())
-    toast("Route exceeds nominal fuel range. Choose a closer stop or a longer-range aircraft.", vec3(1.f, .7f, .3f), false);
+    toast("Route exceeds nominal fuel range. Choose a closer stop or a longer-range aircraft.", vec3(1.f, .7f, .3f));
 }
 
 void Game::retireEarthPrefetch() {
@@ -738,7 +738,7 @@ void Game::updateEarthFlight() {
     else if (geo::surfaceDistance(earthPosition, earthDestination->origin) < 2500.) {
       earthCourseHold = false; plane.apDisengage();
       toast(earthDestination->id == g_world.regionId ? "Destination region reached. Choose a local airport on the GPS map." :
-        "Destination region reached. Local airports remain unavailable while detailed terrain prepares.", vec3(.6f, 1.f, .8f), false);
+        "Destination region reached. Local airports remain unavailable while detailed terrain prepares.", vec3(.6f, 1.f, .8f));
     } else if (auto heading = chart.bearing(plane.pos, earthDestination->origin)) plane.apHeading = (float)*heading;
   }
   // Authored Solace joins Earth travel without a loading screen. Quotes and
@@ -881,6 +881,7 @@ void Game::updateEarthFlight() {
 }
 
 void Game::continueEarthFlight() {
+  g_audio.resetWorld(); audioCameraValid = false;
   if (!regionPoseChange) throw std::runtime_error("Missing Earth-flight frame transition.");
   const auto& change = *regionPoseChange;
   // The aircraft is never reset/refuelled: body-space dynamics, engine state,
@@ -922,7 +923,7 @@ void Game::continueEarthFlight() {
   regionPoseChange.reset();
   freeFlight = isolatedFlight = true; paused = regionResumePaused; screen = SCR_FLIGHT;
   earthFacilitiesPending = earthPromotionDeferred = false; updateEarthSurfaceContext();
-  toast("Entering " + flightRegion.name + ".", vec3(.6f, 1.f, .8f), false);
+  toast("Entering " + flightRegion.name + ".", vec3(.6f, 1.f, .8f));
 }
 
 // Main-menu Free Flight never quotes, accepts, saves or settles a career job. A fresh
@@ -1003,7 +1004,7 @@ void Game::launchFreeFlight() {
   earthPosition = regionTravel::Chart(flightRegion.origin).position(plane.pos);
   toasts.clear();
   toast(std::string(s.name) + " / FREE FLIGHT", vec3(0.6f, 1.f, 0.8f), false);
-  toast(freeAirborne ? "Already airborne. Fly anywhere, then return from the pause menu." : "Full tanks. Release the parking brake when ready.", vec3(0.8f, 0.9f, 1.f), false);
+  toast(freeAirborne ? "Already airborne. Fly anywhere, then return from the pause menu." : "Full tanks. Release the parking brake when ready.", vec3(0.8f, 0.9f, 1.f));
 }
 
 void Game::returnToFreeFlight() {
@@ -1242,6 +1243,7 @@ Game::WakePt Game::wakeHere(vec3 c, bool brk, float odo) const {
 // cloud, the traffic flying with it, the renderer's last frame - so nothing jumps. What belongs to a place (the
 // craters, the fields' own traffic, the route) stays: across the seam the map is the same.
 void Game::followSeam(vec3 d) {
+  g_audio.shiftWorld(d); audioCameraPrevious += d;
   camPos += d; dbgCamPos += d; dbgCamLook += d;
   for (auto& p : particles) p.p += d;
   for (auto& w : wreck) w.c += d;
@@ -1586,6 +1588,8 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
   combatBasePayload=payloadKg;
   float fuel = launchPlan.fuelLoadKg;
   launchFuelKg = -1;
+  g_audio.resetWorld(); ++audioSceneId; audioCameraValid=false; audioPlayerCone=-1e9f; audioBoomCooldown=0; audioMachArmed=true;
+  audioThreatAt=audioObjectiveAt=-100; audioExtractSaid=false; commsEndScreen=-1;
   plane.reset(&s, start, hdg, fuel, payloadKg, c.startAirborne, s.cruise);
   plane.apComfort = c.gentle();   // gentle for passengers or a fragile load, else the airframe's whole envelope (the stick is never limited)
   fuelStart = plane.fuel;
@@ -1608,7 +1612,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
   parkingBrake = !c.startAirborne;   // a start on the ground is parked: the brake is released to roll
   if (!plane.onGround) settleAirborneStart();
   particles.clear(); bursts.clear(); pops.clear(); boomT = -1; for (auto& tt : pieceTrail) tt.clear(); trail.clear(); tipTrail[0].clear(); tipTrail[1].clear(); tipOn = false; trailT = 0; wreck.clear(); debris.clear(); craterR = 0; pits.clear();
-  lightning = 0; nextLightning = 6; thunderDelay = -1;
+  lightning = 0; nextLightning = 6;
   landingLight = true;
   approachMinAgl = 1e9f; thrPrevAlong = -1e9f; appLow = false; appHigh = false; coaching.clear();
   apWasOn = false; apDest = -1; wraith = WraithState(); g_scenery.resetDamage();
@@ -1639,12 +1643,15 @@ void Game::endFlight(bool success, const std::string& reason, FlightOutcome outc
     lastSuccess=success; debriefTitle=success?"Military sortie complete":reason.empty()?"Military sortie aborted":reason;
     coaching.clear(); screen=SCR_DEBRIEF; paused=false; showMap=false;
     g_audio.trigger(success?SFX_SUCCESS:SFX_FAIL);
+    announceFlightEnd(success?"Military objectives secured":crashed?(reason=="Hull lost to Hive fire"?reason:"Flight ended after impact"):"Military objective lost");
     return;
   }
   if (freeFlight) {
+    const bool impact=crashed;
     returnToFreeFlight();
     toast(success || outcome == OUT_DIVERTED || outcome == OUT_OFF_AIRPORT ? "Free flight complete" : reason.empty() || outcome == OUT_ABANDONED ? "Back in the Free Flight hangar" : reason,
           vec3(0.6f, 0.9f, 1.f), false);
+    announceFlightEnd(impact?"Flight ended after impact":"Free flight complete");
     return;
   }
   if (researchFlight) {  // research flights never touch the career: back to the research menu
@@ -1652,6 +1659,7 @@ void Game::endFlight(bool success, const std::string& reason, FlightOutcome outc
     researchFlight = false; paused = false; showMap = false;
     screen = SCR_RESEARCH; resOpened = realTime;
     if (!reason.empty()) toast(reason, success ? vec3(0.6f, 1, 0.7f) : vec3(1, 0.5f, 0.4f));
+    announceFlightEnd(crashed?"Flight ended after impact":"Research flight complete");
     return;
   }
   debriefTitle.clear();
@@ -1677,6 +1685,7 @@ void Game::endFlight(bool success, const std::string& reason, FlightOutcome outc
     if (contract.type == CT_TRIAL) finishTrial(success);
     isolatedFlight = false; paused = false; showMap = false; screen = SCR_HUB; hubTab = TAB_CONTRACTS;
     toast(success ? "Practice flight complete" : reason.empty() ? "Practice flight over" : reason, success ? vec3(0.6f, 1, 0.7f) : vec3(1, 0.5f, 0.4f));
+    announceFlightEnd(success?"Practice flight complete":"Practice flight over");
     return;
   }
   Contract c = contract;
@@ -1713,6 +1722,7 @@ void Game::endFlight(bool success, const std::string& reason, FlightOutcome outc
   if (success && c.payout > 0) g_audio.trigger(SFX_CASH);
   screen = SCR_DEBRIEF;
   paused = false; showMap = false;
+  announceFlightEnd(result.outcome==OUT_CHECKRIDE_FAILED?"Checkride not passed":success?"Flight complete":crashed?"Flight ended after impact":"Flight ended");
 }
 
 // One coaching point from what was recorded on the arrival: the most important thing to work on, or what went well
@@ -2017,7 +2027,7 @@ void Game::updateFlight(float dt) {
     }
     flightClock += simDt;
     timeOfDay += simDt / 3600.f;
-    if (plane.ev.bellyLanding && !result.bellyLanding) { result.bellyLanding = true; toast("Belly landing - hold it straight", vec3(1, 0.6f, 0.3f)); g_audio.trigger(SFX_CRASH, 0.4f); }
+    if (plane.ev.bellyLanding && !result.bellyLanding) { result.bellyLanding = true; toast("Belly landing - hold it straight", vec3(1, 0.6f, 0.3f)); g_audio.triggerLocal(SFX_METAL, vec3(0,-plane.gearHeight(),0), .7f); }
   }
   gameTime += simDt;
   if (plane.engineRunning && !wasRunning) {
@@ -2028,14 +2038,18 @@ void Game::updateFlight(float dt) {
     else if (!takeoffAnnounced) toast("Engine running.", vec3(0.7f, 1, 0.7f));   // (the takeoff clearance is the tower's: updateAtc)
   }
   // gear / flap motor cues
-  if (prevGear > 0.99f && plane.gear < 0.99f) g_audio.trigger(SFX_GEAR_CLUNK, 0.6f);
-  if (prevGear < 0.99f && plane.gear >= 0.99f) g_audio.trigger(SFX_GEAR_CLUNK, 1.0f);
+  if (prevGear > 0.99f && plane.gear < 0.99f) g_audio.triggerLocal(SFX_GEAR_CLUNK, vec3(0,-plane.gearHeight(),0), .6f);
+  if (prevGear < 0.99f && plane.gear >= 0.99f) g_audio.triggerLocal(SFX_GEAR_CLUNK, vec3(0,-plane.gearHeight(),0), 1.f);
   prevGear = plane.gear; prevFlaps = plane.flaps;
   // weather effects
   if (wx.storm) {
     nextLightning -= dt;
-    if (nextLightning <= 0) { lightning = 1.f; nextLightning = 6.f + (rand() % 1000) * 0.015f; thunderDelay = 0.8f + (rand() % 100) * 0.03f; }
-    if (thunderDelay > 0) { thunderDelay -= dt; if (thunderDelay <= 0) g_audio.trigger(SFX_THUNDER, 0.7f + (rand() % 30) * 0.01f); }
+    if (nextLightning <= 0) {
+      lightning = 1.f; nextLightning = 6.f + (rand() % 1000) * .015f;
+      float angle = (rand()%6283)*.001f, range = 350.f + (rand()%1700);
+      vec3 strike = camPos + vec3(cosf(angle)*range, 250.f+(rand()%600), sinf(angle)*range);
+      g_audio.triggerAt(SFX_THUNDER, strike, .85f); // the mixer delays the sound by the actual distance / speed of sound
+    }
   }
   lightning = std::max(0.f, lightning - dt * 4.f) * (lightning > 0.5f ? 1.f : (rand() % 3 ? 1.f : 0.3f));
   updateCloudWake(simDt);
@@ -2043,16 +2057,17 @@ void Game::updateFlight(float dt) {
   updateUfo(simDt);
   // AI traffic
   traffic.enabled = set.traffic && !militaryFlight;
+  traffic.audioObserver = dbgCam ? dbgCamPos : camPos;
   if(!militaryFlight) airlineTraffic(simDt);
   if (traffic.update(simDt, plane.pos, plane.vel, plane.onGround || crashed, plane.spec->span) && !crashed && !plane.ev.crashed) {
     plane.ev.crashed = true; plane.ev.crashReason = "Mid-air collision";
   }
   for (auto& f : traffic.puffs) spawn(f.p, f.v, f.life, f.size, f.grow, f.col, f.alpha, f.kind, 1.f, 0.f);
-  for (auto& b : traffic.booms) g_audio.trigger(SFX_BOOM, b.second);
+  for (auto& b : traffic.booms) g_audio.triggerAt(SFX_BOOM, b.first, b.second);
   updateWraith(simDt);
   updateHive(simDt);
   if(screen!=SCR_FLIGHT) return;
-  for (float f : traffic.flybys) g_audio.trigger(SFX_FLYBY, f);
+  // Continuous, individually tracked traffic engines provide the pass and its real Doppler shift.
   for (auto& m : traffic.radio) toast(m, vec3(1.f, 0.78f, 0.3f));
   // entertainment: O + P held for a second while flying summons the Spectre display pair (again: sends them home).
   // They fly their show around you and bow out when you land or settle onto an approach
@@ -2112,10 +2127,11 @@ void Game::updateFlight(float dt) {
   if (plane.ev.crashed) {
     vec3 impactVel = plane.vel;
     crashed = true;
-    g_audio.trigger(SFX_CRASH);
     toast(plane.ev.crashReason, vec3(1, 0.4f, 0.3f));
     bool water = g_world.height(plane.pos.x, plane.pos.z) < 0.5f;
     bool air = plane.ev.crashReason.find("Structural") != std::string::npos && plane.agl() > 4.f;   // overstressed in flight: it comes apart in the air
+    g_audio.triggerAt(water && !air ? SFX_SPLASH : air ? SFX_METAL : SFX_IMPACT, plane.pos, 1.f);
+    if (!water && plane.fuel > 1.f) g_audio.triggerAt(SFX_CRASH, plane.pos, clampf(.35f+sqrtf(plane.fuel)*.035f,.35f,1.f));
     breakUp(impactVel, water, air);
     plane.vel = vec3(); plane.w = vec3();
     if (camMode == 1 || camMode == 3) camMode = 2;
@@ -2153,7 +2169,9 @@ void Game::updateFlight(float dt) {
     float fpm = -plane.ev.touchdownVs * 196.85f;
     touchdownFpm = fpm; touchedDown = true;
     tdRunway = g_world.onRunway(plane.pos.x, plane.pos.z, 10.f);   // (the arrival's evidence: the last touchdown's runway, or -1 off every runway)
-    g_audio.trigger(SFX_TOUCHDOWN, clampf(fpm / 600.f, 0.15f, 1.f));
+    const GearStations audioGear = gearStations(*plane.spec);
+    for (float side : {-1.f,1.f}) g_audio.triggerAt(SFX_TOUCHDOWN,
+      plane.pos+plane.q.rotate(vec3(side*audioGear.track,-plane.gearHeight(),audioGear.mainZ)), clampf(fpm/600.f,.15f,.8f));
     std::string r = fpm < 120 ? "BUTTER!" : fpm < 250 ? "Smooth landing" : fpm < 450 ? "Good landing" : fpm < 650 ? "Firm landing" : "HARD landing!";
     toast(fmt("%s  %.0f fpm", r.c_str(), fpm), fpm < 450 ? vec3(0.6f, 1, 0.6f) : vec3(1, 0.6f, 0.3f));
     float gs = length(vec3(plane.vel.x, 0, plane.vel.z));
@@ -2704,7 +2722,7 @@ void Game::jetEffects(float dt) {
         spawn(ex, plane.vel + exDir * (60.f + 120.f * frand()) + j * 70.f, 0.25f + 0.3f * frand(), 0.12f, -0.2f, vec3(1.f, 0.75f, 0.4f) * 4.f, 1.f, SPR_SPARK, 2.f, 0.f);
       }
     }
-    g_audio.trigger(SFX_BOOM, 0.25f);
+    for (int e = 0; e < nEx; ++e) g_audio.triggerLocal(SFX_REHEAT, exP[e], .45f / sqrtf(float(nEx)));
   }
   prevAB = ab;
   // hover downwash: dust or spray blown out in a ring under the jet
@@ -2720,11 +2738,13 @@ void Game::jetEffects(float dt) {
             water ? vec3(0.9f, 0.95f, 1.f) : vec3(0.5f, 0.46f, 0.38f), water ? 0.5f : 0.35f, SPR_SMOKE, 1.2f, 0.3f);
     }
   }
-  // sonic boom when passing Mach 1 (the vapour cone itself is volumetric, in the shader)
+  // The pilot feels transonic buffeting; an external observer hears a boom only when the Mach cone arrives.
   float M = plane.mach;
-  if (prevMach < 1.f && M >= 1.f && !plane.onGround) {
-    g_audio.trigger(SFX_BOOM, 1.f);
-    toast("MACH 1 - SONIC BOOM", vec3(0.4f, 0.9f, 1));
+  if (M < .94f) audioMachArmed = true;
+  if (audioMachArmed && M >= 1.f && !plane.onGround) {
+    audioMachArmed = false;
+    g_audio.triggerLocal(SFX_TRANSONIC, kModels[plane.spec-kAircraft].eye+vec3(0,0,-1), .45f);
+    toast("MACH 1 - SUPERSONIC", vec3(0.4f, 0.9f, 1));
     vec3 f = normalize(plane.vel), r = normalize(cross(f, vec3(0, 1, 0)) + vec3(1e-4f, 0, 0)), u = cross(r, f);
     bursts.push_back({plane.pos, r * 25.f, u * 25.f, vec3(0.7f, 0.85f, 1.f), 0.f});
   }
@@ -2807,7 +2827,7 @@ void Game::buildLights(FrameParams& fp) {
 // ------------------------------------------------------------------ UFO encounter
 void Game::startUfo() {
   ufo = Ufo(); ufo.on = true; ufo.side = (rand() & 1) ? 1.f : -1.f;
-  g_audio.trigger(SFX_UFO_ARRIVE, 0.9f);
+  g_audio.triggerAt(SFX_UFO_ARRIVE, ufo.pos, .9f, plane.vel, 900001);
   toast("UNIDENTIFIED CONTACT", vec3(0.4f, 1.f, 0.6f));
 }
 
@@ -2850,9 +2870,9 @@ void Game::updateUfo(float dt) {
   ufo.hatch = smoothstepf(8.f, 10.f, t) * (1.f - smoothstepf(21.f, 23.f, t));
   ufo.laugh = smoothstepf(15.8f, 16.3f, t) * (1.f - smoothstepf(18.3f, 18.8f, t));
   ufo.wave = smoothstepf(18.4f, 18.9f, t) * (1.f - smoothstepf(20.8f, 21.3f, t));
-  if (t > 16.f && !ufo.sfxLaugh) { ufo.sfxLaugh = true; g_audio.trigger(SFX_UFO_LAUGH, 1.f); }
+  if (t > 16.f && !ufo.sfxLaugh) { ufo.sfxLaugh = true; g_audio.triggerAt(SFX_UFO_LAUGH, ufo.pos, 1.f, plane.vel, 900001); }
   if (t > 23.f && !ufo.sfxZoom) {
-    ufo.sfxZoom = true; g_audio.trigger(SFX_UFO_ZOOM, 1.f);
+    ufo.sfxZoom = true; g_audio.triggerAt(SFX_UFO_ZOOM, ufo.pos, 1.f, plane.vel, 900001);
     vec3 c = ufo.pos;
     bursts.push_back({c, ufo.right * 14.f, ufo.fwd * 14.f, vec3(0.4f, 1.f, 0.7f), 0.f});
     for (int i = 0; i < 40; i++) spawn(c, plane.vel + vec3((rand() % 200 - 100) * 0.3f, (rand() % 200 - 100) * 0.3f, (rand() % 200 - 100) * 0.3f), 0.6f, 0.25f, -0.3f, vec3(0.5f, 1.f, 0.8f) * 3.f, 1.f, SPR_SPARK, 1.f, 0.f);
@@ -2938,8 +2958,10 @@ void Game::partImpact(vec3 p, vec3 v, float E, float fire, bool water) {
   const float s = cbrtf(std::max(E, 1.f)), R = clampf(0.055f * s, 0.4f, 18.f);
   auto sph = [&]() { vec3 d(r.range(-1, 1), r.range(-1, 1), r.range(-1, 1)); float l = length(d); return l > 1e-3f ? d / l : vec3(0, 1, 0); };
   vec3 hd(v.x, 0, v.z); hd = length(hd) > 1.f ? normalize(hd) : vec3();   // (the way it was going: the earth flies on that way)
-  const float closeK = clampf(1.f - length(p - camPos) / 3000.f, 0.f, 1.f);   // (not "near": a macro on Windows)
-  g_audio.trigger(SFX_CRASH, clampf(s / 110.f, 0.12f, 1.f) * (0.35f + 0.65f * closeK));
+  // Impact energy controls source level/timbre; distance is applied once by the mixer, with no loudness floor.
+  if (E > 80.f) g_audio.triggerAt(water ? SFX_SPLASH : SFX_IMPACT, p, clampf(s / 130.f, .06f, .85f));
+  if (!water && E > 2500.f) g_audio.triggerAt(SFX_METAL, p, clampf(s / 220.f, .08f, .45f));
+  if (!water && fire > .5f && E > 15000.f) g_audio.triggerAt(SFX_CRASH, p, clampf(s / 270.f * fire, .08f, .6f));
   if (water) {   // a column of spray as tall as the blow, and a ring racing out over the water
     const int n = (int)clampf(R * 24.f, 10.f, 110.f);
     for (int i = 0; i < n; i++) {
@@ -3125,7 +3147,7 @@ void Game::updateWreck(float dt) {
     if (pp.piece < (int)wreck.size()) {
       const WreckPiece& w = wreck[pp.piece];
       bool wet = g_world.height(w.c.x, w.c.z) < 0.5f && w.c.y < 1.f;
-      if (!(wet && w.c.y < -1.f)) { fireball(w.c, w.v, pp.R, airBreak && !w.landed, wet); g_audio.trigger(SFX_CRASH, 0.35f); }
+      if (!(wet && w.c.y < -1.f)) { fireball(w.c, w.v, pp.R, airBreak && !w.landed, wet); g_audio.triggerAt(wet ? SFX_SPLASH : SFX_CRASH, w.c, clampf(pp.R*.065f,.08f,.5f)); }
     }
   }
   for (WreckPiece& w : wreck) {
@@ -3464,6 +3486,7 @@ FrameParams Game::buildFrame() {
     if (camMode == 3) fp.fovY = clampf(2.f * atanf(std::max(plane.spec->span, plane.spec->fusLen) * (botControl ? 0.42f : 1.5f) / length(plane.pos - camPos)), 4.f * DEG, 60.f * DEG);
     if (camMode == 1) fp.fovY = 2.f * atanf(tanf((set.fov + 19.f) * 0.5f * DEG) / ckZoom);   // cockpit zoom: lean in to read the displays
     if (screen == SCR_LOADING && militaryFlight) militaryLoadingCamera(fp);
+    g_audio.setView(fp.camPos,fp.camRight,fp.camUp,-fp.camBack);
     fp.landLight = landingLight && plane.engineRunning ? (0.3f + 0.7f * fp.night) : 0.f;
     fp.landLightPos = plane.pos + plane.forward() * (plane.spec->fusLen * 0.4f);
     fp.landLightDir = normalize(plane.forward() - plane.up() * 0.1f);
@@ -4459,8 +4482,26 @@ void Game::updateAtc(float dt) {
 // and queued; the warnings speak on their rising edge (and again if they persist); the towers run their exchange.
 // Nothing stale is ever said: the queue is dropped on pause, at the end of the flight and when the aircraft
 // crashes (then only the crash itself is announced).
+void Game::announceFlightEnd(const std::string& message) {
+  // One explicit outcome survives the screen transition; stale airborne instructions do not.
+  atc.cancel(); commsPending.clear(); commsEndScreen=-1;
+  AtcVoice::Tx tx;
+  if(atc.resolve(message,contract.id,padPrompts(),tx)) {
+    tx.prio=90; atc.say(tx); commsEndScreen=int(screen); commsEndTime=0;
+  }
+}
+
 void Game::updateComms(float dt) {
   bool live = (screen == SCR_FLIGHT || screen == SCR_LOADING) && !paused && !launchCardPending();
+  if(commsEndScreen>=0) {
+    if(int(screen)!=commsEndScreen || paused) {commsEndScreen=-1;atc.cancel();}
+    else {
+      atc.update(dt); commsEndTime+=dt;
+      voiceDuck=approach(voiceDuck,atc.busy()?1.f:0.f,atc.busy()?6.f:1.5f,dt);
+      if(commsEndTime>1.f && !atc.busy()) commsEndScreen=-1;
+      return;
+    }
+  }
   // (paused, or in the menus, nobody is talking: the music comes back up - it stayed at the duck when a pause cut a
   // call short: the review of v3.44.0, AUD-2)
   if (!live) { atc.cancel(); commsPending.clear(); commsCrashSeen = false; voiceDuck = approach(voiceDuck, 0.f, 1.5f, dt); return; }
@@ -4496,9 +4537,8 @@ void Game::updateComms(float dt) {
     for (auto& a : hudAnnunciators()) {
       auto it = failVoiced.find(a.slot);
       if (it != failVoiced.end() && it->second == a.key) continue;
-      failVoiced[a.slot] = a.key;
       AtcVoice::Tx tx;
-      if (atc.resolve(a.text, contract.id, padPrompts(), tx)) atc.say(tx);
+      if (atc.resolve(a.text, contract.id, padPrompts(), tx)) { atc.say(tx); failVoiced[a.slot] = a.key; }
     }
   }
   for (const auto& m : commsPending) {
@@ -4522,6 +4562,34 @@ void Game::updateComms(float dt) {
 
 void Game::feedAudio() {
   AudioParams ap;
+  ap.scene = (screen == SCR_FLIGHT || (screen == SCR_DEBRIEF && crashed)) && plane.spec;
+  ap.paused = paused;
+  if (ap.scene && !audioSceneWas) { ++audioSceneId; audioCameraValid=false; audioMachArmed=true; audioPlayerCone=-1e9f; }
+  audioSceneWas=ap.scene; ap.sceneId=audioSceneId;
+  ap.wrapPeriod=g_world.repeating?WRAP_SPAN:0;
+  ap.listener.position=dbgCam?dbgCamPos:camPos;
+  if (plane.spec) {
+    ap.aircraftPosition=plane.pos; ap.aircraftVelocity=plane.vel; ap.aircraftRotation=plane.q;
+    ap.cabinEye=kModels[plane.spec-kAircraft].eye; ap.soundSpeed=plane.soundSpeed;
+    ap.interior=camMode==1 && !dbgCam && !crashed;
+    vec3 forward=ap.interior?plane.q.rotate(quat::axisAngle(vec3(0,1,0),lookYaw).rotate(quat::axisAngle(vec3(1,0,0),lookPitch).rotate(vec3(0,0,-1)))):
+      normalize(plane.pos+vec3(0,plane.spec->fusRad*.3f,0)-ap.listener.position);
+    vec3 up=ap.interior?plane.up():vec3(0,1,0);
+    if(camMode==0 && !dbgCam) up=normalize(lerp(vec3(0,1,0),camQ.rotate(vec3(0,1,0)),.3f));
+    if(dbgCam) forward=normalize(dbgCamLook-dbgCamPos);
+    ap.listener.forward=forward; ap.listener.right=normalize(cross(forward,up)); ap.listener.up=cross(ap.listener.right,forward);
+    vec3 movement=audioDisplacement(audioCameraPrevious,ap.listener.position,ap.wrapPeriod);
+    bool continuous=audioCameraValid && audioCameraMode==camMode && lastDt>1e-4f && length(movement)<2000.f;
+    ap.listener.velocity=continuous?movement/(lastDt*(dbgCam?1.f:std::max(timeAccel,1.f))):(camMode==3?vec3():plane.vel);
+    if(length(ap.listener.velocity)>2000) ap.listener.velocity=plane.vel; // camera cuts are not supersonic ears
+    audioCameraPrevious=ap.listener.position;audioCameraValid=ap.scene;audioCameraMode=camMode;
+    float cone=audioMachCone(plane.pos,plane.vel,ap.listener.position,plane.soundSpeed,ap.wrapPeriod);
+    audioBoomCooldown=std::max(0.f,audioBoomCooldown-lastDt);
+    if(ap.scene && !paused && !ap.interior && camMode==3 && audioPlayerCone>-1e8f && audioPlayerCone<0 && cone>=0 && audioBoomCooldown<=0) {
+      g_audio.triggerAt(SFX_BOOM,plane.pos,.85f);audioBoomCooldown=6.f;
+    }
+    audioPlayerCone=cone;
+  }
   ap.master = set.master; ap.engineVol = set.engineVol * (1.f - 0.35f * voiceDuck); ap.sfxVol = set.sfxVol; ap.voiceVol = set.atcVol;
   {   // the radio music, at the master volume (the review of v3.44.0, AUD-1), lowered under speech
     const float rv = radioLevel();
@@ -4533,6 +4601,7 @@ void Game::feedAudio() {
   if (screen == SCR_FLIGHT && plane.spec && !crashed) {
     const AircraftSpec& s = *plane.spec;
     ap.inFlight = true;
+    ap.signature = clampf(powf((s.engineType==ENG_JET?30000.f:200000.f)/std::max(s.power,1.f),.055f),.82f,1.2f);
     ap.engineType = s.engineType; ap.engines = s.engines; ap.cylinders = s.cylinders; ap.blades = s.blades;
     ap.research = s.special != 0; ap.nozzle = plane.nozzle; ap.mach = plane.mach;
     ap.rpm = s.engineType == ENG_JET ? plane.n1 : plane.rpm; ap.maxRpm = s.maxRpm; ap.n1 = plane.n1;
@@ -4543,12 +4612,51 @@ void Game::feedAudio() {
     ap.stallWarn = plane.onGround ? 0.f : plane.stallWarn; ap.stallIsShaker = s.engineType == ENG_JET || s.license == LIC_ATP;
     ap.gearMoving = plane.gear > 0.01f && plane.gear < 0.99f; ap.flapsMoving = fabsf(plane.flaps - plane.ctl.flaps) > 0.02f;
     ap.gearDown = plane.gear; ap.flaps = plane.flaps;
-    ap.interior = camMode == 1;
+    const int model = int(plane.spec-kAircraft);
+    const auto& md=kModels[model];
+    ap.engineRadius=clampf(sqrtf(std::max(s.power,1.f))*(s.engineType==ENG_PISTON?.025f:.13f),9.f,50.f);
+    ap.gearPosition=vec3(0,-plane.gearHeight(),gearStations(s).mainZ);
+    ap.slip=dot(plane.vel-plane.windVel,plane.right())/std::max(plane.airspeed,1.f);
+    ap.buffet=clampf(plane.stallWarn*.6f+plane.wxl.sigma*.3f+expf(-powf((plane.mach-.98f)*16.f,2))*.25f,0,1);
+    if(s.special) {
+      vec3 xp[4],xd[4];float strength[4];int count=jetExhausts(plane,xp,xd,strength);
+      for(int e=0;e<count;++e) {ap.enginePosition[e]=xp[e];ap.engineDirection[e]=xd[e];ap.enginePower[e]=s.special==2?clampf(plane.podThr[e],0,1.6f):1.f;}
+    } else {
+      const auto& geometry=aeroGeom(s);
+      for(int e=0;e<std::min(s.engines,4);++e) {
+        ap.enginePosition[e]=e<geometry.nEng?geometry.eng[e].pos:vec3(s.engines==1?0.f:(e%2?md.nacX:-md.nacX),md.nacY,md.nacZ0);
+        ap.engineDirection[e]=vec3(0,0,1);
+      }
+    }
     // (the rain drumming on the airframe as hard as it rains here, louder the faster it meets it; the wind noise
     // gusting with the eddies and gust bursts the aircraft is flying through)
     ap.rain = wx.precip == 1 ? clampf(rainNow * (0.75f + 0.35f * smoothstepf(10.f, 70.f, plane.airspeed)), 0.f, 1.f) : 0.f;
     ap.turbulence = clampf(0.6f * plane.wxl.sigma + 0.3f * plane.gustBurst, 0.f, 1.f);
     ap.paused = paused;
+  }
+  if (ap.scene) {
+    // Retain IDs across ordering changes: sorting by audibility never swaps an engine's oscillator state.
+    std::vector<std::pair<float,AudioEmitter>> candidates;
+    auto offer=[&](AudioEmitter e) {
+      float distance=length(audioDisplacement(ap.listener.position,e.position,ap.wrapPeriod));
+      if(distance<6500) candidates.push_back({e.level*e.radius/std::max(e.radius,distance),e});
+    };
+    if(set.traffic) for(const auto& c:traffic.craft) if(c.alive && c.state!=TrafficCraft::PARKED) {
+      const auto& sp=kAircraft[c.spec]; AudioEmitter e;e.id=10000+c.id;e.position=c.pos;e.velocity=c.vel;e.forward=c.q.rotate(vec3(0,0,-1));
+      e.engineType=sp.engineType;e.cylinders=sp.cylinders;e.blades=sp.blades;e.spool=clampf(c.throttle,0,1);
+      e.n1=22+e.spool*78;e.rpm=sp.maxRpm*(.3f+.7f*e.spool);e.radius=sp.engineType==ENG_PISTON?22:55;e.level=.7f;offer(e);
+    }
+    for(const auto& a:hiveCombat.actors) if(a.alive) {
+      AudioEmitter e;e.id=100000+a.id;e.position=plane.pos+hiveCombat.displacement(plane.pos,a.position);e.velocity=a.velocity;
+      e.forward=normalize(a.velocity);e.spool=clampf(length(a.velocity)/180.f,.25f,1.f);e.n1=30+e.spool*70;e.level=.65f;e.radius=45;offer(e);
+    }
+    for(size_t i=0;i<wreck.size();++i) if(wreck[i].fire>.2f && wreck[i].c.y>0) {
+      AudioEmitter e;e.id=500000+uint32_t(i);e.kind=AudioEmitter::Fire;e.position=wreck[i].c;e.velocity=wreck[i].v;
+      e.level=wreck[i].fire*clampf(1.2f-crashTimer*.06f,.15f,1);e.radius=8;offer(e);
+    }
+    std::sort(candidates.begin(),candidates.end(),[](const auto&a,const auto&b){return a.first>b.first;});
+    for(size_t i=0;i<candidates.size() && ap.emitterCount<19;++i) ap.emitters[ap.emitterCount++]=candidates[i].second;
+    if(ufo.on) {AudioEmitter e;e.id=900001;e.kind=AudioEmitter::Track;e.position=ufo.pos;e.velocity=plane.vel;ap.emitters[ap.emitterCount++]=e;}
   }
   g_audio.setParams(ap);
 }
@@ -5935,17 +6043,33 @@ void Game::updateHive(float dt) {
     if(e.type==hive::EventType::PlayerDamage && !crashed) {
       militaryHull=std::max(0.f,militaryHull-e.value);
       plane.w+=vec3(.015f,.009f,.02f)*std::min(e.value,30.f);
-      g_audio.trigger(SFX_BEEP,.4f);
+      g_audio.triggerAt(SFX_IMPACT,at,clampf(e.value*.025f,.12f,.65f));
       if(militaryHull<=0) { plane.ev.crashed=true; plane.ev.crashReason="Hull lost to Hive fire"; }
     }
     if(e.type==hive::EventType::Death || e.type==hive::EventType::Hit || e.type==hive::EventType::Fire) {
       int n=e.type==hive::EventType::Death?28:e.type==hive::EventType::Hit?8:3;
       for(int j=0;j<n;++j) spawn(at,vec3(sparkRng.range(-15,15),sparkRng.range(-4,18),sparkRng.range(-15,15)),.25f+sparkRng.uni()*.5f,.2f,.3f,vec3(1,.55f,.24f)*2,1,SPR_SPARK,.6f,-1);
-      if(e.type==hive::EventType::Death) { ++wraith.kills; g_audio.trigger(SFX_BOOM,.45f); for(int j=0;j<8;++j) spawn(at,vec3(0,5+j,0),2.f,3.f,4.f,vec3(.12f),.6f,SPR_SMOKE,1,0); }
+      if(e.type==hive::EventType::Death) { ++wraith.kills; g_audio.triggerAt(SFX_CRASH,at,.45f); for(int j=0;j<8;++j) spawn(at,vec3(0,5+j,0),2.f,3.f,4.f,vec3(.12f),.6f,SPR_SMOKE,1,0); }
     }
+    if(e.type==hive::EventType::Fire) {
+      const auto* actor = hiveCombat.find(e.source);
+      g_audio.triggerAt(SFX_CANNON,at,.32f,actor?actor->velocity:vec3());
+    }
+    if(e.type==hive::EventType::Hit) g_audio.triggerAt(SFX_METAL,at,.3f);
+    if(e.type==hive::EventType::Telegraph && e.target==0 && realTime-audioThreatAt>9.f) {
+      audioThreatAt=realTime; toast("INCOMING FIRE - BREAK AWAY",vec3(1,.45f,.2f));
+    }
+    if(e.type==hive::EventType::ObjectiveDamage && realTime-audioObjectiveAt>12.f) {
+      audioObjectiveAt=realTime; toast("PROTECTED SITE UNDER ATTACK",vec3(1,.55f,.2f));
+    }
+    if(e.type==hive::EventType::Wave && e.source==0) toast("HOSTILE WAVE INBOUND",vec3(1,.55f,.2f));
     if(e.type==hive::EventType::ScanComplete) toast("Intelligence site recorded",vec3(.3f,1,.7f));
   }
   hiveCombat.clearEvents();
+  if (hiveCombat.mission.status == hive::MissionStatus::Active) audioExtractSaid = false;
+  if (hiveCombat.mission.status == hive::MissionStatus::Extract && !audioExtractSaid) {
+    audioExtractSaid = true; toast("OBJECTIVES COMPLETE - RETURN TO EXTRACTION",vec3(.3f,1,.7f));
+  }
   if(militaryFlight && !militarySettled && !crashed && !plane.ev.crashed) {
     if(hiveCombat.mission.status==hive::MissionStatus::Success) endFlight(true,"Military objectives secured");
     else if(hiveCombat.mission.status==hive::MissionStatus::Failed) endFlight(false,"Military objective lost",OUT_ABANDONED);

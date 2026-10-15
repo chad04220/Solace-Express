@@ -1203,6 +1203,15 @@ struct GameTest {
         bool silent = true; for (auto& x : g.atc.history) if (x.rfind("TWR ", 0) == 0) silent = false;
         printf("No tower at a farm strip: %s\n", silent ? "ok" : "FAIL"); fails += !silent;
       }
+      if (voices) {   // an explicit outcome survives the transition; old airborne calls do not
+        Game q; q.initHeadless(); q.diskless=true; q.atc.load(std::string(SOMNIUM_ASSETS)+"/voice");
+        q.screen=SCR_FLIGHT; q.researchFlight=true; q.toast("Gear down");
+        q.endFlight(true,""); q.updateComms(1.f); audio(.02f);
+        bool outcome=q.screen==SCR_RESEARCH && !q.atc.history.empty() && q.atc.history.back()=="Research flight complete" && q.commsPending.empty();
+        q.screen=SCR_HUB; q.updateComms(.1f); audio(.02f);
+        bool cancelled=!q.atc.busy() && q.commsEndScreen<0;
+        printf("Audio: explicit outcome survives flight end %d, leaving its screen cancels %d: %s\n",outcome,cancelled,outcome&&cancelled?"ok":"FAIL");fails+=!(outcome&&cancelled);
+      }
       if (voices) {   // every indexed clip decodes; the research cards, failure annunciators, aerobatics and every craft's SPLASH line resolve
         int bad = 0, n = 0;
         for (auto& id : g.atc.indexed()) { n++; if (!g.atc.decodes(id)) { if (bad < 5) printf("   clip does not decode: %s\n", id.c_str()); bad++; } }

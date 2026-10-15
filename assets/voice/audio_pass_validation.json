@@ -1,0 +1,631 @@
+{
+  "method": "Unprompted local faster-whisper small.en, int8 CPU, beam 5; no text hints",
+  "model": {
+    "model": "Systran/faster-whisper-small.en",
+    "revision": "d1d751a5f8271d482d14ca55d9e2deeebbae577f",
+    "files": [
+      {
+        "rfilename": "config.json",
+        "blobId": "ced3fd5bbb3e9f7664658065d2d36164712cf1d5",
+        "size": 2657
+      },
+      {
+        "rfilename": "model.bin",
+        "blobId": "8ebf0973579cfb13f4536b674d0ba3c6aecbc169",
+        "size": 483545366,
+        "lfs": {
+          "sha256": "62b2a45b05ee59acb4a5341b33ee35e041395d378d418a18acfe4c9e768ee37a",
+          "size": 483545366,
+          "pointerSize": 134
+        }
+      },
+      {
+        "rfilename": "tokenizer.json",
+        "blobId": "15d7bdf9ba25718ca2504eec6a8f02bc55af0a6a",
+        "size": 2128466
+      },
+      {
+        "rfilename": "vocabulary.txt",
+        "blobId": "ee695b8d3e3c10d488304e04468efec4ca27554a",
+        "size": 422309
+      }
+    ]
+  },
+  "human_listening_approved": false,
+  "clips": [
+    {
+      "id": "audio2026.ops.supersonic",
+      "expected": "Supersonic speed reached.",
+      "heard": "Supersonic speed reached.",
+      "word_edits": 0,
+      "words": 3,
+      "peak": 0.749969482421875,
+      "rms": 0.09222669899463654,
+      "seconds": 1.579,
+      "sha256": "10b61f34945cf594eb744e0d40e9c31fc7da6e2ccf8706b78a39bc47de0096f0"
+    },
+    {
+      "id": "audio2026.command.combat_realtime",
+      "expected": "Combat runs in real time.",
+      "heard": "Combat runs in real time.",
+      "word_edits": 0,
+      "words": 5,
+      "peak": 0.749969482421875,
+      "rms": 0.07005160301923752,
+      "seconds": 1.643,
+      "sha256": "885e7c5ad16157a1d825442003caa4bb47da10e426d8229d9750aec43fa143b3"
+    },
+    {
+      "id": "audio2026.ops.overrun",
+      "expected": "Runway overrun. Parking brake set.",
+      "heard": "Runway overrun, parking brake set.",
+      "word_edits": 0,
+      "words": 5,
+      "peak": 0.749969482421875,
+      "rms": 0.0809011235833168,
+      "seconds": 2.283,
+      "sha256": "489fd0a391449068a2f98fb46ce08816cec5d66badbc43fa8919051394f5ee4c"
+    },
+    {
+      "id": "audio2026.ops.tailwind",
+      "expected": "Too much tailwind to stop safely. Going around.",
+      "heard": "Too much tailwind to stop safely, going around.",
+      "word_edits": 0,
+      "words": 8,
+      "peak": 0.69451904296875,
+      "rms": 0.0954652801156044,
+      "seconds": 3.008,
+      "sha256": "242ada55c8d051f16616f6a60fd47cf8ae313ad2bc3510a5917f0eb5b089bb86"
+    },
+    {
+      "id": "audio2026.ops.wind_hold",
+      "expected": "The wind has shifted. Unable to autoland. Circling clear of terrain.",
+      "heard": "The wind has shifted, unable to auto-land, circling clear of terrain.",
+      "word_edits": 0,
+      "words": 11,
+      "peak": 0.700103759765625,
+      "rms": 0.0947549045085907,
+      "seconds": 4.288,
+      "sha256": "3e80902d25ab2775ff6bfbcd85a64897384a7a576ccb0089a42adfec866773bc"
+    },
+    {
+      "id": "audio2026.ops.autoland_hold",
+      "expected": "Unable to autoland. Holding clear of the ground. Check the flight display.",
+      "heard": "Unable to auto land, holding clear of the ground, check the flight display.",
+      "word_edits": 0,
+      "words": 12,
+      "peak": 0.688873291015625,
+      "rms": 0.09375139325857162,
+      "seconds": 4.395,
+      "sha256": "68ed1d0a3d635c89bd9ca3cbd04e91421f2f798f4f711b526d15521bf70c0a31"
+    },
+    {
+      "id": "audio2026.ops.autopilot_unable",
+      "expected": "Autopilot unable. Check the flight display and maintain control.",
+      "heard": "Autopilot unable. Check the flight display and maintain control.",
+      "word_edits": 0,
+      "words": 9,
+      "peak": 0.749969482421875,
+      "rms": 0.09166474640369415,
+      "seconds": 4.053,
+      "sha256": "a82802eaf37b81d091fdff93dd68039420cfa8211497b8e4d92eb11b402ab2c5"
+    },
+    {
+      "id": "audio2026.ops.autopilot_off",
+      "expected": "Autopilot disconnected. You have control.",
+      "heard": "Autopilot disconnected. You have control.",
+      "word_edits": 0,
+      "words": 5,
+      "peak": 0.749969482421875,
+      "rms": 0.09068049490451813,
+      "seconds": 2.603,
+      "sha256": "a9ef183e1fc83a49a6c76281d42665b40e13fea64df51a590f5c5ec7fe498dab"
+    },
+    {
+      "id": "audio2026.ops.gliding",
+      "expected": "Power-off diversion. Gliding toward the selected runway.",
+      "heard": "Power off diversion, gliding toward the selected runway.",
+      "word_edits": 0,
+      "words": 8,
+      "peak": 0.614959716796875,
+      "rms": 0.09717289358377457,
+      "seconds": 3.477,
+      "sha256": "69b4461e4144fcc5dd17bc2ffd0f139da41abd89fe8afab58244473c18b1faa9"
+    },
+    {
+      "id": "audio2026.ops.autoland_set",
+      "expected": "Autoland destination set. Check the selected airport and runway.",
+      "heard": "Auto Land Destination Set. Check the selected airport and runway.",
+      "word_edits": 0,
+      "words": 9,
+      "peak": 0.72259521484375,
+      "rms": 0.09499772638082504,
+      "seconds": 4.16,
+      "sha256": "b8b2c2bc85ddfe6040a4038a4646433be7c49ba63191d0f39908f870fb5c0bea"
+    },
+    {
+      "id": "audio2026.ops.engine_running",
+      "expected": "Engine running. Release the parking brake when ready.",
+      "heard": "Engine running. Release the parking brake when ready.",
+      "word_edits": 0,
+      "words": 8,
+      "peak": 0.674346923828125,
+      "rms": 0.0954381674528122,
+      "seconds": 2.965,
+      "sha256": "901b2b037874109d9c5e8054e1ff7a001883f99e81651741523bc7d4c3198c3a"
+    },
+    {
+      "id": "audio2026.ops.engine_stopped",
+      "expected": "Engine stopped. Use your engine start control to restart.",
+      "heard": "Engine stopped. Use your engine start control to restart.",
+      "word_edits": 0,
+      "words": 9,
+      "peak": 0.749969482421875,
+      "rms": 0.07951881736516953,
+      "seconds": 3.52,
+      "sha256": "3611983b0c308fa9324ea8246358412c3b788441c03632f043d1a307c93d4428"
+    },
+    {
+      "id": "audio2026.ops.vtol_throttle",
+      "expected": "Hover throttle mode. Hold the throttle increase control for thrust. Release it to idle.",
+      "heard": "Hover throttle mode. Hold the throttle increase control for thrust. Release it to idle.",
+      "word_edits": 0,
+      "words": 14,
+      "peak": 0.7266845703125,
+      "rms": 0.09477952867746353,
+      "seconds": 5.312,
+      "sha256": "03910fcbf2a6ef621f5b1dd8fa80b5b8c0aaeec6d3e6a118456e4bef8b42fa5e"
+    },
+    {
+      "id": "audio2026.ops.time",
+      "expected": "Time acceleration changed.",
+      "heard": "Time acceleration changed.",
+      "word_edits": 0,
+      "words": 3,
+      "peak": 0.749969482421875,
+      "rms": 0.0962287113070488,
+      "seconds": 1.643,
+      "sha256": "357e42e4effad5552d386928946f6ab8384e6c8a777648decfb64968df3f83eb"
+    },
+    {
+      "id": "audio2026.ops.formation_done",
+      "expected": "Formation run complete. Return to the assigned airport and land.",
+      "heard": "Formation run complete. Return to the assigned airport and land.",
+      "word_edits": 0,
+      "words": 10,
+      "peak": 0.749969482421875,
+      "rms": 0.09461230039596558,
+      "seconds": 3.84,
+      "sha256": "4168051ae1b84adee16086fad0693a767b6e67aa9d2c12734ccc743687e35ad2"
+    },
+    {
+      "id": "audio2026.ops.test_saved",
+      "expected": "Test card complete. Signed off.",
+      "heard": "Test card complete, signed off.",
+      "word_edits": 0,
+      "words": 5,
+      "peak": 0.749969482421875,
+      "rms": 0.08763274550437927,
+      "seconds": 1.92,
+      "sha256": "6e866b907a1ae61c9bc874312ddb521893bb2f4b14c3302d1a7033905139124f"
+    },
+    {
+      "id": "audio2026.ops.test_unsaved",
+      "expected": "Test complete. The result could not be saved. This sign-off is for this session only.",
+      "heard": "Test complete, the result could not be saved. This sign off is for this session only.",
+      "word_edits": 0,
+      "words": 16,
+      "peak": 0.749969482421875,
+      "rms": 0.09196431189775467,
+      "seconds": 4.992,
+      "sha256": "ba641fe422c51416e3fb3b8c52d4faf955a4807f0e4a49ac09230b9f3fac6b86"
+    },
+    {
+      "id": "audio2026.ops.flap_asym",
+      "expected": "Flap asymmetry. Match the flap lever to the stuck left flap. Use aileron to hold the wing up.",
+      "heard": "Flap asymmetry. Match the flap lever to the stuck left flap. Use aileron to hold the wing up.",
+      "word_edits": 0,
+      "words": 18,
+      "peak": 0.687469482421875,
+      "rms": 0.09276500344276428,
+      "seconds": 5.547,
+      "sha256": "a4ccab3d119bd19738a5efcad49d486d7378c4b4e2b915138fd9f4a862146cb1"
+    },
+    {
+      "id": "audio2026.ops.below_minimums",
+      "expected": "Below minimums and not aligned. Go around.",
+      "heard": "Below minimums and not aligned. Go around.",
+      "word_edits": 0,
+      "words": 7,
+      "peak": 0.543304443359375,
+      "rms": 0.09742403030395508,
+      "seconds": 2.688,
+      "sha256": "eb6d90fbf01ca68956067abb1c634821035f130a4b5230b2e1de3ff84754e3f2"
+    },
+    {
+      "id": "audio2026.ops.gear_blocked",
+      "expected": "Gear cannot move. Check the landing gear warning.",
+      "heard": "Gear cannot move. Check the landing gear warning.",
+      "word_edits": 0,
+      "words": 8,
+      "peak": 0.749969482421875,
+      "rms": 0.09246987104415894,
+      "seconds": 2.795,
+      "sha256": "9d979992bc04ab34f0dde149271f9526066f312737a8433c04dd59c10180ebb7"
+    },
+    {
+      "id": "audio2026.ops.free_airborne",
+      "expected": "Already airborne. You are free to explore. Return from the pause menu when finished.",
+      "heard": "Already airborne, you are free to explore. Return from the pause menu when finished.",
+      "word_edits": 0,
+      "words": 14,
+      "peak": 0.749969482421875,
+      "rms": 0.08416713774204254,
+      "seconds": 4.757,
+      "sha256": "d91dec9901102f4e67d82ce5ab55d35c2c9312b6109e0fd38717c638488fd5e3"
+    },
+    {
+      "id": "audio2026.ops.free_ground",
+      "expected": "Full tanks. Release the parking brake when ready.",
+      "heard": "Full tanks, release the parking brake when ready.",
+      "word_edits": 0,
+      "words": 8,
+      "peak": 0.749969482421875,
+      "rms": 0.08802144229412079,
+      "seconds": 2.752,
+      "sha256": "f61840b6dc1596150c04f6fa6c63253f54d6cfa837f66bdf40e97651f071d7a3"
+    },
+    {
+      "id": "audio2026.ops.region_arrived",
+      "expected": "Destination region reached. Choose a local airport on the GPS map.",
+      "heard": "Destination region reached. Choose a local airport on the GPS map.",
+      "word_edits": 0,
+      "words": 11,
+      "peak": 0.749969482421875,
+      "rms": 0.09429613500833511,
+      "seconds": 4.352,
+      "sha256": "5547bc250950c78dfca515e76299ca73c47a2ac00519ce4d18c467766a046aab"
+    },
+    {
+      "id": "audio2026.ops.route_set",
+      "expected": "Route set. Check your destination on the GPS map.",
+      "heard": "Route set, check your destination on the GPS map.",
+      "word_edits": 0,
+      "words": 9,
+      "peak": 0.7235107421875,
+      "rms": 0.0950373187661171,
+      "seconds": 3.157,
+      "sha256": "ae6085cbf43e54154fa84568b693db0ac1db5446694fa49153ffd8bd592d3b1b"
+    },
+    {
+      "id": "audio2026.ops.range",
+      "expected": "This route exceeds the aircraft's nominal fuel range. Choose a closer fuel stop.",
+      "heard": "This route exceeds the aircraft's nominal fuel range. Choose a closer fuel stop.",
+      "word_edits": 0,
+      "words": 13,
+      "peak": 0.701324462890625,
+      "rms": 0.09487693011760712,
+      "seconds": 5.013,
+      "sha256": "943b8e6f14baf599bef145a17be71abbf98ef89506e86de7d3bc40570f63cc73"
+    },
+    {
+      "id": "audio2026.ops.region_enter",
+      "expected": "Entering the next region.",
+      "heard": "Entering the next region.",
+      "word_edits": 0,
+      "words": 4,
+      "peak": 0.749969482421875,
+      "rms": 0.08575202524662018,
+      "seconds": 1.451,
+      "sha256": "402dc3c84da8747ec03b3ea7fd5135440d0e392e4504ccef47caccb6d70c7814"
+    },
+    {
+      "id": "audio2026.command.mission_begin",
+      "expected": "Military aircraft assigned. Complete the objectives, then return to extraction.",
+      "heard": "Military aircraft assigned, complete the objectives then return to extraction.",
+      "word_edits": 0,
+      "words": 10,
+      "peak": 0.7198486328125,
+      "rms": 0.09834819287061691,
+      "seconds": 4.928,
+      "sha256": "516ea5b65a9f4d03ae6bf93268c8ee1a89625c05776243819470ef9865fc2722"
+    },
+    {
+      "id": "audio2026.command.first_scan",
+      "expected": "Proceed to the first marked intelligence site. Maintain the sensor altitude and speed.",
+      "heard": "Proceed to the first marked intelligence site. Maintain the sensor altitude and speed.",
+      "word_edits": 0,
+      "words": 13,
+      "peak": 0.7490234375,
+      "rms": 0.0990295484662056,
+      "seconds": 5.397,
+      "sha256": "fca72186fab33219631ddb2b9286c44022a7b0c5e65e8198c3ff136d1854a7ab"
+    },
+    {
+      "id": "audio2026.command.protect",
+      "expected": "Protect the marked site. Keep hostile aircraft away from the objective.",
+      "heard": "Protect the marked site, keep hostile aircraft away from the objective.",
+      "word_edits": 0,
+      "words": 11,
+      "peak": 0.749969482421875,
+      "rms": 0.06199038028717041,
+      "seconds": 4.224,
+      "sha256": "ab0946399034b555a44bfce6d09c934bbc3cf07e09501308fa5826b4ff72da65"
+    },
+    {
+      "id": "audio2026.command.practice",
+      "expected": "Practice wave deployed. Enemy contacts are marked.",
+      "heard": "Practice wave deployed, enemy contacts are marked.",
+      "word_edits": 0,
+      "words": 7,
+      "peak": 0.749969482421875,
+      "rms": 0.07267458736896515,
+      "seconds": 2.987,
+      "sha256": "ccaa39314f9c845a5fad7c09516b43c9aa6ced93f9188903a1d0f3ed3dc03022"
+    },
+    {
+      "id": "audio2026.command.scan",
+      "expected": "Intelligence site recorded.",
+      "heard": "Intelligence site recorded.",
+      "word_edits": 0,
+      "words": 3,
+      "peak": 0.749969482421875,
+      "rms": 0.09098973870277405,
+      "seconds": 1.557,
+      "sha256": "5d67605cf947d6960bddf0074571e11fb0696377c421db518a41f9152a6564e9"
+    },
+    {
+      "id": "audio2026.command.incoming",
+      "expected": "Incoming fire. Break away.",
+      "heard": "incoming fire break away.",
+      "word_edits": 0,
+      "words": 4,
+      "peak": 0.749969482421875,
+      "rms": 0.08330488950014114,
+      "seconds": 1.664,
+      "sha256": "2e3e4e0902f1cad1276dc4ff9090ea99bbb18b3079d501686f9733a248673f6f"
+    },
+    {
+      "id": "audio2026.command.site_attack",
+      "expected": "The protected site is under attack.",
+      "heard": "The protected site is under attack.",
+      "word_edits": 0,
+      "words": 6,
+      "peak": 0.749969482421875,
+      "rms": 0.07892455905675888,
+      "seconds": 1.813,
+      "sha256": "9f8748493db27b82fe5ac63f7579dfb7b20c081194563558c2622b610c18f693"
+    },
+    {
+      "id": "audio2026.command.wave",
+      "expected": "Hostile wave inbound.",
+      "heard": "Hostile wave inbound.",
+      "word_edits": 0,
+      "words": 3,
+      "peak": 0.7227783203125,
+      "rms": 0.09907369315624237,
+      "seconds": 1.301,
+      "sha256": "0c3114d6c525d4bea6b2c7522702bb8089ca1262bc66f8cfba02f8c770603d1c"
+    },
+    {
+      "id": "audio2026.command.extract",
+      "expected": "Objectives complete. Return to extraction.",
+      "heard": "Objectives complete. Return to extraction.",
+      "word_edits": 0,
+      "words": 5,
+      "peak": 0.749969482421875,
+      "rms": 0.0851074680685997,
+      "seconds": 2.667,
+      "sha256": "107143712c45a7a741c137dd9b0c1963dde66d4b0cc93afc25d652b3c7ddedfd"
+    },
+    {
+      "id": "audio2026.command.success",
+      "expected": "All military objectives are secure. Mission complete.",
+      "heard": "All military objectives are secure, mission complete.",
+      "word_edits": 0,
+      "words": 7,
+      "peak": 0.69512939453125,
+      "rms": 0.09765809774398804,
+      "seconds": 3.413,
+      "sha256": "47fd92a026241e3f8eba0b9ef835a8b4695dd7c735e51d6ee334f7934198faeb"
+    },
+    {
+      "id": "audio2026.command.failed",
+      "expected": "Military objective lost. Mission unsuccessful.",
+      "heard": "Military objective lost, mission unsuccessful.",
+      "word_edits": 0,
+      "words": 5,
+      "peak": 0.635101318359375,
+      "rms": 0.09816308319568634,
+      "seconds": 3.136,
+      "sha256": "c96bce90c43e40244e176379b381e42b2826cad4e55cf987e7812dba4f9fb3a0"
+    },
+    {
+      "id": "audio2026.command.hull",
+      "expected": "Aircraft destroyed by enemy fire.",
+      "heard": "Aircraft destroyed by enemy fire.",
+      "word_edits": 0,
+      "words": 5,
+      "peak": 0.749969482421875,
+      "rms": 0.07689830660820007,
+      "seconds": 1.92,
+      "sha256": "d35a6987f5568e34087ffa3c1d1830be1fc80284235933dbaeced6d39565d34f"
+    },
+    {
+      "id": "audio2026.ops.free_done",
+      "expected": "Free flight complete.",
+      "heard": "Free flight complete.",
+      "word_edits": 0,
+      "words": 3,
+      "peak": 0.660797119140625,
+      "rms": 0.09078261256217957,
+      "seconds": 1.259,
+      "sha256": "825ab11a72a23a9016af459c857f8569f2d137e8597c45ebb9f74a919707e310"
+    },
+    {
+      "id": "audio2026.ops.practice_done",
+      "expected": "Practice flight complete.",
+      "heard": "Practice flight complete.",
+      "word_edits": 0,
+      "words": 3,
+      "peak": 0.7193603515625,
+      "rms": 0.09210548549890518,
+      "seconds": 1.387,
+      "sha256": "fdc14f5e4837b8784ab72e7a9004262ce8f09ddf2ba69d4b832b1cf83f8d4afe"
+    },
+    {
+      "id": "audio2026.ops.practice_over",
+      "expected": "Practice flight ended.",
+      "heard": "Practice flight ended.",
+      "word_edits": 0,
+      "words": 3,
+      "peak": 0.651153564453125,
+      "rms": 0.09250519424676895,
+      "seconds": 1.387,
+      "sha256": "5f2e48cc40d2990ec2219b139a279b5c0cd7f6813aaa8e015ddfc9368b1ea882"
+    },
+    {
+      "id": "audio2026.ops.research_done",
+      "expected": "Research flight complete.",
+      "heard": "Research flight complete.",
+      "word_edits": 0,
+      "words": 3,
+      "peak": 0.71075439453125,
+      "rms": 0.0929032638669014,
+      "seconds": 1.429,
+      "sha256": "9937412f4a2377c407ff688dfea8e0f47441e79d4bf6615a081433044382571f"
+    },
+    {
+      "id": "audio2026.ops.checkride_failed",
+      "expected": "Checkride not passed. Review the debrief before trying again.",
+      "heard": "Check ride not passed. Review the debrief before trying again.",
+      "word_edits": 0,
+      "words": 9,
+      "peak": 0.637542724609375,
+      "rms": 0.09539450705051422,
+      "seconds": 3.584,
+      "sha256": "d05e03060098e54edba720ebcc7d4ff1a22a2e0554050e4ddc6882100ddca04d"
+    },
+    {
+      "id": "audio2026.ops.flight_done",
+      "expected": "Flight complete. Review your landing and flight results.",
+      "heard": "Flight complete. Review your landing and flight results.",
+      "word_edits": 0,
+      "words": 8,
+      "peak": 0.72198486328125,
+      "rms": 0.09430617839097977,
+      "seconds": 3.072,
+      "sha256": "a3682c009c622a35a6b9cf40ecbf7e5186cda0c8b675ce508a164b472b943bb8"
+    },
+    {
+      "id": "audio2026.ops.impact_end",
+      "expected": "Flight ended after impact. Review the debrief when ready.",
+      "heard": "Flight ended after impact. Review the debrief when ready.",
+      "word_edits": 0,
+      "words": 9,
+      "peak": 0.749969482421875,
+      "rms": 0.07288222759962082,
+      "seconds": 3.563,
+      "sha256": "98178d3230fc7e718e52508b8180c5656b2aaa918fc1534ac46a11f302766ce3"
+    },
+    {
+      "id": "audio2026.ops.flight_end",
+      "expected": "Flight ended. Review the debrief when ready.",
+      "heard": "Flight ended. Review the debrief when ready.",
+      "word_edits": 0,
+      "words": 7,
+      "peak": 0.749969482421875,
+      "rms": 0.081468865275383,
+      "seconds": 2.645,
+      "sha256": "ed9994c467ff449ba7650f1a92a8d8d0692f7b327fbd58f1db41e962e93d6049"
+    },
+    {
+      "id": "audio2026.ops.autopilot_route",
+      "expected": "Autopilot route updated. Check the selected runway on the flight display.",
+      "heard": "Autopilot route updated. Check the selected runway on the flight display.",
+      "word_edits": 0,
+      "words": 11,
+      "peak": 0.71099853515625,
+      "rms": 0.09317179769277573,
+      "seconds": 4.544,
+      "sha256": "7f97e9913563179c7d444534da0034d195538595868e9d4a87b879dd8674bca6"
+    },
+    {
+      "id": "audio2026.ops.region_preparing",
+      "expected": "Destination region reached. Local airport data is still preparing.",
+      "heard": "Destination region reached. Local airport data is still preparing.",
+      "word_edits": 0,
+      "words": 9,
+      "peak": 0.749969482421875,
+      "rms": 0.09525715559720993,
+      "seconds": 4.181,
+      "sha256": "c6eb8bb87ae7cc0a01c48a57536c3ff39ebcd7a479eec9f57e82d91ecec5b013"
+    },
+    {
+      "id": "audio2026.command.plasma_away",
+      "expected": "Plasma bomb released.",
+      "heard": "Plasma Bomb released.",
+      "word_edits": 0,
+      "words": 3,
+      "peak": 0.749969482421875,
+      "rms": 0.09681111574172974,
+      "seconds": 1.301,
+      "sha256": "643d97d31b9a0db08732f88e01cb01ce357f0132710def99876301bfa92cddb8"
+    },
+    {
+      "id": "audio2026.command.penetrator_away",
+      "expected": "Penetrator released.",
+      "heard": "Penetrator released.",
+      "word_edits": 0,
+      "words": 2,
+      "peak": 0.6353759765625,
+      "rms": 0.09829514473676682,
+      "seconds": 1.195,
+      "sha256": "4b74e2d088f89be2a1d51a17783998f5eda3b8ca99a4134b34871b91a5ee3ed9"
+    },
+    {
+      "id": "audio2026.command.emp_away",
+      "expected": "Electromagnetic pulse payload released.",
+      "heard": "Electromagnetic pulse payload released.",
+      "word_edits": 0,
+      "words": 4,
+      "peak": 0.749969482421875,
+      "rms": 0.09617044031620026,
+      "seconds": 2.261,
+      "sha256": "4b1ca93c7493f9df43d6d985a32279a48fc66afb7f362ce7079b2084d7139cdc"
+    },
+    {
+      "id": "audio2026.command.structure_destroyed",
+      "expected": "Structure destroyed.",
+      "heard": "Structure destroyed.",
+      "word_edits": 0,
+      "words": 2,
+      "peak": 0.70074462890625,
+      "rms": 0.09617031365633011,
+      "seconds": 1.195,
+      "sha256": "305e6ab1afe7353e19a7db610f906f03e2cfa31a0a7a3b81a2052c30e834c384"
+    },
+    {
+      "id": "audio2026.command.overheated",
+      "expected": "Weapons overheated. Allow them to cool.",
+      "heard": "Weapons overheated, allow them to cool.",
+      "word_edits": 0,
+      "words": 6,
+      "peak": 0.749969482421875,
+      "rms": 0.0964769795536995,
+      "seconds": 2.304,
+      "sha256": "07684a6b2b2529f7337222d55406785626c67021022a287c8d63d22747ddd222"
+    },
+    {
+      "id": "audio2026.command.ammo_empty",
+      "expected": "Forward weapon ammunition depleted.",
+      "heard": "Forward weapon ammunition depleted.",
+      "word_edits": 0,
+      "words": 4,
+      "peak": 0.749969482421875,
+      "rms": 0.08818924427032471,
+      "seconds": 2.112,
+      "sha256": "63de004bd7564332fe8da4da266774454e2b40f943698caa3e94905f9bfeddc2"
+    }
+  ]
+}

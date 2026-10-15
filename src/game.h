@@ -275,11 +275,15 @@ private:
   float lookYaw = 0, lookPitch = 0;
   quat camQ; vec3 camPos; vec3 camVel;
   float propAngle = 0;
+  vec3 audioCameraPrevious; bool audioCameraValid = false, audioSceneWas = false, audioMachArmed = true;
+  uint32_t audioSceneId = 0;
+  int audioCameraMode = -1; float audioPlayerCone = -1e9f, audioBoomCooldown = 0;
+  float audioThreatAt = -100, audioObjectiveAt = -100; bool audioExtractSaid = false;
   bool landingLight = true;
   float flapNotch = 0;
   int phase = 0, lastHintPhase = -1;
   std::string hint;
-  float lightning = 0, nextLightning = 5, thunderDelay = -1;
+  float lightning = 0, nextLightning = 5;
   float prevGear = 1, prevFlaps = 0;
   bool takeoffAnnounced = false;
   float touchdownFpm = 0; bool touchedDown = false;
@@ -500,6 +504,8 @@ private:
   std::vector<Annunciator> hudAnnunciators() const;
   std::map<std::string, std::string> failVoiced;   // slot -> the state key last spoken this flight
   void updateComms(float dt);
+  void announceFlightEnd(const std::string& message);
+  int commsEndScreen = -1; float commsEndTime = 0;
   float voiceDuck = 0;   // 0..1: music and engine lowered while someone is talking
   std::string settingsWritten;   // the settings file's last written contents (written again only when changed)
   int atcStation(int airport) const { return (airport * 7 + 2) % AtcVoice::kVoices; }   // each airport keeps one voice

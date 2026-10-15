@@ -49,14 +49,14 @@ void Game::wraithControls(float dt) {
   if (actPressed(ACT_CLOAK) || dblA) {
     W.cloakOn = !W.cloakOn;
     toast(W.cloakOn ? "CLOAK ENGAGED" : "CLOAK DISENGAGED", vec3(0.75f, 0.45f, 1.f));
-    g_audio.trigger(SFX_CLOAK, W.cloakOn ? 1.f : 0.7f);
+    g_audio.triggerLocal(SFX_CLOAK, vec3(0,0,1), W.cloakOn ? 1.f : 0.7f);
   }
   // Y (keyboard or gamepad, in the air on the pad): weapons hot - the laser turrets drop out and the bomb bay opens.
   // Y again: weapons safe - bay closed, turrets stowed. While hot the gamepad bumpers are the triggers, not the rudder.
   if (actKeyP(ACT_WEAPONS) || (air && actPadP(ACT_WEAPONS))) {
     W.armed = !W.armed;
     toast(W.armed ? "WEAPONS HOT - lasers out, bomb bay open" : "WEAPONS SAFE - bay closed, lasers stowed", vec3(1.f, 0.35f, 0.4f));
-    g_audio.trigger(SFX_GEAR_CLUNK, 0.6f);
+    g_audio.triggerLocal(SFX_GEAR_CLUNK, kBayBomb, 0.6f);
   }
   // fire: left mouse or Enter held, or the right bumper while weapons are hot
   bool padHot = air && in.pad && W.armed;
@@ -65,7 +65,7 @@ void Game::wraithControls(float dt) {
   const bool overlay = showMap || showRadio;
   bool fire = (in.mDown[0] && !overlay) || (actKey(ACT_FIRE) && !overlay) || (padHot && actPad(ACT_FIRE));
   if (W.fireLatch) { if (!in.mDown[0] && !actKey(ACT_FIRE)) W.fireLatch = false; fire = false; }
-  if (fire && !W.armed) { W.armed = true; g_audio.trigger(SFX_GEAR_CLUNK, 0.6f); }
+  if (fire && !W.armed) { W.armed = true; g_audio.triggerLocal(SFX_GEAR_CLUNK, kBayBomb, 0.6f); }
   W.wantFire = fire;   // the bolt leaves the lens after this frame's physics step (updateWraith)
   // bombs: Backspace, middle mouse, or the left bumper while weapons are hot - each press queues a drop
   if ((!overlay && (actKeyP(ACT_BOMB) || in.mPressed[2])) || (padHot && actPadP(ACT_BOMB))) {
@@ -90,7 +90,7 @@ void Game::fireLaser() {
   const float massRatio=mass/std::max(1.f,plane.spec->emptyMass);
   plane.w+=vec3(moment.x/std::max(1.f,plane.spec->Ixx*massRatio),moment.y/std::max(1.f,plane.spec->Iyy*massRatio),moment.z/std::max(1.f,plane.spec->Izz*massRatio));
   W.laserGlow = 1.f;
-  g_audio.trigger(SFX_LASER, 0.8f);
+  g_audio.triggerAt(combatLoadout.forward==hive::ForwardSet::Pulse?SFX_LASER:combatLoadout.forward==hive::ForwardSet::Heavy?SFX_HEAVY:SFX_CANNON,a,.65f,plane.vel);
   spawn(a, plane.vel, 0.06f, 0.9f, 2.f, gun.colour * 2.f, 1.f, SPR_GLOW, 0.f, 0.f);   // muzzle flash
 }
 
@@ -112,12 +112,13 @@ void Game::laserImpact(vec3 b, int craft, int entKind, const Ent* ent) {
     traffic.craft[craft].alive = false;
     W.kills++;
     toast(fmt("SPLASH %d - %s down", W.kills, kAircraft[traffic.craft[craft].spec].name), vec3(1.f, 0.5f, 0.3f));
-    g_audio.trigger(SFX_BOOM, 0.5f);
+    g_audio.triggerAt(SFX_CRASH, p, .6f);
     for (int i = 0; i < 40; i++) spawn(p + rndDir() * 2.f, v * 0.5f + rndDir() * (10.f + 25.f * frand()), 0.6f + frand(), 2.5f + 2.f * frand(), 4.f, vec3(1.f, 0.55f, 0.2f) * 3.f, 1.f, SPR_FIRE, 1.2f, 0.4f);
     for (int i = 0; i < 25; i++) spawn(p, v * 0.6f + rndDir() * (30.f + 50.f * frand()), 1.f + frand(), 0.25f, -0.1f, vec3(1.f, 0.7f, 0.3f) * 4.f, 1.f, SPR_SPARK, 0.8f, -1.f);
     for (int i = 0; i < 20; i++) spawn(p + rndDir() * 3.f, v * 0.3f + rndDir() * 6.f, 4.f + 3.f * frand(), 3.f, 5.f, vec3(0.12f), 0.6f, SPR_SMOKE, 1.f, 0.6f);
     return;
   }
+  g_audio.triggerAt(SFX_IMPACT,b,.25f);
   bool water = !entKind && b.y < 0.5f && g_world.height(b.x, b.z) < 0.3f;
   // every hit: sparks, a flash and a puff
   for (int i = 0; i < 14; i++) spawn(b + vec3(0, 0.3f, 0), rndDir() * (8.f + 18.f * frand()) + vec3(0, 6.f, 0), 0.3f + 0.4f * frand(), 0.12f, -0.1f, vec3(1.f, 0.4f, 0.5f) * 4.f, 1.f, SPR_SPARK, 1.f, -1.f);
@@ -142,7 +143,7 @@ void Game::laserImpact(vec3 b, int craft, int entKind, const Ent* ent) {
     for (int i = 0; i < nf; i++) spawn(mid, rndDir() * (15.f + 30.f * frand()) + vec3(0, 12.f, 0), 1.2f + frand(), 0.3f, -0.1f, cl == EC_TREE ? vec3(1.f, 0.6f, 0.25f) * 3.f : vec3(1.f, 0.75f, 0.4f) * 4.f, 1.f, SPR_SPARK, 1.f, -1.f);
     for (int i = 0; i < nf / 2 + 4; i++) spawn(mid + rndDir() * sz * 0.5f, vec3(0, 3.f + 4.f * frand(), 0) + rndDir() * 2.f, 6.f + 5.f * frand(), sz * 0.8f + 2.f, sz * 0.9f + 3.f,
                                      cl == EC_ROCK ? vec3(0.5f, 0.47f, 0.43f) : vec3(0.09f, 0.08f, 0.08f), 0.7f, SPR_SMOKE, 0.6f, 0.5f);
-    g_audio.trigger(SFX_BOOM, clampf(0.25f + R * 0.04f, 0.25f, 0.8f) * clampf(1.4f - length(b - camPos) / 3000.f, 0.2f, 1.f));
+    g_audio.triggerAt(cl == EC_ROCK ? SFX_IMPACT : SFX_CRASH,b,clampf(.25f+R*.04f,.25f,.8f));
     if (ent->y > 0.3f) addScorch(ent->x, ent->z, clampf(R * 0.75f, 1.6f, 9.f), clampf(0.3f + R * 0.08f, 0.4f, 1.4f));
     if (cl == EC_BUILDING) toast(fmt("%s destroyed", I.name), vec3(1.f, 0.6f, 0.3f));
     return;
@@ -283,7 +284,7 @@ void Game::detonate(vec3 p, bool water, hive::BombSet kind, const vec3* queryOri
   if(kind==hive::BombSet::EMP) hiveCombat.playerEMP(query,payload.radius,payload.disruption,hiveWorld());
   else hiveCombat.playerBlast(query,payload.radius,payload.damage,hiveWorld());
   if(kind!=hive::BombSet::Plasma) {
-    g_audio.trigger(kind==hive::BombSet::EMP?SFX_LASER:SFX_BOOM,.65f);
+    g_audio.triggerAt(kind==hive::BombSet::EMP?SFX_EMP:water?SFX_SPLASH:SFX_CRASH,p,.85f);
     // EMP is an electrical transient; conventional explosive throws fragments and dust, never a plasma cloud.
     for(int i=0;i<48;++i) spawn(p+vec3(0,1,0),rndDir()*(kind==hive::BombSet::EMP?95.f:45.f),.3f+frand()*.8f,.22f,.25f,payload.colour*2.f,1,SPR_SPARK,.4f,kind==hive::BombSet::EMP?0:-1);
     spawn(p,vec3(),.16f,kind==hive::BombSet::EMP?18.f:10.f,6,payload.colour*2.f,.8f,SPR_GLOW,0,0);
@@ -303,8 +304,7 @@ void Game::detonate(vec3 p, bool water, hive::BombSet kind, const vec3* queryOri
     // buildings, and their collision - the review of v3.44.0, WLD-2)
     W.flattened.push_back(vec3(p.x, p.z, 24.f * 4.f));
   }
-  float dCam = length(p - camPos);
-  g_audio.trigger(SFX_PLASMA, clampf(1.3f - dCam / 6000.f, 0.25f, 1.f));
+  g_audio.triggerAt(SFX_PLASMA,p,.9f);
   // everything inside the fireball goes with it
   std::vector<vec3> where;
   int n = traffic.destroyNear(p, 230.f, where);
@@ -371,14 +371,17 @@ void Game::updateWraith(float dt) {
     vec3 p, v; bombLaunch(plane, p, v);
     W.bombs.push_back({p, v, 0.f, combatLoadout.bomb});
     W.bombLoaded = 0; W.bombQueue--; W.bayHold = 0.6f; W.dropped++;
-    g_audio.trigger(SFX_GEAR_CLUNK, 0.6f);
+    g_audio.triggerLocal(SFX_GEAR_CLUNK, kBayBomb, 0.6f);
     toast(std::string(hive::bombSpec(combatLoadout.bomb).name)+" AWAY", hive::bombSpec(combatLoadout.bomb).colour);
   }
   if (W.bombQueue > 0 && (plane.onGround || combatLoadout.bombs<=0)) W.bombQueue = 0;
   // laser bolts fly, then new ones leave the lenses (after the physics step, from where the turrets are now)
   updateBolts(dt);
   W.laserCD -= dt;
+  bool hotBefore=combatLoadout.overheated; int roundsBefore=combatLoadout.rounds;
   if (combatLoadout.step(dt,wr && W.wantFire && W.lasers > 0.97f)) fireLaser();
+  if(wr && !hotBefore && combatLoadout.overheated) toast("WEAPONS OVERHEATED - COOLING",vec3(1,.65f,.3f));
+  if(wr && roundsBefore>0 && combatLoadout.rounds==0) toast("FORWARD AMMUNITION DEPLETED",vec3(1,.65f,.3f));
   W.wantFire = false;
   // bombs fall (a little drag), trail violet sparks, and go off on the ground, the sea or near an aircraft
   for (size_t i = 0; i < W.bombs.size(); i++) {

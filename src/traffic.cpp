@@ -2,6 +2,7 @@
 // circuits with glideslope approaches; cruisers cross the map; XR-30 formations make high-speed passes; a display team
 // flies an aerobatic sequence with smoke.
 #include "traffic.h"
+#include "audio_spatial.h"
 #include "aircraft.h"
 #include "world.h"
 #include "airport_layout.h"
@@ -783,14 +784,11 @@ bool Traffic::update(float dt, vec3 player, vec3 playerVel, bool playerOnGround,
         }
         f = c.q.rotate(vec3(0, 0, -1));
         c.vel = f * c.speed; c.pos += c.vel * dt;
-        c.boomCD -= dt;
-        if (c.speed > 340.f && dist < 1300.f && c.boomCD <= 0) { booms.push_back({c.pos, clampf(1.3f - dist / 1300.f, 0.25f, 1.f)}); c.boomCD = 30.f; }
         if (dist > 20000.f || c.timer > 120.f) c.alive = false;
         break;
       }
       case TrafficCraft::ESCORT: {   // flown by updateEscorts; here: booms and fly-by roars on close fast passes
-        c.boomCD -= dt; c.flybyCD -= dt;
-        if (c.speed > 340.f && dist < 1500.f && c.boomCD <= 0) { booms.push_back({c.pos, clampf(1.3f - dist / 1500.f, 0.25f, 1.f)}); c.boomCD = 25.f; }
+        c.flybyCD -= dt;
         vec3 relV = c.vel - playerVel, toP = player - c.pos;
         float closing = dot(relV, toP) / std::max(dist, 1.f);
         if (dist < 220.f && closing > 25.f && c.flybyCD <= 0) { flybys.push_back(clampf(closing / 200.f, 0.35f, 1.f) * clampf(1.4f - dist / 220.f, 0.4f, 1.f)); c.flybyCD = 5.f; }
@@ -801,6 +799,10 @@ bool Traffic::update(float dt, vec3 player, vec3 playerVel, bool playerOnGround,
         if (length(vec2(g_world.airports[c.airport].x - player.x, g_world.airports[c.airport].z - player.z)) > 22000.f) c.alive = false;
         break;
     }
+    c.boomCD -= dt;
+    float cone = audioMachCone(c.pos,c.vel,audioObserver,isa(c.pos.y).a,g_world.repeating?WRAP_SPAN:0);
+    if(c.alive && c.audioCone>-1e8f && c.audioCone<0 && cone>=0 && c.boomCD<=0) {booms.push_back({c.pos,.85f});c.boomCD=8.f;}
+    c.audioCone=cone;
     // ground safety for anything flying
     float g = g_world.height(c.pos.x, c.pos.z);
     if (c.role != TrafficCraft::AIRPORT && c.pos.y < g + 30.f) { c.pos.y = g + 30.f; if (c.vel.y < 0) c.vel.y = 0; }

@@ -1,6 +1,7 @@
 // Somnium Volandi - tower controller voices (see atc.h)
 #include "atc.h"
 #include "audio.h"
+#include "audio_stream.h"
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
@@ -12,11 +13,16 @@
 static const char* kVoiceName[AtcVoice::kVoices] = {"tower_north", "tower_coast", "tower_valley"};
 
 bool AtcVoice::load(const std::string& d) {
-  dir = d; clips.clear(); lookup.clear(); exact.clear();   // (a reload with removed ids leaves no stale references)
+  dir = d; clips.clear(); lookup.clear(); exact.clear(); cues.clear();   // (a reload with removed ids leaves no stale references)
   std::ifstream f(dir + "/voice_index.txt");
   if (!f) return false;
+  // Supplemental cues are separate so importing the legacy packs cannot silently erase them.
+  std::string index((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+  std::ifstream extra(dir + "/voice_index_extra.txt");
+  if(extra) index += "\n" + std::string((std::istreambuf_iterator<char>(extra)), std::istreambuf_iterator<char>());
+  std::istringstream input(index);
   std::string ln;
-  while (std::getline(f, ln)) {
+  while (std::getline(input, ln)) {
     if (ln.empty() || ln[0] == '#') continue;
     size_t a = ln.find('\t');
     if (a == std::string::npos) continue;
@@ -33,6 +39,12 @@ bool AtcVoice::load(const std::string& d) {
     bool legacyLesson = f[0].compare(0, 7, "lesson.") == 0 && c.kind != "lesson";
     if ((c.kind == "line" || c.kind == "lesson") && !c.speaker.empty() && !legacyLesson) {
       exact[c.words].push_back(f[0]);
+    }
+    if (c.speaker.empty()) { // three-column tower rows still have a stable character identity
+      size_t slash=c.file.find('/'); if(slash!=std::string::npos) c.speaker=c.file.substr(0,slash);
+    }
+    if(c.kind=="cue_regex" && f.size()>6) {
+      try {cues.push_back({std::regex(f[6]),f[0]});} catch(const std::regex_error&) {continue;}
     }
     clips[f[0]] = c;
   }
@@ -73,9 +85,20 @@ void AtcVoice::cardinal(const std::string& sp, long n, std::vector<std::string>&
   for (auto& sc : scales) if (n >= sc.first) { cardinal(sp, n / sc.first, ids); ids.push_back(atomO(sp, sc.second)); if (n % sc.first) cardinal(sp, n % sc.first, ids); return; }
 }
 
+bool AtcVoice::resolve(const std::string& message, const std::string& mission, bool pad, Tx& out) const {
+  if(resolveRecorded(message,mission,pad,out)) return true;
+  for(const auto& cue:cues) if(std::regex_match(message,cue.first)) {
+    const auto& c=clips.at(cue.second);
+    out=Tx();out.text=message;out.ids={cue.second};out.prio=c.prio;out.radio=c.speaker=="command";
+    out.group=c.speaker=="command"?"command."+cue.second:"ops."+cue.second;
+    return true;
+  }
+  return false;
+}
+
 // A port of the voice pack's reference resolver (resolve_message.py): the line recorded for a message the game shows,
 // or the message assembled from fragments (weather, flap / pod settings, checkpoints, landing ratings, warnings ...).
-bool AtcVoice::resolve(const std::string& msg, const std::string& mission, bool /*pad*/, Tx& out) const {
+bool AtcVoice::resolveRecorded(const std::string& msg, const std::string& mission, bool /*pad*/, Tx& out) const {
   out = Tx(); out.text = msg;
   auto finish = [&](const std::string& sp, int prio) {
     for (auto& id : out.ids) if (id.empty() || !clips.count(id)) { out.ids.clear(); return false; }   // (a fragment the pack lacks)
@@ -219,10 +242,10 @@ static bool readWav(const std::string& path, std::vector<float>& out, int outRat
   for (size_t o = 12; o + 8 <= b.size();) {
     size_t n = u32(o + 4);
     if (!b.compare(o, 4, "fmt ")) { if (n < 16 || o + 24 > b.size()) return false; fmt = (int)u16(o + 8); ch = (int)u16(o + 10); rate = (int)u32(o + 12); bits = (int)u16(o + 22); }   // (a truncated header: no clip - the review of v3.44.0, AUD-4)
-    else if (!b.compare(o, 4, "data")) { data = o + 8; len = std::min(n, b.size() - data); }
+    else if (!b.compare(o, 4, "data")) { data = o + 8; if(n>b.size()-data) return false; len=n; }
     o += 8 + n + (n & 1);
   }
-  if (!data || ch != 1 || rate <= 0 || !((fmt == 1 && bits == 16) || (fmt == 7 && bits == 8))) return false;
+  if (!data || ch != 1 || rate < 8000 || rate > 192000 || outRate < 8000 || outRate > 192000 || !((fmt == 1 && bits == 16) || (fmt == 7 && bits == 8))) return false;
   std::vector<float> in;
   if (fmt == 1) { in.resize(len / 2); for (size_t i = 0; i < in.size(); i++) in[i] = (int16_t)u16(data + i * 2) / 32768.f; }
   else {
@@ -234,14 +257,27 @@ static bool readWav(const std::string& path, std::vector<float>& out, int outRat
     }
   }
   if (in.empty()) return false;   // (no samples: an empty or cut-off data chunk)
-  // to the output rate (linear: the radio speech has nothing above ~6 kHz)
-  double step = (double)rate / outRate;
-  size_t n = (size_t)((in.size() - 1) / step) + 1;
-  out.resize(n);
-  for (size_t i = 0; i < n; i++) {
-    double p = i * step; size_t k = (size_t)p; float t = (float)(p - k);
-    out[i] = k + 1 < in.size() ? in[k] * (1 - t) + in[k + 1] * t : in[k];
+  if(in.size()>size_t(rate)*120) return false;
+  // Windowed-sinc sample-rate conversion: avoid imaging/sibilance from the old linear upsampler.
+  const double step=double(rate)/outRate;
+  const size_t n=size_t(in.size()/step);
+  out.resize(n); const int taps=16; AudioSincKernel kernel;kernel.prepare(rate,outRate);
+  for(size_t i=0;i<n;++i) {
+    uint64_t position=uint64_t(i)*uint64_t(rate); int center=int(position/outRate); double sum=0,weight=0;
+    const auto& coefficients=kernel.at(double(position%outRate)/outRate,center);
+    for(int j=-taps+1;j<=taps;++j) {
+      int at=center+j;if(at<0 || at>=int(in.size())) continue;
+      double w=coefficients[j+taps-1];sum+=in[size_t(at)]*w;weight+=w;
+    }
+    out[i]=fabs(weight)>1e-9?float(sum/weight):0;
   }
+  // Modest level matching; do not normalize breaths/quiet fragments into loud noise.
+  double energy=0;size_t active=0;float peak=0;
+  for(float x:out) {peak=std::max(peak,fabsf(x));if(fabsf(x)>.015f){energy+=x*x;++active;}}
+  float rms=active?float(sqrt(energy/active)):0;
+  float gain=rms>.025f?clampf(.14f/rms,.7f,1.8f):1.f;
+  if(peak>0) gain=std::min(gain,.85f/peak);
+  for(float& x:out) x*=gain;
   return true;
 }
 
@@ -280,9 +316,20 @@ std::shared_ptr<std::vector<float>> AtcVoice::assemble(const Tx& tx) {
   for (const std::string& id : tx.ids) {
     if (id.empty()) { out->insert(out->end(), (size_t)(0.22f * sr), 0.f); continue; }
     const std::vector<float>* p = pcm(id);
-    if (!p) continue;
+    if (!p || p->empty()) { ++missingAudio; out->clear(); return out; } // never speak a partial clearance with a missing digit/word
     if (any) out->insert(out->end(), (size_t)(0.035f * sr), 0.f);
-    out->insert(out->end(), p->begin(), p->end());
+    size_t first=0,last=p->size();
+    const auto& clip=clips.at(id);
+    if(clip.kind=="fragment" || clip.kind=="symbol") {
+      const size_t pad=size_t(.012f*sr);
+      while(first<last && fabsf((*p)[first])<.003f) ++first;
+      first=first>pad?first-pad:0;
+      while(last>first && fabsf((*p)[last-1])<.003f) --last;
+      last=std::min(p->size(),last+pad);
+    }
+    size_t start=out->size();out->insert(out->end(),p->begin()+first,p->begin()+last);
+    size_t fade=std::min(size_t(.003f*sr),(last-first)/2);
+    for(size_t i=0;i<fade;++i) {float gain=float(i)/std::max(size_t(1),fade);(*out)[start+i]*=gain;(*out)[out->size()-1-i]*=gain;}
     any = true;
   }
   if (sq) { out->insert(out->end(), (size_t)(0.03f * sr), 0.f); squelch(0.14f, 0.22f, true); }
@@ -293,7 +340,16 @@ std::shared_ptr<std::vector<float>> AtcVoice::assemble(const Tx& tx) {
 void AtcVoice::start(const Tx& tx) {
   auto buf = assemble(tx);
   if (buf->empty()) return;
-  g_audio.voicePlay(buf);
+  std::string speaker;
+  for(const auto& id:tx.ids) {auto c=clips.find(id);if(c!=clips.end()) {speaker=c->second.speaker;break;}}
+  vec3 seat(-.22f,.05f,-.65f); // Aster: left glareshield
+  if(speaker=="instructor" || speaker=="rosa") seat=vec3(.65f,.02f,-.12f); // right seat
+  else if(speaker=="nyx") seat=vec3(.2f,.12f,-.75f);
+  else if(speaker=="ops") seat=vec3(-.35f,.08f,-.8f);
+  else if(speaker=="command") seat=vec3(.32f,-.1f,-.7f);
+  else if(tx.radio) seat=vec3(-.18f,-.22f,-.7f); // radio stack
+  g_audio.voicePlay(buf,seat);
+  playingText=tx.text;
   playingPrio = tx.prio; idleT = 0;
   started = tx; history.push_back((tx.subtitle ? "TWR " : "") + tx.text);
   if (historyLimit && history.size() > historyLimit) history.erase(history.begin(), history.begin() + (history.size() - historyLimit));
@@ -303,6 +359,8 @@ bool AtcVoice::busy() const { return g_audio.voiceBusy(); }
 
 void AtcVoice::say(const Tx& tx) {
   if (!ok()) return;
+  if(tx.ids.empty()) return;
+  if((busy() && playingText==tx.text) || std::any_of(queue.begin(),queue.end(),[&](const Tx& q){return q.text==tx.text;})) return;
   if (valid && !valid(tx)) { dropped++; return; }   // already overtaken by events: never queued
   // urgent: cut in (a go-around over a routine call; a hazard, 95 and up, over anything routine such as a landing clearance)
   if (busy() && (tx.prio >= playingPrio + 30 || (tx.prio >= kHazard && playingPrio < kHazard))) {
@@ -323,6 +381,8 @@ void AtcVoice::say(const Tx& tx) {
 
 // Returns each started transmission exactly once: one started here, or one that cut in from say() since the last call
 AtcVoice::Tx AtcVoice::update(float dt) {
+  for(auto& q:queue) q.age+=std::max(dt,0.f);
+  queue.erase(std::remove_if(queue.begin(),queue.end(),[&](const Tx& q){bool stale=q.age>(q.prio>=kHazard?5.f:14.f);if(stale)++dropped;return stale;}),queue.end());
   if (!busy()) {
     playingPrio = -1;
     idleT += dt;
@@ -340,4 +400,4 @@ AtcVoice::Tx AtcVoice::update(float dt) {
   return out;
 }
 
-void AtcVoice::cancel() { queue.clear(); started = Tx(); if (busy()) g_audio.voiceStop(); playingPrio = -1; }
+void AtcVoice::cancel() { queue.clear(); started = Tx(); if (busy()) g_audio.voiceStop(); playingPrio = -1; playingText.clear(); }

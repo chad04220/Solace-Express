@@ -1,4 +1,4 @@
-// Somnium Volandi - internet radio streaming (Windows Media Foundation on Windows)
+// Somnium Volandi - internet radio streaming (Windows Media Foundation PCM decoder on Windows)
 #pragma once
 #include <string>
 

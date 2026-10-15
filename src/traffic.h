@@ -27,7 +27,7 @@ struct TrafficCraft {
   int leader = -1; vec3 offset;
   // display team: manoeuvre sequencer
   int man = -1, seg = 0; float segT = 0; vec3 smokeCol; bool smoke = false;
-  float boomCD = 0, flybyCD = 0;
+  float boomCD = 0, flybyCD = 0, audioCone = -1e9f;
   float escSide = 1, escBlend = 0; vec3 escUp = vec3(0, 1, 0), escRel, escFrom;   // escort: which side of the player it works, smoothed lift direction
   bool alive = true;
   int id = 0;
@@ -44,6 +44,7 @@ public:
   std::vector<float> flybys;                    // close high-speed passes of the escort this frame (intensity)
   std::vector<std::string> radio;               // escort radio calls this frame (the game shows them)
   bool enabled = true;
+  vec3 audioObserver; // actual viewing camera, independent of collision/player position
   void reset();
   // player: position, velocity, on ground; returns true if the player collided with traffic (mid-air)
   bool update(float dt, vec3 playerPos, vec3 playerVel, bool playerOnGround, float playerSpan);
