@@ -1,3 +1,19 @@
+## What's new in v3.49.8
+
+### Spatial audio (prepared by Codex)
+- **Every sound now comes from where it is.** Engines, traffic, wind, rain, crashes, weapons, voices, warnings, menu clicks and the radio all go through one mixer that places them around your head. Sounds follow the camera, so turn your head in the cockpit or swing the outside view and they move with it. Headphones give the clearest sense of direction; ordinary stereo speakers work too.
+- **Each engine sounds from its own mount:** both of a twin's, all four of the Atlas's or the XR-40's pods. Spool one down and you hear which.
+- **Aircraft pass you with Doppler**, the pitch dropping as they go by, instead of a recorded flyby. Distant sounds fade and dull with distance, with no floor.
+- **Thunder arrives after the flash**, as long after as the strike is far away. Watching from outside, a supersonic aircraft's **sonic boom** reaches you when its shock wave does; on board, Mach 1 brings buffet and a callout.
+- **Crashes:** each part that hits makes its own sound where it hits: impacts, scraping metal, splashes and fuel blasts, each a little different, with burning wreckage crackling where it lies.
+- **On the ground:** touchdowns and rolling sound different on paved runways, grass, gravel, snow and sand. Wind changes with your speed, sideslip and turbulence.
+- **Weapons:** the cannon, the pulse laser, the charged shot, EMP, the conventional blast and plasma each have their own sound, from where they fire and land.
+- **Radio music** plays through the same mixer, decoded in the background.
+- **More speech:** two new voices, flight operations and military control, speak 63 new cues: combat warnings and objectives, Free Flight regions, autoland problems, landing coaching and flight results.
+
+### Good to know
+- The audio has been checked by tests and a rendered preview, not yet heard on a Windows sound device. Please listen with headphones: a four-engine cockpit while turning your head, traffic passing, a crash near and far, a storm, landings on each surface, and pausing or muting while someone is speaking or music is playing. Tell me anything that sounds off.
+
 ## What's new in v3.49.7
 
 ### No more frozen menus when a flight starts
