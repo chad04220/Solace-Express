@@ -1643,7 +1643,8 @@ void Game::endFlight(bool success, const std::string& reason, FlightOutcome outc
     lastSuccess=success; debriefTitle=success?"Military sortie complete":reason.empty()?"Military sortie aborted":reason;
     coaching.clear(); screen=SCR_DEBRIEF; paused=false; showMap=false;
     g_audio.trigger(success?SFX_SUCCESS:SFX_FAIL);
-    announceFlightEnd(success?"Military objectives secured":crashed?(reason=="Hull lost to Hive fire"?reason:"Flight ended after impact"):"Military objective lost");
+    announceFlightEnd(success?"Military objectives secured":crashed?(reason=="Hull lost to Hive fire"?reason:"Flight ended after impact"):
+      reason=="Military objective lost"?reason:"Flight ended");
     return;
   }
   if (freeFlight) {
@@ -1722,7 +1723,7 @@ void Game::endFlight(bool success, const std::string& reason, FlightOutcome outc
   if (success && c.payout > 0) g_audio.trigger(SFX_CASH);
   screen = SCR_DEBRIEF;
   paused = false; showMap = false;
-  announceFlightEnd(result.outcome==OUT_CHECKRIDE_FAILED?"Checkride not passed":success?"Flight complete":crashed?"Flight ended after impact":"Flight ended");
+  announceFlightEnd(result.outcome==OUT_CHECKRIDE_FAILED?"Checkride not passed":success?"Flight complete":crashed?"Flight ended after impact":"Flight ended",coaching);
 }
 
 // One coaching point from what was recorded on the arrival: the most important thing to work on, or what went well
@@ -2170,8 +2171,11 @@ void Game::updateFlight(float dt) {
     touchdownFpm = fpm; touchedDown = true;
     tdRunway = g_world.onRunway(plane.pos.x, plane.pos.z, 10.f);   // (the arrival's evidence: the last touchdown's runway, or -1 off every runway)
     const GearStations audioGear = gearStations(*plane.spec);
-    for (float side : {-1.f,1.f}) g_audio.triggerAt(SFX_TOUCHDOWN,
-      plane.pos+plane.q.rotate(vec3(side*audioGear.track,-plane.gearHeight(),audioGear.mainZ)), clampf(fpm/600.f,.15f,.8f));
+    const AudioSurface contactSurface=tdRunway>=0?AudioSurface(g_world.airports[tdRunway].surface):AudioSurface::Grass;
+    // A belly arrival has no tyres to spin up; its metal contact is emitted above.
+    if(!result.bellyLanding) for (float side : {-1.f,1.f}) g_audio.touchdown(
+      plane.pos+plane.q.rotate(vec3(side*audioGear.track,-plane.gearHeight(),audioGear.mainZ)),
+      clampf(fpm/600.f,.15f,.8f),length(vec3(plane.vel.x,0,plane.vel.z)),contactSurface);
     std::string r = fpm < 120 ? "BUTTER!" : fpm < 250 ? "Smooth landing" : fpm < 450 ? "Good landing" : fpm < 650 ? "Firm landing" : "HARD landing!";
     toast(fmt("%s  %.0f fpm", r.c_str(), fpm), fpm < 450 ? vec3(0.6f, 1, 0.6f) : vec3(1, 0.6f, 0.3f));
     float gs = length(vec3(plane.vel.x, 0, plane.vel.z));
@@ -2676,7 +2680,7 @@ void Game::launchResearch() {
     plane.ctl.throttle = 0.7f; takeoffAnnounced = true;
     settleAirborneStart();   // (startFlight parked it for a start on the ground)
     camQ = plane.q; camPos = plane.pos + plane.q.rotate(vec3(0, 4, 26));
-  } else if (wr) toast("F/V tilts the four thruster pods: full down for vertical takeoff", vec3(0.7f, 0.9f, 1));
+  } else if (wr) toast(expandHint("{flapsDown}/{flapsUp}: tilt the four thruster pods fully down for vertical takeoff",padPrompts()), vec3(0.7f, 0.9f, 1));
   combatBasePayload=plane.payload; syncCombatPayload();
   prevMach = 0;
 }
@@ -4292,7 +4296,7 @@ void Game::updateAtc(float dt) {
     bool full = !F.called[k];
     std::string say = full ? reg.substr(0, 2) + reg.substr(3) : reg.substr(0, 1) + reg.substr(4);
     for (char ch : say) ids.push_back(atc.alpha(v, ch));
-    ids.push_back("");
+    ids.push_back(AtcVoice::kPause);
     txt = (full ? reg : reg.substr(0, 1) + "-" + reg.substr(4)) + ", ";
     return full ? k + 1 : 0;   // the Tx tag: updateComms marks the full form heard when it starts
   };
@@ -4324,7 +4328,7 @@ void Game::updateAtc(float dt) {
     txt += fmt("wind %03d at %d", hdg, spd);
     if (gst >= spd + 5) { ids.push_back(atc.atom(v, "gusting")); num(gst); txt += fmt(" gusting %d", gst); }
     ids.push_back(atc.atom(v, "knots")); txt += " knots. ";
-    ids.push_back("");
+    ids.push_back(AtcVoice::kPause);
   };
   // the arrival tower is the operational destination's: the field the autopilot is landing at when that isn't the
   // contract's (a GPS alternate, a glide to the nearest field) - a fresh inbound call to it; the contract's own
@@ -4381,7 +4385,7 @@ void Game::updateAtc(float dt) {
       if (F.airborne && agl > 120.f && length(plane.pos - D.pos()) > 1500.f) {
         AtcVoice::Tx tx; tx.prio = 40; tx.subtitle = true; tx.group = "tower";
         if (F.dep == F.arr) { tx.ids.push_back(atc.line(vd, "remain_pattern")); tx.text = atc.text(tx.ids[0]); }
-        else { tx.ids = {atc.line(vd, "contact_departure"), "", atc.line(vd, "good_day")}; tx.text = atc.text(tx.ids[0]) + " " + atc.text(tx.ids[2]); }
+        else { tx.ids = {atc.line(vd, "contact_departure"), AtcVoice::kPause, atc.line(vd, "good_day")}; tx.text = atc.text(tx.ids[0]) + " " + atc.text(tx.ids[2]); }
         tx.apt = F.dep; F.phase = F.dep == F.arr ? 4 : 3; tx.key = atcKey(); atc.say(tx); F.waitT = 0;
         if (F.dep == F.arr) F.arrRev = F.depRev;
       }
@@ -4418,9 +4422,9 @@ void Game::updateAtc(float dt) {
         // the sequence: an aircraft on final closer in than this one lands first
         RwyTraffic rt = rwyTraffic(F.arr);
         if (rt.fin && rt.finD < dist) {
-          tx.ids.push_back(""); tx.ids.push_back(atc.line(va, "number_two")); tx.text += " " + atc.text(tx.ids.back());
+          tx.ids.push_back(AtcVoice::kPause); tx.ids.push_back(atc.line(va, "number_two")); tx.text += " " + atc.text(tx.ids.back());
           if (kAircraft[rt.fin->spec].emptyMass > 2.5f * plane.spec->emptyMass) {
-            tx.ids.push_back(""); tx.ids.push_back(atc.line(va, "wake_caution")); tx.text += " " + atc.text(tx.ids.back());
+            tx.ids.push_back(AtcVoice::kPause); tx.ids.push_back(atc.line(va, "wake_caution")); tx.text += " " + atc.text(tx.ids.back());
           }
         }
         tx.apt = F.arr; F.phase = 4; tx.key = atcKey(); atc.say(tx); F.waitT = 0; F.trafficSaid = false;
@@ -4482,12 +4486,13 @@ void Game::updateAtc(float dt) {
 // and queued; the warnings speak on their rising edge (and again if they persist); the towers run their exchange.
 // Nothing stale is ever said: the queue is dropped on pause, at the end of the flight and when the aircraft
 // crashes (then only the crash itself is announced).
-void Game::announceFlightEnd(const std::string& message) {
-  // One explicit outcome survives the screen transition; stale airborne instructions do not.
+void Game::announceFlightEnd(const std::string& message, const std::string& followup) {
+  // Explicit results and their landing feedback survive the screen transition.
   atc.cancel(); commsPending.clear(); commsEndScreen=-1;
   AtcVoice::Tx tx;
   if(atc.resolve(message,contract.id,padPrompts(),tx)) {
     tx.prio=90; atc.say(tx); commsEndScreen=int(screen); commsEndTime=0;
+    if(!followup.empty() && atc.resolve(followup,contract.id,padPrompts(),tx)) {tx.prio=35;atc.say(tx);}
   }
 }
 
@@ -4498,7 +4503,7 @@ void Game::updateComms(float dt) {
     else {
       atc.update(dt); commsEndTime+=dt;
       voiceDuck=approach(voiceDuck,atc.busy()?1.f:0.f,atc.busy()?6.f:1.5f,dt);
-      if(commsEndTime>1.f && !atc.busy()) commsEndScreen=-1;
+      if(commsEndTime>1.f && !atc.pending()) commsEndScreen=-1;
       return;
     }
   }
@@ -4593,7 +4598,7 @@ void Game::feedAudio() {
   ap.master = set.master; ap.engineVol = set.engineVol * (1.f - 0.35f * voiceDuck); ap.sfxVol = set.sfxVol; ap.voiceVol = set.atcVol;
   {   // the radio music, at the master volume (the review of v3.44.0, AUD-1), lowered under speech
     const float rv = radioLevel();
-    if (fabsf(rv - radioSentVol) > 0.01f || (rv != radioSentVol && (voiceDuck <= 0.f || voiceDuck >= 1.f))) { radio.setVolume(rv); radioSentVol = rv; }
+    if (rv != radioSentVol) { radio.setVolume(rv); radioSentVol = rv; }
   }
   static bool muffled = false;
   if (actKeyP(ACT_ANR) || (screen == SCR_FLIGHT && !paused && actPadP(ACT_ANR))) { muffled = !muffled; toast(muffled ? "Engine noise muffled (headset ANR on)" : "Headset ANR off"); }
@@ -4609,6 +4614,10 @@ void Game::feedAudio() {
     ap.running = plane.engineRunning; ap.cranking = !plane.engineRunning && plane.starterTime > 0;
     for (int e = 0; e < 4; e++) ap.engineHealth[e] = plane.fail.engineHealth[e];
     ap.airspeed = plane.airspeed; ap.groundSpeed = length(vec3(plane.vel.x, 0, plane.vel.z)); ap.onGround = plane.onGround; ap.rough = plane.groundRough;
+    static_assert(SURF_ASPHALT==int(AudioSurface::Paved) && SURF_GRASS==int(AudioSurface::Grass) &&
+      SURF_GRAVEL==int(AudioSurface::Gravel) && SURF_SNOW==int(AudioSurface::Snow) && SURF_SAND==int(AudioSurface::Sand),"audio ground materials match the world");
+    int groundAirport=plane.onGround?g_world.onRunway(plane.pos.x,plane.pos.z,4.f):-1;
+    ap.groundSurface=groundAirport>=0?AudioSurface(g_world.airports[groundAirport].surface):AudioSurface::Grass;
     ap.stallWarn = plane.onGround ? 0.f : plane.stallWarn; ap.stallIsShaker = s.engineType == ENG_JET || s.license == LIC_ATP;
     ap.gearMoving = plane.gear > 0.01f && plane.gear < 0.99f; ap.flapsMoving = fabsf(plane.flaps - plane.ctl.flaps) > 0.02f;
     ap.gearDown = plane.gear; ap.flaps = plane.flaps;

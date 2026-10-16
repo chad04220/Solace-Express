@@ -48,7 +48,7 @@ bool publish(const std::shared_ptr<State>& s,unsigned serial,uint32_t token,cons
   }
   return sent==count;
 }
-// Streaming windowed-sinc converter. The 16-frame lookahead crosses decoder packet
+// Streaming windowed-sinc converter. Its lookahead crosses decoder packet
 // boundaries, so 44.1 kHz music does not click or accumulate timing drift at 48 kHz.
 HRESULT decode(const std::shared_ptr<State>& s,unsigned serial,uint32_t token,const std::string& url) {
   IMFSourceResolver* resolver=nullptr;IUnknown* object=nullptr;IMFMediaSource* source=nullptr;
@@ -69,19 +69,34 @@ HRESULT decode(const std::shared_ptr<State>& s,unsigned serial,uint32_t token,co
   if(SUCCEEDED(hr))hr=MFCreateMediaType(&requested);
   if(SUCCEEDED(hr))hr=requested->SetGUID(MF_MT_MAJOR_TYPE,MFMediaType_Audio);
   if(SUCCEEDED(hr))hr=requested->SetGUID(MF_MT_SUBTYPE,MFAudioFormat_Float);
+  // Let Media Foundation respect the source channel mask when folding surround
+  // stations to stereo; never silently discard rear channels or mistake quad
+  // rear-left for a centre channel. Windows 10/11 support this conversion.
+  if(SUCCEEDED(hr))hr=requested->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS,2);
   if(SUCCEEDED(hr))hr=reader->SetCurrentMediaType(MF_SOURCE_READER_FIRST_AUDIO_STREAM,nullptr,requested);
   if(SUCCEEDED(hr))hr=reader->GetCurrentMediaType(MF_SOURCE_READER_FIRST_AUDIO_STREAM,&actual);
   UINT32 channels=0,rate=0,bits=0;
   if(SUCCEEDED(hr))hr=actual->GetUINT32(MF_MT_AUDIO_NUM_CHANNELS,&channels);
   if(SUCCEEDED(hr))hr=actual->GetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND,&rate);
   if(SUCCEEDED(hr))hr=actual->GetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE,&bits);
-  if(SUCCEEDED(hr) && (channels<1 || channels>8 || rate<8000 || rate>192000 || bits!=32))hr=MF_E_INVALIDMEDIATYPE;
+  if(SUCCEEDED(hr) && (channels!=2 || rate<8000 || rate>192000 || bits!=32))hr=MF_E_INVALIDMEDIATYPE;
   AudioStreamResampler resampler;
   while(SUCCEEDED(hr) && !cancelled(s,serial)) {
     IMFSample* sample=nullptr;DWORD flags=0;LONGLONG stamp=0;
     hr=reader->ReadSample(MF_SOURCE_READER_FIRST_AUDIO_STREAM,0,nullptr,&flags,&stamp,&sample);
-    if(FAILED(hr) || (flags&(MF_SOURCE_READERF_ENDOFSTREAM|MF_SOURCE_READERF_ERROR|MF_SOURCE_READERF_CURRENTMEDIATYPECHANGED))) {
+    if(FAILED(hr) || (flags&(MF_SOURCE_READERF_ENDOFSTREAM|MF_SOURCE_READERF_ERROR))) {
       release(sample);if(SUCCEEDED(hr))hr=MF_E_INVALID_STREAM_DATA;break;
+    }
+    if(flags&MF_SOURCE_READERF_CURRENTMEDIATYPECHANGED) {
+      UINT32 oldRate=rate,oldChannels=channels;release(actual);
+      hr=reader->GetCurrentMediaType(MF_SOURCE_READER_FIRST_AUDIO_STREAM,&actual);
+      if(SUCCEEDED(hr))hr=actual->GetUINT32(MF_MT_AUDIO_NUM_CHANNELS,&channels);
+      if(SUCCEEDED(hr))hr=actual->GetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND,&rate);
+      if(SUCCEEDED(hr))hr=actual->GetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE,&bits);
+      GUID subtype={};if(SUCCEEDED(hr))hr=actual->GetGUID(MF_MT_SUBTYPE,&subtype);
+      if(SUCCEEDED(hr) && (channels!=2 || bits!=32 || rate<8000 || rate>192000 || subtype!=MFAudioFormat_Float))hr=MF_E_INVALIDMEDIATYPE;
+      if(FAILED(hr)){release(sample);break;}
+      if(oldRate!=rate || oldChannels!=channels)resampler=AudioStreamResampler();
     }
     if(!sample)continue;
     IMFMediaBuffer* buffer=nullptr;hr=sample->ConvertToContiguousBuffer(&buffer);

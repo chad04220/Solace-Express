@@ -319,6 +319,9 @@ struct GameTest {
         q.voiceDuck = 1.f; q.paused = true;
         for (int i = 0; i < 240; i++) { q.updateComms(1.f / 60.f); q.feedAudio(); }
         const bool unducked = q.voiceDuck < 0.01f && fabsf(q.radio.volume() - 0.4f) < 0.01f;
+        // Small slider changes during duck release must still reach exact mute.
+        q.voiceDuck=.5f;q.set.master=.01f;q.feedAudio();q.set.master=0;q.feedAudio();
+        const bool muted=q.radio.volume()==0.f;
         q.paused = false;
         AtcVoice::Tx w; w.key = Game::kWarnKey + 1;
         q.warnWas[1] = true; const bool holds = q.atc.valid(w);
@@ -330,9 +333,9 @@ struct GameTest {
         { std::ofstream f(vd / "empty.wav", std::ios::binary); const char h[] = "RIFF\x24\0\0\0WAVEfmt \x10\0\0\0\x01\0\x01\0\x40\x1f\0\0\x80\x3e\0\0\x02\0\x10\0data\0\0\0\0"; f.write(h, sizeof h - 1); }
         AtcVoice v; const bool refused = v.load(vd.string()) && !v.decodes("bad.trunc") && !v.decodes("bad.empty");
         std::error_code ec; fs::remove_all(vd, ec);
-        const bool ok = master && unducked && holds && passed && refused;
-        printf("Audio: radio at master x radio %d, unducked after a pause %d, hazard call kept while it holds %d and dropped once passed %d, bad clips refused %d: %s\n",
-               master, unducked, holds, passed, refused, ok ? "ok" : "FAIL"); fails += !ok;
+        const bool ok = master && unducked && muted && holds && passed && refused;
+        printf("Audio: radio at master x radio %d, unducked after a pause %d, exact mute during duck release %d, hazard kept %d/dropped %d, bad clips refused %d: %s\n",
+               master, unducked, muted, holds, passed, refused, ok ? "ok" : "FAIL"); fails += !ok;
       }
       {   // WLD-1..3 (the v3.44.0 review): a plasma crater is dug into the ground the aircraft and the wreckage meet; what eight
           // bombs flattened stays flattened; a wreck on a chunk seam is the business of the chunks either side of it
@@ -1211,6 +1214,12 @@ struct GameTest {
         q.screen=SCR_HUB; q.updateComms(.1f); audio(.02f);
         bool cancelled=!q.atc.busy() && q.commsEndScreen<0;
         printf("Audio: explicit outcome survives flight end %d, leaving its screen cancels %d: %s\n",outcome,cancelled,outcome&&cancelled?"ok":"FAIL");fails+=!(outcome&&cancelled);
+        q.screen=SCR_DEBRIEF;q.atc.history.clear();
+        const std::string feedback="Well flown: 65 kt over the threshold, down 250 m in, 400 m to spare.";
+        q.announceFlightEnd("Flight complete",feedback);
+        for(int i=0;i<900;++i){q.updateComms(1.f/60.f);audio(1.f/60.f);}
+        bool coached=q.atc.history.size()==2 && q.atc.history[0]=="Flight complete" && q.atc.history[1]==feedback && q.commsEndScreen<0;
+        printf("Audio: landing feedback follows the result across the speech gap: %s\n",coached?"ok":"FAIL");fails+=!coached;
       }
       if (voices) {   // every indexed clip decodes; the research cards, failure annunciators, aerobatics and every craft's SPLASH line resolve
         int bad = 0, n = 0;

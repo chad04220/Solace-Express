@@ -20,6 +20,18 @@ std::vector<float> shot(vec3 at,int type=SFX_CRASH,float intensity=.5f,AudioPara
 std::shared_ptr<std::vector<float>> tone(int sr,int hz=440){auto x=std::make_shared<std::vector<float>>(sr);for(int i=0;i<sr;++i)(*x)[i]=.15f*sinf(2*PI*hz*i/sr);return x;}
 }
 int main(){
+ // Every shipped one-shot is exercised through PCM, including the less common
+ // UFO, mechanical, UI and payload effects. Tails must end and no cue can bypass spatial rendering.
+ for(int type=0;type<SFX_COUNT;++type) {
+  bool valid=true;
+  for(int rate:{44100,48000,96000}) {
+   AudioEngine a;a.init(rate);a.setParams(quiet());render(a,.5f);
+   AudioSource s;s.position=vec3(-8,0,-3);s.radius=12;s.range=100;s.propagation=false;
+   a.triggerSource(type,s,.5f);auto x=render(a,7);
+   valid=valid && peak(x)<=.92001f && energy(x)>.00001 && energy(x,0)>energy(x,1)*1.5 && energy(x,-1,size_t(6.9f*rate))<1e-9;
+  }
+  check(valid,fmt("effect %d is spatial, finite, audible and ends cleanly at 44.1/48/96 kHz",type).c_str());
+ }
  auto left=shot(vec3(-30,0,-10)),right=shot(vec3(30,0,-10));
  check(energy(left,0)>energy(left,1)*2 && energy(right,1)>energy(right,0)*2,"an impact stays on its physical side");
  AudioParams turned=quiet();turned.listener.right=vec3(-1,0,0);turned.listener.forward=vec3(0,0,1);
@@ -76,6 +88,22 @@ int main(){
   check(lr/std::sqrt(ll*rr)<.98,"left and right airflow are not the same mono noise");
   p.airspeed=0;a.setParams(p);render(a,2);check(energy(render(a,.3f))<1e-6,"wind follows airspeed down to rest");
  }
+ {std::vector<std::vector<float>> landings,rolling;
+  for(auto surface:{AudioSurface::Paved,AudioSurface::Grass,AudioSurface::Gravel,AudioSurface::Snow,AudioSurface::Sand}) {
+   AudioEngine a;a.init(48000);auto p=quiet();a.setParams(p);render(a,.5f);
+   a.touchdown(vec3(0,0,-3),.5f,40,surface);landings.push_back(render(a,1));
+   a.init(48000);p.inFlight=true;p.onGround=true;p.groundSpeed=30;p.rough=.6f;p.groundSurface=surface;
+   a.setParams(p);render(a,.5f);rolling.push_back(render(a,1));
+  }
+  bool distinct=true;for(size_t i=0;i<landings.size();++i)for(size_t j=0;j<i;++j) {
+   double landing=correlation(landings[i],landings[j]),roll=correlation(rolling[i],rolling[j]);
+   if(landing>=.99 || roll>=.999)printf("Surface pair %zu/%zu: touchdown %.6f, rolling %.6f\n",i,j,landing,roll);
+   distinct=distinct && landing<.99 && roll<.999;
+  }
+  check(distinct,"paved, grass, gravel, snow and sand have distinct touchdown and rolling spectra");
+  AudioEngine a;a.init(48000);a.setParams(quiet());render(a,.5f);a.touchdown(vec3(0,0,-3),.5f,0,AudioSurface::Paved);auto vertical=render(a,1);
+  check(energy(vertical)>.001 && energy(vertical)<energy(landings[0])*.9,"stationary VTOL landing retains impact without a high-speed tyre squeal");
+ }
  for(int sr:{44100,48000,96000}){AudioEngine a;a.init(sr);auto p=quiet();p.interior=true;p.cabinEye=vec3(0,2,-10);p.listener.position=p.cabinEye;a.setParams(p);
   a.voicePlay(tone(sr),vec3(.65f,0,-.2f));auto x=render(a,1.1f);
   check(peak(x)>.01 && peak(x)<=.921f && energy(x,1)>energy(x,0)*2,"speech is spatial and finite at supported device rates");
@@ -90,7 +118,8 @@ int main(){
   check(a.musicPush(token,pcm.data(),9600)==9600,"stream buffer wraps and accepts consumed capacity");
   a.musicStop();check(a.musicPush(token,pcm.data(),100)==0 && a.musicBuffered(token)<0,"stopped stream tokens cannot leak old station PCM");
   render(a,.1f);check(energy(render(a,.2f))<1e-10,"stopped stream tail clears");
-  token=a.musicBegin();a.musicVolume(0);a.musicPush(token,pcm.data(),4800);check(energy(render(a,.1f))<1e-10,"radio mute affects the entire spatial route");
+  token=a.musicBegin();a.musicVolume(0);a.musicPush(token,pcm.data(),9600);render(a,.1f);
+  check(energy(render(a,.1f))<1e-10,"radio mute clears the entire spatial route after its short click-free ramp");
   float bad[]={std::numeric_limits<float>::quiet_NaN(),std::numeric_limits<float>::infinity()};a.musicVolume(1);a.musicPush(token,bad,1);check(peak(render(a,.1f))<1,"decoder non-finite samples cannot poison the mixer");
  }
  // Decoder packets have arbitrary boundaries. Conversion must remain continuous and keep pitch/duration.
@@ -106,6 +135,17 @@ int main(){
   check(std::abs(int(result.size()/2)-48000)<=1 && std::abs(crossings-1000)<=2 && delta<.04f,"44.1 to 48 kHz streaming preserves duration/pitch without packet-edge clicks");
   AudioStreamResampler down;std::vector<float> packet(4000,.1f);down.append(packet.data(),2000,2);auto converted=down.take(192000,8000);
   check(!converted.empty() && peak(converted)<1,"extreme decoder rate conversion stays in bounds");
+ }
+ {auto convertedEnergy=[](int rate,int target,int hz) {
+   AudioStreamResampler converter;std::vector<float> x(rate*2);
+   for(int i=0;i<rate;++i)x[i*2]=x[i*2+1]=.2f*sinf(2*PI*hz*double(i)/rate);
+   converter.append(x.data(),rate,2);std::vector<float> output;
+   for(;;){auto packet=converter.take(rate,target);if(packet.empty())break;output.insert(output.end(),packet.begin(),packet.end());}
+   return energy(output,-1,256);
+  };
+  check(convertedEnergy(192000,8000,18000)<convertedEnergy(192000,8000,1000)*.0001 &&
+        convertedEnergy(96000,16000,18000)<convertedEnergy(96000,16000,1000)*.0001,
+        "high-rate music removes out-of-band energy before downsampling (over 40 dB rejection)");
  }
  // Worst bounded polyphony: four engines, twenty nearby traffic voices, and a dense debris burst.
  {AudioEngine a;a.init(48000);auto p=quiet();p.master=1;p.inFlight=true;p.engines=4;p.research=true;p.engineVol=1;p.spool=.9f;p.airspeed=260;

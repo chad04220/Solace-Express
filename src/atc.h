@@ -21,9 +21,11 @@ class AtcVoice {
 public:
   static const int kVoices = 3;
   static const int kHazard = 95;   // priority from which a transmission interrupts any routine one
+  static constexpr const char* kPause = "@pause";
   bool load(const std::string& dir);   // voice_index.txt; the clips are decoded on first use
   bool ok() const { return !clips.empty(); }
-  // a transmission; "" in ids: a pause between sentences. radio: squelch around it; subtitle: show its text (the
+  // a transmission; kPause in ids: a pause between sentences. Empty/missing IDs refuse the entire call.
+  // radio: squelch around it; subtitle: show its text (the
   // calls the game didn't already show); group: a newer call of the same group replaces a waiting one (levers);
   // tag: the caller's own marker, handed back when the transmission starts
   struct Tx { std::vector<std::string> ids; std::string text; int prio = 0; bool radio = true, subtitle = false; std::string group; int tag = 0, apt = -1;
@@ -48,6 +50,7 @@ public:
   Tx update(float dt);
   void cancel();
   bool busy() const;
+  bool pending() const { return busy() || !queue.empty() || !started.ids.empty(); }
   std::vector<std::string> history;   // every transmission started, in order; the towers' prefixed "TWR " (tests)
   int missingAudio = 0;
   int dropped = 0;                    // stale transmissions never started

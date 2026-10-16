@@ -338,12 +338,20 @@ struct GameTest {
     // loading attempts are genuine production paths and cannot buy access through cumulative sortie counts.
     {
       auto q=make();Game& g=*q;
+#ifdef SOMNIUM_ASSETS
+      check(g.atc.load(std::string(SOMNIUM_ASSETS)+"/voice"),"military outcome speech assets load");
+#endif
       for(bool prematureSuccess:{false,true}) {
         g.launchMilitary(military::LocalSurvey);
+        g.atc.history.clear();
         g.endFlight(prematureSuccess,prematureSuccess?"Unmet mission":"User abort",prematureSuccess?OUT_SUCCESS:OUT_ABANDONED);
         check(!g.lastSuccess && !g.career.militaryMissionCompleted(military::LocalSurvey) &&
           !g.career.militaryMissionUnlocked(military::RouteRecon) && g.career.military.completedMissions==0,
           prematureSuccess?"failed first mission does not unlock the second":"aborted first mission does not unlock the second");
+#ifdef SOMNIUM_ASSETS
+        g.updateComms(1.f);
+        check(!g.atc.history.empty() && g.atc.history.back()=="Flight ended","abort/incomplete sortie does not claim a protected objective was lost");
+#endif
       }
       g.launchMilitary(military::LocalSurvey);g.screen=SCR_LOADING;g.in.pressed[K_ESC]=true;g.updateLoading(dt);g.in.endFrame();
       check(g.screen==SCR_HUB && !g.career.attemptOpen && g.career.military.completedMissions==0 &&

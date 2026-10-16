@@ -241,13 +241,14 @@ struct AudioEngine::Impl {
   AudioBinaural engines[4], wind[2], roll[2], rain[2], mechanisms[2], stall, voiceSpatial, music[2];
   float enginePitch[4] = {1,1,1,1};
   Smooth sRpm, sN1, sSpool, sAir, sGs, sLoad, sRain, sMuffle, sInterior, sVol, sStall, sGear, sFlap, sDuck;
-  Noise nz[2]; Biquad windBP[2], windLP[2], buffLP[2], rollLP[2], rainLP[2], engineLP[4];
+  Noise nz[2]; Biquad windBP[2], windLP[2], buffLP[2], rollLP[2], rollGrit[2], rainLP[2], engineLP[4];
   float stallPh = 0, motorPh = 0, gustPhase = 0, gearPh = 0, flapPh = 0;
   unsigned block = 0;
   OneShot shots[64]; AmbientVoice ambient[20]; Rng variants{0x7b13a279};
   std::shared_ptr<const std::vector<float>> voice; size_t voicePos = 0;
   vec3 voiceSeat = vec3(-.22f,.05f,-.65f); float voiceFade = 0, voiceTail = 0, voiceLast = 0;
   float limiter = 1, dcIn[2] = {}, dcOut[2] = {}, musicGain = 0;
+  Smooth sMusic;
 };
 
 AudioEngine::~AudioEngine() { delete impl; }
@@ -321,6 +322,10 @@ void AudioEngine::trigger(int type, float intensity) {
 void AudioEngine::triggerAt(int type, vec3 p, float intensity, vec3 v, uint32_t follow) {
   auto s = effectSource(type, p, v); s.follow = follow; triggerSource(type, s, intensity);
 }
+void AudioEngine::touchdown(vec3 p, float intensity, float speed, AudioSurface surface) {
+  auto s=effectSource(SFX_TOUCHDOWN,p,vec3());s.radius=8;s.range=1000;
+  s.surface=surface;s.contactSpeed=clampf(speed,0,200);triggerSource(SFX_TOUCHDOWN,s,intensity);
+}
 void AudioEngine::triggerLocal(int type, vec3 p, float intensity) {
   auto s = effectSource(type, p, vec3()); s.space = AudioSpace::Airframe; s.propagation = false; triggerSource(type, s, intensity);
 }
@@ -336,7 +341,10 @@ static void startShot(OneShot& s, int type, float inten, float sr, const AudioSo
   // Independent noise, resonances, pitch and envelope for each physical event.
   if (type >= SFX_TOUCHDOWN && type != SFX_BEEP && type != SFX_AP_DISC) sr /= s.variant;
   switch (type) {
-    case SFX_TOUCHDOWN: s.f1.set(BP, 1700, 1.4f, sr); s.f2.set(LP, 90, 0.8f, sr); break;
+    case SFX_TOUCHDOWN: {
+      const float band=source.surface==AudioSurface::Gravel?3000.f:source.surface==AudioSurface::Grass?750.f:
+        source.surface==AudioSurface::Snow?420.f:source.surface==AudioSurface::Sand?1100.f:1700.f;
+      s.f1.set(BP,band,source.surface==AudioSurface::Paved?1.4f:.65f,sr);s.f2.set(LP,90,.8f,sr);break; }
     case SFX_CRASH: s.f1.set(LP, 900, 0.7f, sr); s.f2.set(BP, 2500, 1.0f, sr); break;
     case SFX_THUNDER: s.f1.set(LP, 160, 0.7f, sr); s.f2.set(LP, 60, 0.7f, sr); break;
     case SFX_BOOM: s.f1.set(LP, 240, 0.7f, sr); s.f2.set(LP, 75, 0.8f, sr); s.f3.set(HP, 26, 0.7f, sr); s.f4.set(HP, 26, 0.7f, sr); break;
@@ -379,8 +387,16 @@ static bool runShot(OneShot& s, float sr, float& out) {
     case SFX_AP_DISC: v = sinf(2 * PI * (880 + 220 * (fmodf(t, 0.2f) > 0.1f)) * t) * 0.1f * (t < 0.9f); alive = t < 0.9f; break;
     case SFX_GEAR_CLUNK: v = s.f1.p(s.nz.w()) * expf(-t * 25) * 1.5f + sinf(2 * PI * 70 * t) * expf(-t * 18) * 0.3f; alive = t < 0.4f; break;
     case SFX_TOUCHDOWN: {
-      float chirp = s.f1.p(s.nz.w()) * expf(-t * 9.f) * smoothstepf(0, 0.01f, t) * (0.4f + 0.8f);
-      float thump = (s.f2.p(s.nz.w()) * 3.f + sinf(2 * PI * 55 * t) * 0.5f) * expf(-t * 14.f);
+      // Only a paved surface squeals. Loose surfaces brush/crunch, and a
+      // stationary vertical landing still has strut impact without tyre chirp.
+      const bool paved=s.source.surface==AudioSurface::Paved;
+      float speed=smoothstepf(1.f,30.f,s.source.contactSpeed);
+      float chirp = s.f1.p(s.nz.w()) * expf(-t * (paved?9.f:15.f)) * smoothstepf(0,0.01f,t) * speed * (paved?1.2f:.55f);
+      const float body=s.source.surface==AudioSurface::Gravel?68.f:s.source.surface==AudioSurface::Grass?46.f:
+        s.source.surface==AudioSurface::Snow?36.f:s.source.surface==AudioSurface::Sand?41.f:55.f;
+      const float soft=s.source.surface==AudioSurface::Snow?.6f:s.source.surface==AudioSurface::Sand?.7f:
+        s.source.surface==AudioSurface::Grass?.8f:1.f;
+      float thump = (s.f2.p(s.nz.w()) * 3.f + sinf(2 * PI * body * t) * 0.5f) * expf(-t * (paved?14.f:10.f)) * soft;
       v = chirp + thump; alive = t < 0.8f; break; }
     case SFX_CRASH: {
       float env = expf(-t * (1.1f / s.size)) * smoothstepf(0, 0.01f, t);
@@ -598,7 +614,9 @@ void AudioEngine::render(float* out, int frames) {
         I.windBP[c].set(BP,260+std::min(air,400.f)*4.5f,.55f,sr);
         I.windLP[c].set(LP,1600+std::min(air,400.f)*12,.7f,sr);
         I.buffLP[c].set(BP,46+c*7,.65f,sr);
-        I.rollLP[c].set(LP,120+gs*4,.75f,sr);
+        const bool gravel=P.groundSurface==AudioSurface::Gravel;
+        float band=P.groundSurface==AudioSurface::Snow?220.f:P.groundSurface==AudioSurface::Grass?500.f:gravel?2400.f:850.f;
+        I.rollLP[c].set(LP,120+gs*4,.75f,sr);I.rollGrit[c].set(BP,band,.65f,sr);
         I.rainLP[c].set(BP,inter?1800.f:3800.f,.55f,sr);
       }
       I.mechanisms[0].target(sourceCue(P,attached(P.gearPosition,6)),P.sfxVol*.8f,sr,.3f*inter);
@@ -650,7 +668,10 @@ void AudioEngine::render(float* out, int frames) {
         float buffet=I.buffLP[c].p(noise)*(P.buffet*.65f+P.gearDown*.08f+P.flaps*.12f)*pressure;
         float slip=1+(c?1.f:-1.f)*clampf(P.slip,-1,1)*.3f;
         I.wind[c].mix((wind+buffet)*slip*world*(P.inFlight?1:0),L,R);
-        float roll=I.rollLP[c].p(I.nz[c].w())*clampf(gs/30,0,1.3f)*(.4f+.9f*P.rough);
+        float grain=I.nz[c].w();
+        float texture=P.groundSurface==AudioSurface::Paved?.012f:P.groundSurface==AudioSurface::Gravel?.20f:
+          P.groundSurface==AudioSurface::Snow?.07f:.10f;
+        float roll=(I.rollLP[c].p(grain)*(.4f+.9f*P.rough)+I.rollGrit[c].p(grain)*texture)*clampf(gs/30,0,1.3f);
         I.roll[c].mix(roll*world*(P.onGround && P.inFlight?1:0),L,R);
         float drops=I.rainLP[c].p(I.nz[c].w())*.18f*rain;
         I.rain[c].mix(drops*world*(P.inFlight?1:0),L,R);
@@ -697,7 +718,8 @@ void AudioEngine::render(float* out, int frames) {
     I.voiceSpatial.mix(speech,L,R);
     L*=P.master;R*=P.master;
     // Radio::setVolume already includes master/duck. It now goes through the same near-field speakers and limiter.
-    for(int c=0;c<2;++c) I.music[c].mix(musicBlock[f*2+c]*I.musicGain,L,R);
+    float musicGain=I.sMusic.p(I.musicGain,1-expf(-1/(.006f*sr)));
+    for(int c=0;c<2;++c) I.music[c].mix(musicBlock[f*2+c]*musicGain,L,R);
     float v[2]={L,R};
     for(int c=0;c<2;++c) {float y=v[c]-I.dcIn[c]+expf(-2*PI*22/sr)*I.dcOut[c];I.dcIn[c]=v[c];I.dcOut[c]=y;v[c]=y;}
     // Stereo-linked peak protection preserves location; ordinary signals remain linear (no constant tanh distortion).

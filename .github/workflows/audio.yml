@@ -1,0 +1,65 @@
+name: Audio regression
+
+on:
+  push:
+    paths:
+      - 'src/audio*'
+      - 'src/atc.*'
+      - 'src/radio*'
+      - 'src/game*'
+      - 'assets/voice/**'
+      - 'tests/audio*'
+      - 'tests/gameplay_test.cpp'
+      - 'tools/voice_audio*'
+      - 'tools/audio_asset_audit.py'
+      - 'CMakeLists.txt'
+      - '.github/workflows/audio.yml'
+  pull_request:
+    paths:
+      - 'src/audio*'
+      - 'src/atc.*'
+      - 'src/radio*'
+      - 'src/game*'
+      - 'assets/voice/**'
+      - 'tests/audio*'
+      - 'tests/gameplay_test.cpp'
+      - 'tools/voice_audio*'
+      - 'tools/audio_asset_audit.py'
+      - 'CMakeLists.txt'
+      - '.github/workflows/audio.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: audio-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: cmake -S . -B build-audio -DSANITIZE=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo
+      - run: cmake --build build-audio --target audio_spatial_test audio_voice_test --parallel 2
+      - run: ctest --test-dir build-audio -R '^audio_' --output-on-failure
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+          UBSAN_OPTIONS: print_stacktrace=1
+
+  windows:
+    # Independent of the full-resolution aircraft bake: reviewers get a native
+    # decoder/linkage result promptly. Playback uses local files, no live station.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: cmake -S . -B build-audio -A x64
+      - run: cmake --build build-audio --config Release --target audio_spatial_test audio_voice_test audio_radio_test --parallel 2
+      - run: ctest --test-dir build-audio -C Release -R '^audio_' --output-on-failure

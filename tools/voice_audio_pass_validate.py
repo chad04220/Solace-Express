@@ -15,10 +15,20 @@ from math import gcd
 from faster_whisper import WhisperModel
 root=Path(__file__).resolve().parents[1]/'assets/voice'
 m=json.loads((root/'audio_pass.json').read_text())
-model=WhisperModel(sys.argv[1],device='cpu',compute_type='int8',cpu_threads=3,local_files_only=True)
+pin=json.loads((Path(__file__).parent/'voice_lesson_helpers/asr-model.json').read_text())
+model_dir=Path(sys.argv[1])
+for entry in pin['files']:
+ data=(model_dir/entry['rfilename']).read_bytes()
+ assert len(data)==entry['size'], 'ASR model size mismatch: '+entry['rfilename']
+ if 'lfs' in entry:
+  assert hashlib.sha256(data).hexdigest()==entry['lfs']['sha256'], 'ASR model hash mismatch'
+ else:
+  assert hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()==entry['blobId'], 'ASR metadata hash mismatch'
+model=WhisperModel(str(model_dir),device='cpu',compute_type='int8',cpu_threads=3,local_files_only=True)
 def words(s):
  s=s.lower().replace('mach 1','mach one').replace('real-time','real time')
  s=s.replace('auto-land','autoland').replace('auto land','autoland').replace('check ride','checkride').replace('breakaway','break away')
+ s=s.replace('centreline','centerline').replace('center line','centerline').replace('centre line','centerline')
  return re.findall(r"[a-z0-9]+(?:'[a-z]+)?",s)
 def edits(a,b):
  row=list(range(len(b)+1))
@@ -40,8 +50,11 @@ for row in m['lines']:
  expected=words(row['text']);got=words(heard);err=edits(expected,got)
  item=dict(id=row['id'],expected=row['text'],heard=heard,word_edits=err,words=len(expected),peak=float(np.max(np.abs(x))),rms=float(np.sqrt(np.mean(x*x))),seconds=round(len(x)/sr,3),sha256=row['sha256'])
  report.append(item);print(row['id'],err,'/',len(expected),heard,flush=True)
-result=dict(method='Unprompted local faster-whisper small.en, int8 CPU, beam 5; no text hints',model=json.loads((Path(__file__).parent/'voice_lesson_helpers/asr-model.json').read_text()),human_listening_approved=False,clips=report)
+passed=all(r['word_edits']==0 and .01<r['rms']<.3 and r['peak']<.96 for r in report)
+result=dict(method='Unprompted local faster-whisper small.en, int8 CPU, beam 5; no text hints',model=pin,passed=passed,human_listening_approved=False,clips=report)
 (root/'audio_pass_validation.json').write_text(json.dumps(result,indent=2)+'\n')
 m['validation']['independent_asr']=True;m['validation']['report']='audio_pass_validation.json'
+m['validation']['asr_passed']=passed
 (root/'audio_pass.json').write_text(json.dumps(m,indent=2)+'\n')
 print('Total:',sum(r['word_edits'] for r in report),'edits /',sum(r['words'] for r in report),'words',flush=True)
+sys.exit(0 if passed else 1)

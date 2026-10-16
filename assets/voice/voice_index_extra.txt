@@ -53,3 +53,12 @@ audio2026.command.emp_away	command/audio2026.emp_away.wav	Electromagnetic pulse 
 audio2026.command.structure_destroyed	command/audio2026.structure_destroyed.wav	Structure destroyed.	command	45	cue_regex	.+ destroyed
 audio2026.command.overheated	command/audio2026.overheated.wav	Weapons overheated. Allow them to cool.	command	80	cue_regex	WEAPONS OVERHEATED - COOLING
 audio2026.command.ammo_empty	command/audio2026.ammo_empty.wav	Forward weapon ammunition depleted.	command	80	cue_regex	FORWARD AMMUNITION DEPLETED
+audio2026.ops.vtol_pods	ops/audio2026.vtol_pods.wav	Tilt the four thruster pods fully down for vertical takeoff. Use the flap controls shown on screen.	ops	50	cue_regex	.+: tilt the four thruster pods fully down for vertical takeoff
+audio2026.ops.coach_goaround	ops/audio2026.coach_goaround.wav	Good decision going around. Set up on the centreline, at approach speed, before trying again.	ops	35	cue_regex	Good call going around: .+|[0-9]+ go-arounds: .+
+audio2026.ops.coach_touchdown	ops/audio2026.coach_touchdown.wav	Touchdown was firm. Hold a steady descent on power, then gently raise the nose to flare just above the runway.	ops	35	cue_regex	Touchdown at [0-9]+ fpm: .+
+audio2026.ops.coach_fast	ops/audio2026.coach_fast.wav	Your threshold speed was too high. Slow down earlier on final. Extra speed causes floating and uses more runway.	ops	35	cue_regex	You crossed the threshold at .+
+audio2026.ops.coach_long	ops/audio2026.coach_long.wav	The touchdown point was beyond the middle of the runway. On your next approach, use the first third of the runway.	ops	35	cue_regex	You touched down .+
+audio2026.ops.coach_stop	ops/audio2026.coach_stop.wav	Little runway remained after stopping. Brake firmly once all wheels are down.	ops	35	cue_regex	You stopped with only .+
+audio2026.ops.coach_slow	ops/audio2026.coach_slow.wav	You were too slow over the threshold. Keep the recommended approach speed until the flare.	ops	35	cue_regex	Slow over the threshold .+
+audio2026.ops.coach_high	ops/audio2026.coach_high.wav	Threshold height was excessive. Establish a three degree glide path earlier.	ops	35	cue_regex	High over the threshold .+
+audio2026.ops.coach_good	ops/audio2026.coach_good.wav	Well flown. Your landing measurements are shown in the debrief.	ops	35	cue_regex	Well flown(?:[,:].*)?\.

@@ -7,12 +7,15 @@
 #include <vector>
 
 enum class AudioSpace { Listener, Cabin, Airframe, World };
+enum class AudioSurface { Paved, Grass, Gravel, Snow, Sand };
 struct AudioSource {
   AudioSpace space = AudioSpace::World;
   vec3 position, velocity;
   float radius = 12, range = 2500;
   bool propagation = true;
   uint32_t follow = 0; // optional persistent emitter ID, e.g. the UFO
+  AudioSurface surface = AudioSurface::Paved;
+  float contactSpeed = 40; // tyre spin-up/brush speed, independent of vertical impact energy
 };
 struct AudioEmitter {
   enum Kind { Engine, Fire, Track };
@@ -41,6 +44,7 @@ struct AudioParams {
   bool running = false, cranking = false;
   float engineHealth[4] = {1, 1, 1, 1};   // per engine: 1 sound; below it a piston misfires and a turbine's n1 sags (C7)
   float airspeed = 0, groundSpeed = 0; bool onGround = false; float rough = 0;
+  AudioSurface groundSurface = AudioSurface::Paved;
   float stallWarn = 0; bool gearMoving = false, flapsMoving = false; float gearDown = 1, flaps = 0;
   bool interior = false, muffled = false;
   float rain = 0, snow = 0, turbulence = 0;
@@ -65,6 +69,7 @@ public:
   void setView(vec3 position, vec3 right, vec3 up, vec3 forward); // final rendered camera, including debrief orbit
   void trigger(int sfx, float intensity = 1.0f);
   void triggerAt(int sfx, vec3 position, float intensity = 1, vec3 velocity = vec3(), uint32_t follow = 0);
+  void touchdown(vec3 position, float intensity, float groundSpeed, AudioSurface surface);
   void triggerLocal(int sfx, vec3 bodyPosition, float intensity = 1);
   void triggerUI(int sfx, float x, float y, float intensity = 1); // normalized screen position (-1..1)
   void triggerSource(int sfx, const AudioSource& source, float intensity = 1);

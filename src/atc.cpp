@@ -102,7 +102,7 @@ bool AtcVoice::resolveRecorded(const std::string& msg, const std::string& missio
   out = Tx(); out.text = msg;
   auto finish = [&](const std::string& sp, int prio) {
     for (auto& id : out.ids) if (id.empty() || !clips.count(id)) { out.ids.clear(); return false; }   // (a fragment the pack lacks)
-    out.prio = prio; out.radio = sp == "tower" || sp == "spectre";
+    out.prio = prio; out.radio = sp == "tower" || sp == "spectre" || sp.rfind("tower_",0)==0;
     return !out.ids.empty();
   };
   auto line = [&](const std::string& id) {
@@ -128,6 +128,14 @@ bool AtcVoice::resolveRecorded(const std::string& msg, const std::string& missio
     return line(id);
   }
   std::smatch m;
+  // Generated/real-world fields have no prerecorded proper name. Announce their
+  // actual identifier with one existing controller's phonetics, never another
+  // airport's name. The full name remains in the displayed message.
+  static const std::regex airportRe(R"(([A-Z0-9]{3,8}) - .+)");
+  if (std::regex_match(msg, m, airportRe)) {
+    for (char c : m[1].str()) out.ids.push_back(c >= '0' && c <= '9' ? digit(0,c-'0') : alpha(0,c));
+    out.group="airport"; return finish(kVoiceName[0],45);
+  }
   auto digits = [&](const std::string& sp, const std::string& t) { for (char c : t) out.ids.push_back(atomO(sp, std::string("n") + c)); };
   static const std::regex wxRe(R"(Runway (\d{2}), Wind (\d{3})@(\d+)kt(?: G(\d+))?, (clear|scattered|broken|overcast)(?: (\d+)ft)?, vis (10\+|\d+(?:\.\d+)?)km(?:, (rain|thunderstorms|snow))?, (\d{2}):(\d{2}))");
   if (std::regex_match(msg, m, wxRe)) {
@@ -176,9 +184,11 @@ bool AtcVoice::resolveRecorded(const std::string& msg, const std::string& missio
     out.ids.push_back(atomO("aster", "gear_collapsed_hit_at")); cardinal("aster", std::stol(m[1]), out.ids); out.ids.push_back(atomO("aster", "feet_per_minute"));
     return finish("aster", 80);
   }
-  static const std::regex windShiftRe(R"(Autopilot: the wind has shifted - now runway (\d{2}) at ([A-Z]{3}))");
+  static const std::regex windShiftRe(R"(Autopilot: the wind has shifted - now runway (\d{2}) at ([A-Z0-9]{3,8}))");
   if (std::regex_match(msg, m, windShiftRe)) {
-    out.ids.push_back(atomO("aster", "wind_shift_runway")); digits("aster", m[1]); out.ids.push_back(atomO("aster", "at")); out.ids.push_back(atomO("aster", "airport_" + m[2].str()));
+    out.ids.push_back(atomO("aster", "wind_shift_runway")); digits("aster", m[1]);
+    const auto airport=atomO("aster", "airport_" + m[2].str());
+    if(!airport.empty()) {out.ids.push_back(atomO("aster", "at"));out.ids.push_back(airport);}
     return finish("aster", 60);
   }
   static const std::regex bellyRe(R"(Belly landing too hard - hit at ([+-]?\d+) fpm)");
@@ -261,7 +271,7 @@ static bool readWav(const std::string& path, std::vector<float>& out, int outRat
   // Windowed-sinc sample-rate conversion: avoid imaging/sibilance from the old linear upsampler.
   const double step=double(rate)/outRate;
   const size_t n=size_t(in.size()/step);
-  out.resize(n); const int taps=16; AudioSincKernel kernel;kernel.prepare(rate,outRate);
+  out.resize(n); AudioSincKernel kernel;kernel.prepare(rate,outRate);const int taps=kernel.radius;
   for(size_t i=0;i<n;++i) {
     uint64_t position=uint64_t(i)*uint64_t(rate); int center=int(position/outRate); double sum=0,weight=0;
     const auto& coefficients=kernel.at(double(position%outRate)/outRate,center);
@@ -314,7 +324,7 @@ std::shared_ptr<std::vector<float>> AtcVoice::assemble(const Tx& tx) {
   if (sq) { squelch(0.06f, 0.18f, false); out->insert(out->end(), (size_t)(0.04f * sr), 0.f); }
   bool any = false;
   for (const std::string& id : tx.ids) {
-    if (id.empty()) { out->insert(out->end(), (size_t)(0.22f * sr), 0.f); continue; }
+    if (id == kPause) { out->insert(out->end(), (size_t)(0.22f * sr), 0.f); continue; }
     const std::vector<float>* p = pcm(id);
     if (!p || p->empty()) { ++missingAudio; out->clear(); return out; } // never speak a partial clearance with a missing digit/word
     if (any) out->insert(out->end(), (size_t)(0.035f * sr), 0.f);

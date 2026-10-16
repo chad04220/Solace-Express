@@ -8,11 +8,11 @@ static void word(std::ofstream& f,uint32_t value,int bytes){for(int i=0;i<bytes;
 int main(int argc,char** argv){
  if(argc!=3){fprintf(stderr,"Usage: audio_preview assets/voice output.wav\n");return 2;}
  g_audio.init(48000);AtcVoice voice;if(!voice.load(argv[1]))return 3;
- const int frames=48000*25;std::vector<float> pcm(frames*2);AudioParams p;p.scene=true;p.sceneId=1;p.master=.72f;
+ const int frames=48000*43;std::vector<float> pcm(frames*2);AudioParams p;p.scene=true;p.sceneId=1;p.master=.72f;
  auto say=[&](const char* text){AtcVoice::Tx tx;if(voice.resolve(text,"",false,tx)){voice.say(tx);voice.update(1);}else fprintf(stderr,"No preview voice: %s\n",text);};
  for(int n=0;n<frames;n+=480){
   float t=float(n)/48000;int tick=n/480;p.listener=AudioListener();p.aircraftPosition=vec3();p.aircraftVelocity=vec3();p.aircraftRotation=quat();
-  p.inFlight=t<10;p.interior=t<6;p.cabinEye=vec3(0,1,-2);p.listener.position=t<6?p.cabinEye:vec3(15,3,-20);
+  p.inFlight=t<10;p.interior=t<6;p.onGround=false;p.groundSpeed=0;p.cabinEye=vec3(0,1,-2);p.listener.position=t<6?p.cabinEye:vec3(15,3,-20);
   p.engines=1;p.engineVol=.8f;p.sfxVol=.8f;p.engineType=t<3?0:1;p.research=false;p.rpm=1700;p.n1=75;p.spool=.55f;p.throttle=.6f;p.running=true;
   p.enginePosition[0]=vec3(0,0,-4);p.airspeed=t<3?25:65;p.gearDown=0;p.rain=0;p.turbulence=.25f;p.emitterCount=0;
   if(t>=6 && t<10){p.interior=false;p.research=true;p.engines=4;p.spool=.5f+(t-6)*.1f;p.nozzle=.3f;p.airspeed=130;
@@ -29,11 +29,15 @@ int main(int argc,char** argv){
   if(tick==1660)g_audio.triggerAt(SFX_SPLASH,vec3(18,0,-12),.65f);
   if(tick==1820)g_audio.triggerAt(SFX_BOOM,vec3(-70,40,-110),.8f);
   if(tick==2000)say("OBJECTIVES COMPLETE - RETURN TO EXTRACTION");
+  if(tick>=2500 && tick<=3100 && (tick-2500)%150==0)
+   g_audio.touchdown(vec3(-3,0,-4),.65f,40,AudioSurface((tick-2500)/150));
+  if(t>=32.5f && t<36.5f){p.inFlight=true;p.onGround=true;p.groundSpeed=25;p.rough=.6f;p.groundSurface=AudioSurface(std::min(4,int((t-32.5f)/.8f)));g_audio.setParams(p);}
+  if(tick==3650)say("Well flown: 65 kt over the threshold, down 250 m in, 400 m to spare.");
   voice.update(.01f);g_audio.render(pcm.data()+n*2,480);
  }
  float peak=0;for(float& v:pcm){if(!std::isfinite(v))return 4;peak=std::max(peak,fabsf(v));}
  std::ofstream f(argv[2],std::ios::binary);if(!f)return 5;
  f.write("RIFF",4);word(f,36+frames*4,4);f.write("WAVEfmt ",8);word(f,16,4);word(f,1,2);word(f,2,2);word(f,48000,4);word(f,192000,4);word(f,4,2);word(f,16,2);f.write("data",4);word(f,frames*4,4);
  for(int i=0;i<frames;++i){float fade=clampf(std::min(i,frames-1-i)/960.f,0,1);for(int c=0;c<2;++c)word(f,uint16_t(int16_t(clampf(pcm[i*2+c]*fade,-1,1)*32767)),2);}
- printf("25-second stereo preview: peak %.6f; %s\n",peak,argv[2]);return f?0:6;
+ printf("43-second stereo preview: peak %.6f; %s\n",peak,argv[2]);return f?0:6;
 }

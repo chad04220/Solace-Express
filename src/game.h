@@ -504,7 +504,7 @@ private:
   std::vector<Annunciator> hudAnnunciators() const;
   std::map<std::string, std::string> failVoiced;   // slot -> the state key last spoken this flight
   void updateComms(float dt);
-  void announceFlightEnd(const std::string& message);
+  void announceFlightEnd(const std::string& message, const std::string& followup = {});
   int commsEndScreen = -1; float commsEndTime = 0;
   float voiceDuck = 0;   // 0..1: music and engine lowered while someone is talking
   std::string settingsWritten;   // the settings file's last written contents (written again only when changed)
