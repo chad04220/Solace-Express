@@ -3,6 +3,8 @@
 #include <cstdio>
 #include <fstream>
 #include <sstream>
+#include <filesystem>
+#include <chrono>
 
 namespace {
 int failures=0,checks=0;
@@ -72,5 +74,16 @@ int main(int argc,char** argv){
  check(!voice.busy() && voice.history.size()==n,"an unresolved lookup is refused instead of being mistaken for a sentence pause");
  incomplete.ids={routine.ids[0],AtcVoice::kPause,routine.ids[0]};voice.say(incomplete);voice.update(1);
  check(voice.busy() && voice.history.size()==n+1,"explicit sentence pauses still assemble complete transmissions");voice.cancel();
+ {namespace fs=std::filesystem;
+  const auto dir=fs::temp_directory_path()/("somnium_crlf_voice_"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+  fs::create_directories(dir);fs::copy_file(fs::path(argv[1])/"ops/audio2026.free_ground.wav",dir/"ready.wav");
+  {std::ofstream out(dir/"voice_index.txt",std::ios::binary);out<<"lesson.L1.phase0\tready.wav\tRelease brakes.\tinstructor\t65\tlesson\t\tL1\r\n";}
+  {std::ofstream out(dir/"voice_index_extra.txt",std::ios::binary);out<<"fixture.ops\tready.wav\tReady.\tops\t40\tcue_regex\tReady for flight\r\n";}
+  AtcVoice windows;AtcVoice::Tx tx;
+  check(windows.load(dir.string()) && windows.resolve("Ready for flight","",false,tx) && windows.decodes(tx.ids[0]) &&
+        windows.resolveLesson("L1",0,"Current bound controls",tx) && windows.decodes(tx.ids[0]),
+        "CRLF indexes preserve supplemental cue patterns and lesson mission IDs");
+  std::error_code ec;fs::remove_all(dir,ec);
+ }
  printf("Voice: %d checks, %d failures\n",checks,failures);return failures?1:0;
 }

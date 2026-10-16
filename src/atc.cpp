@@ -23,6 +23,7 @@ bool AtcVoice::load(const std::string& d) {
   std::istringstream input(index);
   std::string ln;
   while (std::getline(input, ln)) {
+    if(!ln.empty() && ln.back()=='\r')ln.pop_back(); // Windows editors/checkouts must not change cue patterns or mission IDs
     if (ln.empty() || ln[0] == '#') continue;
     size_t a = ln.find('\t');
     if (a == std::string::npos) continue;
