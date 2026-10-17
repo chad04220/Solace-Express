@@ -1,6 +1,7 @@
 // Somnium Volandi - environment entities: deterministic placement, chunk streaming and collisions
 #include "entities.h"
 #include "scenery.h"
+#include <chrono>
 #include <condition_variable>
 #include <deque>
 #include <mutex>
@@ -165,7 +166,11 @@ Scenery::Chunk* Scenery::ensure(int cx, int cz, int level) {
   if (chunks.empty()) chunks.resize((size_t)NC * NC);
   auto& p = chunks[(size_t)cz * NC + cx];
   if (!p) p.reset(new Chunk());
-  if (p->level < level) generate(*p, cx, cz, level);
+  if (p->level < level) {
+    const auto t0 = std::chrono::steady_clock::now();
+    generate(*p, cx, cz, level);
+    syncBuilt++; syncBuildMs += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+  }
   return p.get();
 }
 

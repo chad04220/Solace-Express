@@ -3504,6 +3504,7 @@ FrameParams Game::buildFrame() {
       memcpy(fp.plane.rot, worldRot, sizeof worldRot);
     }
     if (!(screen == SCR_LOADING && militaryFlight)) buildFeedCameras(fp);
+    if (screen == SCR_LOADING && !headless) fp.warmCockpit = feedRigOf(plane.spec);   // (the cockpit ready before the flight opens: raster_renderer.cpp)
     if (boomT >= 0 && boomT < 1.6f && !(length(fp.flameLight) > 0.f)) {   // an explosion's flash lights the scene, fading as the fireball cools
       float k = boomT < 0.08f ? boomT / 0.08f : expf(-(boomT - 0.08f) * 2.6f);
       fp.flameLightPos = boomP; fp.flameLight = vec3(1.f, 0.6f, 0.28f) * (boomI * k);

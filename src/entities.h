@@ -101,6 +101,7 @@ public:
   };
   Chunk* get(int cx, int cz);                        // nullptr when outside the world; never generates
   Chunk* ensure(int cx, int cz, int level);          // generates up to the level if needed
+  int syncBuilt = 0; double syncBuildMs = 0;          // chunks ensure has built on its caller's thread, and the time it took
   static int chunkOf(float v) { return (int)floorf((v + WORLD_HALF) / CH); }
   static float chunkX0(int c) { return c * CH - WORLD_HALF; }
   // Collision: returns the kind + 1 of an entity the sphere (p, r) touches, 0 if none (entOut: a copy of it).

@@ -42,6 +42,65 @@ struct GameTest {
     }
     return 0;
   }
+  // the XR-40 in flight: outside, then the cockpit, then bombs away, then outside and back in - each frame's update and
+  // render timed, and the slow ones named by what they did (programs compiled, bodies baked or loaded, scenery gathered)
+  static int wraithHitch(Game& game) {
+    for (int i : kCareerAircraft) Plane::perf(&kAircraft[i]);   // (as Game::init learns them: the traffic reads them)
+    game.headless = false; g_ren.entSync = false;   // (the launch as the game runs it: its loading screen, and its warm-ups)
+    game.resCraft = kWraith; game.resCard = getenv("HITCHCARD") ? atoi(getenv("HITCHCARD")) : -1; game.resAirborne = true; game.resAirport = 0; game.realTime = 20;
+    game.launchResearch();
+    int lf = 0; const int b0 = g_ren.bakeCount, m0 = g_shaderCacheMisses;
+    for (; lf < 4000 && (game.screen == SCR_LOADING || lf < 3); lf++) { game.update(1.f / 30.f); game.render(); game.framePresented(); }
+    printf("loading: %d frames, bodies %d, programs compiled %d, mounts %d\n", lf, g_ren.bakeCount - b0, (int)g_shaderCacheMisses - m0, g_feedMounts[2].ok ? 1 : 0);
+    for (int i = 0; i < 20; i++) { game.update(1.f / 30.f); game.render(); game.framePresented(); }
+    game.camMode = 0; game.toasts.clear();
+    g_ren.profileRegionRender = getenv("HITCHPASSES") != nullptr;
+    std::vector<double> all;
+    auto frame = [&](int i, const char* what) {
+      const int miss0 = g_shaderCacheMisses, bake0 = g_ren.bakeCount; const long long us0 = g_shaderCompileUs;
+      const int gen0 = g_scenery.syncBuilt; const double genMs0 = g_scenery.syncBuildMs;
+      auto t0 = std::chrono::steady_clock::now();
+      game.update(1.f / 30.f);
+      auto t1 = std::chrono::steady_clock::now();
+      game.render(); glFinish();
+      auto t2 = std::chrono::steady_clock::now();
+      const double u = std::chrono::duration<double, std::milli>(t1 - t0).count(), r = std::chrono::duration<double, std::milli>(t2 - t1).count();
+      all.push_back(u + r);
+      printf("frame %3d %-14s update %7.1f ms  render %8.1f ms  programs compiled %d (%.0f ms)  bodies %d  feeds %d  bombs %d  scenery built now %d (%.0f ms)\n",
+             i, what, u, r, (int)g_shaderCacheMisses - miss0, (g_shaderCompileUs - us0) / 1000.0, g_ren.bakeCount - bake0,
+             g_feedMounts[2].ok ? 1 : 0, (int)game.wraith.bombs.size(), g_scenery.syncBuilt - gen0, g_scenery.syncBuildMs - genMs0);
+      if (g_ren.profileRegionRender) {   // (HITCHPASSES: the render's passes, each timed to its end)
+        const auto& a = g_ren.regionAuxRenderMs;
+        printf("          world %.0f  ground shadow %.0f  lighting %.0f  aircraft shadow %.0f  traffic shadow %.0f  stores %.0f  displays %.0f  feeds %.0f  objects %.0f  shadow proxy %.0f  post %.0f ms\n",
+               g_ren.regionTerrainRenderMs, g_ren.regionShadowRenderMs, g_ren.regionLightingRenderMs, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]);
+      }
+      fflush(stdout);
+    };
+    int i = 0;
+    if (getenv("HITCHVIEW")) {   // (the view switches alone: out, in, out, in)
+      for (int v = 0; v < 4; v++) { game.camMode = v & 1; for (int j = 0; j < 3; j++, i++) frame(i, j ? (v & 1 ? "cockpit" : "outside") : (v & 1 ? "-> cockpit" : "-> outside")); }
+      return 0;
+    }
+    if (getenv("HITCHBOMB")) {   // (outside only: the drop and the impact)
+      game.wraith.armed = true; game.wraith.bombQueue = 1;
+      for (; i < 140; i++) { frame(i, game.wraith.bombs.empty() ? "outside" : "bomb falling"); if (i > 20 && game.wraith.bombs.empty() && !game.wraith.blasts.empty() && i > 60) break; }
+      return 0;
+    }
+    for (; i < 8; i++) frame(i, "outside");
+    game.camMode = 1;
+    for (; i < 20; i++) frame(i, i == 8 ? "-> cockpit" : "cockpit");
+    game.wraith.armed = true; game.wraith.bombQueue = 1;
+    for (; i < 70; i++) frame(i, i == 20 ? "bomb queued" : "cockpit, bomb");
+    game.camMode = 0;
+    for (; i < 78; i++) frame(i, i == 70 ? "-> outside" : "outside");
+    game.camMode = 1;
+    for (; i < 90; i++) frame(i, i == 78 ? "-> cockpit" : "cockpit");
+    game.wraith.bombQueue = 1;
+    for (; i < 130; i++) frame(i, i == 90 ? "2nd bomb" : "cockpit, bomb");
+    std::vector<double> s = all; std::sort(s.begin(), s.end());
+    printf("median frame %.1f ms, worst %.1f ms\n", s[s.size() / 2], s.back());
+    return 0;
+  }
   static size_t particleCount(const Game& g) { return g.particles.size(); }
   static size_t wreckCount(const Game& g) { return g.wreck.size(); }
   static size_t debrisCount(const Game& g) { return g.debris.size(); }
@@ -349,6 +408,7 @@ void main(){
   Game game;
   game.initHeadless();
   if (scene == "hubfly") return GameTest::hubFly(game);
+  if (scene == "wraithhitch") return GameTest::wraithHitch(game);
   if (scene == "prewarm") {   // the launch prewarm, then the menu's first frames as a player would see them open
     game.debugScene("menu");
     auto t0 = std::chrono::steady_clock::now();

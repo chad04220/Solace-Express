@@ -323,7 +323,9 @@ void flightTests() {
   expect(authored.nearPoint(-49000, 49000) == 51000 && g_world.nearPoint(-49000, 49000) == -49000,
     "procedural navigation never chooses a repeated nearby copy");
   Weather wx; wx.windSpeed = wx.gust = wx.turbulence = wx.cloudCover = 0; wx.timeOfDay = 0;
-  const AircraftSpec& spec = kAircraft[1];
+  // (the Starling, at a jet's speed: the Wren flew this at 180 m/s, nearly three times its cruise, until its structure
+  // became a normal-category +3.8 g one and failed there at once)
+  const AircraftSpec& spec = kAircraft[6];
   const float dt = 1.f / 60.f;
   for (float h : {0.f, 90.f, 180.f, 270.f}) {
     const vec3 direction(float(std::sin(h * geo::kDegrees)), 0, float(-std::cos(h * geo::kDegrees)));

@@ -15,31 +15,31 @@ const AircraftSpec kAircraft[] = {
   {"kestrel", "Kestrel T2", "Two-seat trainer", ENG_PISTON, 1, 4, 2, 750, 2600, 530, 70, 120, 1, 14.9f, 10.1f, 1.5f,
    0.30f, 4.8f, 1.45f, 0.55f, 0.030f, 0.004f, 0.045f, 0.75f, 110000, 22, 25, 30, 50, 45, 400, false, false, false,
    900, 1300, 1900, 0.40f, 0.060f, 0.060f, LIC_STUDENT, 18000, 120,
-   7.3f, 0.62f, 1.19f, -0.92f, 0, 0, vec3(0.92f, 0.92f, 0.95f), vec3(0.85f, 0.12f, 0.10f)},
+   7.3f, 0.62f, 1.19f, -0.92f, 0, 0, vec3(0.92f, 0.92f, 0.95f), vec3(0.85f, 0.12f, 0.10f), 0, 0, 6.0f, -3.0f},
   {"wren", "Wren 180", "Four-seat tourer", ENG_PISTON, 1, 6, 2, 700, 2700, 820, 110, 320, 3, 16.2f, 11.0f, 1.5f,
    0.30f, 4.9f, 1.50f, 0.65f, 0.028f, 0.004f, 0.050f, 0.76f, 180000, 23, 28, 33, 60, 70, 450, false, false, false,
    1500, 2000, 3000, 0.40f, 0.058f, 0.060f, LIC_PPL, 30000, 250,
-   8.3f, 0.68f, 1.18f, -1.07f, 0, 0, vec3(0.95f, 0.95f, 0.92f), vec3(0.10f, 0.30f, 0.70f)},
+   8.3f, 0.68f, 1.18f, -1.07f, 0, 0, vec3(0.95f, 0.95f, 0.92f), vec3(0.10f, 0.30f, 0.70f), 0, 0, 3.8f, -1.52f},
   {"bush", "Bushmaster STOL", "Backcountry taildragger", ENG_PISTON, 1, 6, 3, 700, 2700, 760, 120, 480, 4, 21.5f, 12.4f, 1.75f,
    0.35f, 5.0f, 1.85f, 0.95f, 0.034f, 0.006f, 0.070f, 0.74f, 220000, 18, 18, 24, 55, 72, 220, true, true, false,
    1500, 2100, 3200, 0.42f, 0.065f, 0.070f, LIC_CPL, 40000, 450,
-   8.0f, 0.70f, 1.17f, -1.05f, 0, 0, vec3(0.95f, 0.75f, 0.10f), vec3(0.12f, 0.12f, 0.12f)},
+   8.0f, 0.70f, 1.17f, -1.05f, 0, 0, vec3(0.95f, 0.75f, 0.10f), vec3(0.12f, 0.12f, 0.12f), 0, 0, 4.4f, -1.76f},
   {"islander", "Islander Twin", "Nine-seat utility twin", ENG_PISTON, 2, 6, 2, 700, 2700, 1750, 260, 900, 9, 30.2f, 14.9f, 2.05f,
    0.32f, 4.9f, 1.55f, 0.70f, 0.036f, 0.006f, 0.060f, 0.76f, 195000, 22, 26, 31, 65, 90, 420, true, false, false,
    9000, 9500, 17000, 0.40f, 0.055f, 0.060f, LIC_CPL, 85000, 900,
-   10.9f, 0.85f, 1.12f, -1.38f, 1, 0, vec3(0.96f, 0.96f, 0.96f), vec3(0.05f, 0.55f, 0.45f)},
+   10.9f, 0.85f, 1.12f, -1.38f, 1, 0, vec3(0.96f, 0.96f, 0.96f), vec3(0.05f, 0.55f, 0.45f), 0, 0, 3.8f, -1.52f},
   {"pelican", "Pelican Caravan", "Single turboprop hauler", ENG_TURBOPROP, 1, 0, 3, 1100, 1900, 2150, 420, 1400, 12, 25.9f, 15.9f, 1.95f,
    0.32f, 5.0f, 1.60f, 0.90f, 0.030f, 0.005f, 0.060f, 0.78f, 540000, 30, 31, 38, 85, 130, 550, true, false, false,
    12000, 14000, 24000, 0.40f, 0.052f, 0.060f, LIC_CPL, 120000, 1600,
-   11.5f, 0.92f, 1.09f, -1.83f, 0, 0, vec3(0.95f, 0.95f, 0.95f), vec3(0.85f, 0.45f, 0.05f)},
+   11.5f, 0.92f, 1.09f, -1.83f, 0, 0, vec3(0.95f, 0.95f, 0.95f), vec3(0.85f, 0.45f, 0.05f), 0, 0, 3.8f, -1.52f},
   {"meridian", "Meridian Q400", "Regional turboprop airliner", ENG_TURBOPROP, 2, 0, 4, 900, 1300, 12000, 1500, 4500, 40, 54.0f, 27.4f, 2.1f,
    0.30f, 5.2f, 1.50f, 0.80f, 0.026f, 0.010f, 0.060f, 0.80f, 1800000, 40, 52, 60, 140, 170, 1100, false, false, true,
    180000, 300000, 450000, 0.40f, 0.048f, 0.055f, LIC_ATP, 600000, 8000,
-   26.0f, 1.35f, 0.93f, -0.38f, 1, 1, vec3(0.96f, 0.96f, 0.98f), vec3(0.08f, 0.18f, 0.45f)},
+   26.0f, 1.35f, 0.93f, -0.38f, 1, 1, vec3(0.96f, 0.96f, 0.98f), vec3(0.08f, 0.18f, 0.45f), 0, 0, 2.5f, -1.0f},
   {"starling", "Starling 500 Jet", "Light business jet", ENG_JET, 2, 0, 0, 0, 0, 4600, 2200, 700, 7, 30.0f, 15.9f, 2.0f,
    0.25f, 5.0f, 1.40f, 0.75f, 0.022f, 0.012f, 0.070f, 0.80f, 15000, 0, 55, 62, 200, 4350, 1250, false, false, true,
    30000, 60000, 85000, 0.42f, 0.050f, 0.055f, LIC_ATP, 260000, 0,
-   14.0f, 0.95f, -0.58f, 1.0f, 2, 1, vec3(0.97f, 0.97f, 0.97f), vec3(0.55f, 0.08f, 0.12f), 0, 0, 0, 0, false, 0, .2f, 0, 1.55e-5f, 0, 11000, 200, .547f, 8000},
+   14.0f, 0.95f, -0.58f, 1.0f, 2, 1, vec3(0.97f, 0.97f, 0.97f), vec3(0.55f, 0.08f, 0.12f), 0, 0, 3.0f, -1.2f, false, 0, .2f, 0, 1.55e-5f, 0, 11000, 200, .547f, 8000},
   // ---- Codex's aircraft (docs/design/additional-aircraft, proposals on codex/*): Swift S6, Osprey C6, XR-10 Nightjar
   // Swift S6: four-seat retractable touring piston
   {"swift_s6", "Swift S6", "Retractable low-wing tourer", ENG_PISTON, 1, 6, 3, 700.0f, 2700.0f,
@@ -48,12 +48,12 @@ const AircraftSpec kAircraft[] = {
   260000.0f, 23.0f, 31.0f, 36.0f, 76.0f, 140.0f, 600.0f, false, false, true,
   7600.0f, 6500.0f, 14100.0f, 0.42f, 0.065f, 0.068f, LIC_PPL, 68000, 600,
   8.60f, 0.66f, -1.121212f, -0.155f, 0, 0,
-  vec3(0.91f, 0.88f, 0.80f), vec3(0.13f, 0.26f, 0.32f), 0},
+  vec3(0.91f, 0.88f, 0.80f), vec3(0.13f, 0.26f, 0.32f), 0, 0, 4.4f, -1.76f},
   // Osprey C6: six-seat coastal charter piston twin (its cabin trim: plane_sdf.glsl mapOspreyCabinTrim, by kOsprey)
   {"osprey_c6", "Osprey C6", "Six-seat coastal charter twin", ENG_PISTON, 2, 6, 3, 700.0f, 2700.0f, 1420.0f, 220.0f, 270.0f, 5, 22.5f, 12.4f, 1.82f,
   0.30f, 4.9f, 1.65f, 0.80f, 0.028f, 0.006f, 0.060f, 0.78f, 180000.0f, 24.0f, 30.2f, 35.0f, 74.0f, 110.0f, 550.0f, false, false, true,
   9000.0f, 10800.0f, 19800.0f, 0.41f, 0.056f, 0.062f, LIC_CPL, 68000, 650,
-  9.8f, 0.90f, -0.68f, -0.80f, 1, 0, vec3(0.91f, 0.88f, 0.79f), vec3(0.82f, 0.24f, 0.06f), 0},
+  9.8f, 0.90f, -0.68f, -0.80f, 1, 0, vec3(0.91f, 0.88f, 0.79f), vec3(0.82f, 0.24f, 0.06f), 0, 0, 3.8f, -1.52f},
   // ---- the research craft (stable roster indices 9 through 12; excluded by kCareerAircraft)
   // XR-10 Nightjar: conventional twin-jet research demonstrator (special 0: the generic flight model and field)
   {"xr10_nightjar", "XR-10 Nightjar", "Tapered-wing research demonstrator", ENG_JET, 2, 0, 0, 0.0f, 0.0f,
@@ -62,14 +62,14 @@ const AircraftSpec kAircraft[] = {
   30000.0f, 0.0f, 43.0f, 50.0f, 260.0f, 2150.0f, 1250.0f, false, false, true,
   52000.0f, 80000.0f, 130000.0f, 0.33f, 0.085f, 0.065f, LIC_ATP, 340000, 0,
   16.30f, 0.80f, -0.9375f, -1.145f, 2, 0,
-  vec3(0.14f, 0.18f, 0.20f), vec3(0.20f, 0.78f, 0.70f), 0, 1.30f, 9.f, -4.f, false, 0, .2f, 0, 2.2e-5f, 5.4e-5f, 10000, 240, .288f, 8800},
+  vec3(0.14f, 0.18f, 0.20f), vec3(0.20f, 0.78f, 0.70f), 0, 1.30f, 45.f, -28.f, false, 0, .2f, 0, 2.2e-5f, 5.4e-5f, 10000, 240, .288f, 8800},
   // Supersonic research model with finite fuel and pitch thrust vectoring (see Plane::substep special path).
   // It lands fast and long on its small unflapped wing: 1,400 m of hard runway (250 m and rough fields once said here,
   // and the autoland took it to fields it overran or broke its gear on - the review of v3.33.0, A1)
   {"xr30_specter", "XR-30 Specter", "Confidential research model", ENG_JET, 2, 0, 0, 0, 0, 9000, 6000, 0, 0, 46.0f, 11.2f, 4.6f,
    0.05f, 3.6f, 1.70f, 0.0f, 0.013f, 0.010f, 0.0f, 0.75f, 132000, 0, 60, 70, 420, 1930, 1400, false, false, true,
    25000, 90000, 110000, 0.40f, 0.060f, 0.060f, LIC_STUDENT, 0, 0,
-   17.2f, 1.0f, -0.2f, 1.6f, 2, 1, vec3(0.11f, 0.12f, 0.14f), vec3(0.2f, 0.85f, 1.0f), 1, 2.7f, 40.f, -20.f, false, 0, .2f, 0, 2.3e-5f, 5.8e-5f, 10000, 250, .216f, 15800},
+   17.2f, 1.0f, -0.2f, 1.6f, 2, 1, vec3(0.11f, 0.12f, 0.14f), vec3(0.2f, 0.85f, 1.0f), 1, 2.7f, 180.f, -180.f, false, 0, .2f, 0, 2.3e-5f, 5.8e-5f, 10000, 250, .216f, 15800},
   // XR-20 Mantis: forward-swept single-jet systems demonstrator (special 0: conventional flight model and controls).
   // One centerline 88 kN-rated engine preserves the prior pair's combined thrust (176 kN static at full reheat).
   // Its foreplanes are the model's horizontal tail placed forward; the two fins remain independently ruddered.
@@ -78,13 +78,13 @@ const AircraftSpec kAircraft[] = {
    0.25f, 5.0f, 1.55f, 0.60f, 0.026f, 0.012f, 0.070f, 0.78f,
    88000.0f, 0.0f, 55.0f, 62.0f, 330.0f, 2800.0f, 1350.0f, false, false, true,
    30000.0f, 70000.0f, 100000.0f, 0.45f, 0.070f, 0.070f, LIC_ATP, 480000, 0,
-   16.0f, 1.05f, -0.62f, 0.65f, 2, 0, vec3(0.105f, 0.125f, 0.15f), vec3(0.92f, 0.43f, 0.08f), 0, 1.9f, 14.f, -6.f, false, 0, .2f, 0, 2.3e-5f, 5.8e-5f, 10000, 240, .208f, 10300},
+   16.0f, 1.05f, -0.62f, 0.65f, 2, 0, vec3(0.105f, 0.125f, 0.15f), vec3(0.92f, 0.43f, 0.08f), 0, 1.9f, 34.f, -34.f, false, 0, .2f, 0, 2.3e-5f, 5.8e-5f, 10000, 240, .208f, 10300},
   // Stealth aerobatic research model: four tilting pods (power = one pod's rated thrust).
-  // Finite fuel; fictional +90 / -45 g structure (see Plane::wraithThrust).
+  // Finite fuel; a fictional +300 / -300 g structure, past all it can pull either way (see Plane::wraithThrust).
   {"xr40_wraith", "XR-40 Wraith", "Stealth aerobatic research model", ENG_JET, 4, 0, 0, 0, 0, 10500, 6000, 0, 0, 52.0f, 12.4f, 5.2f,
    0.03f, 3.4f, 1.60f, 0.0f, 0.012f, 0.010f, 0.0f, 0.72f, 72000, 0, 60, 70, 480, 3400, 200, true, false, true,
    30000, 80000, 100000, 0.90f, 0.090f, 0.070f, LIC_STUDENT, 0, 0,
-   16.5f, 1.0f, -0.15f, 0.8f, 2, 1, vec3(0.075f, 0.08f, 0.09f), vec3(0.72f, 0.3f, 1.0f), 2, 4.3f, 90.f, -45.f, false, 0, .2f, 0, 2.5e-5f, 6.2e-5f, 10000, 250, .070f, 18000},
+   16.5f, 1.0f, -0.15f, 0.8f, 2, 1, vec3(0.075f, 0.08f, 0.09f), vec3(0.72f, 0.3f, 1.0f), 2, 4.3f, 300.f, -300.f, false, 0, .2f, 0, 2.5e-5f, 6.2e-5f, 10000, 250, .070f, 18000},
   // Larkspur L4: a four-seat cantilever shoulder-wing touring single. Full payload includes passengers
   // in maxMass(); cargo is baggage, not an additional four-seat cabin. Range is intentionally game-scaled.
   {"larkspur_l4", "Larkspur L4", "Four-seat shoulder-wing tourer", ENG_PISTON, 1, 6, 3, 700, 2700,
@@ -526,7 +526,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     float Vt = std::max(V, 1.f);
     float hover = smoothstepf(0.3f, 0.7f, nozzle) * smoothstepf(70.f, 30.f, V);
     // pitch authority comes from the vectoring nozzles (+-29 deg of deflection, doubled in v1.7): ~110 deg/s at Mach 1
-    bool wr = s.special == 2;   // XR-40: ~80 g at full stick, 400 deg/s roll
+    bool wr = s.special == 2;   // XR-40: 400 deg/s roll; at full stick the pitch rate cap holds its load to some 260 g at its fastest
     float pMax = fbwPitchMax(Vt);
     float rMax = fbwRollMax(hover), yMax = wr ? 1.8f : 1.4f;
     vec3 wd(ctl.pitch * pMax + ctl.trim * 0.15f, -ctl.yaw * yMax, -ctl.roll * rMax);
@@ -1667,8 +1667,9 @@ float Plane::terrainAround() const {
 // in proportion as the speed falls
 static float pitchLag(const PerfModel& P, const AircraftSpec& s, float ias) { return P.tQ * clampf(s.cruise / std::max(ias, 15.f), 0.6f, 2.5f); }
 // A professional's envelope for this airframe (docs/PILOT.md): an airliner's pilot flies 25 deg of bank and 1.3 g, a test
-// pilot in a jet built for 9 g or 40 g manoeuvres at more - smoothly still. 0 for the civil types (5.8 g usable) up to 1
-// at 40 g, on the ratio's logarithm: the XR-10 (9 g) 0.23, the XR-20 (14 g) 0.46, the XR-30 and XR-40 1
+// pilot in a jet built for 14 g or 40 g manoeuvres at more - smoothly still. 0 for the civil types (5.8 g usable or less)
+// up to 1 at 40 g, on the ratio's logarithm: the XR-10 (14 g) 0.46, the XR-20 (20 g) 0.64, the XR-30 and XR-40 (41 g, all
+// they can pull: their structures stand far more) 1
 float Plane::apProScale() const { return clampf(logf(std::max(perf(spec).gUse, 1.f) / 5.8f) / logf(40.f / 5.8f), 0.f, 1.f); }
 float Plane::apProG() const { return 1.3f + 1.2f * apProScale(); }      // normal manoeuvring's load factor: 1.3 g .. 2.5 g
 float Plane::apProBank() const { return 30.f + 30.f * apProScale(); }   // and its bank: 30 .. 60 deg (an airline's 25 to 30; at 25 an airliner's pattern ran 12 km out)

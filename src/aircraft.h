@@ -46,8 +46,9 @@ struct AircraftSpec {
   float fuelCruiseAlt = 0, fuelCruiseTas = 0, fuelCruiseSpool = 0;
   float maxTakeoffMass = 0;     // explicit kg; zero preserves the legacy payload-based envelope
   float maxFuelForPayload(float payloadKg) const { return std::max(0.f, std::min(maxFuel, maxMass() - emptyMass - std::max(0.f, payloadKg))); }
-  float gLimitPos() const { return gPos > 0 ? gPos : special == 2 ? 90.f : special ? 50.f : 5.8f; }
-  float gLimitNeg() const { return gNeg < 0 ? gNeg : special == 2 ? -45.f : special ? -25.f : -3.f; }
+  // (0: a light aircraft's normal category, +3.8 / -1.52 flaps up; every type in the table sets its own)
+  float gLimitPos() const { return gPos > 0 ? gPos : 3.8f; }
+  float gLimitNeg() const { return gNeg < 0 ? gNeg : -1.52f; }
   // the runway it needs: the longer of its learned take-off and landing distances at full weight (Plane::perf), 15% to
   // spare, longer with the field's elevation (runwayM until the type has been learned, and for the research jets)
   float runwayNeeded(float elev) const;

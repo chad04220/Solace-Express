@@ -131,7 +131,7 @@ struct AircraftSpec {
   vec3 colBase, colStripe;     // livery: base paint; cheat line, wingtips, fin flash
   int special = 0;             // 0 for every type but the XR-30 (1) and XR-40 (2): they switch on whole code paths (§5)
   float designMach = 0, gPos = 0, gNeg = 0;   // performance tiers: < 1 held under the barrier by its drag rise, > 1 reheat
-                                              // and the research drag rise; structural limits (0: 5.8 / -3 g)
+                                              // and the research drag rise; structural limits (0: 3.8 / -1.52 g, normal category)
   bool fullCabinEnvelope = false; // include passengers/cargo in reference and MTOW learning; preserve design runway minimum
   float gearHeightM = 0;          // positive authored contact-height override, else derive from geometry
   float takeoffFlap = 0.2f;        // recommended takeoff flap setting (legacy taildraggers keep 0.3)
@@ -253,9 +253,10 @@ width, headrest, dome light, armrests, visor height and slope, overhead, vents).
   critical Mach. Cruise speed and climb come out of it; nothing is tuned. A wrong number shows up as a wrong cruise in
   `flight_test`, so fix the shape or the power, not the drag.
 - **`special`** switches whole paths in `Plane::substep` (`aircraft.cpp`): 1, the XR-30 (fly-by-wire, pitch thrust
-  vectoring, finite jet fuel burn, the research drag rise, a 40 g structure); 2, the XR-40 (four tilting thruster pods,
-  vertical flight, a 90 g structure). A new Tier B type with new physics needs a new value and a new path. A
-  conventional research type uses `special = 0` with `designMach`, `gPos`, `gNeg` (the XR-10 and XR-20).
+  vectoring, finite jet fuel burn, the research drag rise, a +/-180 g structure); 2, the XR-40 (four tilting thruster pods,
+  vertical flight, a +/-300 g structure: both past all their fly-by-wire can pull). A new Tier B type with new physics
+  needs a new value and a new path. A conventional research type uses `special = 0` with `designMach`, `gPos`, `gNeg`
+  (the XR-10 and XR-20).
 - **Learned performance.** At launch, `Plane::perf` flies short test sorties per type (stall speeds, best climb, idle
   sink, roll rate, pitch response, g per stick, take-off and landing distances) at the test weight (60% fuel, 150 kg
   aboard, 1200 m) and caches them in `perf.bin` in the cache folder (`%LOCALAPPDATA%\SomniumVolandi`), stamped with the build.
@@ -821,10 +822,10 @@ Research craft (the research terminal only):
 
 | Craft | Tier | What it is | Top Mach | Structure |
 |---|---|---|---|---|
-| XR-10 Nightjar | A | conventional twin-jet demonstrator | 0.96 | +9 / −4 g |
-| XR-20 Mantis | A | forward-swept systems demonstrator, canards | 1.9 | +14 / −6 g |
-| XR-30 Specter | B | fly-by-wire, pitch thrust vectoring, sealed cockpit | 2.7 | +40 / −20 g |
-| XR-40 Wraith | B | four tilting thruster pods, vertical flight, cloak, lasers, plasma bombs | 4.3 | +90 / −45 g |
+| XR-10 Nightjar | A | conventional twin-jet demonstrator | 0.96 | +45 / −28 g |
+| XR-20 Mantis | A | forward-swept systems demonstrator, canards | 1.9 | +34 / −34 g |
+| XR-30 Specter | B | fly-by-wire, pitch thrust vectoring, sealed cockpit | 2.7 | +180 / −180 g |
+| XR-40 Wraith | B | four tilting thruster pods, vertical flight, cloak, lasers, plasma bombs | 4.3 | +300 / −300 g |
 
 Gaps worth filling: a light-sport two-seater below the Kestrel, a 19-seat turboprop commuter, a medium business jet or
 small regional jet, an agricultural or utility taildragger. Not possible without new physics: floats and amphibians

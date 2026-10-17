@@ -71,7 +71,8 @@ void Renderer::renderFeeds(const FrameParams& fp, const std::function<void(GLuin
   // Direct-window Specter never needs an offscreen camera. Wraith retains a prewarmed
   // bomb target even before release, so activating it does not allocate at the input edge.
   if (screenWindows && fp.feedRig != 2) return;
-  if (!g_feedMounts[fp.feedRig].ok) {   // first sight of this craft: find the mounts (its cameras go up next frame)
+  // (the bomb camera flies free: with the displays as windows nothing needs the mounts)
+  if (!screenWindows && !g_feedMounts[fp.feedRig].ok) {   // first sight of this craft: find the mounts (its cameras go up next frame)
     measureFeedMounts(fp);   // (with no builder, the mounts as they are)
     return;
   }

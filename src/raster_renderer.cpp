@@ -275,6 +275,12 @@ void Renderer::rasterObjects(const FrameParams& fp) {
       if (!planeMeshes.count(k0)) bakePlaneMesh(fp, 0, k0);
       if (getenv("WRECKDBG")) { auto it = planeMeshes.find(k0); printf("wreck: baked its mesh (%s, %d indices)\n", it != planeMeshes.end() && it->second.ok ? "ok" : "failed", it != planeMeshes.end() ? it->second.idx : -1); }
     }
+    else if (fp.warmCockpit >= 0 && slot == 0 && meshUse) {   // the loading screen, its view's body in hand: the cockpit's next, one step a frame
+      FrameParams in = fp; in.plane.PS[3] = 1.f;   // (the first look inside then draws at once: before, it loaded the body and measured the
+      const uint64_t k1 = hullKey(in, 1);          // camera mounts on the builder there - over a second, the XR-40's worst stall)
+      if (!planeMeshes.count(k1)) bakePlaneMesh(in, 1, k1);
+      else if (fp.warmCockpit > 0 && !screenWindows && !g_feedMounts[fp.warmCockpit].ok) { in.feedRig = fp.warmCockpit; measureFeedMounts(in); }
+    }
   }
 }
 

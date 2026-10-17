@@ -246,7 +246,9 @@ void Game::buildFeedCameras(FrameParams& fp) {
   if (!rig || camMode != 1 || crashed || !fp.plane.on) return;
   fp.feedRig = rig;
   const FeedMounts& fm = g_feedMounts[rig];
-  if (!fm.ok) return;   // the renderer measures the mounts the first time it sees the craft; the cameras go up next frame
+  // the renderer measures the mounts the first time it sees the craft and the cameras go up next frame (with the
+  // displays as windows only the bomb camera is drawn, and it flies free of them)
+  if (!fm.ok && !g_ren.screenWindows) return;
   FeedMount mt[kMaxFeeds];
   // (the displays as sharp as a 1080p screen at the cockpit's field of view, or the window's own when it's larger -
   // up to 1440p; three quarters of that on the lowest quality. Scaled with the main view's render resolution: the
@@ -258,7 +260,7 @@ void Game::buildFeedCameras(FrameParams& fp) {
   const vec3 E(fp.plane.M[22 * 4], fp.plane.M[22 * 4 + 1], fp.plane.M[22 * 4 + 2]);   // the eye (body frame)
   for (int i = 0; i < n; i++) {
     FeedCamera& c = fp.feeds[i];
-    c.on = true;
+    c.on = fm.ok;   // (unmeasured, sized all the same: the bomb camera's target is the floor pane's, made before any release)
     vec3 lens = mt[i].nose ? fm.nose + vec3(0.f, 0.f, -0.03f) : mt[i].dir * (fm.skin[i] + 0.03f);   // 3 cm off the skin
     c.pos = fp.plane.pos + toWorld(E + lens);
     c.right = toWorld(mt[i].right); c.up = toWorld(mt[i].up); c.back = toWorld(mt[i].back);
@@ -502,12 +504,14 @@ void Game::wraithVisual(FrameParams& fp) {
 
 void Game::hiveVisual(FrameParams& fp) {
   fp.enemyN=0; fp.hiveOrdnanceN=0;
-  if(!militaryFlight && !(researchFlight && resCard<0 && specIdx==kWraith)) return;
+  const bool hive=militaryFlight || (researchFlight && resCard<0 && specIdx==kWraith);
   if(screen==SCR_LOADING) {
-    // Explicit cache warmup has no fake scene instances and cannot cast phantom shadows.
-    if(!headless) { g_ren.warmEnemyTypes(); if(specIdx==kWraith) g_ren.warmWraithStores(fp); }
+    // Explicit cache warmup has no fake scene instances and cannot cast phantom shadows. Every XR-40 flight carries
+    // stores, so their programs come before any flight opens (a first release compiled them: two seconds at the drop).
+    if(!headless) { if(hive) g_ren.warmEnemyTypes(); if(specIdx==kWraith) g_ren.warmWraithStores(fp); }
     return;
   }
+  if(!hive) return;
   for(const auto& a:hiveCombat.actors) if(a.alive && fp.enemyN<kMaxEnemyCraft) {
     auto& v=fp.enemies[fp.enemyN++]; v=EnemyCraftVisual(); v.type=(EnemyCraftType)(int)a.type;
     v.pos=plane.pos+hiveCombat.displacement(plane.pos,a.position);

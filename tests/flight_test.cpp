@@ -297,17 +297,27 @@ int main(int argc, char** argv) {
       ok = ok && tier;
     }
     fails += !ok;
-    // the overstress: the XR-30 (limited to 40 g) rides 15% over for four seconds while the stress builds (it bleeds
-    // its speed before the airframe gives), and a full pull at Mach 3 takes it past twice the limit: that snaps it
-    const AircraftSpec& s9 = kAircraft[kResearchJet];
-    Plane p; p.reset(&s9, vec3(0, 6000, 0), 90, s9.maxFuel * 0.5f, 85, true, 700); p.ctl.throttle = 1; p.ctl.gearDown = false; p.gear = 0;
+    // the overstress: the Starling (a light jet's +3.0 g) rides some 25% over for four seconds while the stress builds,
+    // its speed held, and a full pull at 300 m/s takes it past twice the limit: that snaps it
+    const AircraftSpec& s6 = kAircraft[6];
+    Plane p; p.reset(&s6, vec3(0, 6000, 0), 90, s6.maxFuel * 0.5f, 85, true, 230); p.ctl.throttle = 1; p.ctl.gearDown = false; p.gear = 0;
     float gmax = 0, ogMax = 0;
-    for (int i = 0; i < 4 * 240 && !p.ev.crashed; i++) { p.ctl.pitch = clampf((50.f - p.gLoad) * 0.1f, -1, 1); p.step(1 / 240.f, calm, i / 240.f); gmax = std::max(gmax, p.gLoad); ogMax = std::max(ogMax, p.overG); }
-    bool held = !p.ev.crashed && gmax > 44.f && ogMax > 0.35f && ogMax < 1.f;
-    p.reset(&s9, vec3(0, 6000, 0), 90, s9.maxFuel * 0.5f, 85, true, 1000); p.ctl.throttle = 1; p.ctl.gearDown = false; p.gear = 0; p.ctl.pitch = 1;
+    for (int i = 0; i < 4 * 240 && !p.ev.crashed; i++) { p.ctl.pitch = clampf((3.7f - p.gLoad) * 0.1f, -1, 1); p.step(1 / 240.f, calm, i / 240.f); gmax = std::max(gmax, p.gLoad); ogMax = std::max(ogMax, p.overG); }
+    bool held = !p.ev.crashed && gmax > s6.gLimitPos() * 1.1f && ogMax > 0.35f && ogMax < 1.f;
+    p.reset(&s6, vec3(0, 6000, 0), 90, s6.maxFuel * 0.5f, 85, true, 300); p.ctl.throttle = 1; p.ctl.gearDown = false; p.gear = 0; p.ctl.pitch = 1;
     float g2 = 0; for (int i = 0; i < 3 * 240 && !p.ev.crashed; i++) { p.step(1 / 240.f, calm, i / 240.f); g2 = std::max(g2, p.gLoad); }
     ok = held && p.ev.crashed && p.ev.crashReason.find("Structural") != std::string::npos;
-    printf("Sustained overstress (XR-30): %.1f g held, stress %.2f of the way to failure, intact; full pull at Mach 3 peaks %.0f g and %s %s\n", gmax, ogMax, g2, p.ev.crashed ? "snaps" : "holds", ok ? "ok" : "FAIL"); fails += !ok;
+    printf("Sustained overstress (Starling): %.2f g held, stress %.2f of the way to failure, intact; full pull at 300 m/s peaks %.1f g and %s %s\n", gmax, ogMax, g2, p.ev.crashed ? "snaps" : "holds", ok ? "ok" : "FAIL"); fails += !ok;
+    // the XR-30 and XR-40 are built past all their fly-by-wire can pull: full stick either way at their fastest, low
+    // down, where the load runs highest, leaves them whole (the pitch rate's cap holds it near 160 g and 265 g)
+    for (int si : {(int)kResearchJet, (int)kWraith}) for (float st : {1.f, -1.f}) {
+      const AircraftSpec& sr = kAircraft[si];
+      Plane q; q.reset(&sr, vec3(0, 2000, 0), 90, sr.maxFuel * 0.7f, 85, true, si == kWraith ? 1400.f : 1000.f); q.ctl.throttle = 1; q.ctl.gearDown = false; q.gear = 0;
+      float gx = 0; for (int i = 0; i < 2 * 240 && !q.ev.crashed; i++) { q.ctl.pitch = st; q.step(1 / 240.f, calm, i / 240.f); gx = st > 0 ? std::max(gx, q.gLoad) : std::min(gx, q.gLoad); }
+      ok = !q.ev.crashed && fabsf(gx) > (si == kWraith ? 200.f : 120.f) && gx < sr.gLimitPos() && gx > sr.gLimitNeg();
+      printf("%s full %s at %.0f m/s: %+.0f g of %+.0f / %+.0f, %s %s\n", sr.name, st > 0 ? "pull" : "push", si == kWraith ? 1400.f : 1000.f, gx, sr.gLimitPos(), sr.gLimitNeg(),
+             q.ev.crashed ? q.ev.crashReason.c_str() : "intact", ok ? "ok" : "FAIL"); fails += !ok;
+    }
   }
   // XR-30 research jet: supersonic in level flight, no vertical flight, slow flight on approach, pull limits, roll authority
   if (in(1)) {
@@ -367,11 +377,12 @@ int main(int argc, char** argv) {
     for (int i = 0; i < 3 * 240 && !p.ev.crashed; i++) { p.step(1 / 240.f, calm, i / 240.f); gmax = std::max(gmax, p.gLoad); }
     ok = !p.ev.crashed && gmax < 50.f && gmax > 10.f;
     printf("XR-30 full-back pull: peak %.1f g %s\n", gmax, ok ? "ok" : "FAIL"); fails += !ok;
-    // no g limiter: a full pull at Mach 1.8 overstresses the airframe and it fails
+    // no g limiter, and no need of one: a full pull at Mach 1.8 rides far past a fighter's load and the airframe stands it
     p.reset(&s, vec3(0, 3000, 0), 90, s.maxFuel, 85, true, 620); p.ctl.throttle = 1; p.ctl.pitch = 1;
-    for (int i = 0; i < 3 * 240 && !p.ev.crashed; i++) p.step(1 / 240.f, calm, i / 240.f);
-    ok = p.ev.crashed && p.ev.crashReason.find("Structural") != std::string::npos;
-    printf("XR-30 unlimited pull at Mach 1.8 breaks the airframe: %s\n", ok ? "ok" : "FAIL"); fails += !ok;
+    gmax = 0;
+    for (int i = 0; i < 3 * 240 && !p.ev.crashed; i++) { p.step(1 / 240.f, calm, i / 240.f); gmax = std::max(gmax, p.gLoad); }
+    ok = !p.ev.crashed && gmax > 40.f;
+    printf("XR-30 unlimited pull at Mach 1.8: peak %.0f g, the airframe %s %s\n", gmax, p.ev.crashed ? "fails" : "holds", ok ? "ok" : "FAIL"); fails += !ok;
     p.reset(&s, vec3(0, 3000, 0), 90, s.maxFuel, 85, true, 340); p.ctl.throttle = 1; p.ctl.pitch = 1;
     float rate = 0;
     for (int i = 0; i < 2 * 240 && !p.ev.crashed; i++) { p.step(1 / 240.f, calm, i / 240.f); rate = std::max(rate, p.w.x / DEG); }
@@ -577,7 +588,8 @@ int main(int argc, char** argv) {
     fails += !ok;
   }
   // ---------------- aerobatics: every figure on a light single, the airliner and the Wraith. It must set itself up,
-  // fly the figure inside the airframe's limits and level off into a hold on the heading the figure ends on.
+  // fly the figure inside the airframe's limits and level off into a hold on the heading the figure ends on - or, the
+  // airliner (+2.5 g) with every figure that pulls through the vertical or corkscrews, say at once it isn't built for it.
   if (in(3)) for (int si : {0, 5, (int)kWraith}) {
     const AircraftSpec& s = kAircraft[si];
     const PerfModel& P = Plane::perf(&s);
@@ -594,8 +606,10 @@ int main(int argc, char** argv) {
       }
       float turned = fabsf(wrapAngle((p.heading() - h0) * DEG) / DEG);
       bool reverses = f == Plane::STUNT_IMMELMANN || f == Plane::STUNT_SPLIT_S || f == Plane::STUNT_WINGOVER;
-      bool ok = !p.ev.crashed && flew && p.apMode == Plane::AP_HOLD && p.apStuntAbort.empty() && maxG < P.gLimit && minG > P.gNeg &&
-                (reverses ? turned > 120.f : turned < 30.f) && fabsf(p.bankDeg()) < 20.f;
+      const bool declines = si == 5 && f != Plane::STUNT_ROLL && f != Plane::STUNT_WINGOVER;
+      bool ok = declines ? !p.ev.crashed && !flew && k <= 1 && p.apMode == Plane::AP_HOLD && p.apStuntAbort.find("isn't built for it") != std::string::npos
+                         : !p.ev.crashed && flew && p.apMode == Plane::AP_HOLD && p.apStuntAbort.empty() && maxG < P.gLimit && minG > P.gNeg &&
+                           (reverses ? turned > 120.f : turned < 30.f) && fabsf(p.bankDeg()) < 20.f;
       printf("Stunt %-16s %-12s %5.1f s  g %+5.1f..%+5.1f  heading change %3.0f  %s%s\n", s.name, Plane::stuntName(f), k / 60.f, minG, maxG, turned,
              p.ev.crashed ? p.ev.crashReason.c_str() : p.apStuntAbort.c_str(), ok ? "  ok" : "  FAIL");
       fails += !ok;

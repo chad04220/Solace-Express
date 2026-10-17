@@ -24,6 +24,9 @@ const Step kFig[Plane::STUNT_COUNT][12] = {
 // height each figure needs above the entry (up) and below it (down), in loop radii
 const float kUp[Plane::STUNT_COUNT] = {2.2f, 0.3f, 1.2f, 2.2f, 0.3f, 2.2f, 1.f};
 const float kDown[Plane::STUNT_COUNT] = {0.3f, 0.5f, 0.8f, 0.2f, 5.f, 0.6f, 0.8f};   // (a split-S picks up speed on the way down)
+// the load each figure needs at the least: those that pull through the vertical 2.5 g, a barrel roll's corkscrew less,
+// a roll or a wingover barely any (an airliner's +2.5 g structure, less its gust margin, flies only those two)
+const float kNeed[Plane::STUNT_COUNT] = {2.5f, 1.f, 1.8f, 2.5f, 2.5f, 2.5f, 1.4f};
 }
 
 const char* Plane::stuntName(int f) {
@@ -41,10 +44,10 @@ void Plane::apStuntBegin(int figure, const Weather& wx) {
   apStuntSpeedAfter = keepSpeed; apStuntAbort.clear();
   const PerfModel& P = perf(spec);
   apSense();
-  // the figure's load factor: what the structure takes less what a gust could add; its entry speed: enough that the
-  // wing can still pull a useful load over the top
+  // the figure's load factor: what the structure takes less what a gust could add (one that needs more is declined:
+  // apStuntFly); its entry speed: enough that the wing can still pull a useful load over the top
   float gust = std::max(0.6f, P.gLimit * 0.05f);
-  apStuntN = std::max(2.5f, (P.gLimit - gust) * 0.85f);
+  apStuntN = (P.gLimit - gust) * 0.85f;
   // (enough speed that after climbing the figure's height it still flies over the top: 2.8 Vs for a loop; a split-S
   // starts slow because it builds its speed on the way down, a wingover needs only a little over the stall)
   bool down = apStunt == STUNT_SPLIT_S, gentle = apStunt == STUNT_WINGOVER || apStunt == STUNT_ROLL;
@@ -112,6 +115,10 @@ bool Plane::apStuntFly(float dt) {
 
   // ---- setting up: the speed and height the figure needs, wings level, before it starts
   if (apStuntStep == 0) {
+    if (apStuntN < kNeed[apStunt]) {   // (an airframe built for less than the figure pulls: said at once, not tried)
+      const std::string why = fmt("the airframe isn't built for it (+%.1f g)", P.gLimit);
+      finish(why.c_str()); return false;
+    }
     float need = margin + kDown[apStunt] * R;
     // a split-S comes down the whole of its half loop: the height that takes, from the pull the wing can hold as the dive
     // builds speed - not the structure's limit, which a research jet's wing can't pull at the figure's entry speed (the
