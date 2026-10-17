@@ -1619,7 +1619,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
   licenseBefore = career.license;
   // the player sees a loading screen while the scenery around the start is generated (tests fly straight away)
   screen = headless ? SCR_FLIGHT : SCR_LOADING;
-  loadT = 0; loadReadyT = -1; loadShown = 0; loadPend0 = 0; loadFrames = 0; loadStableFrames = 0; loadBakeSeen = g_ren.bakeCount; loadObservedFrame = -1; loadMap = false; dbgCam = dbgFollow = false; benchPin = false;
+  loadT = 0; loadReadyT = -1; loadShown = 0; loadPend0 = 0; loadFrames = 0; loadViewsDrawn = false; loadStableFrames = 0; loadBakeSeen = g_ren.bakeCount; loadObservedFrame = -1; loadMap = false; dbgCam = dbgFollow = false; benchPin = false;
   atc.cancel(); atcF = AtcFlight(); hintsVoiced.clear(); commsPending.clear(); lessonVoiceWarned = false;   // (the last flight's calls go before this one's announcements)
   // (a hazard call is said only while the hazard holds: a "PULL UP" queued behind the tower played at 1,958 m, climbing -
   // the review of v3.44.0, AUD-3)
@@ -4874,6 +4874,40 @@ void Game::render() {
     };
   } else if (g_ren.bakeYield && screen != SCR_RESEARCH) g_ren.bakeYield = nullptr;
   if (!vid) {
+    // The loading screen, under its card (and under the frame drawn after them): the flight's views once each - inside
+    // and out, and in the XR-40 a store of each kind and a young blast - before it opens. Building a body or linking a
+    // program isn't all of it: drivers finish a program on its first draw. The first look inside the XR-40 took 90 s
+    // on the software renderer, each look after it under one; its first bomb seen from outside as long.
+    if (screen == SCR_LOADING && !headless && loadReadyT < 0 && loadFrames >= 2 && !loadViewsDrawn && plane.spec && !crashed) {
+      const int cm = camMode, baked = g_ren.bakeCount; const vec3 cp = camPos;
+      const float size = std::max(plane.spec->span, plane.spec->fusLen);
+      for (int view : {cm == 1 ? 1 : 0, cm == 1 ? 0 : 1}) {   // (the view the flight opens with last: the frame after cuts from the other)
+        camMode = view;
+        camPos = view == 1 ? plane.pos + plane.q.rotate(kModels[plane.spec - kAircraft].eye)
+                           : cm != 1 ? cp : plane.pos + plane.q.rotate(vec3(0, size * 0.3f, size * 1.4f));
+        FrameParams w = buildFrame();
+        if (plane.spec->special == 2) {
+          const vec3 ahead = -w.camBack;
+          w.fx.bombs = 3;
+          for (int k = 0; k < 3; k++) {   // (kinds: 0 plasma, 1 penetrator, 2 EMP)
+            const vec3 at = w.camPos + ahead * 14.f + w.camRight * ((k - 1) * 2.f);
+            float* o = w.fx.bomb[k]; o[0] = at.x; o[1] = at.y; o[2] = at.z; o[3] = .29f;
+            float* st = w.fx.bombStyle[k]; st[0] = st[1] = st[2] = 1.f; st[3] = (float)k;
+            const float rot[9] = {w.camRight.x, w.camRight.y, w.camRight.z, w.camUp.x, w.camUp.y, w.camUp.z, w.camBack.x, w.camBack.y, w.camBack.z};
+            std::copy(rot, rot + 9, w.fx.bombRot[k]);
+          }
+          const vec3 at = w.camPos + ahead * 400.f;
+          w.fx.blasts = 1; float* o = w.fx.blast[0]; o[0] = at.x; o[1] = at.y; o[2] = at.z; o[3] = 100.f;
+          float* I = w.fx.blastI[0]; I[0] = 0.2f; I[1] = 1.f; I[2] = I[3] = 0.f;
+        }
+        std::vector<SpriteVert> a, b;
+        buildSprites(w, a, b);
+        g_ren.renderScene(w, a, b);
+      }
+      camMode = cm; camPos = cp;
+      g_ren.dropHistory();
+      loadViewsDrawn = g_ren.bakeCount == baked;   // (a body built at one's end was not drawn yet: again, next frame)
+    }
     fp = buildFrame();
     std::vector<SpriteVert> a, b;
     if (!fp.hangarPreview) {
@@ -5757,7 +5791,7 @@ void Game::launchMilitary(int kind) {
   if (headless) { beginMilitaryLaunch(c); return; }
   pendingMilitaryLaunch = c;
   militaryLaunchFrameDrawn = militaryLaunchFramePresented = false;
-  loadT = 0; loadReadyT = -1; loadShown = 0; loadPend0 = 0; loadFrames = 0;
+  loadT = 0; loadReadyT = -1; loadShown = 0; loadPend0 = 0; loadFrames = 0; loadViewsDrawn = false;
   loadStableFrames = 0; loadObservedFrame = -1; loadMap = false;
   screen = SCR_LOADING;
   in.pressed[K_ENTER] = in.pressed[' '] = false; in.mPressed[0] = false;
@@ -5770,7 +5804,7 @@ bool Game::queueLaunch(const Contract& card, int spec, LaunchKind kind, std::fun
   PendingLaunch L; L.card = card; L.spec = spec; L.kind = kind; L.from = screen; L.paused = paused; L.begin = std::move(begin);
   pendingLaunch = std::move(L);
   launchFrameDrawn = launchFramePresented = false;
-  loadT = 0; loadReadyT = -1; loadShown = 0; loadPend0 = 0; loadFrames = 0;
+  loadT = 0; loadReadyT = -1; loadShown = 0; loadPend0 = 0; loadFrames = 0; loadViewsDrawn = false;
   loadStableFrames = 0; loadObservedFrame = -1; loadMap = false;
   screen = SCR_LOADING;
   in.pressed[K_ENTER] = in.pressed[' '] = false; in.mPressed[0] = false;

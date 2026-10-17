@@ -519,7 +519,7 @@ private:
   float ckZoom = 1.f, ckZoomT = 1.f;
   CockpitFocusZoom cockpitFocus;
   QualityGovernor autoRes;   // Auto resolution (quality_governor.h): starts at the full picture
-  float loadT = 0, loadReadyT = -1, loadShown = 0; int loadPend0 = 0, loadFrames = 0, loadStableFrames = 0, loadBakeSeen = 0, loadObservedFrame = -1; bool loadMap = false;   // pre-flight loading screen
+  float loadT = 0, loadReadyT = -1, loadShown = 0; int loadPend0 = 0, loadFrames = 0, loadStableFrames = 0, loadBakeSeen = 0, loadObservedFrame = -1; bool loadMap = false, loadViewsDrawn = false;   // pre-flight loading screen (loadViewsDrawn: Game::render)
   bool gpsMapValid = false; vec2 gpsMapC; float gpsMapHalf = 0; int gpsMapN = 0;   // cached GPS aerial image
   bool uiHidden = false, bumperFired = false; float bumperHold = 0;   // LB + RB held 1 s: hide / show the flight UI
   // bound action state: keyboard key or gamepad button

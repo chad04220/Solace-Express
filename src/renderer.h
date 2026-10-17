@@ -670,6 +670,7 @@ public:
   // Optional/unused sun shadows must not block a loading screen forever.
   bool tshRequiredPending(float sunHeight) const { return progTShBake != 0 && sunHeight >= 0.02f && tshPending(); }
   void followSeam(vec3 d) { prevCamPos += d; prevPlanePos += d; }   // the camera came back in over the map's seam: the last frame is where it was, relative
+  void dropHistory() { histValid = false; }   // the next frame's TAA keeps nothing of the last (one drawn only to warm the driver)
   void resetTemporal(bool streamedWorld = false) {   // forget every frame-to-frame accumulation (TAA history, jitter/seed sequence, terrain-shadow bake):
     frameNo = 0; histIdx = 0; histValid = false; cloudAccValid = false;   // the next frame renders as if it were the first (exact test comparisons)
     tshFront = -1; tshBack = 0; tshRow = 0; tshBaking = false; tshStreaming = streamedWorld;
