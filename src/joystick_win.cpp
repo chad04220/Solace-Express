@@ -2,6 +2,9 @@
 // Input::joys. XInput gamepads (an "IG_" in the device path) stay with the gamepad path, so a pad is never read twice.
 // The devices are found again whenever Windows reports a device change (joyDevicesChanged, from WM_DEVICECHANGE).
 #define DIRECTINPUT_VERSION 0x0800
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #include <dinput.h>
 #include <algorithm>

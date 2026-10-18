@@ -1,6 +1,9 @@
 // Crash reports on Windows: the handlers (crash.h). Everything the handler needs is set up at install, so writing the
 // report only opens files and calls MiniDumpWriteDump (dbghelp.dll, loaded at install: a crash is no time to load one)
 #include "crash.h"
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #include <dbghelp.h>
 #include <csignal>
