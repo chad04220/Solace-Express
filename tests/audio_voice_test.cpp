@@ -1,5 +1,6 @@
 #include "../src/atc.h"
 #include "../src/audio.h"
+#include <algorithm>
 #include <cstdio>
 #include <fstream>
 #include <sstream>
@@ -16,6 +17,12 @@ int main(int argc,char** argv){
  check(voice.load(argv[1]),"voice index and supplemental cast load");
  int bad=0;for(const auto& id:voice.indexed())if(!voice.decodes(id)){++bad;printf("Missing/invalid: %s\n",id.c_str());}
  printf("Voice: %zu recordings decoded\n",voice.indexed().size());check(!bad,"every indexed recording decodes in the production player");
+ printf("Voice: %.1f MB of decoded clips kept (budget %.0f MB)\n",voice.cachedBytes()/1048576.0,voice.cacheLimit/1048576.0);
+ check(voice.cachedBytes()>0 && voice.cachedBytes()<=voice.cacheLimit,"with every recording decoded, the clips kept stay within the budget");
+ {AtcVoice small;small.load(argv[1]);small.cacheLimit=size_t(4)<<20;size_t most=0;bool all=true;   // (the longest clip is about 2 MB)
+  for(const auto& id:small.indexed()){all&=small.decodes(id);most=std::max(most,small.cachedBytes());}
+  const bool again=small.decodes(small.indexed().front());   // (let go long ago: it decodes again when wanted)
+  check(all && again && most<=small.cacheLimit,"a small budget lets the oldest clips go and decodes them again when wanted");}
  const char* messages[]={
  "MACH 1 - SUPERSONIC","Combat runs at real time","Autoland: stopped past the end of the runway - parking brake set",
  "Autopilot: too much tailwind to stop on this runway - going around","Autopilot: the wind has shifted - unable to autoland at Meadowbrook - circling clear of the ground (it tries again as the wind changes)",

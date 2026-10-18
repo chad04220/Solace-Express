@@ -124,13 +124,14 @@ struct SoakTest {
 #else
     const bool memOk = mem0 > 0 && growth < 96.0;
 #endif
-    const bool bounded = worst[0] <= 9000 && worst[1] <= 5 && worst[2] <= g.atc.historyLimit && worst[3] < 64 && worst[4] < 400 && worst[5] < 4096;
+    const bool bounded = worst[0] <= 9000 && worst[1] <= 5 && worst[2] <= g.atc.historyLimit && worst[3] < 64 && worst[4] < 400 && worst[5] < 4096 &&
+                         g.atc.cachedBytes() <= g.atc.cacheLimit;
     const bool flew = landed >= (legs - legs / 4) / 2;   // (most legs end on the runway; a few don't in the time given)
     const bool used = worst[2] > 0 && (sorties == 0 || (shots > 0 && dropped > 0));   // (a list never filled proves nothing)
     printf("Soak, %d legs: memory %.0f MB after the first legs, %.0f MB at most (+%.0f MB) %s; lists bounded %d (particles %zu, toasts %zu, history %zu, pending %zu, traffic %zu, XR-40 weapons %zu); %d landed; state finite %d\n",
            legs, mem0, memMax, growth, memOk ? "ok" : "GROWING", bounded, worst[0], worst[1], worst[2], worst[3], worst[4], worst[5], landed, finite);
-    printf("Soak, what it used: the towers' history reached %zu calls; %d XR-40 sorties fired %d bolts and dropped %d bombs: %s\n",
-           worst[2], sorties, shots, dropped, used ? "ok" : "UNUSED");
+    printf("Soak, what it used: the towers' history reached %zu calls, %.1f MB of voice clips kept (budget %.0f MB); %d XR-40 sorties fired %d bolts and dropped %d bombs: %s\n",
+           worst[2], g.atc.cachedBytes() / 1048576.0, g.atc.cacheLimit / 1048576.0, sorties, shots, dropped, used ? "ok" : "UNUSED");
     fails += !memOk + !bounded + !flew + !finite + !used;
     printf("Soak: %s\n", fails ? "FAIL" : "ok");
     return fails ? 1 : 0;

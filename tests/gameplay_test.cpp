@@ -71,6 +71,23 @@ struct GameTest {
       int n = std::min(4096, (int)(dt * 48000.f + 0.5f)); g_audio.render(abuf, n);
       if (getenv("ATCWAV")) for (int i = 0; i < n * 2; i++) rec.push_back((int16_t)(clampf(abuf[i], -1, 1) * 32767));
     };
+    // ---- the XR-40's overheat warning: shown each time held fire overheats the lasers, said once in 30 s (the soak
+    // heard it eighteen times in a two-minute sortie)
+    if (voices && in(1)) {
+      Game q; q.initHeadless(); q.diskless = true; q.atc.load(std::string(SOMNIUM_ASSETS) + "/voice"); q.atc.historyLimit = 0;
+      q.resCraft = kSomnus; q.resAirborne = true; q.launchResearch(); q.somnus.armed = true;
+      int shown = 0, said = 0; bool hot = false;
+      for (float t = 0; t < 90.f && q.screen == SCR_FLIGHT; t += 1.f / 60.f) {
+        q.in = Input(); q.in.mDown[0] = fmodf(t, 1.f) < .5f;   // (the lasers in bursts, as the soak fires them)
+        q.update(1.f / 60.f); q.in.endFrame();
+        if (g_audio.voiceBusy()) g_audio.render(abuf, 800);
+        shown += q.combatLoadout.overheated && !hot; hot = q.combatLoadout.overheated;
+      }
+      for (const auto& h : q.atc.history) said += h == "WEAPONS OVERHEATED - COOLING";
+      q.atc.cancel();
+      const bool ok = shown >= 6 && said >= 1 && said <= 3;
+      printf("XR-40 overheat warning: overheated %d times in 90 s of held fire, said %d times: %s\n", shown, said, ok ? "ok" : "FAIL"); fails += !ok;
+    }
     // ---- sun: finite light for every second of the day, in clear and overcast weather
     if (in(1)) for (int wxi = 0; wxi < 2; wxi++) {
       g.wx.cloudCover = wxi ? 1.f : 0.f; g.wx.storm = wxi == 1;

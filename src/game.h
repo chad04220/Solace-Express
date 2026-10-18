@@ -383,6 +383,7 @@ private:
     int wrecked = 0;              // trees, rocks and buildings destroyed
     int kills = 0;
     int shots = 0, dropped = 0;   // laser bolts fired, bombs released (the test cards count them)
+    float overheatSaid = -1e9f;   // when the overheat warning was last spoken (flightClock)
   } somnus;
   hive::Combat hiveCombat;
   hive::Loadout combatLoadout;

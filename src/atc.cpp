@@ -13,7 +13,7 @@
 static const char* kVoiceName[AtcVoice::kVoices] = {"tower_north", "tower_coast", "tower_valley"};
 
 bool AtcVoice::load(const std::string& d) {
-  dir = d; clips.clear(); lookup.clear(); exact.clear(); cues.clear();   // (a reload with removed ids leaves no stale references)
+  dir = d; clips.clear(); lookup.clear(); exact.clear(); cues.clear(); cacheBytes = 0;   // (a reload with removed ids leaves no stale references)
   std::ifstream f(dir + "/voice_index.txt");
   if (!f) return false;
   // Supplemental cues are separate so importing the legacy packs cannot silently erase them.
@@ -299,7 +299,21 @@ const std::vector<float>* AtcVoice::pcm(const std::string& id) {
   auto it = clips.find(id);
   if (it == clips.end()) return nullptr;
   Clip& c = it->second;
-  if (!c.loaded) { c.loaded = true; if (!readWav(dir + "/" + c.file, c.pcm, g_audio.sampleRate)) c.pcm.clear(); }
+  c.used = ++useTick;
+  if (!c.loaded) {
+    c.loaded = true;   // (a file that doesn't decode stays loaded, empty: it isn't read again)
+    if (!readWav(dir + "/" + c.file, c.pcm, g_audio.sampleRate)) std::vector<float>().swap(c.pcm);
+    cacheBytes += c.pcm.capacity() * sizeof(float);
+    // over the budget: the least recently used clips go, never this one (the callers copy a clip out before asking
+    // for the next, so a clip let go mid-transmission has already been used)
+    while (cacheBytes > cacheLimit) {
+      Clip* old = nullptr;
+      for (auto& e : clips) if (&e.second != &c && !e.second.pcm.empty() && (!old || e.second.used < old->used)) old = &e.second;
+      if (!old) break;
+      cacheBytes -= old->pcm.capacity() * sizeof(float);
+      std::vector<float>().swap(old->pcm); old->loaded = false;
+    }
+  }
   return c.pcm.empty() ? nullptr : &c.pcm;
 }
 

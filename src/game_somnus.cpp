@@ -382,7 +382,13 @@ void Game::updateSomnus(float dt) {
   W.laserCD -= dt;
   bool hotBefore=combatLoadout.overheated; int roundsBefore=combatLoadout.rounds;
   if (combatLoadout.step(dt,wr && W.wantFire && W.lasers > 0.97f)) fireLaser();
-  if(wr && !hotBefore && combatLoadout.overheated) toast("WEAPONS OVERHEATED - COOLING",vec3(1,.65f,.3f));
+  // (the warning shows each time, and is spoken once in 30 s: held fire overheats every few seconds, and the soak heard
+  // it eighteen times in a two-minute sortie)
+  if(wr && !hotBefore && combatLoadout.overheated) {
+    const bool say = flightClock - W.overheatSaid >= 30.f;
+    if (say) W.overheatSaid = flightClock;
+    toast("WEAPONS OVERHEATED - COOLING",vec3(1,.65f,.3f),say);
+  }
   if(wr && roundsBefore>0 && combatLoadout.rounds==0) toast("FORWARD AMMUNITION DEPLETED",vec3(1,.65f,.3f));
   W.wantFire = false;
   // bombs fall (a little drag), trail violet sparks, and go off on the ground, the sea or near an aircraft

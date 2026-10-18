@@ -55,12 +55,17 @@ public:
   int missingAudio = 0;
   int dropped = 0;                    // stale transmissions never started
   size_t historyLimit = 64;           // the newest this many are kept (0: all, for tests)
+  // the decoded clips kept, at most this many bytes (the least recently used go first, and decode again when next
+  // wanted): the whole cast decodes to over 400 MB at the engine's rate, a session's working set to a few tens
+  size_t cacheLimit = size_t(64) << 20;
+  size_t cachedBytes() const { return cacheBytes; }
 private:
   bool resolveRecorded(const std::string&, const std::string&, bool, Tx&) const;
   std::vector<std::pair<std::regex,std::string>> cues;
   std::string playingText;
-  struct Clip { std::string file, words, speaker, kind, mission; int prio = 40; std::vector<float> pcm; bool loaded = false; };
+  struct Clip { std::string file, words, speaker, kind, mission; int prio = 40; std::vector<float> pcm; bool loaded = false; uint64_t used = 0; };
   std::unordered_map<std::string, Clip> clips;
+  size_t cacheBytes = 0; uint64_t useTick = 0;
   std::unordered_map<std::string, std::vector<std::string>> exact;   // shown text -> lines
   std::string atomO(const std::string& speaker, const std::string& key) const;   // original pack fragments
   void cardinal(const std::string& sp, long n, std::vector<std::string>& ids) const;

@@ -1,3 +1,14 @@
+## What's new in v3.50.1
+
+### Less memory over a long session
+- **Voice lines no longer pile up in memory.** Every line the game spoke used to stay loaded until you quit, and the whole cast is more than 400 MB once loaded. Now at most 64 MB of voice lines are kept: the ones you haven't heard for a while are let go and loaded again if they come back.
+
+### The XR-40's overheat warning
+- **"Weapons overheated, cooling" is said at most once every 30 seconds.** Holding the trigger overheats the lasers every few seconds, and the warning was spoken every time. It still shows on screen each time.
+
+### Testing
+- **The long-session test now runs with the voices on** and checks every list of things the game keeps (effects, messages, radio calls, traffic, the XR-40's weapons) every second, not only at the end of each flight.
+
 ## What's new in v3.50.0
 
 ### Every aircraft has a new name
