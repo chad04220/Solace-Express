@@ -30,7 +30,7 @@ struct GameTest {
     g.realTime=20;g.uiDt=1.f/60;g.in.mx=g.in.my=-100;
     g.screen=SCR_HUB;g.hubTab=TAB_CONTRACTS;g.hubList=2;
     if(scene=="military_hub") return;
-    g.resCraft=kWraith;g.resCard=-1;g.resAirport=g.career.location;
+    g.resCraft=kSomnus;g.resCard=-1;g.resAirport=g.career.location;
     g.resAirborne=true;g.resWx=0;g.resTime=14;
     g.practiceForward=hive::ForwardSet::Kinetic;g.practiceBomb=hive::BombSet::EMP;g.practiceWave=3;
     if(scene=="practice_configuration") {

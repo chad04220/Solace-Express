@@ -58,7 +58,7 @@ Chooses one LOS-visible, non-Cantor ally within 700 m and supplies 8 shield/seco
 
 Starts with 400 finite shield and 2,500 hull. A 2.5-second visible charge locks the aim before firing one 1,200 m/s, 25-damage lance, then twelve seconds of recovery. Recovery drains shield at 80/second; there is never an invulnerability gate. Hull thresholds below 70% and 35% each spawn exactly two Needle escorts when the eight-actor budget allows. There are at most two escort waves per Archon. No automatic self-shield regeneration or endless reinforcements.
 
-A player Wraith bolt baseline is 25 damage. Player weapon heat, recoil, cooldowns, ammunition and loadout choice remain in the game/loadout layer. Enemy cadence and projectile budgets impose explicit firing limits here.
+A player Somnus bolt baseline is 25 damage. Player weapon heat, recoil, cooldowns, ammunition and loadout choice remain in the game/loadout layer. Enemy cadence and projectile budgets impose explicit firing limits here.
 
 ## Collision and damage
 

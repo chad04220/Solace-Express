@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "iteration": "fleet-interiors-v9-larkspur-atlas",
+  "iteration": "fleet-interiors-v9-thistledown-atlas",
   "coordinate_note": "Pilot, copilot and system records are [body x, metres below pilot eye, metres aft of packed panel station, scale]. Model IDs are stable; dedicated research interiors 10\u201312 do not consume fleet records.",
   "aircraft": [
     {
       "model": 0,
-      "name": "Kestrel T2",
+      "name": "Dawnlark T2",
       "design": "Compact instructor binnacles, narrow central power bank and angled training utility with a separate low push-pull control row",
       "pilot": [
         -0.255,
@@ -64,7 +64,7 @@
     },
     {
       "model": 1,
-      "name": "Wren 180",
+      "name": "Ambler 180",
       "design": "Connected rounded touring fascia with broad shared brow, balanced analog crew scans and central utility above a separate low push-pull control row",
       "pilot": [
         -0.27,
@@ -123,7 +123,7 @@
     },
     {
       "model": 2,
-      "name": "Bushmaster STOL",
+      "name": "Scrubrunner STOL",
       "design": "Supported utility floor sticks, forward mechanical power quadrant, raised analog gauges and supported paired crew seats",
       "pilot": [
         -0.247,
@@ -182,7 +182,7 @@
     },
     {
       "model": 3,
-      "name": "Islander Twin",
+      "name": "Skerry Twin",
       "design": "Squared two-pilot workbench: matched high six-packs, centered paired-engine bank and lower shared utility inset",
       "pilot": [
         -0.343,
@@ -241,7 +241,7 @@
     },
     {
       "model": 4,
-      "name": "Pelican Caravan",
+      "name": "Longshore Hauler",
       "design": "Asymmetric cargo workbench: broad pilot scan and upright single-engine column, recessed co-pilot scan and right-hand utility shelf",
       "pilot": [
         -0.365,
@@ -300,7 +300,7 @@
     },
     {
       "model": 5,
-      "name": "Meridian Q400",
+      "name": "Archipel 400",
       "design": "Matched regional-airliner glass bridge, centralized paired-engine tower and low shared communication deck",
       "pilot": [
         -0.51,
@@ -359,7 +359,7 @@
     },
     {
       "model": 6,
-      "name": "Starling 500",
+      "name": "Emissary 500",
       "design": "Swept executive twin-glass brow with a forward shared engine stack and low center utility console",
       "pilot": [
         -0.294,
@@ -418,7 +418,7 @@
     },
     {
       "model": 7,
-      "name": "Swift S6",
+      "name": "Cutwater S6",
       "design": "Compact tourer with raised center gear/flap island and right-descending engine/fuel group between unequal slim flight binnacles",
       "pilot": [
         -0.3,
@@ -477,7 +477,7 @@
     },
     {
       "model": 8,
-      "name": "Osprey C6",
+      "name": "Wavecrest C6",
       "design": "Warm connected twin bridge: equal copper-edged analog scans, central paired-engine bank and low shared console inset in ivory shell",
       "pilot": [
         -0.328,
@@ -536,7 +536,7 @@
     },
     {
       "model": 9,
-      "name": "XR-10 Nightjar",
+      "name": "XR-10 Vigil",
       "design": "Pilot-dominant research glass with recessed co-pilot primary and a shared forward center engine/status stack",
       "pilot": [
         -0.235,
@@ -595,7 +595,7 @@
     },
     {
       "model": 13,
-      "name": "Larkspur L4",
+      "name": "Thistledown L4",
       "design": "Four-seat olive and ivory utility tourer: raised captain six-pack, recessed right companion scan, offset power/status tower, low compact linked sticks and narrow push-pull console",
       "pilot": [
         -0.3,
@@ -654,7 +654,7 @@
     },
     {
       "model": 14,
-      "name": "Atlas A180",
+      "name": "Galleon 180",
       "design": "Two-crew wraparound blueglass flightdeck: inward-canted equal flight/navigation bridges, shared engine display, low utility and navigation deck, floor yokes, paired thrust pedestal and reachable overhead systems",
       "pilot": [
         -0.72,

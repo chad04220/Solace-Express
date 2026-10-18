@@ -11,9 +11,9 @@ float researchPanelShape(vec2 q, ResearchPanel p){
   vec2 a = abs(q);
   return max(max(a.x - p.h.x, a.y - p.h.y), (a.x + a.y - p.h.x - p.h.y + p.corner)*0.70710678);
 }
-// The Specter's stepped arc is five individually tilted modules. Its broad, central attitude display takes
+// The Nocturne's stepped arc is five individually tilted modules. Its broad, central attitude display takes
 // priority; the adjacent left map and right power module have a shorter scan than the two outer system pages.
-ResearchPanel specterPanel(int i){
+ResearchPanel nocturnePanel(int i){
   ResearchPanel p;
   float a = i == 0 ? -0.91 : i == 1 ? -0.48 : i == 2 ? 0.0 : i == 3 ? 0.48 : 0.91;
   float r = (i == 0 || i == 4) ? 0.66 : i == 2 ? 0.61 : 0.605;
@@ -26,25 +26,25 @@ ResearchPanel specterPanel(int i){
   return p;
 }
 // Shared with the layout clearance test: the panorama frame's actual solid, including its window cut-out.
-float specterPanoramaBezel(vec3 q){
+float nocturnePanoramaBezel(vec3 q){
   float r = length(vec3(q.x, 0.0, q.z)), ang = atan(q.x, -q.z);
   vec2 a = abs(vec2(r - 0.675, ang)), b = abs(vec2(q.y - 0.02, 0.0));
   float d = max(max(a.x - 0.02, a.y - 1.3), b.x - 0.345);
   d = max(d, -max(max(r - 0.66, a.y - 1.25), b.x - 0.30));
   // The curved lower rim used to cross the flat primary glass at its upper corners. Relieve only its mount:
   // the 14 mm margin clears the glass while the module's 18 mm border still covers the opening.
-  ResearchPanel panel = specterPanel(2);
+  ResearchPanel panel = nocturnePanel(2);
   vec3 l = researchPanelFrame(q, panel);
   float keepout = max(researchPanelShape(vec2(l.x, l.y), panel) - 0.014, abs(vec2(l.z - 0.012, 0.0)).x - 0.030);
   return max(d, -keepout);
 }
-int specterPanelIndex(vec3 q){
+int nocturnePanelIndex(vec3 q){
   float a = atan(q.x, -q.z);
   return a < -0.71 ? 0 : a < -0.29 ? 1 : a < 0.29 ? 2 : a < 0.71 ? 3 : 4;
 }
-// The Wraith retains its angular bridge and transparent footwell. Three unequal hex-clipped screens replace
+// The Somnus retains its angular bridge and transparent footwell. Three unequal hex-clipped screens replace
 // the two tiny dash screens: primary attitude in the centre, engines left and heading map right.
-ResearchPanel wraithPanel(int i){
+ResearchPanel somnusPanel(int i){
   ResearchPanel p;
   float side = float(i - 1);
   p.c = i == 1 ? vec3(0.0, -0.389, -0.96) : vec3(side*0.455, -0.409, -0.945);
@@ -59,7 +59,7 @@ ResearchPanel wraithPanel(int i){
 const vec3 WR_BRIDGE_C = vec3(0.0, -0.09, -0.083);
 const vec3 WR_BRIDGE_HALF = vec3(0.68, 0.031, 0.035);
 const float WR_BRIDGE_ROUND = 0.015;
-int wraithPanelIndex(vec3 q){ return q.x < -0.28 ? 0 : q.x > 0.28 ? 2 : 1; }
+int somnusPanelIndex(vec3 q){ return q.x < -0.28 ? 0 : q.x > 0.28 ? 2 : 1; }
 // Kept off the central flight scan and deliberately smaller than the main page.
 const vec3 WR_HOLO_EMITTER = vec3(-0.675, -0.409, -0.932);
 const vec3 WR_HOLO_CENTRE = vec3(-0.675, -0.299, -0.866);

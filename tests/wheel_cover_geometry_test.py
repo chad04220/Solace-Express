@@ -48,7 +48,7 @@ nose_cut, = capture(r"sp=max\(sp,-\(l\.y-\(nc\.y-nwr\*" + n + r"\)\)\)", sdf)
 main_half, = capture(r"sdRoundCylX\(ap-wc,wr," + n + r",0\.04\)", sdf)
 nose_half, = capture(r"sdRoundCylX\(l-nc,nwr," + n + r",0\.035\)", sdf)
 nose_scale, = capture(r"gM\[18\]\.y\*" + n + r";\}", parts)
-assert "if(gtype!=0)res=gearWheelDetails(isAtlas()?" in sdf
+assert "if(gtype!=0)res=gearWheelDetails(isGalleon()?" in sdf
 assert "if(gtype!=0)res=gearWheelDetails(ap-wc," in sdf
 assert "X.R=partRxz(gPS.z);X.T=vec3(0.0,0.0,gM[18].w);" in parts
 assert "gearNoseShape(transpose(X.R)*(p-X.T)/ns)" in sdf

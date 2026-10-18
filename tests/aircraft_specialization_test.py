@@ -23,20 +23,20 @@ def read(name):
 
 common = read('src/shaders/plane_common.glsl')
 expected = {
-    'AF_WRAITH': (True, False, False, True),
+    'AF_SOMNUS': (True, False, False, True),
     'AF_JET': (True, False, True, False),
     'AF_LIGHT': (False, True, False, False),
 }
 for family, values in expected.items():
     block = re.search(r'#(?:if|elif) defined\(' + family + r'\)(.*?)(?=#el)', common, re.S).group(1)
-    for gate, value in zip(('RESEARCH_ON', 'FLEET_ON', 'JET_ON', 'WRAITH_ON'), values):
+    for gate, value in zip(('RESEARCH_ON', 'FLEET_ON', 'JET_ON', 'SOMNUS_ON'), values):
         assert f'#define {gate} {str(value).lower()}' in block, (family, gate)
 
 material = read('src/shaders/plane_material.glsl')
 for gate in ('FLEET_ON && mid == 1', 'FLEET_ON && mid == 2', 'FLEET_ON && mid == 10',
              'FLEET_ON && mid == 21', 'FLEET_ON && mid >= 60', 'FLEET_ON && MODEL_IS(8)',
-             'FLEET_ON && isMantis()', 'FLEET_ON && fleetCabin()',
-             'WRAITH_ON && mid >= 80', 'WRAITH_ON && mid >= 61', 'JET_ON && mid >= 30'):
+             'FLEET_ON && isReverie()', 'FLEET_ON && fleetCabin()',
+             'SOMNUS_ON && mid >= 80', 'SOMNUS_ON && mid >= 61', 'JET_ON && mid >= 30'):
     assert gate in material, 'Missing material family guard: ' + gate
 mesh = read('src/aircraft_mesh.cpp')
 hull = read('src/aircraft_hull.cpp')
@@ -80,23 +80,23 @@ if a.shader_dir:
     # pass's and the bake's, as the driver gets them
     own_code = {
         'mapFleetPanel': (*range(10), 13, 14), 'shadeFleetCabin': (*range(10), 13, 14), 'fuselagePaint': (*range(10), 11, 13, 14),
-        'swiftSeatPadded': (7,), 'swiftPowerFurniture': (7,), 'swiftYokeWheel': (7,), 'swiftDisplayRearSupports': (7,),
-        'bushSeatPadded': (2,), 'bushmasterPowerFurniture': (2,), 'bushmasterStickGrip': (2,), 'bushRaisedPrimaryRisers': (2,),
-        'mapOspreyCabinTrim': (8,), 'ospreyCabinAlbedo': (8,), 'twinPowerBankField': (3, 8),
-        'mapMantisCockpit': (11,),
-        'atlasFanPose': (14,), 'atlasFanField': (14,),
-        'atlasMainKnee': (14,), 'atlasGearFoldR': (14,), 'atlasMainDoorWidth': (14,), 'atlasMainDoorAngle': (14,),
-        'atlasFixedWingFootprint': (14,), 'atlasRootFairing': (14,), 'atlasFairingOwns': (14,),
-        'larkspurStickShaft': (13,), 'larkspurStickGrip': (13,), 'larkspurStickPivot': (13,),
-        'atlasNavFrame': (14,), 'atlasOverheadFrame': (14,), 'mapNewFleetFurnishings': (13, 14),
-        'mapJet': (10,), 'mapJetCockpit': (10,), 'specterPanoramaBezel': (10,), 'jetScreen': (10,), 'jtNozzleShape': (10,),
-        'mapWraith': (12,), 'mapWraithCockpit': (12,), 'wraithScreen': (12,), 'shadeWraithCockpit': (12,),
+        'cutwaterSeatPadded': (7,), 'cutwaterPowerFurniture': (7,), 'cutwaterYokeWheel': (7,), 'cutwaterDisplayRearSupports': (7,),
+        'scrubrunnerSeatPadded': (2,), 'scrubrunnerPowerFurniture': (2,), 'scrubrunnerStickGrip': (2,), 'scrubrunnerRaisedPrimaryRisers': (2,),
+        'mapWavecrestCabinTrim': (8,), 'wavecrestCabinAlbedo': (8,), 'twinPowerBankField': (3, 8),
+        'mapReverieCockpit': (11,),
+        'galleonFanPose': (14,), 'galleonFanField': (14,),
+        'galleonMainKnee': (14,), 'galleonGearFoldR': (14,), 'galleonMainDoorWidth': (14,), 'galleonMainDoorAngle': (14,),
+        'galleonFixedWingFootprint': (14,), 'galleonRootFairing': (14,), 'galleonFairingOwns': (14,),
+        'thistledownStickShaft': (13,), 'thistledownStickGrip': (13,), 'thistledownStickPivot': (13,),
+        'galleonNavFrame': (14,), 'galleonOverheadFrame': (14,), 'mapNewFleetFurnishings': (13, 14),
+        'mapJet': (10,), 'mapJetCockpit': (10,), 'nocturnePanoramaBezel': (10,), 'jetScreen': (10,), 'jtNozzleShape': (10,),
+        'mapSomnus': (12,), 'mapSomnusCockpit': (12,), 'somnusScreen': (12,), 'shadeSomnusCockpit': (12,),
     }
-    shading = ('shadeFleetCabin', 'fuselagePaint', 'ospreyCabinAlbedo', 'jetScreen', 'wraithScreen', 'shadeWraithCockpit')
-    cabin = ('mapFleetPanel', 'swiftSeatPadded', 'swiftPowerFurniture', 'swiftYokeWheel', 'swiftDisplayRearSupports', 'bushSeatPadded',
-             'bushmasterPowerFurniture', 'bushmasterStickGrip', 'bushRaisedPrimaryRisers', 'mapOspreyCabinTrim', 'twinPowerBankField',
-             'mapMantisCockpit', 'mapJetCockpit', 'specterPanoramaBezel', 'mapWraithCockpit', 'larkspurStickShaft', 'larkspurStickGrip',
-             'larkspurStickPivot', 'atlasNavFrame', 'atlasOverheadFrame', 'mapNewFleetFurnishings')
+    shading = ('shadeFleetCabin', 'fuselagePaint', 'wavecrestCabinAlbedo', 'jetScreen', 'somnusScreen', 'shadeSomnusCockpit')
+    cabin = ('mapFleetPanel', 'cutwaterSeatPadded', 'cutwaterPowerFurniture', 'cutwaterYokeWheel', 'cutwaterDisplayRearSupports', 'scrubrunnerSeatPadded',
+             'scrubrunnerPowerFurniture', 'scrubrunnerStickGrip', 'scrubrunnerRaisedPrimaryRisers', 'mapWavecrestCabinTrim', 'twinPowerBankField',
+             'mapReverieCockpit', 'mapJetCockpit', 'nocturnePanoramaBezel', 'mapSomnusCockpit', 'thistledownStickShaft', 'thistledownStickGrip',
+             'thistledownStickPivot', 'galleonNavFrame', 'galleonOverheadFrame', 'mapNewFleetFurnishings')
     for m in range(aircraft_count):
         for prog in (f'plane_mesh_af{m}.frag', f'hullbake_af{m}.frag', f'hullbake_out_af{m}.frag', f'objects_af{m}.frag', f'shadow_proxy_af{m}.frag'):
             src = (a.shader_dir / 'pruned' / prog).read_text()
@@ -119,7 +119,7 @@ if a.shader_dir:
     # (each aircraft's are made as it is drawn); and each scenery class's holds only its class's surfaces
     for prog in ('objects_noaf.frag', 'shadow_proxy_maps.frag', 'effects_light.frag', 'part_pose.frag'):
         src = (a.shader_dir / 'pruned' / prog).read_text()
-        for fn in ('mapPlaneBody', 'mapPlane', 'mapJet', 'mapWraith', 'planeMaterialN', 'mapFleetPanel'):
+        for fn in ('mapPlaneBody', 'mapPlane', 'mapJet', 'mapSomnus', 'planeMaterialN', 'mapFleetPanel'):
             assert not re.search(r'^\w+\s+' + fn + r'\s*\(', src, re.M), (prog, fn)
     classes = {0: ('P_LEAFCARD', 'P_NEEDLE'), 1: ('P_ROCK',), 2: ('K_HANGAR', 'P_FENCE')}
     for c in range(3):

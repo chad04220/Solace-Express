@@ -36,10 +36,10 @@ int main() {
     if (!ok) { printf("FAIL: %s, model %d, part %d\n", what, model, part); failures++; }
   };
   for (int model = 0; model < 15; model++) {
-    const auto family = model == 10 ? Family::Specter : model == 12 ? Family::Wraith : Family::Fleet;
+    const auto family = model == 10 ? Family::Nocturne : model == 12 ? Family::Somnus : Family::Fleet;
     const auto& builder = meshBuilderFor(buildGolden::kPacked[model]);
     check(builder.family == family && familyOf(buildGolden::kPacked[model]) == family, "build-family selection", model);
-    const char* define = model == 10 ? "#define AF_JET\n" : model == 12 ? "#define AF_WRAITH\n" : "#define AF_LIGHT\n";
+    const char* define = model == 10 ? "#define AF_JET\n" : model == 12 ? "#define AF_SOMNUS\n" : "#define AF_LIGHT\n";
     check(strcmp(shaderDefine(family), define) == 0, "unchanged shader-family define", model);
   }
   for (const auto& gold : buildGolden::lists) {

@@ -17,9 +17,9 @@ for kind,rows in sorted(views.items()):
     if a.kinds!='all' and kind not in [int(x) for x in a.kinds.split(',')]:continue
     valid=[r for r in rows if (a.captures/(r['name']+'.png')).exists()]
     if not valid:continue
-    atlas=mesh[(kind,3)];width,height=1920,1280;board=Image.new('RGB',(width,height),(13,23,31));d=ImageDraw.Draw(board)
-    d.text((24,16),f"{atlas['name']} | actual production asset, unit scale",font=title,fill=(235,243,247))
-    first=valid[0];d.text((24,58),f"Hero mesh: {atlas['triangles']} triangles | {float(first['width']):.2f}m wide x {float(first['height_above_grade']):.2f}m above grade x {float(first['depth']):.2f}m deep",font=body,fill=(169,217,198))
+    galleon=mesh[(kind,3)];width,height=1920,1280;board=Image.new('RGB',(width,height),(13,23,31));d=ImageDraw.Draw(board)
+    d.text((24,16),f"{galleon['name']} | actual production asset, unit scale",font=title,fill=(235,243,247))
+    first=valid[0];d.text((24,58),f"Hero mesh: {galleon['triangles']} triangles | {float(first['width']):.2f}m wide x {float(first['height_above_grade']):.2f}m above grade x {float(first['depth']):.2f}m deep",font=body,fill=(169,217,198))
     for n,r in enumerate(valid[:4]):
         path=a.captures/(r['name']+'.png');im=Image.open(path).convert('RGB')
         if im.size!=(1920,1080):raise SystemExit('Native1080 invariant failed: '+str(path))
@@ -27,5 +27,5 @@ for kind,rows in sorted(views.items()):
         x=(n%2)*960;y=105+(n//2)*578
         d.text((x+20,y),r['angle'].replace('_',' ').title(),font=body,fill=(233,239,241));board.paste(im.resize((960,540),Image.Resampling.LANCZOS),(x,y+30))
     d.text((24,1245),'Staged review fixture | Full production renderer | Native originals retained | Software capture, no GPU FPS claim',font=body,fill=(179,192,203))
-    dest=a.output/f'kind_{kind}_multiangle.png';board.thumbnail((a.max_width,round(a.max_width*height/width)),Image.Resampling.LANCZOS);board.save(dest,optimize=True);board.save(dest.with_suffix('.jpg'),quality=94);summary.append({'kind':kind,'name':atlas['name'],'views':len(valid),'hero_triangles':int(atlas['triangles']),'board':dest.name})
+    dest=a.output/f'kind_{kind}_multiangle.png';board.thumbnail((a.max_width,round(a.max_width*height/width)),Image.Resampling.LANCZOS);board.save(dest,optimize=True);board.save(dest.with_suffix('.jpg'),quality=94);summary.append({'kind':kind,'name':galleon['name'],'views':len(valid),'hero_triangles':int(galleon['triangles']),'board':dest.name})
 (a.output/'index.json').write_text(json.dumps(summary,indent=2)+'\n');print(f'Created {len(summary)} real-image asset boards.')

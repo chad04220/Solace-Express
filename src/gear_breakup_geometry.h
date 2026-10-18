@@ -52,7 +52,7 @@ inline NacFold nacFold(const ModelDef& m, const GearStations& gs, float gh) {
   }
   return {vec3(gs.track, pivotY, pivotZ), angle, tz - m.wheelR - .1f, tz + m.wheelR + .12f, pivotZ + .2f, T};
 }
-// Research nose-gear pivot uses the authored belly, including the Wraith facets.
+// Research nose-gear pivot uses the authored belly, including the Somnus facets.
 inline float jetBelly(const ModelDef& m, float z, float x) {
   if (m.engine == 6) {
     const float zc = clampf(z, -8.3f, 7.8f), yc = -.1f - .12f * smoothstepf(-5.f, -8.4f, zc);
@@ -64,13 +64,13 @@ inline float jetBelly(const ModelDef& m, float z, float x) {
   return cy - hh * sqrtf(std::max(1.f - x * x / (hw * hw), 0.f));
 }
 inline float jetWingTop(const ModelDef& m, float x, float z) {
-  const bool wraith = m.engine == 6;
-  const float span = wraith ? x - 1.f : x, chordPos = wraith ? z + 3.f : z + 1.6f;
-  const float k = clampf(span / (wraith ? 5.2f : 5.6f), 0.f, 1.f);
-  const float chord = lerpf(wraith ? 8.2f : 7.2f, wraith ? 1.35f : 1.2f, k);
-  const float le = (wraith ? 4.7f : 5.6f) * k, r1 = (wraith ? .035f : .04f) * chord * .5f, r2 = std::max(.004f * chord, .005f);
+  const bool somnus = m.engine == 6;
+  const float span = somnus ? x - 1.f : x, chordPos = somnus ? z + 3.f : z + 1.6f;
+  const float k = clampf(span / (somnus ? 5.2f : 5.6f), 0.f, 1.f);
+  const float chord = lerpf(somnus ? 8.2f : 7.2f, somnus ? 1.35f : 1.2f, k);
+  const float le = (somnus ? 4.7f : 5.6f) * k, r1 = (somnus ? .035f : .04f) * chord * .5f, r2 = std::max(.004f * chord, .005f);
   const float half = lerpf(r1, r2, clampf((chordPos - le - r1) / std::max(chord - r1 - r2, .01f), 0.f, 1.f));
-  return (wraith ? -.12f - .12f * smoothstepf(-5.f, -8.4f, z) - span * .012f : -.18f - span * .035f) + half;
+  return (somnus ? -.12f - .12f * smoothstepf(-5.f, -8.4f, z) - span * .012f : -.18f - span * .035f) + half;
 }
 inline float jetStowY(const ModelDef& m, float x, float z) {
   float y = jetWingTop(m, x, z) - .16f;
@@ -96,9 +96,9 @@ inline Pose mainPose(const AircraftSpec& s, const ModelDef& m, const GearStation
   const float amount = up(gear), track = gs.track, mz = gs.mainZ, radius = m.wheelR;
   const vec3 wheel(track, radius - gh, mz);
   if (s.special) {
-    const bool wraith = m.engine == 6;
-    const float direction = wraith ? -1.f : 1.f;
-    vec3 hinge(track, -.2f, wraith ? mz - .5f : mz);
+    const bool somnus = m.engine == 6;
+    const float direction = somnus ? -1.f : 1.f;
+    vec3 hinge(track, -.2f, somnus ? mz - .5f : mz);
     for (int i = 0; i < 2; ++i) hinge.y = jetStowY(m, track, hinge.z + direction * length(vec3(track, .38f - gh, mz) - hinge));
     return {hinge, swingRotation(vec3(track, .38f - gh, mz) - hinge, direction, amount)};
   }
@@ -110,9 +110,9 @@ inline Pose mainPose(const AircraftSpec& s, const ModelDef& m, const GearStation
     const NacFold f = nacFold(m, gs, gh);
     return {f.hinge, quat::axisAngle(vec3(1, 0, 0), amount * f.angle)};
   }
-  const bool atlas = &s == &kAircraft[kAtlas];
+  const bool atlas = &s == &kAircraft[kGalleon];
   if (atlas) {
-    // Same swept two-axis trunnion as atlasGearFoldR. partRxz is a
+    // Same swept two-axis trunnion as galleonGearFoldR. partRxz is a
     // negative-Y rotation; preserving that sign and multiplication order
     // keeps partially extended debris aligned with the baked rigid assembly.
     const vec3 hinge(track, -1.30f, 2.72f), v = wheel - hinge;

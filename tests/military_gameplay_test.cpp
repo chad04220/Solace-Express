@@ -65,18 +65,18 @@ struct GameTest {
     // The native Deploy diagnostic separately proves the matching texture contains the real rendered scene.
     {
       Renderer::LoadingPreview preview;
-      preview.texture=17;preview.width=1280;preview.height=720;preview.craft=kNightjar;
+      preview.texture=17;preview.width=1280;preview.height=720;preview.craft=kVigil;
       preview.mission=military::LocalSurvey;preview.ready=true;
-      check(preview.matches(kNightjar,military::LocalSurvey) &&
-        !preview.matches(kMantis,military::LocalSurvey) && !preview.matches(kNightjar,military::RouteRecon),
+      check(preview.matches(kVigil,military::LocalSurvey) &&
+        !preview.matches(kReverie,military::LocalSurvey) && !preview.matches(kVigil,military::RouteRecon),
         "first loading artwork requires both the assigned aircraft and the exact rendered mission identity");
       preview.classified=true;
-      check(!preview.matches(kNightjar,military::LocalSurvey),"classified aircraft snapshots cannot appear as deployed loading artwork");
+      check(!preview.matches(kVigil,military::LocalSurvey),"classified aircraft snapshots cannot appear as deployed loading artwork");
       preview.classified=false;preview.ready=false;
-      check(!preview.matches(kNightjar,military::LocalSurvey),"unfinished GPU snapshots cannot be used as loading artwork");
+      check(!preview.matches(kVigil,military::LocalSurvey),"unfinished GPU snapshots cannot be used as loading artwork");
       preview.ready=true;preview.texture=0;
-      check(!preview.matches(kNightjar,military::LocalSurvey),"missing GPU snapshot never masquerades as an available aircraft image");
-      FrameParams fp{};fp.plane.on=true;fp.plane.model=kNightjar;
+      check(!preview.matches(kVigil,military::LocalSurvey),"missing GPU snapshot never masquerades as an available aircraft image");
+      FrameParams fp{};fp.plane.on=true;fp.plane.model=kVigil;
       check(!g_ren.retainLoadingPreview(fp,military::LocalSurvey) && !g_ren.loadingPreview().ready,
         "snapshot capture requires an initialized renderer and cannot trigger GL work from CPU-only loading tests");
     }
@@ -117,7 +117,7 @@ struct GameTest {
         "submitted loading card skips image decode, scene rendering, collision setup and saves until it is presented");
       g.framePresented();g.updateLoading(dt);
       check(!g.pendingMilitaryLaunch && g.screen==SCR_LOADING && g.militaryFlight &&
-        g.specIdx==kNightjar && g.career.attempt==attempt+1 && g.career.military.activeAttempt==g.career.attempt &&
+        g.specIdx==kVigil && g.career.attempt==attempt+1 && g.career.military.activeAttempt==g.career.attempt &&
         g.hiveCombat.mission.config.objectiveCount==2 && !g.combatCollisionWarm && g.loadFrames==0 &&
         g.loadReadyT<0 && g.loadShown==0 && snapshot(g.career,true)==civil,
         "only the update after presentation saves one loaner attempt and initializes the real mission while keeping readiness locked");
@@ -169,7 +169,7 @@ struct GameTest {
     // freeze on its last frame while the flight's first scene was set up behind it.
     {
       auto q=make();Game& g=*q;g.headless=false;g.screen=SCR_RESEARCH;
-      g.resCraft=kWraith;g.resCard=-1;g.resAirborne=true;g.resAirport=g.career.location;
+      g.resCraft=kSomnus;g.resCard=-1;g.resAirborne=true;g.resAirport=g.career.location;
       const vec3 oldPos=g.plane.pos;const int oldChunks=g_ren.entChunks,oldBakes=g_ren.bakeCount;
       const auto oldSceneSerial=g_ren.gpuFrameSerial;
       g.in.pressed[K_ENTER]=true;g.in.buttonsPressed=PAD_START;
@@ -185,13 +185,13 @@ struct GameTest {
         g_ren.entChunks==oldChunks && g_ren.bakeCount==oldBakes && g_ren.gpuFrameSerial==oldSceneSerial,
         "the drawn card decodes no picture, renders no scene and bakes nothing before it is presented");
       g.framePresented();g.updateLoading(dt);
-      check(!g.pendingLaunch && g.researchFlight && g.screen==SCR_LOADING && g.specIdx==kWraith && !g.plane.onGround &&
+      check(!g.pendingLaunch && g.researchFlight && g.screen==SCR_LOADING && g.specIdx==kSomnus && !g.plane.onGround &&
         g.loadFrames==0 && g.loadReadyT<0,
         "after presentation the research flight is set up, behind the card, its first scene still to come");
     }
     for(bool pad:{false,true}) {   // Back on the card: back where it was launched from, nothing set up
       auto q=make();Game& g=*q;g.headless=false;g.screen=SCR_RESEARCH;
-      g.resCraft=kWraith;g.resCard=-1;g.resAirborne=false;g.resAirport=g.career.location;
+      g.resCraft=kSomnus;g.resCard=-1;g.resAirborne=false;g.resAirport=g.career.location;
       g.launchResearch();g.render();g.framePresented();
       if(pad)g.in.buttonsPressed=PAD_B;else g.in.pressed[K_ESC]=true;
       g.updateLoading(dt);
@@ -294,7 +294,7 @@ struct GameTest {
           "mouse clicking classified Deploy area cannot accept or launch a mission");
         g.in.mx=g.in.my=-100;
         FrameParams locked{};g.militaryPreviewCamera(locked);
-        check(locked.plane.model==kMantis && locked.hangarPreview && locked.hangarClassified && !locked.prefetchOn &&
+        check(locked.plane.model==kReverie && locked.hangarPreview && locked.hangarClassified && !locked.prefetchOn &&
           locked.plane.lensN==0 && locked.landLight==0 && locked.feedRig==0 && locked.dispMode==0 && locked.plN==0,
           "classified preview uses assigned shape with silhouette pass and no lights, feeds or military world streaming");
         // Actual cached showroom triangles must not occlude the aircraft when the terminal's longer
@@ -327,9 +327,9 @@ struct GameTest {
         g.militarySelection=military::LocalSurvey;const FrameParams available=g.buildFrame();
         g.militarySelection=military::RouteRecon;const FrameParams classified=g.buildFrame();
         g.militarySelection=military::LocalSurvey;const FrameParams availableAgain=g.buildFrame();
-        check(!available.hangarClassified && !available.hangarPreview && available.plane.model==kNightjar &&
-          classified.hangarClassified && classified.hangarPreview && classified.plane.model==kMantis &&
-          !availableAgain.hangarClassified && !availableAgain.hangarPreview && availableAgain.plane.model==kNightjar,
+        check(!available.hangarClassified && !available.hangarPreview && available.plane.model==kVigil &&
+          classified.hangarClassified && classified.hangarPreview && classified.plane.model==kReverie &&
+          !availableAgain.hangarClassified && !availableAgain.hangarPreview && availableAgain.plane.model==kVigil,
           "production frame rebuild resets material flags when switching available to locked and back");
       }
       g_ren.W=oldW;g_ren.H=oldH;
@@ -380,7 +380,7 @@ struct GameTest {
         g.career.military.completedMissions==(uint32_t(1)<<military::LocalSurvey),
         "first genuine success unlocks exactly the next displayed mission and no later mission");
       FrameParams afterUnlock{};g.militaryPreviewCamera(afterUnlock);
-      check(beforeUnlock.plane.model==afterUnlock.plane.model && afterUnlock.plane.model==kMantis &&
+      check(beforeUnlock.plane.model==afterUnlock.plane.model && afterUnlock.plane.model==kReverie &&
         beforeUnlock.hangarClassified && !afterUnlock.hangarClassified && !afterUnlock.hangarPreview && afterUnlock.prefetchOn,
         "same assigned aircraft changes from classified silhouette to actual model after predecessor success");
       const uint32_t completion=g.career.military.completedMissions;
@@ -389,7 +389,7 @@ struct GameTest {
         g.career.military.completedMissions==completion,"completed first mission remains replayable through debrief retry");
       g.endFlight(false,"Replay abort",OUT_ABANDONED);
       g.launchMilitary(military::RouteRecon);
-      check(g.screen==SCR_FLIGHT && g.militaryFlight && g.specIdx==kMantis && g.career.military.activeKind==military::RouteRecon,
+      check(g.screen==SCR_FLIGHT && g.militaryFlight && g.specIdx==kReverie && g.career.military.activeKind==military::RouteRecon,
         "genuinely unlocked second assignment launches its actual loaner");
       g.endFlight(false,"Unlocked mission abort",OUT_ABANDONED);
       check(!g.career.militaryMissionUnlocked(military::HighAltitudeIntel) && g.career.military.completedMissions==completion,
@@ -419,7 +419,7 @@ struct GameTest {
       check(g.combatCollisionWarmMs==warmMs && g.hiveCombat.simulatedSeconds()==warmTime && g.hiveCombat.mission.elapsed==warmMission,
         "warmup is idempotent and bounded prefetch does not advance simulation");
       check(g.screen==SCR_FLIGHT && g.militaryFlight && !g.researchFlight && !g.isolatedFlight && !g.freeFlight,"loaner launches in dedicated career-backed mode "+std::to_string(kind));
-      check(g.specIdx==(kind==0?0:kWraith) && g.source==Career::SRC_MILITARY && g.plane.spec==&kAircraft[g.specIdx],"correct recon/combat loaner "+std::to_string(kind));
+      check(g.specIdx==(kind==0?0:kSomnus) && g.source==Career::SRC_MILITARY && g.plane.spec==&kAircraft[g.specIdx],"correct recon/combat loaner "+std::to_string(kind));
       check(g.career.attempt==attempt+1 && g.career.attemptOpen && g.career.military.activeAttempt==g.career.attempt,"launch commits active token "+std::to_string(kind));
       check(kind==0?near(g.plane.payload,85):near(g.plane.payload,85+g.combatLoadout.massKg()),"loaner payload includes kit/stores only for combat XR40");
       check(g.launchPlan.fees()==0 && g.launchPlan.fuelCostEst==0 && near(g.plane.fuel,g.plane.spec->maxFuel) && g.failPlan.kind==0,"supplied aircraft has full included fuel and no maintenance roll");
@@ -599,7 +599,7 @@ struct GameTest {
         "expanded mission launches its catalogued XR loaner "+std::to_string(missionId));
       check(g.career.attempt==beforeAttempt+1 && m.config.kind==definition.objective &&
         g.combatLoadout.forward==definition.forward && g.combatLoadout.bomb==definition.bomb &&
-        near(g.plane.payload,85+(definition.aircraft==kWraith?g.combatLoadout.massKg():0)),
+        near(g.plane.payload,85+(definition.aircraft==kSomnus?g.combatLoadout.massKg():0)),
         "mission objective, equipment and physical payload agree with catalogue "+std::to_string(missionId));
       FrameParams loading;const auto position=g.plane.pos;const float fuel=g.plane.fuel;
       g.militaryLoadingCamera(loading);
@@ -653,13 +653,13 @@ struct GameTest {
         }
       } else {
         g.plane.pos=vec3(0,18000,0);g.plane.vel=vec3();
-        g.wraith.armed=true;g.wraith.lasers=1;g.wraith.wantFire=true;
+        g.somnus.armed=true;g.somnus.lasers=1;g.somnus.wantFire=true;
         const int rounds=g.combatLoadout.rounds;const float payload=g.plane.payload;
-        for(int n=0;n<90 && g.combatLoadout.rounds==rounds;++n){g.wraith.wantFire=true;g.updateWraith(dt);}
-        check(g.combatLoadout.rounds==rounds-1 && !g.wraith.bolts.empty() && g.wraith.bolts.back().kind==definition.forward &&
+        for(int n=0;n<90 && g.combatLoadout.rounds==rounds;++n){g.somnus.wantFire=true;g.updateSomnus(dt);}
+        check(g.combatLoadout.rounds==rounds-1 && !g.somnus.bolts.empty() && g.somnus.bolts.back().kind==definition.forward &&
           near(g.plane.payload,payload-hive::forwardSpec(definition.forward).roundMassKg),
           "armed XR mission fires its supplied finite physical gun "+std::to_string(missionId));
-        g.wraith.wantFire=false;
+        g.somnus.wantFire=false;
         if(definition.objective==hive::MissionKind::Defense) {
           check(m.config.waveCount==4 && m.config.waves[0].types[0]==hive::Type::Bastion,
             "heavy defense is four bomber-led waves rather than the introductory encounter");
@@ -804,10 +804,10 @@ struct GameTest {
       check(!items.empty(),"cleanup regression uses an actual authored airport entity");
       if(!items.empty())check(g_scenery.damage(items[0].e,items[0].kind,100000) && g_scenery.destroyed(items[0].e),
         "cleanup regression damages an entity through the production scenery path");
-      g.wraith.bolts.push_back({g.plane.pos,vec3(),vec3(0,0,-1),30,0,10,false});
-      g.wraith.bombs.push_back({g.plane.pos,vec3(),0});g.wraith.craters.push_back({0,0,20,3});
-      g.wraith.flattened.push_back(vec3(0,0,20));g_scenery.craters.push_back(vec3(0,0,20));
-      g.wraith.wantFire=true;g.wraith.armed=true;g.wraith.bombQueue=3;g.militaryHull=12;
+      g.somnus.bolts.push_back({g.plane.pos,vec3(),vec3(0,0,-1),30,0,10,false});
+      g.somnus.bombs.push_back({g.plane.pos,vec3(),0});g.somnus.craters.push_back({0,0,20,3});
+      g.somnus.flattened.push_back(vec3(0,0,20));g_scenery.craters.push_back(vec3(0,0,20));
+      g.somnus.wantFire=true;g.somnus.armed=true;g.somnus.bombQueue=3;g.militaryHull=12;
       g.tipTrail[0].resize(1);g.tipTrail[1].resize(1);g.pieceTrail[0].resize(1);g.bursts.resize(1);
       g.trail.resize(1);g.cloudWake.resize(1);g.tipOn=g.airBreak=true;
       g.endFlight(false,"Cleanup regression",OUT_ABANDONED);const auto settled=snapshot(g.career);
@@ -816,8 +816,8 @@ struct GameTest {
         g.screen==SCR_HUB && g.hubList==2 && g.militaryHull==100 && !g.combatCollisionWarm &&
         g.hiveCombat.aliveCount()==0 && g.hiveCombat.mission.status==hive::MissionStatus::Inactive && fp.enemyN==0 && fp.hiveOrdnanceN==0,
         "returning loaner clears mode, source, hull damage, collision warm state and all enemy rendering");
-      check(g.wraith.bolts.empty() && g.wraith.bombs.empty() && g.wraith.blasts.empty() && g.wraith.craters.empty() &&
-        g.wraith.flattened.empty() && !g.wraith.wantFire && !g.wraith.armed && g.wraith.bombQueue==0 && g.wraith.fireLatch &&
+      check(g.somnus.bolts.empty() && g.somnus.bombs.empty() && g.somnus.blasts.empty() && g.somnus.craters.empty() &&
+        g.somnus.flattened.empty() && !g.somnus.wantFire && !g.somnus.armed && g.somnus.bombQueue==0 && g.somnus.fireLatch &&
         !g_scenery.anyGone() && (items.empty() || !g_scenery.destroyed(items[0].e)),
         "returning loaner clears all weapon effects, held controls, craters and destroyed civilian scenery");
       bool noPieceTrails=true;for(const auto& trail:g.pieceTrail)noPieceTrails&=trail.empty();
@@ -826,7 +826,7 @@ struct GameTest {
       g.returnToMilitary();check(snapshot(g.career)==settled,"repeated loaner cleanup never duplicates or changes settlement");
       g.beginFreeFlightSetup();g.freeCraft=0;g.freeAirport=g.career.location;g.freeAirborne=true;g.launchFreeFlight();
       check(g.freeFlight && !g.militaryFlight && g.specIdx==0 && g.source!=Career::SRC_MILITARY && near(g.plane.payload,85) &&
-        g.hiveCombat.aliveCount()==0 && g.wraith.bombs.empty() && !g_scenery.anyGone() && snapshot(g.career)==settled,
+        g.hiveCombat.aliveCount()==0 && g.somnus.bombs.empty() && !g_scenery.anyGone() && snapshot(g.career)==settled,
         "civilian free flight after military return has no loaner equipment, enemies, damage or extra charges");
       g.endFlight(false,"",OUT_ABANDONED);
     }
@@ -843,7 +843,7 @@ struct GameTest {
         for(int i=0;i<4;++i)research[i]|=d.aircraft==kResearchAircraft[i];
         for(int craft=-1;craft<=kAircraftCount+4;++craft)
           legal&=g.career.canFly(c,craft)==(craft==d.aircraft?Career::SRC_MILITARY:Career::SRC_NONE);
-        g.militarySelection=id;g.resCraft=(d.aircraft==kWraith?kNightjar:kWraith);
+        g.militarySelection=id;g.resCraft=(d.aircraft==kSomnus?kVigil:kSomnus);
         FrameParams preview;g.militaryPreviewCamera(preview);
         legal&=preview.plane.model==d.aircraft && preview.enemyN==0 && preview.trafficN==0;
       }
@@ -923,28 +923,28 @@ struct GameTest {
 
     // The player bolt is consumed at its actual contact, including interceptable enemy ordnance.
     {
-      auto q=make();Game& g=*q;g.resCraft=kWraith;g.resCard=-1;g.resAirborne=true;g.resAirport=g.career.location;g.launchResearch();
+      auto q=make();Game& g=*q;g.resCraft=kSomnus;g.resCard=-1;g.resAirborne=true;g.resAirport=g.career.location;g.launchResearch();
       g.plane.pos=vec3(0,12500,0);
       const uint32_t target=g.hiveCombat.spawn(hive::Type::Needle,vec3(0,12000,0));
-      g.wraith.bolts.push_back({vec3(0,12000,80),vec3(0,0,-1000),vec3(0,0,-1),30,0,10,false,hive::ForwardSet::Pulse});
+      g.somnus.bolts.push_back({vec3(0,12000,80),vec3(0,0,-1000),vec3(0,0,-1),30,0,10,false,hive::ForwardSet::Pulse});
       g.updateBolts(.1f);
-      check(!g.wraith.bolts.empty() && g.wraith.bolts[0].hit && std::fabs(g.wraith.bolts[0].h.z)<10 && g.hiveCombat.find(target)->hull<hive::roleSpec(hive::Type::Needle).hull,"player bolt stops on shaped hull instead of frame-end position");
+      check(!g.somnus.bolts.empty() && g.somnus.bolts[0].hit && std::fabs(g.somnus.bolts[0].h.z)<10 && g.hiveCombat.find(target)->hull<hive::roleSpec(hive::Type::Needle).hull,"player bolt stops on shaped hull instead of frame-end position");
       g.clearPracticeEncounter();
       auto& bomb=g.hiveCombat.projectiles[0];bomb={};bomb.alive=true;bomb.id=77;bomb.team=hive::Team::Hive;bomb.weapon=hive::Weapon::Bomb;bomb.position=vec3(0,12000,40);bomb.radius=.45f;bomb.life=10;
-      g.wraith.bolts.push_back({vec3(0,12000,80),vec3(0,0,-1000),vec3(0,0,-1),30,0,10,false,hive::ForwardSet::Pulse});
+      g.somnus.bolts.push_back({vec3(0,12000,80),vec3(0,0,-1000),vec3(0,0,-1),30,0,10,false,hive::ForwardSet::Pulse});
       g.updateBolts(.1f);
-      check(!bomb.alive && !g.wraith.bolts.empty() && g.wraith.bolts[0].hit && std::fabs(g.wraith.bolts[0].h.z-40.45f)<.01f,"intercepting a Hive bomb consumes the player bolt at exact contact");
+      check(!bomb.alive && !g.somnus.bolts.empty() && g.somnus.bolts[0].hit && std::fabs(g.somnus.bolts[0].h.z-40.45f)<.01f,"intercepting a Hive bomb consumes the player bolt at exact contact");
       g.endFlight(false,"Bolt tests finished",OUT_ABANDONED);
     }
 
     // Fast physical bombs must hit intervening hulls/buildings; ground-origin LOS must not suppress blast damage.
     {
-      auto q=make(); Game& g=*q; g.resCraft=kWraith;g.resCard=-1;g.resAirborne=true;g.resAirport=g.career.location;g.launchResearch();
+      auto q=make(); Game& g=*q; g.resCraft=kSomnus;g.resCard=-1;g.resAirborne=true;g.resAirport=g.career.location;g.launchResearch();
       g.plane.pos=vec3(0,12500,0); g.plane.vel=vec3();
       const uint32_t id=g.hiveCombat.spawn(hive::Type::Needle,vec3(0,12000,0));
-      g.wraith.bombs.push_back({vec3(0,12000,80),vec3(0,0,-1000),1,hive::BombSet::Plasma});
-      g.updateWraith(.16f);
-      check(g.wraith.bombs.empty() && g.hiveCombat.find(id)->hull<hive::roleSpec(hive::Type::Needle).hull && !g.wraith.blasts.empty() && std::fabs(g.wraith.blasts.back().p.z)<15,"fast bomb crossing Hive hull detonates at swept contact, not frame end");
+      g.somnus.bombs.push_back({vec3(0,12000,80),vec3(0,0,-1000),1,hive::BombSet::Plasma});
+      g.updateSomnus(.16f);
+      check(g.somnus.bombs.empty() && g.hiveCombat.find(id)->hull<hive::roleSpec(hive::Type::Needle).hull && !g.somnus.blasts.empty() && std::fabs(g.somnus.blasts.back().p.z)<15,"fast bomb crossing Hive hull detonates at swept contact, not frame end");
       g.clearPracticeEncounter(); g.refreshGroundPits();
       std::vector<AptItem> items; airportItems(g.career.location,items); const AptItem* building=nullptr;
       for(const auto& item:items) if(item.kind==EK_ARCH_HANGAR || item.kind==EK_HANGAR) {building=&item;break;}
@@ -958,14 +958,14 @@ struct GameTest {
         vec3 end=from+nextV*tick; float fraction=hiveWorldSweep(from,end,.29f);
         check(fraction>=0 && fraction<=1,"real building obstructs fast bomb segment");
         const vec3 expected=lerp(from,end,clampf(fraction,0.f,1.f));
-        g.wraith.bombs.push_back({from,velocity,1,hive::BombSet::Plasma});g.updateWraith(tick);
-        check(g.wraith.bombs.empty() && !g.wraith.blasts.empty() && length(g.wraith.blasts.back().p-expected)<.1f,"fast bomb selects actual nearest world obstruction");
-        check(!g.wraith.craters.empty(),"normal land plasma detonation retains crater behavior");
+        g.somnus.bombs.push_back({from,velocity,1,hive::BombSet::Plasma});g.updateSomnus(tick);
+        check(g.somnus.bombs.empty() && !g.somnus.blasts.empty() && length(g.somnus.blasts.back().p-expected)<.1f,"fast bomb selects actual nearest world obstruction");
+        check(!g.somnus.craters.empty(),"normal land plasma detonation retains crater behavior");
         g.clearPracticeEncounter();g.refreshGroundPits();
         const vec3 boltEnd=from+velocity*tick; const float boltFraction=hiveWorldSweep(from,boltEnd,0);
-        g.wraith.bolts.push_back({from,velocity,normalize(velocity),30,0,10,false,hive::ForwardSet::Pulse});
+        g.somnus.bolts.push_back({from,velocity,normalize(velocity),30,0,10,false,hive::ForwardSet::Pulse});
         g.updateBolts(tick);
-        check(boltFraction<=1 && !g.wraith.bolts.empty() && g.wraith.bolts[0].hit && length(g.wraith.bolts[0].h-lerp(from,boltEnd,boltFraction))<.1f,"accurate world contact consumes bolt before an intervening building");
+        check(boltFraction<=1 && !g.somnus.bolts.empty() && g.somnus.bolts[0].hit && length(g.somnus.bolts[0].h-lerp(from,boltEnd,boltFraction))<.1f,"accurate world contact consumes bolt before an intervening building");
 
         g.clearPracticeEncounter();g.refreshGroundPits();
         const vec3 blast=center-vec3(span,0,0), hidden=center+vec3(span,0,0);
@@ -987,7 +987,7 @@ struct GameTest {
           g.detonate(wall,false,hive::BombSet::Plasma,&query);
           check(g.hiveCombat.find(front)->hull<hive::roleSpec(hive::Type::Needle).hull,"wall contact nudges blast query outside so near-side enemy takes damage");
           check(g.hiveCombat.find(back)->hull==protectedHull && g.hiveCombat.find(back)->shield==protectedShield,"wall still shields far-side enemy after origin clearance");
-          check(!g.wraith.blasts.empty() && length(g.wraith.blasts.back().p-wall)<.001f,"wall detonation visual remains at exact contact");
+          check(!g.somnus.blasts.empty() && length(g.somnus.blasts.back().p-wall)<.001f,"wall detonation visual remains at exact contact");
         }
 
       }
@@ -997,39 +997,39 @@ struct GameTest {
       g.detonate(sea,true,hive::BombSet::EMP);
       check(a->shield==0 && a->hull==hull,"surface EMP reaches exposed enemy from clearance-adjusted query origin");
       g.detonate(sea,true,hive::BombSet::Plasma);
-      check(a->hull<hull && !g.wraith.blasts.empty() && g.wraith.blasts.back().p.y==0,"surface blast damages visible enemy while visual remains exactly on water");
+      check(a->hull<hull && !g.somnus.blasts.empty() && g.somnus.blasts.back().p.y==0,"surface blast damages visible enemy while visual remains exactly on water");
       g.endFlight(false,"Bomb tests finished",OUT_ABANDONED);
     }
 
     // Research free-roam practice is entirely isolated, including live equipment swaps, damage and repeated reset.
     {
       auto q=make(); Game& g=*q; g.career.job->state=Career::JobState::ACTIVE; g.career.attemptOpen=true;
-      g.resCraft=kWraith; g.resCard=-1; g.resAirborne=true; g.resAirport=g.career.location;
+      g.resCraft=kSomnus; g.resCard=-1; g.resAirborne=true; g.resAirport=g.career.location;
       const std::string before=snapshot(g.career); g.launchResearch();
       check(g.researchFlight && !g.militaryFlight && g.screen==SCR_FLIGHT,"research practice launches outside military career");
       g.spawnPracticeWave(); g.spawnPracticeWave(); g.spawnPracticeWave();
       check(g.hiveCombat.aliveCount()==hive::MaxActors,"repeated wave requests remain bounded at eight actors");
       g.practiceForward=hive::ForwardSet::Kinetic; g.practiceBomb=hive::BombSet::EMP;
-      g.wraith.bombQueue=3; g.wraith.wantFire=true; g.wraith.bombs.push_back({g.plane.pos,vec3(),0});
+      g.somnus.bombQueue=3; g.somnus.wantFire=true; g.somnus.bombs.push_back({g.plane.pos,vec3(),0});
       g.militaryHull=12; g.clearPracticeEncounter();
-      check(g.hiveCombat.aliveCount()==0 && g.hiveCombat.mission.status==hive::MissionStatus::Inactive && g.wraith.bombs.empty() && !g.wraith.wantFire && g.wraith.bombQueue==0 && g.wraith.fireLatch,"equipment swap clears encounter, ordnance and held controls");
+      check(g.hiveCombat.aliveCount()==0 && g.hiveCombat.mission.status==hive::MissionStatus::Inactive && g.somnus.bombs.empty() && !g.somnus.wantFire && g.somnus.bombQueue==0 && g.somnus.fireLatch,"equipment swap clears encounter, ordnance and held controls");
       check(g.combatLoadout.forward==hive::ForwardSet::Kinetic && g.combatLoadout.bomb==hive::BombSet::EMP && g.combatLoadout.rounds==hive::forwardSpec(hive::ForwardSet::Kinetic).rounds && g.militaryHull==100,"equipment swap refills selected stores and practice hull");
-      g.plane.pos=vec3(0,12000,0); g.wraith.armed=true; g.wraith.lasers=1; g.wraith.wantFire=true;
+      g.plane.pos=vec3(0,12000,0); g.somnus.armed=true; g.somnus.lasers=1; g.somnus.wantFire=true;
       const float fullPayload=g.plane.payload;
       const float firingMass=g.plane.mass(); const vec3 velocityBefore=g.plane.vel;
-      const int rounds=g.combatLoadout.rounds; g.updateWraith(dt);
+      const int rounds=g.combatLoadout.rounds; g.updateSomnus(dt);
       check(std::fabs(length(g.plane.vel-velocityBefore)*firingMass-hive::forwardSpec(hive::ForwardSet::Kinetic).recoilImpulseNs)<.1f,"gun recoil uses impulse divided by actual aircraft mass");
       check(near(g.plane.payload,fullPayload-hive::forwardSpec(hive::ForwardSet::Kinetic).roundMassKg),"firing reduces physical ammunition mass");
-      check(g.combatLoadout.rounds==rounds-1 && !g.wraith.bolts.empty() && g.wraith.bolts.back().kind==hive::ForwardSet::Kinetic,"selected forward weapon fires through Game equipment and projectile path");
+      check(g.combatLoadout.rounds==rounds-1 && !g.somnus.bolts.empty() && g.somnus.bolts.back().kind==hive::ForwardSet::Kinetic,"selected forward weapon fires through Game equipment and projectile path");
       const float beforeDrop=g.plane.payload;
-      g.wraith.bay=1; g.wraith.bombLoaded=1; g.wraith.bombQueue=1; const int stores=g.combatLoadout.bombs; g.updateWraith(dt);
+      g.somnus.bay=1; g.somnus.bombLoaded=1; g.somnus.bombQueue=1; const int stores=g.combatLoadout.bombs; g.updateSomnus(dt);
       check(near(g.plane.payload,beforeDrop-hive::bombSpec(hive::BombSet::EMP).storeMassKg),"released bomb leaves aircraft payload mass");
-      check(g.combatLoadout.bombs==stores-1 && !g.wraith.bombs.empty() && g.wraith.bombs.back().kind==hive::BombSet::EMP,"selected payload consumes a finite physical store");
-      FrameParams payloadVisual; payloadVisual.plane.on=true; g.wraithVisual(payloadVisual);
+      check(g.combatLoadout.bombs==stores-1 && !g.somnus.bombs.empty() && g.somnus.bombs.back().kind==hive::BombSet::EMP,"selected payload consumes a finite physical store");
+      FrameParams payloadVisual; payloadVisual.plane.on=true; g.somnusVisual(payloadVisual);
       if(payloadVisual.fx.bombs>0) {
         const float* rotation=payloadVisual.fx.bombRot[0];
         const vec3 forward(-rotation[6],-rotation[7],-rotation[8]);
-        check(dot(forward,normalize(g.wraith.bombs[0].v))>.999f && payloadVisual.plane.wrBombSet==(int)hive::BombSet::EMP,"released rigid payload aligns to velocity and carried model uses selected type");
+        check(dot(forward,normalize(g.somnus.bombs[0].v))>.999f && payloadVisual.plane.wrBombSet==(int)hive::BombSet::EMP,"released rigid payload aligns to velocity and carried model uses selected type");
       } else check(false,"released payload receives a visual instance");
 
       const uint32_t id=g.hiveCombat.spawn(hive::Type::Archon,g.plane.pos+vec3(0,0,-200));
@@ -1046,10 +1046,10 @@ struct GameTest {
         "research practice cannot grant service completion or reveal a later military assignment");
       g.launchResearch(); g.screen=SCR_LOADING; g.in.pressed[K_ESC]=true; g.updateLoading(dt); g.in.endFrame();
       check(g.screen==SCR_RESEARCH && snapshot(g.career)==before,"research loading cancellation does not close civilian active attempt");
-      g.resCraft=kMantis; g.launchResearch(); g.spawnPracticeWave();
+      g.resCraft=kReverie; g.launchResearch(); g.spawnPracticeWave();
       check(g.hiveCombat.aliveCount()==0,"practice encounter spawning is restricted to XR-40");
       g.endFlight(false,"",OUT_ABANDONED);
-      g.resCraft=kWraith; g.resCard=-1; g.launchResearch(); g.resCard=0; g.spawnPracticeWave();
+      g.resCraft=kSomnus; g.resCard=-1; g.launchResearch(); g.resCard=0; g.spawnPracticeWave();
       check(g.hiveCombat.aliveCount()==0,"test-card sorties cannot spawn free-roam practice waves");
       g.endFlight(false,"",OUT_ABANDONED);
       check(snapshot(g.career)==before,"rejected practice operations cannot advance or settle career");
@@ -1106,7 +1106,7 @@ struct GameTest {
           "pending save removes Deploy from keyboard/controller focus and provides Retry save");
         g.pendingCareer.reset();g.saveWhy.clear();frame();
         g.focusNav=true;g.focusId=0x6D0002u;g.in.pressed[K_ENTER]=true;frame();
-        check(g.screen==SCR_FLIGHT && g.militaryFlight && g.specIdx==kMantis && !g.wraith.wantFire,
+        check(g.screen==SCR_FLIGHT && g.militaryFlight && g.specIdx==kReverie && !g.somnus.wantFire,
           "keyboard deploy uses selected mission and does not carry its Enter into weapons");
         const uint32_t token=g.career.military.activeAttempt;g.paused=true;frame();
         bool pauseBounds=true;for(const auto& f:g.focusList)pauseBounds&=f.x>=0 && f.y>=0 && f.x+f.w<=g_ren.W && f.y+f.h<=g_ren.H;
@@ -1119,7 +1119,7 @@ struct GameTest {
         check(g.screen==SCR_DEBRIEF && !g.lastSuccess && g.career.military.failures==1,
           "controller pause Abort settles once into the military debrief");
         frame();g.focusNav=true;g.focusId=0x6D2002u;g.in.buttonsPressed=PAD_A;frame();
-        check(g.screen==SCR_FLIGHT && g.militaryFlight && g.career.military.activeAttempt>token && g.specIdx==kMantis,
+        check(g.screen==SCR_FLIGHT && g.militaryFlight && g.career.military.activeAttempt>token && g.specIdx==kReverie,
           "controller A on debrief Retry launches only the selected military retry");
         g.endFlight(false,"Back-focus regression",OUT_ABANDONED);frame();
         const uint32_t settledAttempt=g.career.attempt;
@@ -1227,7 +1227,7 @@ struct GameTest {
         auto values=[&]() {return std::array<int,3>{{int(g.practiceForward),int(g.practiceBomb),g.practiceWave}};};
         auto previewMatches=[&]() {
           FrameParams fp{};g.researchPreviewCamera(fp);
-          return fp.plane.model==kWraith && fp.plane.wrBombSet==int(g.practiceBomb) &&
+          return fp.plane.model==kSomnus && fp.plane.wrBombSet==int(g.practiceBomb) &&
             near(fp.plane.wr[6][3],float(g.practiceForward)) && fp.plane.wr[6][0]>0 &&
             fp.fx.beams==0 && fp.fx.bombs==0 && g.hiveCombat.aliveCount()==0;
         };
@@ -1280,7 +1280,7 @@ struct GameTest {
         for(uint32_t id:viewIds)walked&=walkedDown.count(id) && walkedUp.count(id);
         std::vector<uint32_t> selectionIds{0x7E5D0000u};
         for(int i=0;i<4;++i)selectionIds.push_back(0x7E5C0000u+uint32_t(i));
-        for(int i=0;i<Game::kNumResCards;++i)if(Game::kResCards[i].craft==kWraith)selectionIds.push_back(0x7E5D0000u+uint32_t(i+1));
+        for(int i=0;i<Game::kNumResCards;++i)if(Game::kResCards[i].craft==kSomnus)selectionIds.push_back(0x7E5D0000u+uint32_t(i+1));
         for(uint32_t id:selectionIds)walked&=walkedDown.count(id) && walkedUp.count(id);
         check(walked,"keyboard reaches every airframe, test card, equipment and preview control from unfocused terminal and back"+label);
         // Explore real D-pad transitions only from already reached states. This catches isolated focus islands
@@ -1385,7 +1385,7 @@ struct GameTest {
         for(int n=0;n<4;++n) {
           g.in.pressed[K_TAB]=true;frame();frame();FrameParams fp{};g.researchPreviewCamera(fp);
           preserved&=values()==chosen && fp.plane.model==g.resCraft &&
-            (g.resCraft==kWraith ? visible(control(kitIds[0])) : !control(kitIds[0]).id);
+            (g.resCraft==kSomnus ? visible(control(kitIds[0])) : !control(kitIds[0]).id);
           for(uint32_t id:viewIds)preserved&=control(id).id==id;
           g.researchView.yaw=.7f;g.researchView.zoom=1;g.researchView.idle=0;g.focusNav=true;g.focusId=viewIds[1];g.in.pressed[K_ENTER]=true;frame();
           preserved&=near(g.researchView.yaw,.7f+15*DEG);
@@ -1393,7 +1393,7 @@ struct GameTest {
           g.focusId=viewIds[4];g.in.pressed[K_ENTER]=true;frame();
           preserved&=near(g.researchView.yaw,.7f) && near(g.researchView.pitch,.15f) && near(g.researchView.zoom,1) && values()==chosen;
         }
-        for(int card=0;card<Game::kNumResCards;++card)if(Game::kResCards[card].craft==kWraith) {
+        for(int card=0;card<Game::kNumResCards;++card)if(Game::kResCards[card].craft==kSomnus) {
           const uint32_t cardId=0x7E5D0000u+uint32_t(card+1);
           preserved&=control(cardId).id==cardId;
           g.focusNav=true;g.focusId=cardId;g.in.pressed[K_ENTER]=true;
@@ -1421,7 +1421,7 @@ struct GameTest {
     // Render CPU-side UI geometry only: exercise the real widget/input paths without a GL context.
     {
       const int oldW=g_ren.W,oldH=g_ren.H;g_ren.W=1920;g_ren.H=1080;
-      auto q=make();Game& g=*q;g.screen=SCR_RESEARCH;g.resCraft=kWraith;g.resCard=-1;
+      auto q=make();Game& g=*q;g.screen=SCR_RESEARCH;g.resCraft=kSomnus;g.resCard=-1;
       g.resOpened=g.resSeqOpened=0;g.resSeq=10;g.resSeqAt=g.realTime;g.resAuthed=true;
       g.focusScreen=SCR_RESEARCH*4;g.in.mx=g.in.my=-100;
       const std::string before=snapshot(g.career);

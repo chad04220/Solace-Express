@@ -1,4 +1,4 @@
-// Existing research landing-gear bounds, shared by Specter and Wraith.
+// Existing research landing-gear bounds, shared by Nocturne and Somnus.
 #pragma once
 #include "aircraft_mesh_build_types.h"
 namespace aircraftBuild {

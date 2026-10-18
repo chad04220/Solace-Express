@@ -38,9 +38,9 @@ int main(int argc,char**argv){
   v=original;ix={0,2,1,0,2,1};const uint32_t fineStart=3;
   assert(repairCoherentWinding(v,ix,s)&&s.flipped==2&&ix.size()==6&&fineStart==3&&v==original);
   assert(ix==std::vector<uint32_t>({0,1,2,0,1,2}));
-  // Native Swift bright-fleck witness, static cache triangle 146476.
-  std::vector<float> swift={-0.385614038f,0.185181677f,-2.74278712f,0.793511391f,-0.544367909f,0.272035629f,11.0f,0.69958353f,-0.385950923f,0.180993259f,-2.75090051f,0.797143102f,-0.538379967f,0.273331016f,11.0f,0.647515893f,-0.388762414f,0.174513072f,-2.75607133f,0.807487905f,-0.527468622f,0.264083415f,11.0f,0.610155404f};
-  const auto swiftBefore=swift;std::vector<uint32_t> swiftIx={0,1,2};
-  assert(repairCoherentWinding(swift,swiftIx,s)&&s.flipped==1&&swift==swiftBefore&&swiftIx==std::vector<uint32_t>({0,2,1}));
+  // Native Cutwater bright-fleck witness, static cache triangle 146476.
+  std::vector<float> cutwater={-0.385614038f,0.185181677f,-2.74278712f,0.793511391f,-0.544367909f,0.272035629f,11.0f,0.69958353f,-0.385950923f,0.180993259f,-2.75090051f,0.797143102f,-0.538379967f,0.273331016f,11.0f,0.647515893f,-0.388762414f,0.174513072f,-2.75607133f,0.807487905f,-0.527468622f,0.264083415f,11.0f,0.610155404f};
+  const auto cutwaterBefore=cutwater;std::vector<uint32_t> cutwaterIx={0,1,2};
+  assert(repairCoherentWinding(cutwater,cutwaterIx,s)&&s.flipped==1&&cutwater==cutwaterBefore&&cutwaterIx==std::vector<uint32_t>({0,2,1}));
   puts("mesh_orientation_test: coherent reversal, valid backface, paired geometry, mixed materials, ambiguous normals, invalid input, immutable attributes and partition preservation passed");
 }

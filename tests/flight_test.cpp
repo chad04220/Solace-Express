@@ -29,8 +29,8 @@ int main(int argc, char** argv) {
   // highest altitude, the comfort routes in a single and the jet, the autoland's failures as an engine out and ice.
   // Every section still runs; the full set is the Windows job's and every local run's.
   const bool quick = getenv("FLIGHT_QUICK") != nullptr;
-  auto skip = [&](int i) { return quick && i != 0 && i != 3 && i != 5 && i != 6 && i != kResearchJet && i != kWraith; };
-  if (strcmp(kAircraft[kOsprey].id, "osprey_c6") != 0 || strcmp(kAircraft[kNightjar].id, "xr10_nightjar") != 0 || strcmp(kAircraft[kResearchJet].id, "xr30_specter") != 0 || strcmp(kAircraft[kMantis].id, "xr20_mantis") != 0 || strcmp(kAircraft[kWraith].id, "xr40_wraith") != 0) { printf("aircraft indices (kOsprey / kNightjar / kResearchJet / kMantis / kWraith) don't match the table\n"); return 1; }
+  auto skip = [&](int i) { return quick && i != 0 && i != 3 && i != 5 && i != 6 && i != kResearchJet && i != kSomnus; };
+  if (strcmp(kAircraft[kWavecrest].id, "wavecrest_c6") != 0 || strcmp(kAircraft[kVigil].id, "xr10_vigil") != 0 || strcmp(kAircraft[kResearchJet].id, "xr30_nocturne") != 0 || strcmp(kAircraft[kReverie].id, "xr20_reverie") != 0 || strcmp(kAircraft[kSomnus].id, "xr40_somnus") != 0) { printf("aircraft indices (kWavecrest / kVigil / kResearchJet / kReverie / kSomnus) don't match the table\n"); return 1; }
   if (in(1)) for (int ai : kCareerAircraft) {
     if (skip(ai)) continue;
     const AircraftSpec& s = kAircraft[ai];
@@ -88,7 +88,7 @@ int main(int argc, char** argv) {
   // a twin flies on one engine, a blocked pitot freezes the airspeed, ice costs lift
   if (in(1)) {
     Weather calm; calm.windSpeed = 0; calm.turbulence = 0; calm.gust = 0;
-    // Kestrel, engine stopped at 1200 m over flat ground: glide at the best-glide speed and measure the ratio
+    // Dawnlark, engine stopped at 1200 m over flat ground: glide at the best-glide speed and measure the ratio
     const AircraftSpec& s = kAircraft[0];
     Plane p; p.reset(&s, vec3(-6000, 1200 + std::max(g_world.height(-6000, 16000), 0.f), 16000), 0, s.maxFuel * 0.5f, 85, true, s.cruise * 0.8f);
     p.ctl.throttle = 0.6f; for (int i = 0; i < 240; i++) p.step(1 / 240.f, calm, i / 240.f);
@@ -102,8 +102,8 @@ int main(int argc, char** argv) {
     }
     float ratio = length(vec3(p.pos.x - p0.x, 0, p.pos.z - p0.z)) / std::max(y0 - p.pos.y, 1.f);
     ok = ok && !p.ev.crashed && !p.engineRunning && p.engineSpool < 0.01f && ratio > 7.f && ratio < 16.f && fabsf(ratio - p.glideRatio()) < p.glideRatio() * 0.35f;
-    printf("Engine-out glide (Kestrel): %.1f:1 over %.0f s, model says %.1f:1 %s\n", ratio, tgl, p.glideRatio(), ok ? "ok" : "FAIL"); fails += !ok;
-    // Swift S6 with the gear stuck up: a belly landing on Solace Capital's runway at Vref, wings level, is survivable
+    printf("Engine-out glide (Dawnlark): %.1f:1 over %.0f s, model says %.1f:1 %s\n", ratio, tgl, p.glideRatio(), ok ? "ok" : "FAIL"); fails += !ok;
+    // Cutwater S6 with the gear stuck up: a belly landing on Solace Capital's runway at Vref, wings level, is survivable
     const AircraftSpec& sw = kAircraft[7];
     const Airport& a = g_world.airports[g_world.findAirport("CAP")];
     vec3 st = a.threshold(false) + a.dir() * 300.f; st.y = a.elev + 6.f;
@@ -126,7 +126,7 @@ int main(int argc, char** argv) {
       if (p.ev.bellyLanding && length(p.vel) < 0.5f) { tstop = i / 240.f; break; }
     }
     ok = ok && !p.ev.crashed && p.ev.bellyLanding && p.gear < 0.01f && tstop > 0 && g_world.onRunway(p.pos.x, p.pos.z, 10) >= 0;
-    printf("Stuck-gear belly landing (Swift S6): %s, stopped after %.0f s %s %s\n", p.ev.bellyLanding ? "skidded" : "no skid", tstop, p.ev.crashReason.c_str(), ok ? "ok" : "FAIL"); fails += !ok;
+    printf("Stuck-gear belly landing (Cutwater S6): %s, stopped after %.0f s %s %s\n", p.ev.bellyLanding ? "skidded" : "no skid", tstop, p.ev.crashReason.c_str(), ok ? "ok" : "FAIL"); fails += !ok;
     // the same landing on a gravel strip, or too fast, wrecks it
     const Airport& hf = g_world.airports[g_world.findAirport("HFS")];
     st = hf.threshold(false) + hf.dir() * 100.f; st.y = hf.elev + 6.f;
@@ -134,7 +134,7 @@ int main(int argc, char** argv) {
     for (int i = 0; i < 30 * 240 && !p.ev.crashed; i++) { p.ctl.pitch = clampf((-0.8f - p.vel.y) * 0.25f - p.w.x * 0.8f + 0.08f, -1, 1); p.step(1 / 240.f, calm, i / 240.f); }
     ok = p.ev.crashed && !p.ev.bellyLanding;
     printf("Belly landing on gravel is a crash: %s %s\n", p.ev.crashReason.c_str(), ok ? "ok" : "FAIL"); fails += !ok;
-    // Islander with the right engine failed: it yaws into the dead engine; with rudder it holds heading and height
+    // Skerry with the right engine failed: it yaws into the dead engine; with rudder it holds heading and height
     const AircraftSpec& tw = kAircraft[3];
     p.reset(&tw, vec3(-6000, 1500, 16000), 0, tw.maxFuel * 0.5f, 300, true, tw.cruise * 0.85f);
     p.ctl.throttle = 0.75f; for (int i = 0; i < 480; i++) p.step(1 / 240.f, calm, i / 240.f);
@@ -150,7 +150,7 @@ int main(int argc, char** argv) {
     }
     float herr = wrapAngle((p.heading() - h0) * DEG) / DEG;
     ok = ok && !p.ev.crashed && yawFree > 2.f && fabsf(herr) < 8.f && p.pos.y > y0b - 150.f && p.engineSpool < 0.6f;
-    printf("Twin engine-out (Islander, right): hands-off yaw %+.1f deg in 2 s, held %+.1f deg, height %+.0f m, power %.2f %s\n", yawFree, herr, p.pos.y - y0b, p.engineSpool, ok ? "ok" : "FAIL"); fails += !ok;
+    printf("Twin engine-out (Skerry, right): hands-off yaw %+.1f deg in 2 s, held %+.1f deg, height %+.0f m, power %.2f %s\n", yawFree, herr, p.pos.y - y0b, p.engineSpool, ok ? "ok" : "FAIL"); fails += !ok;
     {   // ...and on one engine it burns half the fuel at the same throttle (the review of v3.44.0, FLT-7: it burned both's)
       Plane a; a.reset(&tw, vec3(-6000, 1500, 16000), 0, tw.maxFuel * 0.5f, 300, true, tw.cruise * 0.85f);
       Plane b = a; b.failNow(FAIL_ENGINE_TOTAL, 1);
@@ -203,7 +203,7 @@ int main(int argc, char** argv) {
   }
   // ---------------- XR-20's centerline engine: the former pair's real combined thrust, with one failure channel.
   if (in(1)) {
-    const AircraftSpec& single = kAircraft[kMantis];
+    const AircraftSpec& single = kAircraft[kReverie];
     AircraftSpec twin = single; twin.engines = 2; twin.power = 44000.f;   // delivered two-engine proposal
     Plane p, old;
     p.spec = &single; old.spec = &twin;
@@ -288,7 +288,7 @@ int main(int argc, char** argv) {
     bool ok = true;
     for (float alt : {1500.f, 3000.f, 8000.f, 12000.f}) {
       if (quick && (alt == 3000.f || alt == 8000.f)) continue;   // (quick: the lowest and the highest)
-      LevelResult n = levelMach(kNightjar, alt), m = levelMach(kMantis, alt), s = levelMach(kResearchJet, alt), w = levelMach(kWraith, alt);
+      LevelResult n = levelMach(kVigil, alt), m = levelMach(kReverie, alt), s = levelMach(kResearchJet, alt), w = levelMach(kSomnus, alt);
       bool stable = true;
       for (const auto& r : {n, m, s, w}) stable = stable && r.intact && fabsf(r.vs) < 0.3f && fabsf(r.accel) < 0.15f && r.minAlt > alt - 40.f && r.maxAlt < alt + 40.f;
       bool tier = stable && n.mach > 1.15f && n.mach < 1.65f && m.mach > 1.75f && m.mach < 2.25f && m.mach > n.mach + 0.35f
@@ -297,7 +297,7 @@ int main(int argc, char** argv) {
       ok = ok && tier;
     }
     fails += !ok;
-    // the overstress: the Starling (a light jet's +3.0 g) rides some 25% over for four seconds while the stress builds,
+    // the overstress: the Emissary (a light jet's +3.0 g) rides some 25% over for four seconds while the stress builds,
     // its speed held, and a full pull at 300 m/s takes it past twice the limit: that snaps it
     const AircraftSpec& s6 = kAircraft[6];
     Plane p; p.reset(&s6, vec3(0, 6000, 0), 90, s6.maxFuel * 0.5f, 85, true, 230); p.ctl.throttle = 1; p.ctl.gearDown = false; p.gear = 0;
@@ -307,15 +307,15 @@ int main(int argc, char** argv) {
     p.reset(&s6, vec3(0, 6000, 0), 90, s6.maxFuel * 0.5f, 85, true, 300); p.ctl.throttle = 1; p.ctl.gearDown = false; p.gear = 0; p.ctl.pitch = 1;
     float g2 = 0; for (int i = 0; i < 3 * 240 && !p.ev.crashed; i++) { p.step(1 / 240.f, calm, i / 240.f); g2 = std::max(g2, p.gLoad); }
     ok = held && p.ev.crashed && p.ev.crashReason.find("Structural") != std::string::npos;
-    printf("Sustained overstress (Starling): %.2f g held, stress %.2f of the way to failure, intact; full pull at 300 m/s peaks %.1f g and %s %s\n", gmax, ogMax, g2, p.ev.crashed ? "snaps" : "holds", ok ? "ok" : "FAIL"); fails += !ok;
+    printf("Sustained overstress (Emissary): %.2f g held, stress %.2f of the way to failure, intact; full pull at 300 m/s peaks %.1f g and %s %s\n", gmax, ogMax, g2, p.ev.crashed ? "snaps" : "holds", ok ? "ok" : "FAIL"); fails += !ok;
     // the XR-30 and XR-40 are built past all their fly-by-wire can pull: full stick either way at their fastest, low
     // down, where the load runs highest, leaves them whole (the pitch rate's cap holds it near 160 g and 265 g)
-    for (int si : {(int)kResearchJet, (int)kWraith}) for (float st : {1.f, -1.f}) {
+    for (int si : {(int)kResearchJet, (int)kSomnus}) for (float st : {1.f, -1.f}) {
       const AircraftSpec& sr = kAircraft[si];
-      Plane q; q.reset(&sr, vec3(0, 2000, 0), 90, sr.maxFuel * 0.7f, 85, true, si == kWraith ? 1400.f : 1000.f); q.ctl.throttle = 1; q.ctl.gearDown = false; q.gear = 0;
+      Plane q; q.reset(&sr, vec3(0, 2000, 0), 90, sr.maxFuel * 0.7f, 85, true, si == kSomnus ? 1400.f : 1000.f); q.ctl.throttle = 1; q.ctl.gearDown = false; q.gear = 0;
       float gx = 0; for (int i = 0; i < 2 * 240 && !q.ev.crashed; i++) { q.ctl.pitch = st; q.step(1 / 240.f, calm, i / 240.f); gx = st > 0 ? std::max(gx, q.gLoad) : std::min(gx, q.gLoad); }
-      ok = !q.ev.crashed && fabsf(gx) > (si == kWraith ? 200.f : 120.f) && gx < sr.gLimitPos() && gx > sr.gLimitNeg();
-      printf("%s full %s at %.0f m/s: %+.0f g of %+.0f / %+.0f, %s %s\n", sr.name, st > 0 ? "pull" : "push", si == kWraith ? 1400.f : 1000.f, gx, sr.gLimitPos(), sr.gLimitNeg(),
+      ok = !q.ev.crashed && fabsf(gx) > (si == kSomnus ? 200.f : 120.f) && gx < sr.gLimitPos() && gx > sr.gLimitNeg();
+      printf("%s full %s at %.0f m/s: %+.0f g of %+.0f / %+.0f, %s %s\n", sr.name, st > 0 ? "pull" : "push", si == kSomnus ? 1400.f : 1000.f, gx, sr.gLimitPos(), sr.gLimitNeg(),
              q.ev.crashed ? q.ev.crashReason.c_str() : "intact", ok ? "ok" : "FAIL"); fails += !ok;
     }
   }
@@ -400,9 +400,9 @@ int main(int argc, char** argv) {
     ok = -p.w.z / DEG > 250.f;
     printf("XR-30 roll rate %.0f deg/s %s\n", -p.w.z / DEG, ok ? "ok" : "FAIL"); fails += !ok;
   }
-  // ---------------- XR-40 Wraith: four-pod VTOL hover, top speed, roll rate and the structural g it can pull
+  // ---------------- XR-40 Somnus: four-pod VTOL hover, top speed, roll rate and the structural g it can pull
   if (in(1)) {
-    const AircraftSpec& s = kAircraft[kWraith];
+    const AircraftSpec& s = kAircraft[kSomnus];
     Weather calm; calm.windSpeed = 0; calm.turbulence = 0; calm.gust = 0;
     Plane p; p.reset(&s, vec3(0, 800, 0), 0, s.maxFuel, 85, true, 0.1f); p.vel = vec3(); p.ctl.flaps = 1; p.flaps = p.nozzle = 1;
     float I = 0.45f;
@@ -587,10 +587,10 @@ int main(int argc, char** argv) {
     printf("AP live %-16s both out   reads climb %.1f, go-around %s  %s\n", kAircraft[3].name, p.apEnv.climb, p.apEnv.canGoAround ? "yes" : "no", ok ? "ok" : "FAIL");
     fails += !ok;
   }
-  // ---------------- aerobatics: every figure on a light single, the airliner and the Wraith. It must set itself up,
+  // ---------------- aerobatics: every figure on a light single, the airliner and the Somnus. It must set itself up,
   // fly the figure inside the airframe's limits and level off into a hold on the heading the figure ends on - or, the
   // airliner (+2.5 g) with every figure that pulls through the vertical or corkscrews, say at once it isn't built for it.
-  if (in(3)) for (int si : {0, 5, (int)kWraith}) {
+  if (in(3)) for (int si : {0, 5, (int)kSomnus}) {
     const AircraftSpec& s = kAircraft[si];
     const PerfModel& P = Plane::perf(&s);
     Weather calm; calm.windSpeed = 0; calm.turbulence = 0;
@@ -644,8 +644,8 @@ int main(int argc, char** argv) {
   // ---------------- FLT-1 (the review of v3.44.0): a split-S asked for low down. Admitted from 700 m on the structure's
   // load - a pull the research jets' wings can't hold at the figure's entry speed - the XR-20, XR-30 and XR-40 flew into
   // the sea. Asked for at 700 m over the sea now, each climbs first (or gives it up) and none touches the water
-  if (in(3)) for (int si : {kMantis, kResearchJet, kWraith}) {
-    if (quick && si != kWraith) continue;   // (the sanitizer job: the XR-40, the one Codex flew in the game)
+  if (in(3)) for (int si : {kReverie, kResearchJet, kSomnus}) {
+    if (quick && si != kSomnus) continue;   // (the sanitizer job: the XR-40, the one Codex flew in the game)
     const AircraftSpec& s = kAircraft[si];
     Weather calm; calm.windSpeed = 0; calm.turbulence = 0;
     vec3 sea(-WORLD_HALF * 0.9f, 700.f, WORLD_HALF * 0.9f);   // (open sea, far from any island)

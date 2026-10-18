@@ -3,14 +3,14 @@
 //! light aircraft), the side sticks and throttles (the XR-30 and the XR-40) and the XR-40's pedals. Each is a solid
 //! piece that only slides or turns with a control, so it has its own shape in its own frame (partField) and a pose
 //! from the controls (partPose: body = R*local + T). The aircraft's field places each part by its pose
-//! (plane_sdf.glsl, wraith_cockpit_sdf.glsl); the mesh bake (aircraft_mesh.cpp) leaves the parts out of the airframe
+//! (plane_sdf.glsl, somnus_cockpit_sdf.glsl); the mesh bake (aircraft_mesh.cpp) leaves the parts out of the airframe
 //! (gPartMode -2) and bakes each part alone in its own frame (gPartMode = the part), and the raster passes draw each
 //! part's mesh at the pose a small pass computes once a frame from these same functions (kPartPoseFS) - the march
 //! and the objects pass see exactly the shapes the meshes show.
 const int PT_YOKE_SHAFT = 0, PT_YOKE_WHEEL = 1, PT_PEDAL = 2, PT_THR_KNOB = 3, PT_THR_LEVER = 4, PT_FLAP_LEVER = 5,
           PT_JET_STICK = 6, PT_JET_THR = 7, PT_WR_STICK = 8, PT_WR_THR = 9, PT_WR_PEDAL = 10,
           PT_FLAP = 11, PT_AILERON = 12, PT_ELEVATOR = 13, PT_RUDDER = 14,   // (the light aircraft's control surfaces)
-          // the XR-40's (wraith_sdf.glsl wrPartField): its four pods' nacelles, fans, vanes and iris petals, the bay
+          // the XR-40's (somnus_sdf.glsl wrPartField): its four pods' nacelles, fans, vanes and iris petals, the bay
           // doors and the bomb, the laser turrets' hatches, emitters, barrel tips and arms, the elevons and ruddervators
           PT_WR_PODF = 15, PT_WR_PODR = 16, PT_WR_FAN = 17, PT_WR_VANEC = 18, PT_WR_VANEO = 19, PT_WR_VANEY = 20,
           PT_WR_PETAL = 21, PT_WR_DOOR = 22, PT_WR_BOMB = 23, PT_WR_HATCH = 24, PT_WR_TURRET = 25, PT_WR_MUZZLE = 26,
@@ -23,13 +23,13 @@ const int PT_YOKE_SHAFT = 0, PT_YOKE_WHEEL = 1, PT_PEDAL = 2, PT_THR_KNOB = 3, P
           // (they shorten as they retract), wheels and bay doors
           // (the gear's struts, wheels and doors serve the XR-40 too: it has the same gear in other bays)
           PT_JT_NOZZLE = 38, PT_JT_LEGM = 39, PT_JT_WHEELM = 40, PT_JT_LEGN = 41, PT_JT_WHEELN = 42, PT_JT_DOORM = 43, PT_JT_DOORN = 44,
-          PT_WR_ACT = 45, PT_ATLAS_FAN = 46;   // the XR-40's pods' hydraulic tilt actuators (stretched along their axis as the pods tilt)
+          PT_WR_ACT = 45, PT_GALLEON_FAN = 46;   // the XR-40's pods' hydraulic tilt actuators (stretched along their axis as the pods tilt)
 #if !defined(PART_BAKE) || (!defined(AF_LIGHT) && !defined(AF_JET))
 const int PT_WR_KINETIC = 47, PT_WR_CHARGED = 48, PT_WR_PENETRATOR = 49, PT_WR_EMP = 50;
 #endif
 bool partIsJet(int k){ return (k >= PT_JT_ELEVON && k <= PT_JT_RUDDER) || (k >= PT_JT_NOZZLE && k <= PT_JT_DOORN); }
-bool partIsWraith(int k){ return (k >= PT_WR_PODF && k <= PT_WR_RUDV) || k == PT_WR_ACT || (k >= PT_WR_KINETIC && k <= PT_WR_EMP); }
-const vec3 WRP_POD[4] = vec3[4](vec3(-2.35, -0.08, -3.3), vec3(2.35, -0.08, -3.3), vec3(-2.75, 0.05, 3.45), vec3(2.75, 0.05, 3.45));   // (wraith_sdf.glsl WR_POD)
+bool partIsSomnus(int k){ return (k >= PT_WR_PODF && k <= PT_WR_RUDV) || k == PT_WR_ACT || (k >= PT_WR_KINETIC && k <= PT_WR_EMP); }
+const vec3 WRP_POD[4] = vec3[4](vec3(-2.35, -0.08, -3.3), vec3(2.35, -0.08, -3.3), vec3(-2.75, 0.05, 3.45), vec3(2.75, 0.05, 3.45));   // (somnus_sdf.glsl WR_POD)
 int gPartMode = -1;   // -1: the whole aircraft, its parts posed; -2: without its parts; >= 0: that part alone, in its own frame
 struct Pose { mat3 R; vec3 T; };   // (R is a rotation for the cockpit parts; for a control surface an affine map: its deflection
                                    // about a swept, tapered hinge shears it a little, exactly as sdSurface does)
@@ -118,7 +118,7 @@ Pose wrPartPose(int k, vec2 sd){
   }
   mat3 S = partMirror(sd.x);
   float las = gWr[4].z;
-  vec3 L0 = vec3(0.95, -0.1 - 0.12*0.0025443 - 0.18, -5.1);   // (wraith_sdf.glsl: the turret's frame)
+  vec3 L0 = vec3(0.95, -0.1 - 0.12*0.0025443 - 0.18, -5.1);   // (somnus_sdf.glsl: the turret's frame)
   if (k == PT_WR_DOOR) { X.R = S*partRxy(gWr[4].y*1.75); X.T = S*vec3(0.53, -0.575, 0.1); }
   else if (k == PT_WR_BOMB || k == PT_WR_PENETRATOR || k == PT_WR_EMP) { X.R = mat3(max(gWr[6].x, 1e-3)); X.T = vec3(0.0, -0.305, 0.1); }
   else if (k == PT_WR_HATCH) { X.R = S*partRxy(-las*1.9); X.T = S*(L0 + vec3(0.2, -0.17, 0.0)); }
@@ -154,7 +154,7 @@ Pose poseMul(Pose a, Pose b){ Pose X; X.R = a.R*b.R; X.T = a.R*b.T + a.T; return
 // The landing gear (the packed model's: gM[18] track, wheel radius, main and nose stations; gM[19] gear height, tail
 // wheel station, taildragger). The legs travel until gear 0.2, then the doors close over them.
 float gearUp(){ return clamp((1.0 - gPS.x)*1.25, 0.0, 1.0); }
-float gearDoorAngle(){ return smoothstep(0.0, 0.2, gPS.x)*(isAtlas()?1.72:1.45); }
+float gearDoorAngle(){ return smoothstep(0.0, 0.2, gPS.x)*(isGalleon()?1.72:1.45); }
 // In the cockpit view a retracting nose wheel shrinks away as it folds: stowed along the belly it would lie in the
 // footwell of a cabin drawn hollow
 float gearNoseShow(){
@@ -209,7 +209,7 @@ struct GearFold { vec3 H; float legLen, dl, xf, floor0; };   // (floor0: the fai
 GearFold gearFold(){
   vec4 G0 = gM[18], G1 = gM[19], W1 = gM[10];
   float track = G0.x, wr = G0.y, mz = G0.z, wy = wr - G1.x, dl = atan(W1.z);
-  if(isAtlas()) {
+  if(isGalleon()) {
     // A two-axis trunnion folds the truck forward and inward into the swept
     // root bay. The deployed contact is unchanged; both rotations share H.
     GearFold f; f.dl=0.0;f.xf=1.85;
@@ -227,25 +227,25 @@ GearFold gearFold(){
   return f;
 }
 vec3 gearHinge(){ return gearFold().H; }
-#if HAS_ATLAS
-vec3 atlasMainKnee(){return vec3(gM[18].x,-2.40,gearHinge().z);}
-mat3 atlasGearFoldR(float up){
+#if HAS_GALLEON
+vec3 galleonMainKnee(){return vec3(gM[18].x,-2.40,gearHinge().z);}
+mat3 galleonGearFoldR(float up){
   GearFold f=gearFold();vec3 v=vec3(gM[18].x,gM[18].y-gM[19].x,gM[18].z)-f.H;
   float dx=f.xf-f.H.x;
   float dz=-sqrt(max(v.y*v.y+v.z*v.z-dx*dx,.01));
   float yaw=atan(v.y*dz-v.z*dx,v.y*dx+v.z*dz);
   return partRxz(yaw*smoothstep(0.0,.65,up))*partRxy(-1.5707963*smoothstep(.25,1.0,up));
 }
-float atlasMainDoorWidth(float side){return side<0.0?1.30:2.10;}
-float atlasMainDoorAngle(float side){return smoothstep(0.0,.2,gPS.x)*(side<0.0?1.5707963:2.50);}
+float galleonMainDoorWidth(float side){return side<0.0?1.30:2.10;}
+float galleonMainDoorAngle(float side){return smoothstep(0.0,.2,gPS.x)*(side<0.0?1.5707963:2.50);}
 #endif
 mat3 gearFoldR(float up){
-#if HAS_ATLAS
-  if(isAtlas())return atlasGearFoldR(up);
+#if HAS_GALLEON
+  if(isGalleon())return galleonGearFoldR(up);
 #endif
   return partRxy(up*(atan(gM[10].z)-1.5707963));
 }
-float gearFoldAngle(){ return gearUp()*((isAtlas()?0.0:atan(gM[10].z)) - 1.5707963); }
+float gearFoldAngle(){ return gearUp()*((isGalleon()?0.0:atan(gM[10].z)) - 1.5707963); }
 // the fairing and its well (the right side's; F: well -> body): x spanwise, y up from the fairing's floor, z fore and
 // aft from the gear's station; x0..x1, +-hz, depth up to 2 cm under the upper skin
 struct GearWell { Pose F; float x0, x1, hz, depth; };
@@ -253,7 +253,7 @@ GearWell gearFoldWellOf(GearFold f){
   vec4 G0 = gM[18], W1 = gM[10];
   float track = G0.x, wr = G0.y, mz = G0.z;
   GearWell g;
-  if(isAtlas()) {
+  if(isGalleon()) {
     // The rear edge parallels and stays in front of the real wing trailing edge.
     float sweep=(gM[9].w+gM[9].z-gM[9].y)/gM[9].x;
     g.x0=-1.70;g.x1=1.70;g.hz=1.34;
@@ -272,12 +272,12 @@ GearWell gearFoldWell(){ return gearFoldWellOf(gearFold()); }
 float wingHingeZ(float s){ vec4 W0 = gM[9], W1 = gM[10]; float k = clamp(s/W0.x, 0.0, 1.0); return W1.y + W0.w*k + 0.74*mix(W0.y, W0.z, k); }
 // how far back a folding main's fairing may reach, over its span (from the root to its outboard end; the hinge line is
 // straight in the span, so its ends bound it), clear of the flap's hinge line
-float gearFairAft(){ return isAtlas()?gM[18].z+gM[18].y+.92:min(wingHingeZ(0.0), wingHingeZ(gM[18].x + 0.12)) - 0.03; }
-float flapRoot(){ return isAtlas()?4.05:0.55*gM[0].w; }
-#if HAS_ATLAS
+float gearFairAft(){ return isGalleon()?gM[18].z+gM[18].y+.92:min(wingHingeZ(0.0), wingHingeZ(gM[18].x + 0.12)) - 0.03; }
+float flapRoot(){ return isGalleon()?4.05:0.55*gM[0].w; }
+#if HAS_GALLEON
 // Closed root fairings must stay inside the wing's exact planform and ahead
 // of moving flap skin. The final union is clipped to this footprint too.
-float atlasFixedWingFootprint(vec3 p){
+float galleonFixedWingFootprint(vec3 p){
   vec4 W=gM[9];float k=clamp(p.x/W.x,0.0,1.0);
   float le=gM[10].y+W.w*k,ch=mix(W.y,W.z,k);
   float outline=max(max(-p.x,p.x-W.x),max(le-p.z,p.z-le-ch));
@@ -288,11 +288,11 @@ float atlasFixedWingFootprint(vec3 p){
 // The inward fold keeps the wheel's station, and on some of these wings the mains stand near the flaps' hinge line (at
 // their physics' station, 4% of the length aft of the datum): the well came across it, a bay in the flaps (it once
 // moved the flaps outboard of it). Those swing forward into the wing instead, the wheel turned flat ahead of the
-// hinge line (the Swift's, the XR-10's): the hinge H at the leg's top, as far aft as leaves the well 10 cm clear of
+// hinge line (the Cutwater's, the XR-10's): the hinge H at the leg's top, as far aft as leaves the well 10 cm clear of
 // the hinge line (the leg raked aft at rest), and at the height that keeps all of the flat wheel under the upper skin
 // there (gearStowGap); T the stowed wheel's centre; the well from z0 to z1 along a shallow fairing whose floor - fy, 4
 // cm under the wheel's lower caps - carries the doors, hw its half width
-bool gearSwingMain(){ return !isAtlas() && int(gM[0].y + 0.5) == 4 && gM[18].z + gM[18].y + 0.03 > gearFairAft() + 0.005; }
+bool gearSwingMain(){ return !isGalleon() && int(gM[0].y + 0.5) == 4 && gM[18].z + gM[18].y + 0.03 > gearFairAft() + 0.005; }
 struct GearSwing { vec3 H, T; float z0, z1, fy, hw; };
 GearSwing gearSwingOf(){
   vec4 G0 = gM[18], W1 = gM[10];
@@ -312,7 +312,7 @@ GearSwing gearSwingOf(){
 // windscreen.) The pivot stands the nose wheel's radius and 7 cm over the belly - the higher of the belly where the
 // leg stands and where the wheel comes to rest - so the stowed wheel lies inside the fuselage. x: the pivot's height,
 // y: the leg's length (the pivot to the wheel's centre)
-float gearNoseR(){ return isAtlas() ? gM[18].y*.74 : int(gM[0].y + 0.5) == 3 ? gM[18].y*0.75 : gM[18].y*0.85; }
+float gearNoseR(){ return isGalleon() ? gM[18].y*.74 : int(gM[0].y + 0.5) == 3 ? gM[18].y*0.75 : gM[18].y*0.85; }
 vec2 gearNoseFold(){
   float nz = gM[18].w, nwr = gearNoseR(), wy = nwr - gM[19].x;
   vec3 s0 = fusSection(nz);
@@ -360,7 +360,7 @@ VBay gearVBay(bool nose){
     GearSwing g = gearSwingOf();
     b.c = vec3(track, g.fy, 0.5*(g.z0 + g.z1)); b.h = vec2(g.hw, 0.5*(g.z1 - g.z0)); b.depth = g.H.y + .13 - g.fy; b.below = 0.03; b.pitch = 0.0;
   } else if (nose) {   // from just ahead of the pivot to behind the stowed wheel; its hinges at the highest skin along it
-    float nw = gearNoseR(), nx = isAtlas() ? .44 : gtype == 3 ? 0.3 : 0.14;
+    float nw = gearNoseR(), nx = isGalleon() ? .44 : gtype == 3 ? 0.3 : 0.14;
     vec2 nf = gearNoseFold();
     // (its hinges along the chord of the belly's line from end to end: at the station it narrows towards the nose)
     float z0 = nz - 0.14, z1 = nz + nf.y + nw + 0.1;
@@ -409,11 +409,11 @@ Pose gearPartPose(int k, vec2 sd){
     float s = max(gearNoseShow(), 1e-3); Pose N = gearNosePose(s); X.R = N.R*s; X.T = N.T;
   }
   else if (k == PT_GEAR_TAIL) { X.R = partRxz(gPS.z); X.T = vec3(0.0, 0.0, G1.y); }
-#if HAS_ATLAS
-  else if (k == PT_GEAR_MDOOR && isAtlas()) {
-    GearWell g=gearFoldWell();float side=sd.y,width=atlasMainDoorWidth(side);
+#if HAS_GALLEON
+  else if (k == PT_GEAR_MDOOR && isGalleon()) {
+    GearWell g=gearFoldWell();float side=sd.y,width=galleonMainDoorWidth(side);
     mat3 scale=mat3(width/2.10,0,0, 0,1,0, 0,0,1);
-    X.R=S*g.F.R*partMirror(-side)*partRxy(-atlasMainDoorAngle(side))*scale;
+    X.R=S*g.F.R*partMirror(-side)*partRxy(-galleonMainDoorAngle(side))*scale;
     X.T=S*(g.F.T+g.F.R*vec3(side*1.70,0,0));
   }
 #endif
@@ -437,32 +437,32 @@ void partPedestal(out vec3 pc, out float pw, out float ph, out float pd){
   vec4 E = gM[22]; float pz = gM[21].w; int ck = int(gM[21].z + 0.5);
   pw = ck == 0 ? 0.075 : 0.11; ph = 0.22; pd = ck == 0 ? 0.24 : 0.32;
   pc = vec3(0.0, E.y - 0.84 + (0.22 - ph), pz + 0.06 + pd);
-  if(fleetCabin()){ CockpitLayout L=cockpitLayout(); pw=L.pedestal.x;ph=L.pedestal.y;pd=L.pedestal.z;pc=vec3(0,(MODEL_IS(2)?.560:swiftPreservedFurnitureY())-1.06+ph,pz+.06+pd+L.pedestal.w); }
+  if(fleetCabin()){ CockpitLayout L=cockpitLayout(); pw=L.pedestal.x;ph=L.pedestal.y;pd=L.pedestal.z;pc=vec3(0,(MODEL_IS(2)?.560:cutwaterPreservedFurnitureY())-1.06+ph,pz+.06+pd+L.pedestal.w); }
 }
 // the pedals' height: clear of the floor where the belly curves up towards the firewall
 float partPedalY(){ return gCab2.x; }
-// Kestrel/Wren retain the two linked control instances, now compact center sticks.
+// Dawnlark/Ambler retain the two linked control instances, now compact center sticks.
 // Reusing shaft/grip part IDs preserves extraction, animation and all flight input bindings.
 // Shared floor-column family; utility twins reuse the reviewed utility dimensions.
 bool compactTwinPowerBank(){ return MODEL_IS(3) || MODEL_IS(8); }
 bool utilityFloorYoke(){ return compactTwinPowerBank() || MODEL_IS(4); }
 bool floorSupportedYoke(){ return utilityFloorYoke() || MODEL_IS(5) || MODEL_IS(6) || MODEL_IS(9) || MODEL_IS(14); }
 bool compactTrainerStick(){ return MODEL_IS(0) || MODEL_IS(1); }
-bool larkspurCenterStick(){ return MODEL_IS(13); }
-vec3 larkspurStickPivot(float side){return cockpitYokeMount(side);}
-float larkspurStickShaft(vec3 q){return min(length(q)-.018,sdCapsule(q,vec3(0),vec3(0,.080,-.012),.011));}
-vec2 larkspurStickGrip(vec3 q){
+bool thistledownCenterStick(){ return MODEL_IS(13); }
+vec3 thistledownStickPivot(float side){return cockpitYokeMount(side);}
+float thistledownStickShaft(vec3 q){return min(length(q)-.018,sdCapsule(q,vec3(0),vec3(0,.080,-.012),.011));}
+vec2 thistledownStickGrip(vec3 q){
   vec2 r=vec2(sdCapsule(q,vec3(0,.075,-.012),vec3(0,.151,-.024),.018),61.0);
   return opU(r,vec2(length(q-vec3(0,.157,-.032))-.008,68.0));
 }
 vec3 trainerStickPivot(float side){ return cockpitYokeMount(side); }
 vec3 trainerPowerGrip(float side,float throttle){ CockpitLayout L=cockpitLayout();return vec3(side*abs(L.controls.z),gM[22].y-L.controls.w,gM[22].z-.170+.100*(1.0-throttle)); }
 vec3 trainerMixtureGrip(float side){ return vec3(side*.350,gM[22].y-.190,gM[22].z-.140); }
-// Bushmaster local prototype: explicitly gated floor sticks and journaled power lever.
-bool bushmasterPowerLever(){ return MODEL_IS(2); }
-vec3 bushmasterPowerPivot(float side){ return vec3(side*.022,.020,-1.400); }
-float bushmasterPowerAngle(float throttle){ return -.400+.800*clamp(throttle,0.0,1.0); }
-float bushmasterPowerLeverLocal(vec3 q,float side,float gripRadius){
+// Scrubrunner local prototype: explicitly gated floor sticks and journaled power lever.
+bool scrubrunnerPowerLever(){ return MODEL_IS(2); }
+vec3 scrubrunnerPowerPivot(float side){ return vec3(side*.022,.020,-1.400); }
+float scrubrunnerPowerAngle(float throttle){ return -.400+.800*clamp(throttle,0.0,1.0); }
+float scrubrunnerPowerLeverLocal(vec3 q,float side,float gripRadius){
   vec3 elbow=vec3(side*.023,.070,0),grip=vec3(side*.023,.230,0);
   float stem=min(sdCapsule(q,vec3(0),elbow,.007),sdCapsule(q,elbow,grip,.007));
   float journal=sdCylX(q,.022,.006);
@@ -470,21 +470,21 @@ float bushmasterPowerLeverLocal(vec3 q,float side,float gripRadius){
   return min(bored,length(q-grip)-gripRadius);
 }
 
-bool bushmasterFloorStick(){ return MODEL_IS(2); }
-vec3 bushmasterStickPivot(float side){ return vec3(side*.250,.220,-1.500); }
-float bushmasterStickShaft(vec3 q){
+bool scrubrunnerFloorStick(){ return MODEL_IS(2); }
+vec3 scrubrunnerStickPivot(float side){ return vec3(side*.250,.220,-1.500); }
+float scrubrunnerStickShaft(vec3 q){
   return min(length(q)-.016,sdCapsule(q,vec3(0),vec3(0,.090,0),.012));
 }
-vec2 bushmasterStickGrip(vec3 q){
+vec2 scrubrunnerStickGrip(vec3 q){
   vec2 res=vec2(sdCapsule(q,vec3(0,.090,0),vec3(0,.150,0),.018),61.0);
   return opU(res,vec2(length(q-vec3(0,.156,-.006))-.009,68.0));
 }
 
 // sd: the instance (x: which seat or which side, -1 or 1; y: the left or right pedal of the pair). The cockpit's
 // controls and the light aircraft's surfaces (the airframe field places the cockpit's in place: partAt below)
-// Swift compact supported yoke: full flight input through geared physical travel.
-bool swiftCompactYoke(){return MODEL_IS(7);}
-float swiftYokeWheel(vec3 q){
+// Cutwater compact supported yoke: full flight input through geared physical travel.
+bool cutwaterCompactYoke(){return MODEL_IS(7);}
+float cutwaterYokeWheel(vec3 q){
  float d=sdRoundBox(q,vec3(.045,.025,.020),.010);
  vec3 b=vec3(abs(q.x),q.y,q.z);
  d=min(d,sdCapsule(b,vec3(.035,0,0),vec3(.092,.008,0),.014));
@@ -498,28 +498,28 @@ Pose partPoseCockpit(int k, vec2 sd){
   mat3 D = mat3(-1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);   // the yokes' frame: x mirrored, each in its pilot's own frame
   vec3 O = fleetCabin()?cockpitYokeMount(sd.x):vec3(sd.x*abs(E.x), E.y - 0.43, pz);
   float pull = cPitch*(utilityFloorYoke()?.045:(floorSupportedYoke()?.050:.075));
-#if HAS_LARKSPUR
-  if(larkspurCenterStick() && (k==PT_YOKE_SHAFT || k==PT_YOKE_WHEEL)) {
+#if HAS_THISTLEDOWN
+  if(thistledownCenterStick() && (k==PT_YOKE_SHAFT || k==PT_YOKE_WHEEL)) {
     X.R=transpose(partRxy(cRoll*.24)*partRyz(-cPitch*.24));
-    X.T=larkspurStickPivot(sd.x);
+    X.T=thistledownStickPivot(sd.x);
   }
   else
 #endif
-#if HAS_SWIFT
-  if(swiftCompactYoke() && (k==PT_YOKE_SHAFT || k==PT_YOKE_WHEEL)) {
+#if HAS_CUTWATER
+  if(cutwaterCompactYoke() && (k==PT_YOKE_SHAFT || k==PT_YOKE_WHEEL)) {
     X.T=vec3(sd.x*.250,.270,-1.500+cPitch*.025);
     X.R=k==PT_YOKE_WHEEL?D*transpose(partRxy(-cRoll*.400)):D;
   }
   else
 #endif
-#if HAS_BUSHMASTER
-  if(bushmasterFloorStick() && (k==PT_YOKE_SHAFT || k==PT_YOKE_WHEEL)) {
+#if HAS_SCRUBRUNNER
+  if(scrubrunnerFloorStick() && (k==PT_YOKE_SHAFT || k==PT_YOKE_WHEEL)) {
     X.R=transpose(partRxy(cRoll*.180)*partRyz(-cPitch*.180));
-    X.T=bushmasterStickPivot(sd.x);
+    X.T=scrubrunnerStickPivot(sd.x);
   }
   else
 #endif
-#if HAS_KESTREL || HAS_WREN
+#if HAS_DAWNLARK || HAS_AMBLER
   if(compactTrainerStick() && (k==PT_YOKE_SHAFT || k==PT_YOKE_WHEEL)) {
     X.R=transpose(partRxy(cRoll*.18)*partRyz(-cPitch*.18));
     X.T=trainerStickPivot(sd.x);
@@ -533,16 +533,16 @@ Pose partPoseCockpit(int k, vec2 sd){
     X.R = mat3(q, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
     X.T = vec3(sd.x*gCab2.z + q*gCab2.w, partPedalY(), gCab2.y - q*cYaw*0.055);
   } else if (k == PT_THR_KNOB) {
-#if HAS_LARKSPUR
-    if(larkspurCenterStick()){CockpitLayout L=cockpitLayout();X.T=vec3(L.controls.z,E.y-L.controls.w,E.z-.290-.100*cThr);}
+#if HAS_THISTLEDOWN
+    if(thistledownCenterStick()){CockpitLayout L=cockpitLayout();X.T=vec3(L.controls.z,E.y-L.controls.w,E.z-.290-.100*cThr);}
     else
 #endif
-#if HAS_SWIFT
-    if(swiftCompactYoke()){X.T=vec3(-.040,.070,-1.660-.100*cThr);}
+#if HAS_CUTWATER
+    if(cutwaterCompactYoke()){X.T=vec3(-.040,.070,-1.660-.100*cThr);}
     else
 #endif
-#if HAS_BUSHMASTER
-    if(bushmasterPowerLever()){X.T=bushmasterPowerPivot(-1.0);X.R=partRyz(-bushmasterPowerAngle(cThr));}
+#if HAS_SCRUBRUNNER
+    if(scrubrunnerPowerLever()){X.T=scrubrunnerPowerPivot(-1.0);X.R=partRyz(-scrubrunnerPowerAngle(cThr));}
     else
 #endif
     {CockpitLayout L=cockpitLayout();X.T=compactTrainerStick()?trainerPowerGrip(sd.x,cThr):vec3(fleetCabin()?L.controls.z:0.0,E.y-(fleetCabin()?L.controls.w:.5),pz+.05+.1*(1.0-cThr));}
@@ -552,15 +552,15 @@ Pose partPoseCockpit(int k, vec2 sd){
     if (k == PT_THR_LEVER) {
       mat3 Dq = mat3(sd.x, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
       X.R = Dq*partLever(mix(-0.55, 0.6, cThr));
-      // Atlas thrust shafts stay behind the inclined navigation housing through the complete sweep.
+      // Galleon thrust shafts stay behind the inclined navigation housing through the complete sweep.
       X.T = Dq*vec3(MODEL_IS(4)?0.0:0.035, pc.y + ph - 0.02, pc.z - pd*0.35 + (MODEL_IS(14)?0.095:0.0));
     } else {
       X.R = partLever(mix(0.3, -0.5, gPS.y));
       X.T = vec3(pw*0.6, pc.y + ph - 0.02, pc.z + pd*(compactTwinPowerBank()?.80:.10));
     }
   }
-  else if (k == PT_JET_STICK) { X.R = transpose(partRxy(cRoll*0.25)*partRyz(-cPitch*0.25)); X.T = E.xyz + (isMantis()?vec3(.43,-.535,-.28):vec3(0.42, -0.375, -0.02)); }
-  else if (k == PT_JET_THR) X.T = E.xyz + (isMantis()?vec3(-.43,-.505,-.28+0.12*(0.5-cThr)):vec3(-0.42, -0.34, -0.02 + 0.12*(0.5 - cThr)));
+  else if (k == PT_JET_STICK) { X.R = transpose(partRxy(cRoll*0.25)*partRyz(-cPitch*0.25)); X.T = E.xyz + (isReverie()?vec3(.43,-.535,-.28):vec3(0.42, -0.375, -0.02)); }
+  else if (k == PT_JET_THR) X.T = E.xyz + (isReverie()?vec3(-.43,-.505,-.28+0.12*(0.5-cThr)):vec3(-0.42, -0.34, -0.02 + 0.12*(0.5 - cThr)));
   else if (k == PT_WR_STICK) { X.R = transpose(partRxy(cRoll*0.25)*partRyz(-cPitch*0.25)); X.T = E.xyz + vec3(0.5, -0.41, -0.06); }
   else if (k == PT_WR_THR) X.T = E.xyz + vec3(-0.5, -0.38, -0.08 + 0.13*(0.5 - cThr));
   else
@@ -572,14 +572,14 @@ Pose partPoseCockpit(int k, vec2 sd){
                      : surfPose(sd.x, W1.x, W1.y, W1.z, W0.x, W0.y, W0.z, W0.w, 0.74, -cRoll*sd.x*0.33, 0.0);
   } else if (k == PT_ELEVATOR) {
     vec4 H0 = gM[12], H1 = gM[13];
-    X = surfPose(sd.x, H1.x, H1.y, H1.z, H0.x, H0.y, H0.z, H0.w, 0.68, isMantis() ? elevDefl(cPitch) : -elevDefl(cPitch), 0.0);
+    X = surfPose(sd.x, H1.x, H1.y, H1.z, H0.x, H0.y, H0.z, H0.w, 0.68, isReverie() ? elevDefl(cPitch) : -elevDefl(cPitch), 0.0);
   } else if (k == PT_RUDDER) {   // the fin's frame: span up (y), chord aft (z), thickness across (x)
     vec4 V0 = gM[14], V1 = gM[15];
     mat3 A = mat3(0.0, 0.0, 1.0,   1.0, 0.0, 0.0,   0.0, 1.0, 0.0); vec3 a = vec3(-V1.x, -V1.y, 0.0);
     mat3 B = mat3(0.0, 1.0, 0.0,   0.0, 0.0, 1.0,   1.0, 0.0, 0.0); vec3 b = vec3(0.0, V1.x, V1.y);
-    mat3 D; vec3 d; surfDefl(V0.x, V0.y, V0.z, V0.w, 0.66, -cYaw*0.5*(isMantis()?sd.x:1.0), 0.0, D, d);   // (29 deg each way: aero_strips.cpp)
+    mat3 D; vec3 d; surfDefl(V0.x, V0.y, V0.z, V0.w, 0.66, -cYaw*0.5*(isReverie()?sd.x:1.0), 0.0, D, d);   // (29 deg each way: aero_strips.cpp)
     X.R = B*D*A; X.T = B*(D*a + d) + b;
-    if(isMantis()) {
+    if(isReverie()) {
       // Rest mesh stays in the generic fin frame. Two instances cant/translate it onto the fixed airframe shoulders.
       mat3 C=partMirror(sd.x)*partRxy(-MT_CANT); vec3 P=vec3(0.0,V1.x,V1.y);
       X.T=C*(X.T-P)+vec3(sd.x*MT_FIN_X,V1.x,V1.y); X.R=C*X.R;
@@ -588,8 +588,8 @@ Pose partPoseCockpit(int k, vec2 sd){
 #if HAS_CABIN
   else if (k == PT_WR_PEDAL) {
     X.R = mat3(sd.x, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
-    bool specter=int(gM[0].z+.5)==5;
-    X.T = E.xyz + (specter?vec3(sd.x*.145,-.820,-.73-sd.x*cYaw*.055):vec3(sd.x*.16,-.675,-.78-sd.x*cYaw*.04));   // (right rudder, yaw > 0, pushes the right pedal forward, -z: it pulled it back)
+    bool nocturne=int(gM[0].z+.5)==5;
+    X.T = E.xyz + (nocturne?vec3(sd.x*.145,-.820,-.73-sd.x*cYaw*.055):vec3(sd.x*.16,-.675,-.78-sd.x*cYaw*.04));   // (right rudder, yaw > 0, pushes the right pedal forward, -z: it pulled it back)
   }
 #endif
   return X;
@@ -604,7 +604,7 @@ Pose partPoseCockpit(int k, vec2 sd){
 // (centre nc, half size nh, pitch np, depth nd, how far the cut reaches below the hinges nb)
 const float JT_TYRE_H = 0.10;   // (the main tyres' half width: slim enough to lie flat in the wing)
 struct JtGear { vec3 H, T, mc, P, nc; vec2 mh, nh; float dir, md, np, nd, nb; };
-// the belly's height at body z, x across (the XR-40's faceted section: wraith_sdf.glsl wrSection; the XR-30's round)
+// the belly's height at body z, x across (the XR-40's faceted section: somnus_sdf.glsl wrSection; the XR-30's round)
 float jtBelly(float z, float x){
   if (int(gM[0].z + 0.5) == 6) {
     float zc = clamp(z, -8.3, 7.8), yc = -0.1 - 0.12*smoothstep(-5.0, -8.4, zc);
@@ -614,8 +614,8 @@ float jtBelly(float z, float x){
   }
   vec3 s = fusSection(z); return s.z - s.y*sqrt(max(1.0 - x*x/(s.x*s.x), 0.0));
 }
-// the jet's wing's upper skin at span x, body z (sdPanel's frame and sizes: plane_sdf.glsl mapJet, wraith_sdf.glsl
-// mapWraith with wrSection's centre line)
+// the jet's wing's upper skin at span x, body z (sdPanel's frame and sizes: plane_sdf.glsl mapJet, somnus_sdf.glsl
+// mapSomnus with wrSection's centre line)
 float jtWingTop(float x, float z){
   bool wr = int(gM[0].z + 0.5) == 6;
   float s = wr ? x - 1.0 : x, c = wr ? z + 3.0 : z + 1.6;
@@ -696,10 +696,10 @@ Pose jtPartPose(int k, vec2 sd){
   }
   return X;
 }
-// Atlas high-bypass fan: real swept blades and a domed spinner, a single baked part per engine.
+// Galleon high-bypass fan: real swept blades and a domed spinner, a single baked part per engine.
 // gM identity carries through traffic; parked/stopped own engines have zero indicated N1.
 uniform vec4 uFanHealth; // uploaded on the scene/pose path, separate from display-only engine health
-Pose atlasFanPose(float side){
+Pose galleonFanPose(float side){
   Pose X; float health=gOwn?(side<0.0?uFanHealth.x:uFanHealth.y):1.0;
   // The simulation already integrates RPM into this phase for jets as well as propellers.
   // Reuse it rather than time*spool, which jumps when the throttle changes.
@@ -708,7 +708,7 @@ Pose atlasFanPose(float side){
   X.T=vec3(side*gM[16].x,gM[16].y,gM[16].w+.74);
   return X;
 }
-vec2 atlasFanField(vec3 p){
+vec2 galleonFanField(vec3 p){
   float nr=gM[16].z, rr=length(p.xy), a=atan(p.y,p.x), sector=6.2831853/24.0;
   a-=sector*floor(a/sector+.5);
   vec2 b=rr*vec2(sin(a),cos(a));
@@ -720,14 +720,14 @@ vec2 atlasFanField(vec3 p){
 // inlines the others' code
 // (a build has the families its aircraft can have: a part is only ever asked for by an aircraft that has it)
 Pose partPose(int k, vec2 sd){
-#if HAS_WRAITH
-  if (partIsWraith(k)) return wrPartPose(k, sd);
+#if HAS_SOMNUS
+  if (partIsSomnus(k)) return wrPartPose(k, sd);
 #endif
 #if HAS_RESEARCH
   if (partIsJet(k)) return jtPartPose(k, sd);
 #endif
-#if HAS_ATLAS
-  if (k == PT_ATLAS_FAN) return atlasFanPose(sd.x);
+#if HAS_GALLEON
+  if (k == PT_GALLEON_FAN) return galleonFanPose(sd.x);
 #endif
 #if HAS_FLEET
   if (k >= PT_GEAR_MAIN && k <= PT_GEAR_NDOOR) return gearPartPose(k, sd);
@@ -736,30 +736,30 @@ Pose partPose(int k, vec2 sd){
 }
 #ifdef PART_BAKE
 vec2 gearPartField(int k, vec3 l);   // (plane_sdf.glsl)
-vec2 wrPartField(int k, vec3 l);   // (wraith_sdf.glsl)
+vec2 wrPartField(int k, vec3 l);   // (somnus_sdf.glsl)
 vec2 jtPartField(int k, vec3 l);   // (plane_sdf.glsl)
 #endif
 // each part's shape in its own frame: distance and material id (the cockpit's controls and the light aircraft's surfaces)
 vec2 partFieldCockpit(int k, vec3 l){
   vec2 res = vec2(1e9, 0.0);
 #if HAS_CABIN   // (the cockpit's controls: never in an outside body's builder)
-#if HAS_LARKSPUR
-  if(larkspurCenterStick() && k==PT_YOKE_SHAFT)res=vec2(larkspurStickShaft(l),60.0);
-  else if(larkspurCenterStick() && k==PT_YOKE_WHEEL)res=larkspurStickGrip(l);
+#if HAS_THISTLEDOWN
+  if(thistledownCenterStick() && k==PT_YOKE_SHAFT)res=vec2(thistledownStickShaft(l),60.0);
+  else if(thistledownCenterStick() && k==PT_YOKE_WHEEL)res=thistledownStickGrip(l);
   else
 #endif
-#if HAS_SWIFT
-  if(swiftCompactYoke() && k==PT_YOKE_SHAFT) {
+#if HAS_CUTWATER
+  if(cutwaterCompactYoke() && k==PT_YOKE_SHAFT) {
     res=vec2(sdCapsule(l,vec3(0,0,-.130),vec3(0,0,-.010),.012),60.0);
-  } else if(swiftCompactYoke() && k==PT_YOKE_WHEEL) {
-    res=vec2(swiftYokeWheel(l),66.0);
+  } else if(cutwaterCompactYoke() && k==PT_YOKE_WHEEL) {
+    res=vec2(cutwaterYokeWheel(l),66.0);
   } else
 #endif
-#if HAS_BUSHMASTER
-  if(bushmasterFloorStick() && k==PT_YOKE_SHAFT) {
-    res=vec2(bushmasterStickShaft(l),60.0);
-  } else if(bushmasterFloorStick() && k==PT_YOKE_WHEEL) {
-    res=bushmasterStickGrip(l);
+#if HAS_SCRUBRUNNER
+  if(scrubrunnerFloorStick() && k==PT_YOKE_SHAFT) {
+    res=vec2(scrubrunnerStickShaft(l),60.0);
+  } else if(scrubrunnerFloorStick() && k==PT_YOKE_WHEEL) {
+    res=scrubrunnerStickGrip(l);
   } else
 #endif
   if(compactTrainerStick() && k==PT_YOKE_SHAFT) {
@@ -787,10 +787,10 @@ vec2 partFieldCockpit(int k, vec3 l){
     res=opU(res,vec2(rim,60.0));
     res = opU(res, vec2(sdCapsule(l, vec3(0.0, -0.025, -0.018), vec3(0.0, -0.058, -0.085), 0.011), 60.0));   // arm up to the footwell wall
   } else if (k == PT_THR_KNOB) {   // push-pull: the shaft slides through the panel
-#if HAS_BUSHMASTER
-    res = bushmasterPowerLever()?vec2(bushmasterPowerLeverLocal(l,-1.0,.022),66.0):vec2(min(sdCapsule(l, vec3(0.0, 0.0, (compactTrainerStick()||swiftCompactYoke())?-.180:-.160), vec3(0.0), 0.006), length(l) - 0.022), 66.0);
+#if HAS_SCRUBRUNNER
+    res = scrubrunnerPowerLever()?vec2(scrubrunnerPowerLeverLocal(l,-1.0,.022),66.0):vec2(min(sdCapsule(l, vec3(0.0, 0.0, (compactTrainerStick()||cutwaterCompactYoke())?-.180:-.160), vec3(0.0), 0.006), length(l) - 0.022), 66.0);
 #else
-    res = vec2(min(sdCapsule(l, vec3(0.0, 0.0, (compactTrainerStick()||swiftCompactYoke())?-.180:-.160), vec3(0.0), 0.006), length(l) - 0.022), 66.0);
+    res = vec2(min(sdCapsule(l, vec3(0.0, 0.0, (compactTrainerStick()||cutwaterCompactYoke())?-.180:-.160), vec3(0.0), 0.006), length(l) - 0.022), 66.0);
 #endif
   } else if (k == PT_THR_LEVER) {
     res = vec2(sdCapsule(l, vec3(0.0), vec3(0.0, 0.16, 0.0), 0.008), 60.0);
@@ -798,8 +798,8 @@ vec2 partFieldCockpit(int k, vec3 l){
   } else if (k == PT_FLAP_LEVER) {
     res = vec2(min(sdCapsule(l, vec3(0.0), vec3(0.0, 0.11, 0.0), 0.006), sdRoundBox(l - vec3(0.0, 0.11, 0.0), vec3(0.022, 0.006, 0.012), 0.004)), 60.0);
   } else if (k == PT_JET_STICK) {
-    res = vec2(min(sdCapsule(l, vec3(0.0), vec3(0.0, 0.11, -0.01), 0.016), sdRoundBox(l - vec3(0.0, 0.15, -0.01), vec3(0.021, 0.042, 0.027), 0.015)), isMantis()?61.0:47.0);
-  } else if (k == PT_JET_THR) res = vec2(sdRoundBox(l, vec3(0.03, 0.04, 0.05), 0.02), isMantis()?61.0:47.0);
+    res = vec2(min(sdCapsule(l, vec3(0.0), vec3(0.0, 0.11, -0.01), 0.016), sdRoundBox(l - vec3(0.0, 0.15, -0.01), vec3(0.021, 0.042, 0.027), 0.015)), isReverie()?61.0:47.0);
+  } else if (k == PT_JET_THR) res = vec2(sdRoundBox(l, vec3(0.03, 0.04, 0.05), 0.02), isReverie()?61.0:47.0);
   else if (k == PT_WR_STICK) {
     float stick = sdCapsule(l, vec3(0.0), vec3(0.0, 0.09, -0.01), 0.014);
     vec3 gq = l - vec3(0.0, 0.14, -0.015);
@@ -827,7 +827,7 @@ vec2 partFieldCockpit(int k, vec3 l){
     res = vec2(sdSurface(hs, hc, ht, H0.x, H0.y, H0.z, H0.w, 0.1, 0.68, 0.12, H0.x*0.98, 0.0, 0.0), 3.0);
     // A forward canard crosses the cockpit's z range. Match the cabin field's clipping when its rigid mesh
     // is drawn from inside, as the wing flaps already do, so the inboard elevator cannot enter the footwell.
-    if (isMantis() && gPS.w > 0.5) { vec3 sec=fusSection(l.z); res.x=max(res.x,-(length(vec2(l.x/sec.x,(l.y-sec.z)/sec.y))-1.0)*min(sec.x,sec.y)); }
+    if (isReverie() && gPS.w > 0.5) { vec3 sec=fusSection(l.z); res.x=max(res.x,-(length(vec2(l.x/sec.x,(l.y-sec.z)/sec.y))-1.0)*min(sec.x,sec.y)); }
   } else if (k == PT_RUDDER) {
     vec4 V0 = gM[14], V1 = gM[15];
     float h = V0.x, rud0 = gM[13].w > 0.5 ? 0.05 : 0.08*h;
@@ -849,14 +849,14 @@ vec2 partFieldCockpit(int k, vec3 l){
 #ifdef PART_BAKE
 // any part's shape (the mesh bake only, PART_BAKE: one part alone in its own frame)
 vec2 partField(int k, vec3 l){
-#if HAS_WRAITH
-  if (partIsWraith(k)) return wrPartField(k, l);
+#if HAS_SOMNUS
+  if (partIsSomnus(k)) return wrPartField(k, l);
 #endif
 #if HAS_RESEARCH
   if (partIsJet(k)) return jtPartField(k, l);
 #endif
-#if HAS_ATLAS
-  if (k == PT_ATLAS_FAN) return atlasFanField(l);
+#if HAS_GALLEON
+  if (k == PT_GALLEON_FAN) return galleonFanField(l);
 #endif
 #if HAS_FLEET
   if (k >= PT_GEAR_MAIN && k <= PT_GEAR_NDOOR) return gearPartField(k, l);

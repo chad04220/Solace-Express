@@ -171,7 +171,7 @@ int main() {
   }
   printf("Loading strip: on-screen bounds and clear central aircraft region at five window sizes: PASS\n");
   size_t count = 0;
-  // Small training/touring craft, research jets, transport and Atlas A180
+  // Small training/touring craft, research jets, transport and Galleon 180
   // (42.60 m maximum span/length), plus a larger-room regression case.
   for (float size : {12.f, 16.5f, 24.f, 42.6f, 50.f}) {
     const auto v = hangarPreview::geometry(size);

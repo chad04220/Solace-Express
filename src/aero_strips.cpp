@@ -101,8 +101,8 @@ AeroGeom build(const AircraftSpec& s, int idx) {
     addPanel(g, AS_WING, (float)side, vec3(0, wy, wz), sp, n, wb, wcr, wct, wsw, washout, NW);
     // flaps from the fuselage's side to their share of the span, ailerons outboard of them to 94% (the drawn surfaces:
     // plane_parts.glsl partPoseCockpit, sdSurface)
-    // Match the authored Atlas flap root, which starts outboard of the main-gear fairing (plane_parts.glsl).
-    float flapEnd = wb * m.flapFrac, flap0 = idx == kAtlas ? 4.05f : 0.55f * s.fusRad;
+    // Match the authored Galleon flap root, which starts outboard of the main-gear fairing (plane_parts.glsl).
+    float flapEnd = wb * m.flapFrac, flap0 = idx == kGalleon ? 4.05f : 0.55f * s.fusRad;
     addControl(g, first, g.nSt, vec3(0, wy, wz), sp, wb, NW, flap0, flapEnd, AC_FLAP, 0.26f);
     addControl(g, first, g.nSt, vec3(0, wy, wz), sp, wb, NW, flapEnd + 0.03f, wb * 0.94f, AC_AIL, 0.26f);
     for (int i = first; i < g.nSt; i++) {   // the fuselage carries the lift through where the wing passes it
@@ -149,7 +149,7 @@ AeroGeom build(const AircraftSpec& s, int idx) {
   if (m.vt[0] > 0.f) {
     const float h = m.vt[0], rud0 = m.ttail ? 0.05f : 0.08f * h;
     const int first0 = g.nSt, NF = 4;
-    if (idx == kMantis) {
+    if (idx == kReverie) {
       const float cant = 0.48f, fx = 1.05f;
       for (int side = -1; side <= 1; side += 2) {
         vec3 sp(side * sinf(cant), cosf(cant), 0), n(cosf(cant), -side * sinf(cant), 0);
@@ -164,7 +164,7 @@ AeroGeom build(const AircraftSpec& s, int idx) {
     }
     for (int i = first0; i < g.nSt; i++) g.st[i].clMax = 1.2f;
     AeroSurface& f = g.surf[AS_FIN];
-    const int nf = idx == kMantis ? 2 : 1;
+    const int nf = idx == kReverie ? 2 : 1;
     f.first = first0; f.count = g.nSt - first0; f.b = h; f.S = nf * h * 0.5f * (m.vt[1] + m.vt[2]);
     f.AR = (m.ttail ? 1.9f : 1.55f) * h * h / (f.S / nf);   // (the fuselage and the tailplane end-plate it)
     f.sweep = (m.vt[3] + 0.5f * (m.vt[2] - m.vt[1])) / h; f.e = 0.8f;
@@ -253,7 +253,7 @@ void calibrate(AeroGeom& g, const AircraftSpec& s, int idx) {
   if (s.flapCL <= 0.01f) g.flapA = 0.f;
   // (and their drag: the type's at full flap, on its wing - the deflected flap's own profile drag, about sin^2 of its
   // angle, and the induced drag of the lift crowded inboard - square in the deflection. A generic 0.4 left the
-  // full-flap drag a third to a fifth of it: the Bushmaster dived its final at idle, nose 13 deg down, gathering speed)
+  // full-flap drag a third to a fifth of it: the Scrubrunner dived its final at idle, nose 13 deg down, gathering speed)
   {
     float fa = 0; for (int i = 0; i < g.nSt; i++) if (g.st[i].ctl == AC_FLAP) fa += g.st[i].area * g.st[i].cover * 1.1f;
     if (fa > 0.f && g.flapA > 1e-3f && s.flapCD > 0.f) g.flapCdK = s.flapCD * s.wingArea / (fa * g.flapA * g.flapA);

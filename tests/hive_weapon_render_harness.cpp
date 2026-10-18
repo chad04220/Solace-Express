@@ -32,7 +32,7 @@ static void aim(FrameParams& f,vec3 target,vec3 offset,float fov=.55f){
 }
 static FrameParams fixture(int kind,bool night){
  FrameParams f{};f.hangarPreview=true;f.hangarSize=35;f.hangarOrigin=vec3(0);
- f.plane.on=true;f.plane.model=kWraith;packModelOf(kWraith,f.plane.M);
+ f.plane.on=true;f.plane.model=kSomnus;packModelOf(kSomnus,f.plane.M);
  f.plane.pos=vec3(0,kind==1?5.f:4.f,0);f.plane.rot[0]=f.plane.rot[4]=f.plane.rot[8]=1;
  f.plane.colBase=vec3(.085f,.10f,.12f);f.plane.colStripe=vec3(.12f,.65f,.9f);
  f.plane.wr[4][1]=1;f.plane.wr[4][2]=1;f.plane.wr[6][0]=1;
@@ -77,7 +77,7 @@ int main(int argc,char**argv){
  g_ren.bakeYield=[](){};
  // Exercise an initially absent EXTERIOR cache while the view requests cockpit.
  // Subsequent release draws must reuse this warm cache rather than bake on release.
- auto warm=fixture(0,false);warm.plane.PS[3]=1;g_ren.warmWraithStores(warm);
+ auto warm=fixture(0,false);warm.plane.PS[3]=1;g_ren.warmSomnusStores(warm);
  printf("WARM exterior stores from cockpit packet complete\n");
  const char* names[]={"pulse-plasma","kinetic-penetrator","charged-emp"};
  for(int kind=0;kind<3;kind++){

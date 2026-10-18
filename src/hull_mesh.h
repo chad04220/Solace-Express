@@ -54,7 +54,7 @@ inline void cabinBox(const float* M, float* lo, float* hi) {
   float E[3] = {m(22, 0), m(22, 1), m(22, 2)}, pz = m(21, 3);
   lo[0] = -1.1f; lo[1] = E[1] - 1.25f; lo[2] = std::min(pz, E[2]) - 0.7f;
   hi[0] = 1.1f; hi[1] = E[1] + 0.5f; hi[2] = E[2] + 1.6f;
-  // Atlas alone: the real wraparound flight deck is wider/taller than the compact
+  // Galleon alone: the real wraparound flight deck is wider/taller than the compact
   // fleet cabin. Its stable packed model tag includes two times the model index.
   if (int(m(19,3)+.5f)/2 == 14) { lo[0]=-1.85f;hi[0]=1.85f;hi[1]=E[1]+1.05f; }
 }

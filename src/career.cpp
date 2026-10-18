@@ -56,7 +56,7 @@ void buildStory() {
   // ------------------------------------------------------------ Chapter 0: Student Permit
   { S s("L1", 0, CT_LESSON, "MDB", "MDB", "Lesson 1: Takeoff and Climb");
     s.lesson().pay(150).wx(W(50, 4, 0, 0.05f, 0.2f, 4500, 40, 0, false, 9.5f))
-     .brief("Welcome to Meadowbrook Flight Academy! Today you'll fly the Kestrel trainer for the first time. "
+     .brief("Welcome to Meadowbrook Flight Academy! Today you'll fly the Dawnlark trainer for the first time. "
             "Release the brakes, apply full power, rotate gently at 50 knots and climb straight ahead through the rings.")
      .wp(wpRel("MDB", 2.2f, 0, 150)).wp(wpRel("MDB", 4.0f, 0, 300)).wp(wpRel("MDB", 5.5f, -0.6f, 380))
      .hints({"Press {parkingBrake} to release the parking brake, then hold {throttleUp} (or gamepad RT) to add full throttle.",
@@ -103,7 +103,7 @@ void buildStory() {
   // ------------------------------------------------------------ Chapter 1: Private Pilot (cargo by rental)
   { S s("C1", 1, CT_CARGO, "ORC", "MDB", "Seed Delivery");
     s.load(90, 0).pay(700).lic(LIC_PPL).wx(W(250, 6, 0, 0.1f, 0.25f, 4000, 40, 0, false, 9.0f))
-     .brief("The Orchard Valley co-op needs seed sacks flown to Meadowbrook. Rent a Kestrel - the fee comes out of your pay."); add(s); }
+     .brief("The Orchard Valley co-op needs seed sacks flown to Meadowbrook. Rent a Dawnlark - the fee comes out of your pay."); add(s); }
   { S s("C2", 1, CT_CARGO, "MDB", "PVI", "Parts for the Port");
     s.load(110, 0).pay(950).lic(LIC_PPL).wx(W(270, 12, 4, 0.2f, 0.4f, 3500, 30, 0, false, 14.0f))
      .brief("Engine parts for a fishing trawler at Port Verde. Afternoon sea breeze on the west coast."); add(s); }
@@ -115,7 +115,7 @@ void buildStory() {
      .brief("The keeper's mail and a crate of hand-made bottles back to Meadowbrook. Light rain moving in. Fragile!").fragile(); add(s); }
   { S s("C5", 1, CT_CARGO, "MDB", "GLR", "Gull Rock Generator");
     s.load(260, 0).pay(1900).lic(LIC_PPL).wx(W(80, 10, 3, 0.2f, 0.3f, 3500, 30, 0, false, 10.0f))
-     .brief("A replacement generator for the weather station on Gull Rock. Too heavy for the Kestrel - rent a Wren 180. "
+     .brief("A replacement generator for the weather station on Gull Rock. Too heavy for the Dawnlark - rent an Ambler 180. "
             "The runway is only 480 m with water at both ends."); add(s); }
   { S s("C6", 1, CT_CARGO, "GLR", "CAP", "Urgent Documents");
     s.load(30, 0).pay(1700).lic(LIC_PPL).limit(16).wx(W(120, 8, 0, 0.1f, 0.2f, 5000, 40, 0, false, 8.0f))
@@ -137,13 +137,13 @@ void buildStory() {
   { S s("P3", 2, CT_CARGO, "CDR", "SMP", "Summit Pass Rescue Gear");
     s.load(380, 0).pay(5200).lic(LIC_CPL).wx(W(250, 14, 8, 0.5f, 0.35f, 7500, 40, 0, false, 9.5f))
      .brief("Mountain rescue needs equipment at Summit Pass: a 600 m gravel shelf at 5,400 ft. Only a STOL aircraft can do this. "
-            "Rent the Bushmaster - a taildragger, so keep the tail down with back pressure and use rudder constantly."); add(s); }
+            "Rent the Scrubrunner - a taildragger, so keep the tail down with back pressure and use rudder constantly."); add(s); }
   { S s("P4", 2, CT_MEDEVAC, "SMP", "CAP", "Medevac: Injured Climber");
     s.load(80, 1).pay(5600).lic(LIC_CPL).limit(20).wx(W(260, 16, 9, 0.55f, 0.5f, 6000, 30, 0, false, 10.3f))
      .brief("An injured climber needs a hospital. Get her to Solace Capital within 20 minutes - and gently."); add(s); }
   { S s("P5", 2, CT_PAX, "CAP", "KLO", "Island Hopper");
     s.load(100, 8).pay(6200).lic(LIC_CPL).wx(W(70, 12, 4, 0.2f, 0.4f, 3500, 35, 0, false, 12.0f))
-     .brief("Eight tourists to tropical Kaleo. Rent an Islander Twin for the crossing."); add(s); }
+     .brief("Eight tourists to tropical Kaleo. Rent a Skerry Twin for the crossing."); add(s); }
   { S s("P6", 2, CT_PAX, "KLO", "PMB", "Beach Resort Shuttle");
     s.load(120, 7).pay(4800).lic(LIC_CPL).wx(W(90, 11, 6, 0.3f, 0.7f, 2000, 12, 1, false, 16.0f))
      .brief("Resort guests to Palm Bay's sand strip. Afternoon showers are rolling through."); add(s); }
@@ -154,7 +154,7 @@ void buildStory() {
   { S s("O1", 3, CT_CARGO, "VCF", "SMP", "Your Own Wings: Lodge Supplies");
     s.load(400, 0).pay(14000).lic(LIC_CPL).owned().wx(W(270, 10, 4, 0.35f, 0.3f, 8000, 40, 0, false, 10.0f))
      .brief("The Summit Lodge wants a regular supply operator - but only one with their own aircraft. "
-            "Time to visit the Hangar and buy your first plane. A Bushmaster fits the job."); add(s); }
+            "Time to visit the Hangar and buy your first plane. A Scrubrunner fits the job."); add(s); }
   { S s("O2", 3, CT_PAX, "SMP", "NPT", "Ski Team Transfer");
     s.load(120, 3).pay(13000).lic(LIC_CPL).owned().wx(W(10, 12, 6, 0.4f, 0.6f, 6500, 15, 2, false, 15.0f))
      .brief("The national ski team is heading home to Northpoint. Light snow over the Spine."); add(s); }
@@ -169,7 +169,7 @@ void buildStory() {
      .brief("Priceless ice core samples. Any rough handling (over 2 G) will crack them."); add(s); }
   { S s("O6", 3, CT_CARGO, "FJH", "CAP", "Fjord Fish to Market");
     s.load(1150, 0).pay(30000).lic(LIC_CPL).owned().wx(W(20, 12, 5, 0.2f, 0.5f, 4500, 30, 0, false, 6.5f))
-     .brief("A huge catch for the capital's morning market. You'll need something bigger - the Pelican Caravan hauls 1.4 tonnes."); add(s); }
+     .brief("A huge catch for the capital's morning market. You'll need something bigger - the Longshore Hauler hauls 1.4 tonnes."); add(s); }
   { S s("O7", 3, CT_PAX, "CAP", "FAR", "Far Isle Grand Opening");
     s.load(200, 11).pay(36000).lic(LIC_CPL).owned().wx(W(140, 10, 3, 0.15f, 0.3f, 4500, 40, 0, false, 17.5f))
      .brief("Guests for the Far Isle resort's grand opening. 52 km over open water - golden hour on arrival."); add(s); }
@@ -179,7 +179,7 @@ void buildStory() {
   // ------------------------------------------------------------ Chapter 4: Airline captain
   { S s("A1", 4, CT_PAX, "KLO", "CAP", "Solace Regional: Launch Day");
     s.load(600, 36).pay(55000).lic(LIC_ATP).wx(W(60, 9, 0, 0.15f, 0.35f, 4500, 40, 0, false, 9.0f))
-     .brief("You've founded Solace Regional! Your first scheduled service needs a real airliner - lease a Meridian Q400 until you can afford your own."); add(s); }
+     .brief("You've founded Solace Regional! Your first scheduled service needs a real airliner - lease an Archipel 400 until you can afford your own."); add(s); }
   { S s("A2", 4, CT_PAX, "CAP", "FJH", "Northern Service");
     s.load(500, 34).pay(60000).lic(LIC_ATP).wx(W(10, 18, 10, 0.4f, 0.8f, 2500, 6, 2, false, 13.0f))
      .brief("Snow and strong northerly winds at Fjordhaven. The fjord channels the wind straight across the runway."); add(s); }
@@ -187,8 +187,8 @@ void buildStory() {
     s.load(600, 40).pay(65000).lic(LIC_ATP).wx(W(250, 12, 6, 0.3f, 0.6f, 3000, 20, 1, false, 18.8f))
      .brief("A full cabin to Port Verde across the Spine. Sunset over the sea."); add(s); }
   { S s("A4", 4, CT_VIP, "PVI", "FAR", "The Minister's Jet");
-    s.load(150, 5).pay(110000).lic(LIC_ATP).owned().type("starling").limit(12).wx(W(130, 8, 0, 0.1f, 0.2f, 6000, 50, 0, false, 11.5f))
-     .brief("The Minister needs to reach Far Isle in 12 minutes, in comfort. Only a jet will do: the Starling 500. The autopilot's full arrival takes too long: fly the approach straight in."); add(s); }
+    s.load(150, 5).pay(110000).lic(LIC_ATP).owned().type("emissary").limit(12).wx(W(130, 8, 0, 0.1f, 0.2f, 6000, 50, 0, false, 11.5f))
+     .brief("The Minister needs to reach Far Isle in 12 minutes, in comfort. Only a jet will do: the Emissary 500. The autopilot's full arrival takes too long: fly the approach straight in."); add(s); }
   { S s("A5", 4, CT_PAX, "FAR", "NPT", "Storm Run");
     s.load(500, 30).pay(85000).lic(LIC_ATP).wx(W(200, 20, 12, 0.6f, 0.95f, 1800, 6, 1, true, 16.0f))
      .brief("Thunderstorms across the islands. Crews are grounded everywhere but you. Get your passengers to Northpoint."); add(s); }
@@ -991,7 +991,7 @@ int Career::routeRevenue(const Route& r) const {
   const AircraftSpec& s = kAircraft[fleet[r.fleetIdx].spec];
   float km = g_world.distanceKm(r.from, r.to);
   float load = r.pilot >= 0 && r.pilot < (int)airline.pilots.size() ? 0.5f + 0.17f * airline.pilots[r.pilot].rating : 0.5f;   // 0.67 / 0.84 / 1.0
-  float gross = km * (s.pax * 4.5f + s.cargoKg * 0.02f) * load + 60.f;   // (a 28 km Q400 leg grosses about $5,900 with a full cabin)
+  float gross = km * (s.pax * 4.5f + s.cargoKg * 0.02f) * load + 60.f;   // (a 28 km Archipel 400 leg grosses about $5,900 with a full cabin)
   return (int)gross / 10 * 10;
 }
 int Career::routeFuelCost(const Route& r) const {

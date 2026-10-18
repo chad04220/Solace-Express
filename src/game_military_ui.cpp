@@ -248,7 +248,7 @@ void Game::drawMilitary(const FrameParams& fp) {
     }
     by+=10*s;
     paragraph("EXTRACT  Return to the airborne extraction gate after all objectives are complete.",M_ACCENT,12.5f,18);
-    if(m.aircraft==kWraith) {
+    if(m.aircraft==kSomnus) {
       by+=20*s;rule(bx,by,bw,s);by+=18*s;
       label(bx,by,bw,s,"FLIGHT CONTROLS");by+=24*s;
       const bool pad=padPrompts();
@@ -342,7 +342,7 @@ void Game::drawMilitaryDebrief() {
   };
   metric(0,"FLIGHT TIME",fmt("%d:%02d",int(flightClock)/60,int(flightClock)%60));
   metric(1,"AIRFRAME HULL",fmt("%.0f%%",militaryHull));
-  metric(2,"HOSTILES DESTROYED",std::to_string(wraith.kills));
+  metric(2,"HOSTILES DESTROYED",std::to_string(somnus.kills));
   metric(3,"MAXIMUM G",fmt("%.1f",plane.maxG));
   label(px,y+253*s,iw,s,"SERVICE SETTLEMENT");
   float py=y+285*s;int total=0;

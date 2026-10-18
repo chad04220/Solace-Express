@@ -24,14 +24,14 @@ static void fillPlaneVisual(PlaneVisual& pv, const Plane& p, float propAngle, bo
 static const vec3 kJetWingTip(5.62f, -0.38f, 4.4f);
 // XR-30 nozzle swivel (0 aft .. 90 deg down) plus pitch vectoring; mirrored by mapJet and the exhaust plumes
 static float jetNozzleAngle(const Plane& p) { return p.nozzle * 0.5f * PI - clampf(p.ctl.pitch + p.ctl.trim * 0.3f, -1, 1) * 0.5f; }
-static const vec3 kWraithWingTip(6.2f, -0.24f, 2.0f);
+static const vec3 kSomnusWingTip(6.2f, -0.24f, 2.0f);
 // research craft exhaust exits and jet directions (body coords): XR-30 two 2D nozzles, XR-40 four pods.
 // strength: that exhaust's share of the thrust (1 = the XR-30's)
 static int jetExhausts(const Plane& p, vec3* pos, vec3* dir, float* strength) {
   if (p.spec->special == 2) {
     for (int i = 0; i < 4; i++) {
       float a0 = p.podTilt[i], a = a0 + p.podVane[i], y = p.podYaw[i];
-      pos[i] = kWraithPods[i] + vec3(0, -sinf(a0), cosf(a0)) * 1.55f;
+      pos[i] = kSomnusPods[i] + vec3(0, -sinf(a0), cosf(a0)) * 1.55f;
       dir[i] = normalize(vec3(-sinf(y), -sinf(a) * cosf(y), cosf(a) * cosf(y)));
       strength[i] = clampf(p.podThr[i] * 1.4f, 0.f, 1.2f);
     }
@@ -43,7 +43,7 @@ static int jetExhausts(const Plane& p, vec3* pos, vec3* dir, float* strength) {
 }
 
 // ------------------------------------------------------------------ control bindings
-const char* const kActionGroups[] = {"FLIGHT", "SYSTEMS", "VIEW / COMMS", "XR-40 WRAITH"};
+const char* const kActionGroups[] = {"FLIGHT", "SYSTEMS", "VIEW / COMMS", "XR-40 SOMNUS"};
 const ActionInfo kActions[ACT_COUNT] = {
   {"pitchDown", "Pitch down (nose down)", 0, 'W', 0},          {"pitchUp", "Pitch up (nose up)", 0, 'S', 0},
   {"rollLeft", "Roll left", 0, 'A', 0},                         {"rollRight", "Roll right", 0, 'D', 0},
@@ -917,7 +917,7 @@ void Game::continueEarthFlight() {
   contract.title = "Free Flight / " + flightRegion.name;
   launchPlan.startAirport = attemptFrom = freeAirport; wpIndex = 0; apDest = -1; tdRunway = -2;
   atcF = AtcFlight{}; atcF.dep = atcF.arr = freeAirport; atcF.phase = plane.onGround ? 0 : 3;
-  wraith = WraithState{}; ufo = Ufo{}; ufo.next = 180.f;
+  somnus = SomnusState{}; ufo = Ufo{}; ufo.next = 180.f;
   tipOn = false; trailT = 0; wakeGap = true; wakeOdo = 0;
   craterR = craterD = 0; boomT = -1;
   regionPoseChange.reset();
@@ -1032,7 +1032,7 @@ void Game::returnToMilitary() {
   crashed = completed = landed = false; dbgCam = dbgFollow = false;
   hiveCombat.reset(1, WRAP_SPAN); combatLoadout.reset(); militaryHull = 100;
   combatCollisionWarm = false; combatCollisionWarmMs = 0; combatPrefetchCursor = 0;
-  wraith = WraithState(); wreck.clear(); debris.clear(); pops.clear(); particles.clear(); pits.clear();
+  somnus = SomnusState(); wreck.clear(); debris.clear(); pops.clear(); particles.clear(); pits.clear();
   bursts.clear(); trail.clear(); cloudWake.clear(); tipTrail[0].clear(); tipTrail[1].clear();
   for (auto& smoke : pieceTrail) smoke.clear();
   tipOn = airBreak = false; trailT = 0; wakeGap = true; wakeOdo = 0;
@@ -1190,9 +1190,9 @@ void Game::updateResearchCard(float dt) {
     case RS_CLIMB: inst = air && plane.vel.y >= st.v; break;
     case RS_HOVER: inst = air && plane.nozzle > 0.7f && length(plane.vel) < 4.f && plane.agl() > 4.f; break;
     case RS_VLAND: inst = plane.onGround && touchedDown && plane.nozzle > 0.7f && gs < 1.f && touchdownFpm < 400.f; break;
-    case RS_CLOAK: inst = wraith.stealth >= 0.95f; break;
-    case RS_LASER: inst = wraith.shots >= (int)st.v; break;
-    case RS_BOMB: inst = wraith.dropped >= (int)st.v; break;
+    case RS_CLOAK: inst = somnus.stealth >= 0.95f; break;
+    case RS_LASER: inst = somnus.shots >= (int)st.v; break;
+    case RS_BOMB: inst = somnus.dropped >= (int)st.v; break;
     case RS_LAND: { float dA; int ap = g_world.nearestAirport(plane.pos.x, plane.pos.z, &dA); inst = plane.onGround && touchedDown && gs < 2.f && ap == resAirport && dA < g_world.airports[ap].length * 0.5f + 600.f; } break;
   }
   resHold = inst ? resHold + dt : 0.f;
@@ -1254,10 +1254,10 @@ void Game::followSeam(vec3 d) {
   boomP += d;
   for (auto& w : cloudWake) w.c += d;
   ufo.pos += d;
-  for (auto& b : wraith.bolts) b.h += d;
-  for (auto& b : wraith.bombs) b.p += d;
-  for (auto& b : wraith.blasts) b.p += d;
-  wraith.cam.pos += d; wraith.cam.look += d; wraith.cam.blastP += d;
+  for (auto& b : somnus.bolts) b.h += d;
+  for (auto& b : somnus.bombs) b.p += d;
+  for (auto& b : somnus.blasts) b.p += d;
+  somnus.cam.pos += d; somnus.cam.look += d; somnus.cam.blastP += d;
   traffic.followSeam(d);
   g_ren.followSeam(d);
 }
@@ -1379,8 +1379,8 @@ Contract Game::trialContract(int kind) const {
   if (kind == TR_STOL) { int smp = g_world.findAirport("SMP"); if (smp >= 0) c.from = c.to = smp; }
   const Airport& A = g_world.airports[c.from];
   if (kind == TR_SPOT) c.brief = fmt("Take off, fly a circuit and put the wheels down as close as you can to the mark 300 m past the threshold at %s, as softly as you can. Score: metres from the mark plus a quarter of the touchdown rate in fpm. Lower is better.", A.name);
-  else if (kind == TR_FORMATION) c.brief = fmt("Take off from %s and climb above 300 m: the Spectre display pair joins you and flies its show around you for three minutes. Hold a steady platform for them - wings near level, no yanking, no diving at the ground - and land back here when they bow out. Score: the seconds you spent out of a steady platform. Lower is better.", A.name);
-  else if (kind == TR_STOL) c.brief = "Summit Pass, 600 m of gravel at 5,400 ft. Take off, come round and land as short as you can: the score is the landing roll from touchdown to a stop. Lower is better. The Bushmaster is the natural choice.";
+  else if (kind == TR_FORMATION) c.brief = fmt("Take off from %s and climb above 300 m: the Nocturne display pair joins you and flies its show around you for three minutes. Hold a steady platform for them - wings near level, no yanking, no diving at the ground - and land back here when they bow out. Score: the seconds you spent out of a steady platform. Lower is better.", A.name);
+  else if (kind == TR_STOL) c.brief = "Summit Pass, 600 m of gravel at 5,400 ft. Take off, come round and land as short as you can: the score is the landing roll from touchdown to a stop. Lower is better. The Scrubrunner is the natural choice.";
   else {
     // the gate course: eight rings out from the runway, each bending a little, hugging the ground
     uint32_t seed = kind == TR_DAILY ? (uint32_t)(time(nullptr) / 86400) * 2654435761u : 0x5eedu + (uint32_t)home * 131u;
@@ -1615,7 +1615,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
   lightning = 0; nextLightning = 6;
   landingLight = true;
   approachMinAgl = 1e9f; thrPrevAlong = -1e9f; appLow = false; appHigh = false; coaching.clear();
-  apWasOn = false; apDest = -1; wraith = WraithState(); g_scenery.resetDamage();
+  apWasOn = false; apDest = -1; somnus = SomnusState(); g_scenery.resetDamage();
   licenseBefore = career.license;
   // the player sees a loading screen while the scenery around the start is generated (tests fly straight away)
   screen = headless ? SCR_FLIGHT : SCR_LOADING;
@@ -1856,7 +1856,7 @@ void Game::flightControls(float dt) {
   }
   (void)manual;
   // XR-40 weapons hot: the bumpers fire and bomb, so the rudder is frozen until weapons are safe again
-  if (plane.spec->special == 2 && wraith.armed && !plane.onGround) { yawIn = 0; padY = 0; }
+  if (plane.spec->special == 2 && somnus.armed && !plane.onGround) { yawIn = 0; padY = 0; }
   c.yaw = approach(c.yaw, clampf(yawIn + padY, -1, 1), 4.f, dt);
   // throttle
   float thr = 0;
@@ -1918,7 +1918,7 @@ void Game::flightControls(float dt) {
     else if (plane.apStuntWasAirport >= 0) { const int keep = apDest; apDest = plane.apStuntWasAirport; engageAutopilot(); apDest = keep; }
     else toast("Autopilot ON: the stick trims heading and altitude, throttle sets speed", vec3(0.6f, 1, 0.6f));
   }
-  if (plane.spec->special == 2) wraithControls(dt);
+  if (plane.spec->special == 2) somnusControls(dt);
   if (actKeyP(ACT_PARK) || (!showMap && actPadP(ACT_PARK))) { parking = !parking; toast(parking ? "Parking brake SET" : "Parking brake released", vec3(1, 0.85f, 0.5f)); }
   float wb = actDown(ACT_BRAKE) ? 1.f : 0.f;
   if (wb > 0 && parking && plane.onGround && length(plane.vel) > 2.f) parking = false;
@@ -2065,12 +2065,12 @@ void Game::updateFlight(float dt) {
   }
   for (auto& f : traffic.puffs) spawn(f.p, f.v, f.life, f.size, f.grow, f.col, f.alpha, f.kind, 1.f, 0.f);
   for (auto& b : traffic.booms) g_audio.triggerAt(SFX_BOOM, b.first, b.second);
-  updateWraith(simDt);
+  updateSomnus(simDt);
   updateHive(simDt);
   if(screen!=SCR_FLIGHT) return;
   // Continuous, individually tracked traffic engines provide the pass and its real Doppler shift.
   for (auto& m : traffic.radio) toast(m, vec3(1.f, 0.78f, 0.3f));
-  // entertainment: O + P held for a second while flying summons the Spectre display pair (again: sends them home).
+  // entertainment: O + P held for a second while flying summons the Nocturne display pair (again: sends them home).
   // They fly their show around you and bow out when you land or settle onto an approach
   {
     bool flying = !crashed && !plane.onGround;
@@ -2079,7 +2079,7 @@ void Game::updateFlight(float dt) {
       if (escortSummon >= 1.f && !escortLatch) {
         escortLatch = true;
         if (traffic.escortActive()) traffic.dismissEscort();
-        else if (traffic.escortStop) toast("Spectre display pair: climb away from the field first", vec3(1.f, 0.78f, 0.3f));
+        else if (traffic.escortStop) toast("Nocturne display pair: climb away from the field first", vec3(1.f, 0.78f, 0.3f));
         else { traffic.spawnEscort(plane.pos, plane.vel); g_audio.trigger(SFX_CHIME, 0.8f); }
       }
     } else { escortSummon = 0; escortLatch = false; }
@@ -2224,7 +2224,7 @@ void Game::updateFlight(float dt) {
   if (!plane.onGround && plane.wxl.cloud > 0.03f) vapK = std::max(vapK, 0.35f * smoothstepf(0.03f, 0.3f, plane.wxl.cloud) * smoothstepf(20.f, 50.f, plane.airspeed));   // (in cloud the tips' vortices stir it at any g)
   if (vapK > 0.f || tipOn) {
     if (vapK > 0.f && !tipOn) tipSeg++;
-    vec3 tip = plane.spec->special == 2 ? kWraithWingTip : plane.spec->special ? kJetWingTip : modelWingTip(kModels[plane.spec - kAircraft]);
+    vec3 tip = plane.spec->special == 2 ? kSomnusWingTip : plane.spec->special ? kJetWingTip : modelWingTip(kModels[plane.spec - kAircraft]);
     for (int sd = 0; sd < 2; sd++) {
       float sx = sd ? 1.f : -1.f;
       TipPt t{plane.pos + plane.q.rotate(vec3(sx * tip.x, tip.y, tip.z + 0.3f)), 0.f, vapK, tipSeg};
@@ -2655,7 +2655,7 @@ void Game::launchResearch() {
   // loading card, not behind a frozen terminal: Game::queueLaunch)
   { Contract card = researchContract(); card.startAirborne = resAirborne;
     if (queueLaunch(card, resCraft, LAUNCH_RESEARCH, [this] { launchResearch(); })) return; }
-  bool wr = resCraft == kWraith;
+  bool wr = resCraft == kSomnus;
   const AircraftSpec& rs = kAircraft[resCraft];
   if (resCard >= 0 && kResCards[resCard].craft != resCraft) resCard = -1;
   resStep = 0; resHold = 0; resBest = 0; resCardDone = false;
@@ -2770,7 +2770,7 @@ void Game::buildLights(FrameParams& fp) {
   const AircraftSpec& s = *plane.spec;
   const ModelDef& md = kModels[plane.spec - kAircraft];
   float t = realTime, night = fp.night;
-  float dark = s.special == 2 ? 1.f - wraith.stealth : 1.f;   // a cloaked XR-40 runs dark
+  float dark = s.special == 2 ? 1.f - somnus.stealth : 1.f;   // a cloaked XR-40 runs dark
   auto W = [&](vec3 b) { return plane.pos + plane.q.rotate(b); };
   auto lens = [&](vec3 b, vec3 axis, int tint, vec3 emit) {
     int i = fp.plane.lensN; if (i >= 6) return;
@@ -2779,7 +2779,7 @@ void Game::buildLights(FrameParams& fp) {
     D[0] = axis.x; D[1] = axis.y; D[2] = axis.z; D[3] = (float)tint; fp.plane.lensN++;
   };
   // Exactly one light per live exhaust, with the same moving anchor/radius/power as its plume.
-  // This replaces the old special-craft and separate Mantis paths; a failed or unfueled engine emits neither.
+  // This replaces the old special-craft and separate Reverie paths; a failed or unfueled engine emits neither.
   if (!(camMode == 1 && fp.sealedCockpit)) {
     const ExhaustVisual& ex = fp.plane.exhaust;
     const float flick = .85f + .15f*sinf(t*57.f)*sinf(t*23.f + 1.f);
@@ -2792,7 +2792,7 @@ void Game::buildLights(FrameParams& fp) {
     }
   }
   // fixture positions (body space)
-  vec3 tip = s.special == 2 ? kWraithWingTip : s.special ? kJetWingTip : modelWingTip(md);
+  vec3 tip = s.special == 2 ? kSomnusWingTip : s.special ? kJetWingTip : modelWingTip(md);
   vec3 tail = s.special == 2 ? vec3(0, -0.1f, 7.86f) : s.special ? vec3(0, 0.45f, 7.6f) : modelTailTip(md);
   vec3 bcn = s.special == 2 ? vec3(0, 0.53f, 1.6f) : s.special ? vec3(0, 0.67f, 1.6f) : modelFinTop(md);
   vec3 ldg;   // left landing light, in the wing leading edge
@@ -2897,11 +2897,11 @@ void Game::refreshGroundPits() {
   // pits don't: what a bolt destroys is tracked one object at a time)
   if (craterR > 0) g_scenery.craters.push_back(vec3(craterX, craterZ, craterR * 1.5f));
   for (const Pit& p : pits) if (p.R > 1.2f) g_scenery.craters.push_back(vec3(p.x, p.z, p.R * 1.3f));
-  for (const vec3& f : wraith.flattened) g_scenery.craters.push_back(f);
+  for (const vec3& f : somnus.flattened) g_scenery.craters.push_back(f);
   if (craterR > 0) g_groundPits.push_back({craterX, craterZ, craterR, craterD});
   for (const Pit& p : pits) g_groundPits.push_back({p.x, p.z, p.R, p.D});
-  for (const auto& c : wraith.craters) g_groundPits.push_back({c.x, c.z, c.R, c.D});
-  for (int i = (int)wraith.scorch.size() - 1; i >= 0; i--) g_groundPits.push_back({wraith.scorch[i].x, wraith.scorch[i].z, wraith.scorch[i].R, wraith.scorch[i].D});
+  for (const auto& c : somnus.craters) g_groundPits.push_back({c.x, c.z, c.R, c.D});
+  for (int i = (int)somnus.scorch.size() - 1; i >= 0; i--) g_groundPits.push_back({somnus.scorch[i].x, somnus.scorch[i].z, somnus.scorch[i].R, somnus.scorch[i].D});
   if (g_groundPits.size() > 24) g_groundPits.resize(24);   // (the renderer's 24)
 }
 
@@ -3020,7 +3020,7 @@ void Game::breakUp(vec3 impactVel, bool water, bool air) {
   // In particular, speed-dependent nose steering must not snap to its taxi angle.
   FrameParams captured{};
   fillPlaneVisual(captured.plane, plane, propAngle, false);
-  wraithVisual(captured);
+  somnusVisual(captured);
   wreckPlanePose = captured.plane;
   const AircraftSpec& s = *plane.spec;
   Rng r(1234 + (uint32_t)(flightClock * 100));
@@ -3494,7 +3494,7 @@ FrameParams Game::buildFrame() {
     fp.landLight = landingLight && plane.engineRunning ? (0.3f + 0.7f * fp.night) : 0.f;
     fp.landLightPos = plane.pos + plane.forward() * (plane.spec->fusLen * 0.4f);
     fp.landLightDir = normalize(plane.forward() - plane.up() * 0.1f);
-    wraithVisual(fp);
+    somnusVisual(fp);
     if (!wreck.empty()) {
       // Freeze articulation while preserving the moving world frame:
       // nearby-wreck shadow selection still needs its current position.
@@ -3702,7 +3702,7 @@ void Game::menuBackgroundCamera(FrameParams& fp) {
   if (screen == SCR_RESEARCH) { researchPreviewCamera(fp); return; }
   if (screen == SCR_HUB && hubTab == TAB_CONTRACTS && hubList == 2) { militaryPreviewCamera(fp); return; }
   if (screen == SCR_FREE_FLIGHT || (screen == SCR_HUB && hubTab == TAB_HANGAR)) { hangarPreviewCamera(fp); return; }
-  // A Wren circles over the islands while the camera chases it in a slow arc
+  // An Ambler circles over the islands while the camera chases it in a slow arc
   static Plane demo;
   static bool initd = false;
   if (!initd) { demo.reset(&kAircraft[screen == SCR_MENU ? 1 : 0], vec3(0, 600, 0), 0, 50, 100, true, 60); initd = true; }
@@ -4085,18 +4085,18 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
     float dcam = length(plane.pos - fp.camPos);
     float ls = std::max(0.05f, dcam * 0.0012f);   // distant glints only: up close the modelled lens is the light
     float glint = 0.2f + 0.8f * smoothstepf(20.f, 110.f, dcam);
-    float navI = (0.6f + 2.5f * night) * (1.f - wraith.stealth) * glint;   // a cloaked XR-40 runs dark
+    float navI = (0.6f + 2.5f * night) * (1.f - somnus.stealth) * glint;   // a cloaked XR-40 runs dark
     const ModelDef& md = kModels[plane.spec - kAircraft];
     bool jet = s.special != 0;   // the XR-30 is an SDF of its own: its lights don't follow the generic model layout
-    vec3 tip = s.special == 2 ? kWraithWingTip : jet ? kJetWingTip : modelWingTip(md);
+    vec3 tip = s.special == 2 ? kSomnusWingTip : jet ? kJetWingTip : modelWingTip(md);
     vec3 lt = plane.pos + plane.q.rotate(vec3(-tip.x, tip.y, tip.z)), rtp = plane.pos + plane.q.rotate(tip);
     if (camMode != 1) {
       bill(add, lt, ls, vec3(1.f, 0.1f, 0.05f) * navI, 1, SPR_GLOW, 0.3f);
       bill(add, rtp, ls, vec3(0.1f, 1.f, 0.2f) * navI, 1, SPR_GLOW, 0.3f);
       bill(add, plane.pos + plane.q.rotate(s.special == 2 ? vec3(0, -0.1f, 7.93f) : jet ? vec3(0, 0.45f, 7.67f) : modelTailTip(md)), ls, vec3(1.f) * navI, 1, SPR_GLOW, 0.3f);
-      if (plane.engineRunning && wraith.stealth < 0.5f && fmodf(t, 1.0f) < 0.12f) bill(add, plane.pos + plane.q.rotate(s.special == 2 ? vec3(0, 0.6f, 1.6f) : jet ? vec3(0, 0.74f, 1.6f) : modelFinTop(md) + vec3(0, 0.06f, 0)), ls * 1.6f, vec3(1.f, 0.05f, 0.02f) * (2.f + 3.f * night) * glint, 1, SPR_GLOW, 0.3f);
+      if (plane.engineRunning && somnus.stealth < 0.5f && fmodf(t, 1.0f) < 0.12f) bill(add, plane.pos + plane.q.rotate(s.special == 2 ? vec3(0, 0.6f, 1.6f) : jet ? vec3(0, 0.74f, 1.6f) : modelFinTop(md) + vec3(0, 0.06f, 0)), ls * 1.6f, vec3(1.f, 0.05f, 0.02f) * (2.f + 3.f * night) * glint, 1, SPR_GLOW, 0.3f);
       float st = fmodf(t, 1.3f);
-      if (!plane.onGround && wraith.stealth < 0.5f && (st < 0.05f || (st > 0.12f && st < 0.16f))) { bill(add, lt, ls * 3.f, vec3(4.f) * glint, 1, SPR_GLOW, 0.3f); bill(add, rtp, ls * 3.f, vec3(4.f) * glint, 1, SPR_GLOW, 0.3f); }
+      if (!plane.onGround && somnus.stealth < 0.5f && (st < 0.05f || (st > 0.12f && st < 0.16f))) { bill(add, lt, ls * 3.f, vec3(4.f) * glint, 1, SPR_GLOW, 0.3f); bill(add, rtp, ls * 3.f, vec3(4.f) * glint, 1, SPR_GLOW, 0.3f); }
     }
     // AI traffic lights: nav lights, beacon, strobes when airborne, landing lights on the runway and on approach,
     // reheat glow on XR-30 formations
@@ -4719,7 +4719,7 @@ void Game::update(float dt) {
   armInputs();
   // gamepad: both bumpers held together for a second hides the whole flight UI; again brings it back (not while the
   // XR-40's weapons are armed: the bumpers are its triggers then; the pause menu has the same switch)
-  bool bumpersFree = !(screen == SCR_FLIGHT && plane.spec && plane.spec->special == 2 && wraith.armed);
+  bool bumpersFree = !(screen == SCR_FLIGHT && plane.spec && plane.spec->special == 2 && somnus.armed);
   if (in.pad && bumpersFree && (in.buttons & PAD_LB) && (in.buttons & PAD_RB)) {
     bumperHold += dt;
     if (bumperHold >= 1.f && !bumperFired) { bumperFired = true; uiHidden = !uiHidden; g_audio.trigger(SFX_CLICK); }
@@ -5080,7 +5080,7 @@ void Game::debugScene(const std::string& name) {
   }
   if (name == "research" || name == "research40" || name == "research10" || name == "research20") {   // the terminal, settled (selection decrypted)
     screen = SCR_RESEARCH; realTime = 30; resOpened = 20; resAuthed = true;
-    resCraft = name == "research40" ? kWraith : name == "research10" ? kNightjar : name == "research20" ? kMantis : kResearchJet; resLastCraft = resCraft; resSelT = 20; resAirport = std::max(0, g_world.findAirport("CAP"));
+    resCraft = name == "research40" ? kSomnus : name == "research10" ? kVigil : name == "research20" ? kReverie : kResearchJet; resLastCraft = resCraft; resSelT = 20; resAirport = std::max(0, g_world.findAirport("CAP"));
     resSeqOpened = resOpened; resSeq = realTime - resOpened; resSeqAt = realTime; resWarm = false; resWork = 1.f;   // (the boot sequence's own clock long past the shutters: drawResearch)
     return;
   }
@@ -5100,7 +5100,7 @@ void Game::debugScene(const std::string& name) {
     const int siteWas = resAirport, wxWas = resWx;
     if (site >= 0) resAirport = std::min(site, (int)g_world.airports.size() - 1);
     if (wxSel >= 0) resWx = std::min(wxSel, 2);
-    resCraft = kWraith; realTime = 20; resAirborne = mode != 2; resTime = getenv("TOD") ? (float)atof(getenv("TOD")) : hour >= 0.f ? hour : 12.f; launchResearch();
+    resCraft = kSomnus; realTime = 20; resAirborne = mode != 2; resTime = getenv("TOD") ? (float)atof(getenv("TOD")) : hour >= 0.f ? hour : 12.f; launchResearch();
     resAirport = siteWas; resWx = wxWas;   // (the research menu's own choices: this scene's are for this flight only)
     // (over town 1: 3 km short of the town's centre, 450 m over it, heading across it at 200 m/s. 2: the same flight
     // over its centre, held there - flying on, going nowhere - a scene that holds still, for timing the worst of it: in
@@ -5122,38 +5122,38 @@ void Game::debugScene(const std::string& name) {
     botControl = true;
     if (mode == 1) { plane.ctl.flaps = 1; flapNotch = 1; plane.flaps = plane.nozzle = 1; plane.vel = vec3(); plane.ctl.throttle = 0.66f; plane.engineRunning = true; plane.engineSpool = 0.66f; }
     else if (mode != 2) { plane.apEngage(Plane::AP_HOLD, -1, wx); }
-    if (mode == 3 || mode == 4) wraith.cloakOn = true;
+    if (mode == 3 || mode == 4) somnus.cloakOn = true;
     if (getenv("WRCLOUD")) { wx.cloudCover = (float)atof(getenv("WRCLOUD")); wx.cloudBase = plane.pos.y - 60.f; }   // craft inside the cloud deck
-    if (mode == 5 || mode == 6) { wraith.armed = true; }
+    if (mode == 5 || mode == 6) { somnus.armed = true; }
     if (getenv("WRTHR")) { plane.ctl.throttle = (float)atof(getenv("WRTHR")); plane.apSpeed = 900.f; }
     if (getenv("WRSPD")) { plane.vel = plane.forward() * (float)atof(getenv("WRSPD")); plane.apSpeed = (float)atof(getenv("WRSPD")); }
-    if (mode == 5) wraith.bayHold = 100.f;
+    if (mode == 5) somnus.bayHold = 100.f;
     // 9: cockpit looking down while a bomb falls (secs after release); 10: the same, secs after it goes off
     bool bombCk = mode == 9 || mode == 10 || (mode == 8 && getenv("WRBOMB"));
-    if (mode == 7 || bombCk) { wraith.bombQueue = 1; wraith.armed = bombCk; }
+    if (mode == 7 || bombCk) { somnus.bombQueue = 1; somnus.armed = bombCk; }
     if (getenv("WRUFO")) { startUfo(); ufo.side = (float)atof(getenv("WRUFO")); }   // UFO alongside (side -1 / 1)
     float firstDrop = 0; vec3 blastAt;
     int frames = (int)((mode == 3 ? 0.55f : mode == 7 || mode == 10 ? 60.f : mode == 9 ? 30.f : secs) * 60.f);
     float dropT = -1, boomAt = -1;
     for (int i = 0; i < frames; i++) {
       if (mode == 9 || mode == 10) {
-        if (dropT < 0 && !wraith.bombs.empty()) dropT = realTime;
-        if (boomAt < 0 && !wraith.blasts.empty()) boomAt = realTime;
+        if (dropT < 0 && !somnus.bombs.empty()) dropT = realTime;
+        if (boomAt < 0 && !somnus.blasts.empty()) boomAt = realTime;
         if (mode == 9 && dropT >= 0 && realTime - dropT > secs) break;
         if (mode == 10 && boomAt >= 0 && realTime - boomAt > secs) break;
       }
       realTime += 1 / 60.f; update(1 / 60.f);
-      if (mode == 6) wraith.wantFire = true;   // trigger held
+      if (mode == 6) somnus.wantFire = true;   // trigger held
       if (getenv("WRTHR")) { plane.ctl.throttle = (float)atof(getenv("WRTHR")); plane.engineSpool = std::max(plane.engineSpool, plane.ctl.throttle * 0.98f); }
-      if (mode == 7 && !wraith.blasts.empty() && firstDrop == 0) { firstDrop = realTime; blastAt = wraith.blasts[0].p; }
+      if (mode == 7 && !somnus.blasts.empty() && firstDrop == 0) { firstDrop = realTime; blastAt = somnus.blasts[0].p; }
       if (mode == 7 && firstDrop > 0 && realTime - firstDrop > secs) break;
     }
     if (mode == 6) {
-      for (auto& b : wraith.bolts) b.life = b.age + 1.f;   // keep the bolts in flight bright for the screenshot
+      for (auto& b : somnus.bolts) b.life = b.age + 1.f;   // keep the bolts in flight bright for the screenshot
       // the streak of the youngest visible bolt must start at its lens, however fast the craft flies
       // (in the craft's frame the tail sits on the lens's firing line, 2000 m/s x age - streak out from it)
       float worstOff = 0, worstAlong = 0; int n = 0;
-      for (auto& b : wraith.bolts) if (b.len > 0.05f && !b.hit && b.age < 0.5f) {
+      for (auto& b : somnus.bolts) if (b.len > 0.05f && !b.hit && b.age < 0.5f) {
         float off = 1e9f, alongErr = 0;
         for (int s = 0; s < 2; s++) {
           vec3 lens = plane.pos + plane.q.rotate(vec3(s ? 0.95f : -0.95f, -0.68f, -6.44f));
@@ -5167,8 +5167,8 @@ void Game::debugScene(const std::string& name) {
     if (getenv("WRSPARKS")) { int n = 0; for (auto& q : particles) if (q.kind == SPR_SPARK && n < 12) { vec3 b = plane.q.conj().rotate(q.p - plane.pos); printf("spark body (%.1f, %.1f, %.1f) life %.2f\n", b.x, b.y, b.z, q.life); n++; } }
     if (ufo.on) { vec3 r = plane.q.conj().rotate(ufo.pos - plane.pos); printf("wr: ufo t %.1f at craft-frame (%.0f, %.0f, %.0f) m\n", ufo.t, r.x, r.y, r.z); }
     toasts.clear(); hint.clear();
-    for (auto& b : wraith.blasts) printf("wr: blast age %.2f R %.0f at %.0f %.0f %.0f particles %d\n", b.age, b.R, b.p.x, b.p.y, b.p.z, (int)particles.size());
-    printf("wr: mode %d stealth %.2f lasers %.2f bay %.2f bombs %d blasts %d tilt %.2f %.2f %.2f %.2f thr %.2f\n", mode, wraith.stealth, wraith.lasers, wraith.bay, (int)wraith.bombs.size(), (int)wraith.blasts.size(),
+    for (auto& b : somnus.blasts) printf("wr: blast age %.2f R %.0f at %.0f %.0f %.0f particles %d\n", b.age, b.R, b.p.x, b.p.y, b.p.z, (int)particles.size());
+    printf("wr: mode %d stealth %.2f lasers %.2f bay %.2f bombs %d blasts %d tilt %.2f %.2f %.2f %.2f thr %.2f\n", mode, somnus.stealth, somnus.lasers, somnus.bay, (int)somnus.bombs.size(), (int)somnus.blasts.size(),
            plane.podTilt[0], plane.podTilt[1], plane.podTilt[2], plane.podTilt[3], plane.podThr[0]);
     if (mode == 8 || mode == 9 || mode == 10) { camMode = 1; lookYaw = yawD * DEG; lookPitch = pitD * DEG; camYaw = lookYaw; camPitch = lookPitch + 0.12f; return; }
     hudOn = false; dbgCam = true;
@@ -5183,11 +5183,11 @@ void Game::debugScene(const std::string& name) {
   if (name.size() == 4 && name.compare(0, 3, "hub") == 0) { screen = SCR_HUB; hubTab = name[3] - '0'; realTime = 20; return; }
   Contract c = g_story[0];
   int spec = 0;
-  if (name.size() == 3 && name[0] == 'm') {
+  if (name.size() == 3 && name[0] == 'm' && ((name[1] >= '0' && name[1] <= '9') || (name[1] >= 'a' && name[1] < 'a' + kAircraftCount - 10))) {
     // model inspection: m<aircraft><view>  views: e = exterior 3/4 front, r = controls deflected from behind,
     // c = cockpit, g = on the ground, s = side, d = cockpit with controls deflected, f = a split flap (the left one
     // stuck up, the right one down) from behind
-    spec = name[1] - '0'; char v = name[2];
+    spec = name[1] >= 'a' ? name[1] - 'a' + 10 : name[1] - '0'; char v = name[2];   // (aircraft 10 on: a, b, c ...)
     c.wx = Weather(); c.wx.cloudCover = 0.25f; c.wx.timeOfDay = 10.5f; c.wx.windSpeed = 0; c.wx.turbulence = 0;
     startFlight(c, spec, Career::SRC_OWNED);
     realTime = 10; engineAutoStarted = true;
@@ -5236,37 +5236,37 @@ void Game::debugScene(const std::string& name) {
     float px, pz, agl, hdg; char cm = 'c';
     float bagl = 300, blook = -70, bafter = 0.25f;
     if (sscanf(name.c_str(), "wrbomb_%f_%f_%f", &bagl, &blook, &bafter) >= 1) {   // XR-40 cockpit: drop a bomb and watch it go off through the glass floor
-      resCraft = kWraith; realTime = 20; resAirborne = true; resTime = 12.f; launchResearch();
+      resCraft = kSomnus; realTime = 20; resAirborne = true; resTime = 12.f; launchResearch();
       plane.pos.y = std::max(g_world.height(plane.pos.x, plane.pos.z), 0.f) + bagl;
       plane.apEngage(Plane::AP_HOLD, -1, wx); plane.apAlt = plane.pos.y; botControl = true;
-      wraith.armed = true;
+      somnus.armed = true;
       for (int i = 0; i < 90; i++) { realTime += 1 / 60.f; update(1 / 60.f); }
-      wraith.bombQueue = 1;
+      somnus.bombQueue = 1;
       float since = -1;
       for (int i = 0; i < 60 * 40; i++) {
         realTime += 1 / 60.f; update(1 / 60.f);
-        if (since < 0 && !wraith.blasts.empty()) since = 0;
+        if (since < 0 && !somnus.blasts.empty()) since = 0;
         if (since >= 0) { since += 1 / 60.f; if (since >= bafter) break; }
-        if (since < 0 && bafter < 0 && !wraith.bombs.empty() && wraith.bombs[0].t > -bafter) break;   // negative: a falling bomb
+        if (since < 0 && bafter < 0 && !somnus.bombs.empty() && somnus.bombs[0].t > -bafter) break;   // negative: a falling bomb
       }
-      printf("wrbomb: bombs %d blasts %d pip %d\n", (int)wraith.bombs.size(), (int)wraith.blasts.size(), 0);
+      printf("wrbomb: bombs %d blasts %d pip %d\n", (int)somnus.bombs.size(), (int)somnus.blasts.size(), 0);
       camMode = 1; lookYaw = 0; lookPitch = blook * DEG; camYaw = 0; camPitch = lookPitch + 0.12f; hudOn = true; toasts.clear(); hint.clear();
       return;
     }
     float fx, fz, fsec = 3, fpitch = 28, fyaw = 0;
     if (sscanf(name.c_str(), "lasertest_%f_%f_%f_%f_%f", &fx, &fz, &fsec, &fpitch, &fyaw) >= 2) {   // XR-40 firing at the ground ahead from a fixed hover
-      resCraft = kWraith; realTime = 20; resAirborne = true; resTime = 12.f; launchResearch();
+      resCraft = kSomnus; realTime = 20; resAirborne = true; resTime = 12.f; launchResearch();
       float g = std::max(g_world.height(fx, fz), 0.f);
       vec3 pos(fx, g + 70.f, fz);
       quat q = quat::axisAngle(vec3(0, 1, 0), -fyaw * DEG) * quat::axisAngle(vec3(1, 0, 0), -fpitch * DEG);
-      wraith.armed = true; botControl = true;
+      somnus.armed = true; botControl = true;
       for (int i = 0; i < (int)((fsec + 1.f) * 60.f); i++) {
         plane.pos = pos; plane.q = q; plane.vel = vec3(); plane.w = vec3();
-        if (i > 60) wraith.wantFire = true;
+        if (i > 60) somnus.wantFire = true;
         realTime += 1 / 60.f; update(1 / 60.f);
         if ((i & 7) == 0) { plane.q = quat::axisAngle(vec3(0, 1, 0), (-fyaw + 6.f * sinf(i * 0.05f)) * DEG) * quat::axisAngle(vec3(1, 0, 0), -fpitch * DEG); q = plane.q; }   // sweep the aim
       }
-      printf("lasertest: %d destroyed, %d scorch pits, %d bolts in flight\n", wraith.wrecked, (int)wraith.scorch.size(), (int)wraith.bolts.size());
+      printf("lasertest: %d destroyed, %d scorch pits, %d bolts in flight\n", somnus.wrecked, (int)somnus.scorch.size(), (int)somnus.bolts.size());
       vec3 f = q.rotate(vec3(0, 0, -1)); vec3 tgt = pos + f * (70.f / std::max(-f.y, 0.2f));
       hudOn = false; dbgCam = true; dbgFollow = false; toasts.clear(); hint.clear();
       float cd = getenv("LTDIST") ? (float)atof(getenv("LTDIST")) : 1.f;
@@ -5377,7 +5377,7 @@ void Game::debugScene(const std::string& name) {
     if (name == "hud") {   // HUDDEMO=1: every warning, a tower call, failures and messages lit, to look at the layout
       if (getenv("HUDDEMO")) {
         hudDemo = true;
-        atcF.lastCall = "Wren Alfa Bravo, runway 05, wind 040 at 8, cleared to land."; atcF.lastApt = contract.to; atcF.lastT = flightClock - 42.f;
+        atcF.lastCall = "Ambler Alfa Bravo, runway 05, wind 040 at 8, cleared to land."; atcF.lastApt = contract.to; atcF.lastT = flightClock - 42.f;
         plane.fail.engineHealth[0] = 0.4f; plane.fail.alternator = true; plane.fail.battery = 0.6f; plane.fail.ice = 0.3f;
         toast("Checkpoint 2 of 6", vec3(0.5f, 1, 0.7f)); toast("Gear down", vec3(0.8f, 1, 0.8f)); toast("Time acceleration off", vec3(0.8f, 0.8f, 0.8f));
         hint = "Hold a steady 3 degree descent on power, then ease back to flare as the runway fills the windscreen.";
@@ -5935,16 +5935,16 @@ void Game::setupMilitaryEncounter() {
   if(m.objectiveCount>0) toast((m.kind==hive::MissionKind::Recon?"FIRST SCAN: ":"PROTECT: ")+militarySiteLabels[0],vec3(.35f,.85f,1));
 }
 void Game::clearPracticeEncounter() {
-  if (!researchFlight || resCard>=0 || specIdx!=kWraith) return;
+  if (!researchFlight || resCard>=0 || specIdx!=kSomnus) return;
   hiveCombat.reset(1,WRAP_SPAN); militaryHull=100;
   combatCollisionWarm=false; combatCollisionWarmMs=0; combatPrefetchCursor=0;
   // A range reset clears ordnance and damage together; it cannot touch the career.
-  wraith=WraithState(); g_scenery.resetDamage();
+  somnus=SomnusState(); g_scenery.resetDamage();
   combatLoadout.reset(practiceForward,practiceBomb);
   syncCombatPayload();
 }
 void Game::spawnPracticeWave() {
-  if (!researchFlight || resCard>=0 || specIdx!=kWraith || crashed) return;
+  if (!researchFlight || resCard>=0 || specIdx!=kSomnus || crashed) return;
   hive::MissionConfig m; m.kind=hive::MissionKind::Practice; hiveCombat.startMission(m);
   for(int i=0;i<4 && hiveCombat.aliveCount()<hive::MaxActors;++i) {
     vec3 p=plane.pos+plane.forward()*(1700.f+i*240.f)+plane.right()*((i-1.5f)*260.f);
@@ -5987,12 +5987,12 @@ std::string Game::hiveObjectiveText() const {
   return fmt("PRACTICE / HOSTILES %d / HULL %.0f%% / PAUSE FOR RANGE CONTROLS",hiveCombat.aliveCount(),militaryHull);
 }
 void Game::syncCombatPayload() {
-  if(specIdx!=kWraith || !(militaryFlight || (researchFlight && resCard<0))) return;
+  if(specIdx!=kSomnus || !(militaryFlight || (researchFlight && resCard<0))) return;
   // A fixed non-equipment baseline prevents repeated swaps/rearms from accumulating mass.
   plane.payload=std::max(0.f,combatBasePayload)+combatLoadout.massKg();
 }
 void Game::warmCombatCollision() {
-  if(combatCollisionWarm || !(militaryFlight || (researchFlight && resCard<0 && specIdx==kWraith))) return;
+  if(combatCollisionWarm || !(militaryFlight || (researchFlight && resCard<0 && specIdx==kSomnus))) return;
   const auto start=std::chrono::steady_clock::now();
   // Query the production collision path without stepping Combat or touching mission clocks.
   // Radius and nearest-image coordinates match later actor/weapon queries.
@@ -6039,7 +6039,7 @@ void Game::prefetchCombatCollision() {
   combatPrefetchCursor%=total;
 }
 void Game::updateHive(float dt) {
-  if(!militaryFlight && !(researchFlight && resCard<0 && specIdx==kWraith)) return;
+  if(!militaryFlight && !(researchFlight && resCard<0 && specIdx==kSomnus)) return;
   if(dt>0 && !paused) prefetchCombatCollision();
   hive::PlayerSnapshot p; p.position=plane.pos; p.velocity=plane.vel; p.forward=plane.forward(); p.alive=!crashed && !plane.ev.crashed; p.scanning=false;
   if(militaryFlight) {
@@ -6052,7 +6052,7 @@ void Game::updateHive(float dt) {
   auto box=[&](vec3 center,vec3 halfExtent) {
     if(p.bodyBoxCount<hive::MaxPlayerBoxes) p.bodyBoxes[p.bodyBoxCount++]={center,halfExtent};
   };
-  if(specIdx==kWraith) {
+  if(specIdx==kSomnus) {
     // Coarse local collision volumes follow wrSection, diamond-wing panels and the four articulated pods.
     // Unlike the old 12 m sphere, empty air above/below the thin wings is not a hit.
     box(vec3(0,-.10f,-6.3f),vec3(.65f,.38f,2.1f));
@@ -6064,7 +6064,7 @@ void Game::updateHive(float dt) {
     }
     for(int i=0;i<4;++i) {
       const float tilt=plane.podTilt[i];
-      box(kWraithPods[i],vec3(.55f,.55f*std::fabs(cosf(tilt))+1.52f*std::fabs(sinf(tilt)),1.52f*std::fabs(cosf(tilt))+.55f*std::fabs(sinf(tilt))));
+      box(kSomnusPods[i],vec3(.55f,.55f*std::fabs(cosf(tilt))+1.52f*std::fabs(sinf(tilt)),1.52f*std::fabs(cosf(tilt))+.55f*std::fabs(sinf(tilt))));
     }
     box(vec3(0,1.0f,6.1f),vec3(3.0f,1.0f,1.1f));
   } else if(validAircraft(specIdx)) {
@@ -6093,7 +6093,7 @@ void Game::updateHive(float dt) {
     if(e.type==hive::EventType::Death || e.type==hive::EventType::Hit || e.type==hive::EventType::Fire) {
       int n=e.type==hive::EventType::Death?28:e.type==hive::EventType::Hit?8:3;
       for(int j=0;j<n;++j) spawn(at,vec3(sparkRng.range(-15,15),sparkRng.range(-4,18),sparkRng.range(-15,15)),.25f+sparkRng.uni()*.5f,.2f,.3f,vec3(1,.55f,.24f)*2,1,SPR_SPARK,.6f,-1);
-      if(e.type==hive::EventType::Death) { ++wraith.kills; g_audio.triggerAt(SFX_CRASH,at,.45f); for(int j=0;j<8;++j) spawn(at,vec3(0,5+j,0),2.f,3.f,4.f,vec3(.12f),.6f,SPR_SMOKE,1,0); }
+      if(e.type==hive::EventType::Death) { ++somnus.kills; g_audio.triggerAt(SFX_CRASH,at,.45f); for(int j=0;j<8;++j) spawn(at,vec3(0,5+j,0),2.f,3.f,4.f,vec3(.12f),.6f,SPR_SMOKE,1,0); }
     }
     if(e.type==hive::EventType::Fire) {
       const auto* actor = hiveCombat.find(e.source);

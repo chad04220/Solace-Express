@@ -219,8 +219,8 @@ int main(int argc,char**argv){
   printf("Static trim solves physical force and moment balance; TAS m/s, mass kg. Runway integrates 6-DOF.\n");
   printf("type,mass,vs_clean_SL,vs_flap_SL,vref_1.3vs,cruise75_1500m,cruise75_10000m,climb_excess_1500m\n");
   for(int ai:kCareerAircraft){
-    if(!report&&ai!=kLarkspur&&ai!=kAtlas)continue;
-    const AircraftSpec&s=kAircraft[ai];const bool fresh=ai==kLarkspur||ai==kAtlas;
+    if(!report&&ai!=kThistledown&&ai!=kGalleon)continue;
+    const AircraftSpec&s=kAircraft[ai];const bool fresh=ai==kThistledown||ai==kGalleon;
     const float mass=s.emptyMass+.5f*s.maxFuel+.5f*(s.cargoKg+s.pax*85+85);
     const float vs1=sqrtf(2*mass*G0/(1.225f*s.wingArea*aeroCLmaxFlown(s,0)));
     const float vs0=sqrtf(2*mass*G0/(1.225f*s.wingArea*aeroCLmaxFlown(s,1)));
@@ -229,12 +229,12 @@ int main(int argc,char**argv){
     printf("%s,%.0f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\n",s.id,mass,vs1,vs0,1.3f*vs0,vc,high,roc);
     if(!fresh)continue;
     levelFlight(s,mass,vc);
-    if(ai==kAtlas)levelFlight(s,mass,high,10000);
+    if(ai==kGalleon)levelFlight(s,mass,high,10000);
     check(fabsf(s.wingY*s.fusRad-kModels[ai].wing[4])<.001f&&fabsf(s.wingZ-kModels[ai].wing[5])<.001f,s.name,"spec and drawn wing root agree");
-    if(ai==kLarkspur)check(kModels[ai].strut==0&&fabsf(aeroModel(s).extraDq-.12e-6f*s.power)<.00001f,s.name,"cantilever wing has no phantom strut drag");
+    if(ai==kThistledown)check(kModels[ai].strut==0&&fabsf(aeroModel(s).extraDq-.12e-6f*s.power)<.00001f,s.name,"cantilever wing has no phantom strut drag");
     check(aeroGeom(s).wingArea/s.wingArea>.985f&&aeroGeom(s).wingArea/s.wingArea<1.015f,s.name,"drawn wing area matches aerodynamic reference");
     check(vc>0&&vc<isa(1500).a*.9f,s.name,"trimmed subsonic cruise");
-    check(roc>1.5f&&roc<(ai==kAtlas?38.f:12.f),s.name,"believable reference climb power");
+    check(roc>1.5f&&roc<(ai==kGalleon?38.f:12.f),s.name,"believable reference climb power");
     check(trim(s,mass,1.3f*vs0,0,.25f,1,true).ok,s.name,"full-flap approach trims");
     for(int load=0;load<2;++load){
       const float fuel=s.maxFuel*(load?.75f:.3f),payload=load?s.maxMass()-s.emptyMass-fuel:85.f,m=s.emptyMass+fuel+payload;
@@ -243,10 +243,10 @@ int main(int argc,char**argv){
       Run to=takeoff(s,a,fuel,payload),ld=landingRoll(s,a,fuel,payload);
       printf("RUNWAY %s %s mass%.0f groundroll%.1fm lift%.1fm/s t%.1fs landroll%.1fm landing15m%.1fm approach%.1fm/s\n",s.id,load?"design-max":"light",m,to.dist,to.speed,to.time,ld.dist,ld.dist+15.f/tanf(3.f*DEG),1.3f*stall);
       printf("TAKEOFF_15M %s %s distance%.1f climb%.2f\n",s.id,load?"design-max":"light",to.clear15,to.climb);
-      check(to.ok&&to.dist>50&&to.clear15<(ai==kAtlas?1900.f:650.f),s.name,"light/loaded physical takeoff");
-      check(ld.ok&&ld.dist>20&&ld.dist<(ai==kAtlas?1300.f:550.f),s.name,"light/loaded physical braking");
+      check(to.ok&&to.dist>50&&to.clear15<(ai==kGalleon?1900.f:650.f),s.name,"light/loaded physical takeoff");
+      check(ld.ok&&ld.dist>20&&ld.dist<(ai==kGalleon?1300.f:550.f),s.name,"light/loaded physical braking");
     }
-    if(ai==kAtlas){
+    if(ai==kGalleon){
       settledGear(s);
       const Airport& port=g_world.airports[g_world.findAirport("PVI")];
       for(int loaded=0;loaded<2;++loaded){
@@ -260,15 +260,15 @@ int main(int argc,char**argv){
       engineOutFlight(s);
       const float oei=bestClimb(s,s.maxMass(),1500,0);
       Trim t=trim(s,s.maxMass(),100,1500,1,0,false,0);
-      printf("ENGINE_OUT atlas loaded specific-excess%.2fm/s uncorrected-yaw-moment%.0fNm\n",oei,t.out.M.y);
+      printf("ENGINE_OUT galleon loaded specific-excess%.2fm/s uncorrected-yaw-moment%.0fNm\n",oei,t.out.M.y);
       check(t.ok&&fabsf(t.out.M.y)>100000,s.name,"underwing engine failure produces real asymmetric yaw");
       check(oei>-5&&oei<bestClimb(s,s.maxMass(),1500),s.name,"one engine reduces climb capability");
       Trim aw=trim(s,mass,1.3f*vs0,0,.25f,1,true);
       AeroWake wake; aeroWakeBuild(aeroGeom(s),aw.in,aw.out,wake);
-      const AircraftSpec& small=kAircraft[kLarkspur];const float sm=small.maxMass();
+      const AircraftSpec& small=kAircraft[kThistledown];const float sm=small.maxMass();
       const float sv=sqrtf(2*sm*G0/(1.225f*small.wingArea*aeroCLmaxFlown(small,1)))*1.3f;
       Trim sw=trim(small,sm,sv,0,.25f,1,true);AeroWake smallWake;aeroWakeBuild(aeroGeom(small),sw.in,sw.out,smallWake);
-      printf("WAKE atlas circulation%.1f sink%.2f larkspur%.1f sink%.2f\n",wake.gamPair,aeroWakeSink(wake),smallWake.gamPair,aeroWakeSink(smallWake));
+      printf("WAKE galleon circulation%.1f sink%.2f thistledown%.1f sink%.2f\n",wake.gamPair,aeroWakeSink(wake),smallWake.gamPair,aeroWakeSink(smallWake));
       check(fabsf(wake.gamPair)>fabsf(smallWake.gamPair)*3.f,s.name,"transport makes a materially stronger approach wake");
       check(s.gLimitPos()==2.5f&&s.gLimitNeg()==-1.f,s.name,"transport structural limits");
       Plane p;p.spec=&s;p.soundSpeed=340.3f;
@@ -286,7 +286,7 @@ int main(int argc,char**argv){
     check(fabsf(envelope.apEnv.wRatio-s.maxMass()/reference)<.001f,s.name,"autopilot uses learner reference mass");
     check(fabsf(envelope.apEnv.ldgDist-p.ldgRoll)<.01f,s.name,"loaded landing envelope uses true design maximum");
     check(runwayOK(s,g_world.airports[g_world.findAirport("CAP")])&&runwayOK(s,g_world.airports[g_world.findAirport("PVI")]),s.name,"usable capital/port career route");
-    if(ai==kAtlas)check(!runwayOK(s,g_world.airports[g_world.findAirport("FAR")])&&!surfaceOK(s,SURF_GRASS),s.name,"large transport is excluded from short/soft fields");
+    if(ai==kGalleon)check(!runwayOK(s,g_world.airports[g_world.findAirport("FAR")])&&!surfaceOK(s,SURF_GRASS),s.name,"large transport is excluded from short/soft fields");
   }
   printf("%s (%d failures)\n",failures?"FAILED":"PASS",failures);return failures?1:0;
 }

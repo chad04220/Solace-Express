@@ -20,7 +20,7 @@ struct ResCraftInfo {
   int idx;                 // index into kAircraft
   const char* code;        // the programme code on the card
   const char* num;         // "XR-30"
-  const char* name;        // "SPECTER"
+  const char* name;        // "NOCTURNE"
   vec3 colour;             // the terminal's accent while it is selected
   float bars[3];           // velocity, agility, signature (0..1)
   const char* title;       // the decrypted specification title
@@ -34,7 +34,7 @@ struct ResCraftInfo {
 // T/W static in full reheat at sea level with 70% fuel and the pilot, roll rate at full aileron at 200 m/s - it grows
 // with speed on conventional controls. Fuel is finite; endurance varies with altitude and thrust.)
 const ResCraftInfo kResCraft[] = {
-  {kNightjar, "NG-XR10-N  //  BLK 0", "XR-10", "NIGHTJAR", R_SKY, {0.36f, 0.35f, 0.92f}, "SUPERSONIC TWIN-JET DEMONSTRATOR",
+  {kVigil, "NG-XR10-N  //  BLK 0", "XR-10", "VIGIL", R_SKY, {0.36f, 0.35f, 0.92f}, "SUPERSONIC TWIN-JET DEMONSTRATOR",
    {{"CONFIGURATION", "Tapered low wing, conventional tail", -1}, {"PROPULSION", "2 x 30 kN rated, reheat", 0.15f},
     {"THRUST / WEIGHT", "1.67 : 1 static reheat", 0.30f}, {"TOP SPEED", "Mach 1.44 at 8 km", 0.36f},
     {"VECTORING", "None - conventional controls", 0.f}, {"ROLL RATE", "190 deg/s at 200 m/s", 0.48f},
@@ -42,7 +42,7 @@ const ResCraftInfo kResCraft[] = {
    12.f, -6.f, 6.f, 9.f, -4.f, 1.44f, 0.25f,
    {"Conventional controls: no FBW, no vectoring", "Flaps and gear as any jet; approach speed follows weight", "Finite fuel: reheat cuts endurance; plan the sortie",
     "Long hard runways only", "T/W reference: sea level, 70% fuel + pilot"}, "XR10"},
-  {kMantis, "NG-XR20-M  //  BLK 2", "XR-20", "MANTIS", R_COBALT, {0.52f, 0.55f, 0.7f}, "FORWARD-SWEPT SYSTEMS DEMONSTRATOR",
+  {kReverie, "NG-XR20-M  //  BLK 2", "XR-20", "REVERIE", R_COBALT, {0.52f, 0.55f, 0.7f}, "FORWARD-SWEPT SYSTEMS DEMONSTRATOR",
    {{"CONFIGURATION", "Forward sweep, canards, twin fins", -1}, {"PROPULSION", "1 x 88 kN rated, reheat", 0.30f},
     {"THRUST / WEIGHT", "2.13 : 1 static reheat", 0.42f}, {"TOP SPEED", "Mach 2.06 at 8 km", 0.52f},
     {"SYSTEMS", "Single-seat live research cockpit", 0.5f}, {"ROLL RATE", "215 deg/s at 200 m/s", 0.54f},
@@ -50,7 +50,7 @@ const ResCraftInfo kResCraft[] = {
    16.f, -8.f, 8.f, 14.f, -6.f, 2.06f, 0.3f,
    {"Canards ahead of a forward-swept wing: brisk in pitch", "Reheat above 85% throttle; T/W at 70% fuel + pilot", "Conventional controls, flaps and retractable gear",
     "Good for +14 / -6 g; a short overstress is survivable", "Land at ~120 kt with full flap"}, "XR20"},
-  {kResearchJet, "NG-XR30-S  //  BLK 3", "XR-30", "SPECTER", R_ICE, {0.7f, 0.72f, 0.45f}, "HYPERSONIC-CAPABLE RESEARCH MODEL",
+  {kResearchJet, "NG-XR30-S  //  BLK 3", "XR-30", "NOCTURNE", R_ICE, {0.7f, 0.72f, 0.45f}, "HYPERSONIC-CAPABLE RESEARCH MODEL",
    {{"CONFIGURATION", "Lifting body, cranked delta, canards", -1}, {"PROPULSION", "2 x turbofan, 528 kN full reheat", 0.72f},
     {"THRUST / WEIGHT", "4.05 : 1 static reheat", 0.7f}, {"TOP SPEED", "Mach 2.8", 0.7f},
     {"VECTORING", "2D nozzles, +-29 deg pitch", 0.4f}, {"ROLL RATE", "315 deg/s", 0.78f},
@@ -58,7 +58,7 @@ const ResCraftInfo kResCraft[] = {
    50.f, -25.f, 25.f, 40.f, -20.f, 2.8f, 0.42f,
    {"No flaps: land fast, ~140 kt, long runways", "Nozzles vector with the stick for pitch", "FBW commands rotation - no g limiter",
     "Reheat lights above 85% throttle (2x thrust)", "C: cockpit view flies on the displays"}, "XR30"},
-  {kWraith, "NG-XR40-W  //  BLK 1", "XR-40", "WRAITH", R_VIOLET, {1.f, 0.97f, 0.06f}, "STEALTH AEROBATIC RESEARCH MODEL",
+  {kSomnus, "NG-XR40-W  //  BLK 1", "XR-40", "SOMNUS", R_VIOLET, {1.f, 0.97f, 0.06f}, "STEALTH AEROBATIC RESEARCH MODEL",
    {{"CONFIGURATION", "Faceted body, diamond wing, V-tail", -1}, {"PROPULSION", "4 x tilting pods, 604.8 kN boosted", 0.8f},
     {"THRUST / WEIGHT", "1.43 dry / 4.17 boosted", 0.8f}, {"TOP SPEED", "Mach 4.4", 1.f},
     {"VTOL", "Pods tilt 0 - 90 deg, vanes", 1.f}, {"ROLL RATE", "400 deg/s", 1.f},
@@ -128,14 +128,14 @@ void silhouette(int craft, float cx, float cy, float sc, vec3 c, float a, float 
       for (int i = 0; i + 1 < n; i++)
         g_ren.line(cx + side * p[i * 2] * sc, cy + p[i * 2 + 1] * sc, cx + side * p[i * 2 + 2] * sc, cy + p[i * 2 + 3] * sc, th, c, a);
   };
-  if (craft == kWraith) {
+  if (craft == kSomnus) {
     static const float body[] = {0.f, -1.f, 0.22f, -0.55f, 0.95f, 0.18f, 0.9f, 0.3f, 0.3f, 0.62f, 0.42f, 0.95f, 0.18f, 0.88f, 0.f, 0.8f};
     mirror(body, 8);
     for (int i = 0; i < 4; i++) {   // the four pods
-      float px = kWraithPods[i].x / 6.4f, py = kWraithPods[i].z / 8.2f;
+      float px = kSomnusPods[i].x / 6.4f, py = kSomnusPods[i].z / 8.2f;
       g_ren.rectOutline(cx + px * sc - 0.07f * sc, cy + py * sc - 0.14f * sc, 0.14f * sc, 0.28f * sc, c, a, 0.06f * sc, th);
     }
-  } else if (craft == kMantis) {   // forward-swept wing, canards, twin canted fins, one centerline engine
+  } else if (craft == kReverie) {   // forward-swept wing, canards, twin canted fins, one centerline engine
     static const float body[] = {0.f, -1.f, 0.1f, -0.75f, 0.12f, -0.45f, 0.36f, -0.5f, 0.38f, -0.42f, 0.14f, -0.3f, 0.14f, 0.02f, 0.95f, -0.2f, 0.98f, -0.08f, 0.26f, 0.42f, 0.15f, 0.7f, 0.12f, 0.94f, 0.f, 0.96f};
     mirror(body, 13);
     g_ren.rectOutline(cx - 0.08f * sc, cy + 0.34f * sc, 0.16f * sc, 0.42f * sc, c, a, 0.05f * sc, th);
@@ -173,31 +173,31 @@ std::vector<std::string> wrap(const std::string& s, float width, float size);   
 
 // The test cards. Each step: what is measured, the value, how long it must be held (0: once is enough), its label.
 const Game::ResCard Game::kResCards[] = {
-  {kNightjar, "XR10-1", "TRANSONIC DASH", "Check the transonic transition: hold Mach 0.95 for 15 s, climb through 11,000 m, then bring the Nightjar home. Reheat can now carry it beyond Mach 1.",
+  {kVigil, "XR10-1", "TRANSONIC DASH", "Check the transonic transition: hold Mach 0.95 for 15 s, climb through 11,000 m, then bring the Vigil home. Reheat can now carry it beyond Mach 1.",
    {{RS_MACH, 0.95f, 15.f, "Hold Mach 0.95"}, {RS_ALT, 11000.f, 0.f, "Climb through 11,000 m"}, {RS_LAND, 0, 0, "Land back at the range"}}, 3},
-  {kNightjar, "XR10-2", "AGILITY", "Conventional controls at their limit: a 170 deg/s roll, 8 g, then -3 g. The airframe is good for +9 / -4 and will take a short overstress.",
+  {kVigil, "XR10-2", "AGILITY", "Conventional controls at their limit: a 170 deg/s roll, 8 g, then -3 g. The airframe is good for +9 / -4 and will take a short overstress.",
    {{RS_ROLL, 170.f, 0.f, "Roll at 170 deg/s"}, {RS_G, 8.f, 0.f, "Pull 8 g"}, {RS_NEGG, -3.f, 0.f, "Push to -3 g"}, {RS_LAND, 0, 0, "Land back at the range"}}, 4},
-  {kNightjar, "XR10-3", "SLOW FLIGHT", "Low-speed handling above 150 m: hold 115 kt for 8 s, then take it into the stall warning above 600 m and recover.",
+  {kVigil, "XR10-3", "SLOW FLIGHT", "Low-speed handling above 150 m: hold 115 kt for 8 s, then take it into the stall warning above 600 m and recover.",
    {{RS_SLOW, 59.f, 8.f, "Hold 115 kt (above 150 m)"}, {RS_STALL, 0, 0, "Stall warning above 600 m"}, {RS_LAND, 0, 0, "Land back at the range"}}, 3},
-  {kMantis, "XR20-1", "SUPERSONIC", "Reheat and go: hold Mach 1.8 for 15 s (it needs height: the air thins the drag), climb through 15,000 m, land.",
+  {kReverie, "XR20-1", "SUPERSONIC", "Reheat and go: hold Mach 1.8 for 15 s (it needs height: the air thins the drag), climb through 15,000 m, land.",
    {{RS_MACH, 1.8f, 15.f, "Hold Mach 1.8"}, {RS_ALT, 15000.f, 0.f, "Climb through 15,000 m"}, {RS_LAND, 0, 0, "Land back at the range"}}, 3},
-  {kMantis, "XR20-2", "CANARD AGILITY", "The forward-swept wing and canards: a 250 deg/s roll, 12 g, then -5 g. Good for +14 / -6 with a short overstress.",
+  {kReverie, "XR20-2", "CANARD AGILITY", "The forward-swept wing and canards: a 250 deg/s roll, 12 g, then -5 g. Good for +14 / -6 with a short overstress.",
    {{RS_ROLL, 250.f, 0.f, "Roll at 250 deg/s"}, {RS_G, 12.f, 0.f, "Pull 12 g"}, {RS_NEGG, -5.f, 0.f, "Push to -5 g"}, {RS_LAND, 0, 0, "Land back at the range"}}, 4},
-  {kMantis, "XR20-3", "HIGH ALPHA", "Where the forward sweep earns its keep: stall warning above 600 m, 135 kt held for 8 s, then a 120 m/s climb.",
+  {kReverie, "XR20-3", "HIGH ALPHA", "Where the forward sweep earns its keep: stall warning above 600 m, 135 kt held for 8 s, then a 120 m/s climb.",
    {{RS_STALL, 0, 0, "Stall warning above 600 m"}, {RS_SLOW, 70.f, 8.f, "Hold 135 kt (above 150 m)"}, {RS_CLIMB, 120.f, 3.f, "Climb at 120 m/s"}, {RS_LAND, 0, 0, "Land back at the range"}}, 4},
-  {kResearchJet, "XR30-1", "MACH 2.7", "The Specter's top end: hold Mach 2.7 for 10 s, climb through 20,000 m, then land.",
+  {kResearchJet, "XR30-1", "MACH 2.7", "The Nocturne's top end: hold Mach 2.7 for 10 s, climb through 20,000 m, then land.",
    {{RS_MACH, 2.7f, 10.f, "Hold Mach 2.7"}, {RS_ALT, 20000.f, 0.f, "Climb through 20,000 m"}, {RS_LAND, 0, 0, "Land back at the range"}}, 3},
   {kResearchJet, "XR30-2", "VECTORED PULL", "Thrust vectoring and fly-by-wire: 35 g, -15 g, a 300 deg/s roll. The structure is good for +40 / -20.",
    {{RS_G, 35.f, 0.f, "Pull 35 g"}, {RS_NEGG, -15.f, 0.f, "Push to -15 g"}, {RS_ROLL, 300.f, 0.f, "Roll at 300 deg/s"}, {RS_LAND, 0, 0, "Land back at the range"}}, 4},
   {kResearchJet, "XR30-3", "ZOOM CLIMB", "Trade Mach for height: a 300 m/s climb held for 5 s, through 28,000 m, then glide it back.",
    {{RS_CLIMB, 300.f, 5.f, "Climb at 300 m/s"}, {RS_ALT, 28000.f, 0.f, "Climb through 28,000 m"}, {RS_LAND, 0, 0, "Land back at the range"}}, 3},
-  {kWraith, "XR40-1", "MACH 4", "The Wraith's dash: hold Mach 4.0 for 10 s, climb through 25,000 m, land.",
+  {kSomnus, "XR40-1", "MACH 4", "The Somnus's dash: hold Mach 4.0 for 10 s, climb through 25,000 m, land.",
    {{RS_MACH, 4.0f, 10.f, "Hold Mach 4.0"}, {RS_ALT, 25000.f, 0.f, "Climb through 25,000 m"}, {RS_LAND, 0, 0, "Land back at the range"}}, 3},
-  {kWraith, "XR40-2", "VERTICAL FLIGHT", "Tilt the pods down (F/V) and hold a hover for 10 s, then set it down vertically.",
+  {kSomnus, "XR40-2", "VERTICAL FLIGHT", "Tilt the pods down (F/V) and hold a hover for 10 s, then set it down vertically.",
    {{RS_HOVER, 0, 10.f, "Hover for 10 s"}, {RS_VLAND, 0, 0, "Land vertically"}}, 2},
-  {kWraith, "XR40-3", "SYSTEMS", "Every system once: cloak for 10 s, six laser bolts, a plasma bomb, then land.",
+  {kSomnus, "XR40-3", "SYSTEMS", "Every system once: cloak for 10 s, six laser bolts, a plasma bomb, then land.",
    {{RS_CLOAK, 0, 10.f, "Cloak for 10 s"}, {RS_LASER, 6.f, 0.f, "Fire 6 laser bolts"}, {RS_BOMB, 1.f, 0.f, "Release a plasma bomb"}, {RS_LAND, 0, 0, "Land back at the range"}}, 4},
-  {kWraith, "XR40-4", "EXTREMES", "No limiter, no mercy: 80 g, -40 g, a 380 deg/s roll. Good for +90 / -45 with a short overstress.",
+  {kSomnus, "XR40-4", "EXTREMES", "No limiter, no mercy: 80 g, -40 g, a 380 deg/s roll. Good for +90 / -45 with a short overstress.",
    {{RS_G, 80.f, 0.f, "Pull 80 g"}, {RS_NEGG, -40.f, 0.f, "Push to -40 g"}, {RS_ROLL, 380.f, 0.f, "Roll at 380 deg/s"}, {RS_LAND, 0, 0, "Land back at the range"}}, 4},
 };
 const int Game::kNumResCards = sizeof(Game::kResCards) / sizeof(Game::kResCards[0]);
@@ -215,9 +215,9 @@ std::string Game::resStepText(const ResStep& st) const {
     case RS_CLIMB: return fmt("V/S %+.0f / %.0f m/s%s", plane.vel.y, st.v, h.c_str());
     case RS_HOVER: return fmt("PODS %.0f deg  %.0f kt%s", plane.nozzle * 90.f, length(plane.vel) * MS_TO_KT, h.c_str());
     case RS_VLAND: return "PODS DOWN, SETTLE";
-    case RS_CLOAK: return fmt("CLOAK %.0f%%%s", wraith.stealth * 100.f, h.c_str());
-    case RS_LASER: return fmt("BOLTS %d / %.0f", wraith.shots, st.v);
-    case RS_BOMB: return fmt("BOMBS %d / %.0f", wraith.dropped, st.v);
+    case RS_CLOAK: return fmt("CLOAK %.0f%%%s", somnus.stealth * 100.f, h.c_str());
+    case RS_LASER: return fmt("BOLTS %d / %.0f", somnus.shots, st.v);
+    case RS_BOMB: return fmt("BOMBS %d / %.0f", somnus.dropped, st.v);
     default: return std::string("LAND ") + g_world.airports[resAirport].code;
   }
 }
@@ -242,7 +242,7 @@ void Game::drawResearch(const FrameParams& fp) {
     } else resSeq += dt;
   }
   const float T = resSeq, aT = set.menuMotion ? realTime - resOpened : 7.f;
-  bool wr = resCraft == kWraith;
+  bool wr = resCraft == kSomnus;
   const ResCraftInfo& RC = kResCraft[resCraftSlot(resCraft)];
   // The native preview was built before this draw. Keep its dossier and callouts together
   // until the following frame when an airframe/test-card click has changed the selection.
@@ -591,15 +591,15 @@ void Game::drawResearch(const FrameParams& fp) {
     struct Call { vec3 b; const char* t; float side; };
     std::vector<Call> calls;
     float fl = kAircraft[RC.idx].fusLen * 0.5f;
-    if (wr) calls = {{vec3(0, 0, -fl), "SENSOR NOSE  //  PASSIVE", -1}, {kWraithPods[1], "POD 2  //  130 kN  0-90 DEG", 1},
-                     {kWraithPods[2], "POD 3  //  VECTORING VANES", -1}, {vec3(6.2f, -0.24f, 2.0f), "FACETED SKIN  //  CLOAK MESH", 1}};
+    if (wr) calls = {{vec3(0, 0, -fl), "SENSOR NOSE  //  PASSIVE", -1}, {kSomnusPods[1], "POD 2  //  130 kN  0-90 DEG", 1},
+                     {kSomnusPods[2], "POD 3  //  VECTORING VANES", -1}, {vec3(6.2f, -0.24f, 2.0f), "FACETED SKIN  //  CLOAK MESH", 1}};
     else if (RC.idx == kResearchJet) calls = {{vec3(0, 0, -fl), "SYNTHETIC-VISION POD", -1}, {vec3(2.1f, 0.1f, -4.4f), "CANARD  //  ALL-MOVING", 1},
                   {vec3(5.62f, -0.38f, 4.4f), "CRANKED DELTA  //  NO FLAPS", 1}, {vec3(-0.82f, -0.12f, 7.75f), "2D NOZZLE  //  +-29 DEG", -1}};
     else {   // a conventional airframe: its parts from the parametric model
       const ModelDef& md = kModels[RC.idx];
       vec3 tip = modelWingTip(md), fin = modelFinTop(md);
-      calls = {{vec3(0, 0, -fl), "SENSOR NOSE  //  TEST RADAR", -1}, {tip, RC.idx == kMantis ? "FORWARD SWEEP  //  SLOTTED FLAPS" : "TAPERED WING  //  SLOTTED FLAPS", 1},
-               {vec3(-md.nacX, md.nacY, md.nacZ0 + md.nacLen * 0.5f), RC.idx == kMantis ? "CENTERLINE CORE  //  88 kN RATED" : "TURBOFAN  //  30 kN RATED", -1}, {fin, RC.idx == kMantis ? "TWIN CANTED FINS" : "CONVENTIONAL TAIL", 1}};
+      calls = {{vec3(0, 0, -fl), "SENSOR NOSE  //  TEST RADAR", -1}, {tip, RC.idx == kReverie ? "FORWARD SWEEP  //  SLOTTED FLAPS" : "TAPERED WING  //  SLOTTED FLAPS", 1},
+               {vec3(-md.nacX, md.nacY, md.nacZ0 + md.nacLen * 0.5f), RC.idx == kReverie ? "CENTERLINE CORE  //  88 kN RATED" : "TURBOFAN  //  30 kN RATED", -1}, {fin, RC.idx == kReverie ? "TWIN CANTED FINS" : "CONVENTIONAL TAIL", 1}};
     }
     float ca = e * smoothstepf(0.6f, 1.3f, selT);
     int ci = 0;
@@ -684,10 +684,10 @@ void Game::drawResearch(const FrameParams& fp) {
     float ch = range ? 120 * s : std::min(120 * s, L.bot - py - 120 * s);
     if (ch > 50 * s) {
       float gx0 = px + 26 * s, gw = iw - 30 * s, gy0 = py, gh = ch;
-      float mMax = RC.idx == kNightjar ? 1.6f : (RC.vMax > 1.5f ? 4.f : 1.f), nTop = RC.nTop, nBot = RC.nBot, nStep = RC.nStep;   // each craft on its own scale
+      float mMax = RC.idx == kVigil ? 1.6f : (RC.vMax > 1.5f ? 4.f : 1.f), nTop = RC.nTop, nBot = RC.nBot, nStep = RC.nStep;   // each craft on its own scale
       auto X = [&](float m) { return gx0 + m / mMax * gw; };
       auto Y = [&](float n) { return gy0 + (nTop - n) / (nTop - nBot) * gh; };
-      for (int m = 0; m <= 4; m++) { float mm = m * mMax / 4.f; g_ren.rect(X(mm), gy0, 1, gh, R_DIM, 0.18f * e); g_ren.text(X(mm), gy0 + gh + 3 * s, 9 * s, RC.idx != kNightjar && mMax > 1.5f ? fmt("M%d", m) : fmt("M%.2f", mm), R_DIM, e, 1, false); }
+      for (int m = 0; m <= 4; m++) { float mm = m * mMax / 4.f; g_ren.rect(X(mm), gy0, 1, gh, R_DIM, 0.18f * e); g_ren.text(X(mm), gy0 + gh + 3 * s, 9 * s, RC.idx != kVigil && mMax > 1.5f ? fmt("M%d", m) : fmt("M%.2f", mm), R_DIM, e, 1, false); }
       for (float n = nBot; n <= nTop + 0.1f; n += nStep) { g_ren.rect(gx0, Y(n), gw, 1, R_DIM, n == 0 ? 0.4f : 0.18f * e); g_ren.text(gx0 - 4 * s, Y(n) - 5 * s, 9 * s, fmt("%+.0f", n), R_DIM, e, 2, false); }
       float nMax = RC.nMax, nMin = RC.nMin, vMax = RC.vMax, ms = RC.ms;
       std::vector<std::pair<float, float>> env;

@@ -5,7 +5,7 @@
 #include <cassert>
 #include <cstdio>
 int main(){
-  // Actual Islander PT12 triangle814: a rounded trailing-edge normal survived the
+  // Actual Skerry PT12 triangle814: a rounded trailing-edge normal survived the
   // 12-degree crease threshold and smeared over this 640 mm planar face.
   std::vector<float> v={5.625076f,1.0393723f,-.35270765f,.12510794f,-.96303415f,.23856507f,2,1,
     5.1505876f,1.0043087f,-.60956967f,.01735514f,-.99445903f,.10368333f,2,1,
@@ -29,5 +29,5 @@ int main(){
     const auto old=v;assert(aircraftMesh::repairVerifiedPlanarNormals(v,ix,q,s));assert(s.repaired==0 && v==old && ix==originalIx);
   }
   v=before;ix={0,1,999};const auto bad=ix;assert(!aircraftMesh::repairVerifiedPlanarNormals(v,ix,g,s));assert(v==before && ix==bad);
-  std::puts("PASS: planar rigid-face repair preserves geometry/attributes, rejects bends/seams and fixes the actual Islander witness");
+  std::puts("PASS: planar rigid-face repair preserves geometry/attributes, rejects bends/seams and fixes the actual Skerry witness");
 }

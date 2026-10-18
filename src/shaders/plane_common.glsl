@@ -3,50 +3,50 @@
 //! livery paint, skin seams and rivets, the cabin fit.
 // AF_LIGHT: a program for the light aircraft and airliners alone. The research jets' fields, materials, displays
 // and lights become dead code the compiler drops, so every pixel of the big shared passes pays for less code.
-// AF_JET / AF_WRAITH: the XR-30's or the XR-40's own, for the aircraft mesh pass (each aircraft is a draw of its own,
+// AF_JET / AF_SOMNUS: the XR-30's or the XR-40's own, for the aircraft mesh pass (each aircraft is a draw of its own,
 // with its own build): the light aircraft's fields, cabins and liveries and the other research jet's are dropped too. A
 // GPU reserves registers for the worst path in a program whether a pixel takes it or not: the XR-40's cockpit, drawn
 // with every aircraft's code, slowed by 3 ms as the light aircraft's cockpits grew (v3.34 to v3.38, RTX 3070 Laptop).
 // AF_MODEL n: one aircraft's own build (n its index in kAircraft, aircraft.h), with its family's switch above and its
 // packed model as constants (scene_uniforms.glsl gM): the aircraft mesh pass and the bakes draw each aircraft with its
 // own (shaders.h aircraftDefines), so a program holds that aircraft's code and nothing of any other's.
-// FLEET_ON: the light aircraft and airliners; JET_ON, WRAITH_ON: the XR-30, the XR-40; RESEARCH_ON: either of them.
+// FLEET_ON: the light aircraft and airliners; JET_ON, SOMNUS_ON: the XR-30, the XR-40; RESEARCH_ON: either of them.
 // The same switches for the preprocessor (0 or 1), where code the build leaves out goes from the program's source
-// itself (shader_prune.h settles the conditionals before it prunes): HAS_FLEET, HAS_JET, HAS_WRAITH, HAS_RESEARCH.
-#if defined(AF_WRAITH)
+// itself (shader_prune.h settles the conditionals before it prunes): HAS_FLEET, HAS_JET, HAS_SOMNUS, HAS_RESEARCH.
+#if defined(AF_SOMNUS)
 #define RESEARCH_ON true
 #define FLEET_ON false
 #define JET_ON false
-#define WRAITH_ON true
+#define SOMNUS_ON true
 #define HAS_FLEET 0
 #define HAS_JET 0
-#define HAS_WRAITH 1
+#define HAS_SOMNUS 1
 #elif defined(AF_JET)
 #define RESEARCH_ON true
 #define FLEET_ON false
 #define JET_ON true
-#define WRAITH_ON false
+#define SOMNUS_ON false
 #define HAS_FLEET 0
 #define HAS_JET 1
-#define HAS_WRAITH 0
+#define HAS_SOMNUS 0
 #elif defined(AF_LIGHT)
 #define RESEARCH_ON false
 #define FLEET_ON true
 #define JET_ON false
-#define WRAITH_ON false
+#define SOMNUS_ON false
 #define HAS_FLEET 1
 #define HAS_JET 0
-#define HAS_WRAITH 0
+#define HAS_SOMNUS 0
 #else
 #define RESEARCH_ON true
 #define FLEET_ON true
 #define JET_ON true
-#define WRAITH_ON true
+#define SOMNUS_ON true
 #define HAS_FLEET 1
 #define HAS_JET 1
-#define HAS_WRAITH 1
+#define HAS_SOMNUS 1
 #endif
-#define HAS_RESEARCH (HAS_JET || HAS_WRAITH)
+#define HAS_RESEARCH (HAS_JET || HAS_SOMNUS)
 // AF_OUTSIDE: a build that never sees the aircraft from inside - the outside bodies' builder - has no cabin code: an
 // edit to a cockpit changes no outside body's builder, so no outside body is built again for it (HAS_CABIN)
 #ifdef AF_OUTSIDE
@@ -54,40 +54,40 @@
 #else
 #define HAS_CABIN 1
 #endif
-// HAS_<type> for the preprocessor (HAS_SWIFT, HAS_MANTIS...): the build carries that type's own code - every build
+// HAS_<type> for the preprocessor (HAS_CUTWATER, HAS_REVERIE...): the build carries that type's own code - every build
 // of its family but another aircraft's own. HAS_FLEET_CABIN: the career types' and the XR-10's authored cabins
 // (cockpit_layout.glsl fleetCabin). MODEL_IS(n) in code: the player's aircraft is type n (gModelId; traffic is
 // -1), false as it compiles in another aircraft's own build.
 #ifdef AF_MODEL
-#define HAS_KESTREL (AF_MODEL == 0)
-#define HAS_WREN (AF_MODEL == 1)
-#define HAS_BUSHMASTER (AF_MODEL == 2)
-#define HAS_ISLANDER (AF_MODEL == 3)
-#define HAS_PELICAN (AF_MODEL == 4)
-#define HAS_MERIDIAN (AF_MODEL == 5)
-#define HAS_STARLING (AF_MODEL == 6)
-#define HAS_SWIFT (AF_MODEL == 7)
-#define HAS_OSPREY (AF_MODEL == 8)
-#define HAS_NIGHTJAR (AF_MODEL == 9)
-#define HAS_MANTIS (AF_MODEL == 11)
-#define HAS_LARKSPUR (AF_MODEL == 13)
-#define HAS_ATLAS (AF_MODEL == 14)
+#define HAS_DAWNLARK (AF_MODEL == 0)
+#define HAS_AMBLER (AF_MODEL == 1)
+#define HAS_SCRUBRUNNER (AF_MODEL == 2)
+#define HAS_SKERRY (AF_MODEL == 3)
+#define HAS_LONGSHORE (AF_MODEL == 4)
+#define HAS_ARCHIPEL (AF_MODEL == 5)
+#define HAS_EMISSARY (AF_MODEL == 6)
+#define HAS_CUTWATER (AF_MODEL == 7)
+#define HAS_WAVECREST (AF_MODEL == 8)
+#define HAS_VIGIL (AF_MODEL == 9)
+#define HAS_REVERIE (AF_MODEL == 11)
+#define HAS_THISTLEDOWN (AF_MODEL == 13)
+#define HAS_GALLEON (AF_MODEL == 14)
 #define HAS_FLEET_CABIN (AF_MODEL < 10 || AF_MODEL == 13 || AF_MODEL == 14)
 #define MODEL_IS(n) ((n) == AF_MODEL && gModelId == (n))
 #else
-#define HAS_KESTREL HAS_FLEET
-#define HAS_WREN HAS_FLEET
-#define HAS_BUSHMASTER HAS_FLEET
-#define HAS_ISLANDER HAS_FLEET
-#define HAS_PELICAN HAS_FLEET
-#define HAS_MERIDIAN HAS_FLEET
-#define HAS_STARLING HAS_FLEET
-#define HAS_SWIFT HAS_FLEET
-#define HAS_OSPREY HAS_FLEET
-#define HAS_NIGHTJAR HAS_FLEET
-#define HAS_MANTIS HAS_FLEET
-#define HAS_LARKSPUR HAS_FLEET
-#define HAS_ATLAS HAS_FLEET
+#define HAS_DAWNLARK HAS_FLEET
+#define HAS_AMBLER HAS_FLEET
+#define HAS_SCRUBRUNNER HAS_FLEET
+#define HAS_SKERRY HAS_FLEET
+#define HAS_LONGSHORE HAS_FLEET
+#define HAS_ARCHIPEL HAS_FLEET
+#define HAS_EMISSARY HAS_FLEET
+#define HAS_CUTWATER HAS_FLEET
+#define HAS_WAVECREST HAS_FLEET
+#define HAS_VIGIL HAS_FLEET
+#define HAS_REVERIE HAS_FLEET
+#define HAS_THISTLEDOWN HAS_FLEET
+#define HAS_GALLEON HAS_FLEET
 #define HAS_FLEET_CABIN HAS_FLEET
 #define MODEL_IS(n) (gModelId == (n))
 #endif
@@ -156,13 +156,13 @@ vec3 fusSection(float z){
   float t2 = t*t, t3 = t2*t;
   return a.yzw*(2.0*t3 - 3.0*t2 + 1.0) + ma*h*(t3 - 2.0*t2 + t) + b.yzw*(-2.0*t3 + 3.0*t2) + mb*h*(t3 - t2);
 }
-// The Mantis remains in the shared engine-4 path. Its centerline glass cockpit is a stable packed-model
+// The Reverie remains in the shared engine-4 path. Its centerline glass cockpit is a stable packed-model
 // discriminator, including traffic/bake passes that do not carry uModelId. No roster index or uniform layout changes.
 // Explicit packed variant identity, shared by own-aircraft and traffic passes. Low bit remains de-ice.
 int fleetVariant(){ return int(gM[19].w + 0.5)/2; }
-bool isLarkspur(){ return FLEET_ON && fleetVariant() == 13; }
-bool isAtlas(){ return FLEET_ON && fleetVariant() == 14; }
-// Shared passenger-glass outline: the material and Larkspur's physical rear aperture use one envelope.
+bool isThistledown(){ return FLEET_ON && fleetVariant() == 13; }
+bool isGalleon(){ return FLEET_ON && fleetVariant() == 14; }
+// Shared passenger-glass outline: the material and Thistledown's physical rear aperture use one envelope.
 float fleetPassengerPane(vec3 p,vec3 sec){
   int count=int(gM[20].x+.5);
   if(count<=0) return 1e5;
@@ -173,9 +173,9 @@ float fleetPassengerPane(vec3 p,vec3 sec){
   float pane=length(max(d,0.0))+min(max(d.x,d.y),0.0)-radius;
   return pane;
 }
-// The Atlas flight deck wraps onto the low sloping nose, rather than painting only lateral windows.
+// The Galleon flight deck wraps onto the low sloping nose, rather than painting only lateral windows.
 // Shared signed pane mask for the shell cut and exterior glazing. Negative means a real open pane.
-float atlasWindow(vec3 p){
+float galleonWindow(vec3 p){
   float front=max(max(-20.0-p.z,p.z+17.56),max(.42-p.y,p.y-1.53));
   front=max(front,.032-abs(p.x));
   front=max(front,.035-abs(abs(p.x)-1.14));
@@ -184,16 +184,16 @@ float atlasWindow(vec3 p){
   return min(front,side);
 }
 
-bool isMantis(){ return int(gM[0].z + 0.5) == 4 && abs(gM[22].x) < 0.001 && gM[13].y < -3.0; }
+bool isReverie(){ return int(gM[0].z + 0.5) == 4 && abs(gM[22].x) < 0.001 && gM[13].y < -3.0; }
 const float MT_CANT = 0.48;
 const float MT_FIN_X = 1.05;   // fin roots stay on the shoulders when the engine moves to the centerline
 const vec3 MT_INLET = vec3(0.0, 1.05, -0.65);
-vec3 mantisNozzle(){ return vec3(0.0,gM[16].y,gM[16].w+gM[17].x); }
+vec3 reverieNozzle(){ return vec3(0.0,gM[16].y,gM[16].w+gM[17].x); }
 // The aft navigation lamp sits on the upper nozzle rim, clear of the open exhaust.
-vec3 mantisTailLight(){ return mantisNozzle()+vec3(0,gM[16].z*.88+.02,-.04); }
-vec3 mantisFinTop(){ return vec3(MT_FIN_X + sin(MT_CANT)*gM[14].x, gM[15].x + cos(MT_CANT)*gM[14].x + 0.04, gM[15].y + gM[14].w + gM[14].z*0.4); }
+vec3 reverieTailLight(){ return reverieNozzle()+vec3(0,gM[16].z*.88+.02,-.04); }
+vec3 reverieFinTop(){ return vec3(MT_FIN_X + sin(MT_CANT)*gM[14].x, gM[15].x + cos(MT_CANT)*gM[14].x + 0.04, gM[15].y + gM[14].w + gM[14].z*0.4); }
 // One uninterrupted front pane and two side panes. The canopy rail is below the pilot's sightline.
-float mantisWindow(vec3 p){
+float reverieWindow(vec3 p){
   vec4 W=gM[23];
   float front=max(max(W.x-p.z,p.z-W.y),W.z-p.y);
   float side=max(max(W.y+0.045-p.z,p.z-W.w),W.z-0.08-p.y);
@@ -216,8 +216,8 @@ vec3 fuselagePaint(vec3 lp, vec3 sec){
   float fade = smoothstep(gM[2].x - 0.1, gM[3].x, lp.z);                  // grows in over the cowling
   float d = abs(lp.y - c);
   vec3 col = gColBase;
-#if HAS_LARKSPUR
-  if(isLarkspur()) {
+#if HAS_THISTLEDOWN
+  if(isThistledown()) {
     // An ivory upper cabin, deep ocean lower shell and a rising copper tail accent.
     float sweep=.06+.115*smoothstep(-.5,3.1,lp.z);
     float line=lp.y-sec.z-sweep;
@@ -228,8 +228,8 @@ vec3 fuselagePaint(vec3 lp, vec3 sec){
     return col;
   }
 #endif
-#if HAS_ATLAS
-  if(isAtlas()) {
+#if HAS_GALLEON
+  if(isGalleon()) {
     // Broad blue belly and an ascending aft ribbon carry the flightline transport's own identity.
     float aft=smoothstep(6.0,19.0,lp.z), line=lp.y-sec.z-(-.72+1.40*aft);
     col=gColBase;
@@ -239,7 +239,7 @@ vec3 fuselagePaint(vec3 lp, vec3 sec){
     return col;
   }
 #endif
-  if (isMantis()) {
+  if (isReverie()) {
     // Graphite body, angular amber shoulder stripe and anti-glare nose. The form, rather than a recolor, leads.
     col=vec3(.105,.125,.15);
     if(lp.y < sec.z-.45*sec.y) col=vec3(.055,.065,.082);
@@ -259,29 +259,29 @@ float cabinRoof(vec3 sec, float x){ float k = abs(x)/max(sec.x - 0.035, 0.01); r
 float cabinWidth(vec3 sec, float y){ float k = (y - sec.z)/max(sec.y - 0.035, 0.01); return (sec.x - 0.035)*sqrt(max(1.0 - k*k, 0.0)); }
 
 
-// Swift eye/body moves independently of retained world cabin furniture.
-float swiftPreservedFurnitureY(){ return MODEL_IS(7)?.520:gM[22].y; }
+// Cutwater eye/body moves independently of retained world cabin furniture.
+float cutwaterPreservedFurnitureY(){ return MODEL_IS(7)?.520:gM[22].y; }
 
 void loadCabinFit(){
   vec3 E = gM[22].xyz;
   float seatDrop=uCabinSeatFit.y;
   float sw = clamp(cabinWidth(fusSection(E.z + 0.05), E.y - seatDrop) - abs(E.x) - 0.015, 0.145, 0.21);
   if(MODEL_IS(0) || MODEL_IS(1))sw=min(sw,.165); // same cap as CPU rail fitting
-  if(MODEL_IS(2))sw=min(sw,.180); // matched Bushmaster pan/rail fit
-  if(MODEL_IS(7))sw=min(sw,.180); // matched supported Swift pan/rail fit
+  if(MODEL_IS(2))sw=min(sw,.180); // matched Scrubrunner pan/rail fit
+  if(MODEL_IS(7))sw=min(sw,.180); // matched supported Cutwater pan/rail fit
   // headrest: mounted on top of the reclined seat back (centre ~4 cm above eye level, 45 cm aft); dropped altogether
   // (-100) where the cabin roof wouldn't clear it by 8 cm
   float hy = E.y + 0.057;   // along the reclined back's axis, just above its top (top at E.y - 0.046, E.z + 0.434)
   if (cabinRoof(fusSection(E.z + 0.455), abs(E.x) + 0.11) < hy + 0.075 + 0.08) hy = -100.0;
   float ly = cabinRoof(fusSection(E.z - 0.05), 0.09) - 0.035;
-  float wx = max(cabinWidth(fusSection(E.z - 0.15), swiftPreservedFurnitureY() - 0.5) - 0.05, 0.2);
+  float wx = max(cabinWidth(fusSection(E.z - 0.15), cutwaterPreservedFurnitureY() - 0.5) - 0.05, 0.2);
   gCab0 = vec4(sw, hy, ly, wx);
   vec3 vs = fusSection(E.z - 0.30); float hw = max(vs.x - 0.035, 0.01), hh = max(vs.y - 0.035, 0.01);   // visors: at the windshield top, ahead of the eye
   float k = clamp(abs(E.x)/hw, 0.0, 0.95);
   float slope = atan(hh*k/(hw*sqrt(max(1.0 - k*k, 0.01))));
   float vy = cabinRoof(vs, abs(E.x)) - 0.05;
   float oy = cabinRoof(fusSection(E.z - 0.2), 0.22) - 0.03;
-  float vx = min(gM[22].w - 0.07, cabinWidth(fusSection(gM[21].w), swiftPreservedFurnitureY() - 0.19) - 0.04);
+  float vx = min(gM[22].w - 0.07, cabinWidth(fusSection(gM[21].w), cutwaterPreservedFurnitureY() - 0.19) - 0.04);
   gCab1 = vec4(vy, slope, oy, max(vx, 0.1));
   gCab2=uCabinFootFit;gCabSeat=uCabinSeatFit;
 

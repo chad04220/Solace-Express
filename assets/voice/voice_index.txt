@@ -615,15 +615,15 @@ lesson.L4.phase3	rosa/lesson.L4.phase3.wav	Plan your descent early - Orchard Val
 lesson.L4.phase4	rosa/lesson.L4.phase4.wav	Crab into the wind on final. Just before touchdown, use rudder to align with the runway.	rosa	65	lesson		L4
 lesson.L4.phase5	rosa/lesson.L4.phase5.wav	Keep the upwind wing slightly low as you flare.	rosa	65	lesson		L4
 lesson.L4.phase6	rosa/lesson.L4.phase6.wav	Stop on the runway to complete the checkride.	rosa	65	lesson		L4
-radio.spectre.50e58a57b125	spectre/radio.spectre.50e58a57b125.wav	SPECTRE DISPLAY PAIR: Two Specters joining on your wing - enjoy the show!	spectre	45	line		
-radio.spectre.5f513f152f0d	spectre/radio.spectre.5f513f152f0d.wav	SPECTRE: That's the show - Specters breaking off. Fly safe!	spectre	45	line		
-radio.spectre.f055fe79a458	spectre/radio.spectre.f055fe79a458.wav	SPECTRE: You're on approach - we'll leave you to it. Specters out!	spectre	45	line		
-radio.spectre.5494711d80f3	spectre/radio.spectre.5494711d80f3.wav	SPECTRE: Smoke on... now. Tight formation, hold her steady.	spectre	45	line		
-radio.spectre.995c101f1c33	spectre/radio.spectre.995c101f1c33.wav	SPECTRE: Helix - we'll wrap you up. Don't flinch!	spectre	45	line		
-radio.spectre.32d95b24961f	spectre/radio.spectre.32d95b24961f.wav	SPECTRE: Opposition pass coming at you, knife-edge!	spectre	45	line		
-radio.spectre.44663451f855	spectre/radio.spectre.44663451f855.wav	SPECTRE: Back in formation. Nice flying, partner.	spectre	45	line		
-radio.spectre.3205cbc6bf66	spectre/radio.spectre.3205cbc6bf66.wav	SPECTRE: Synchronised loops off your nose - watch this.	spectre	45	line		
-radio.spectre.ca1924958744	spectre/radio.spectre.ca1924958744.wav	SPECTRE: Split and cross - one high, one low!	spectre	45	line		
+radio.nocturne.e44b242c10c8	nocturne/radio.nocturne.e44b242c10c8.wav	NOCTURNE DISPLAY PAIR: Two Nocturnes joining on your wing - enjoy the show!	nocturne	45	line		
+radio.nocturne.53d055103dd3	nocturne/radio.nocturne.53d055103dd3.wav	NOCTURNE: That's the show - Nocturnes breaking off. Fly safe!	nocturne	45	line		
+radio.nocturne.2832d63a4f50	nocturne/radio.nocturne.2832d63a4f50.wav	NOCTURNE: You're on approach - we'll leave you to it. Nocturnes out!	nocturne	45	line		
+radio.nocturne.04d835cbca9c	nocturne/radio.nocturne.04d835cbca9c.wav	NOCTURNE: Smoke on... now. Tight formation, hold her steady.	nocturne	45	line		
+radio.nocturne.f971a3db2802	nocturne/radio.nocturne.f971a3db2802.wav	NOCTURNE: Helix - we'll wrap you up. Don't flinch!	nocturne	45	line		
+radio.nocturne.04f654d808be	nocturne/radio.nocturne.04f654d808be.wav	NOCTURNE: Opposition pass coming at you, knife-edge!	nocturne	45	line		
+radio.nocturne.5127a315cfd9	nocturne/radio.nocturne.5127a315cfd9.wav	NOCTURNE: Back in formation. Nice flying, partner.	nocturne	45	line		
+radio.nocturne.8d903e3a30cc	nocturne/radio.nocturne.8d903e3a30cc.wav	NOCTURNE: Synchronised loops off your nose - watch this.	nocturne	45	line		
+radio.nocturne.e98a967e5786	nocturne/radio.nocturne.e98a967e5786.wav	NOCTURNE: Split and cross - one high, one low!	nocturne	45	line		
 flight.aster.1da01aac21f6	aster/flight.aster.1da01aac21f6.wav	Any stick input hands control back	aster	40	line		
 flight.aster.98e0cfedf757	aster/flight.aster.98e0cfedf757.wav	Autopilot ON: the stick trims heading and altitude, throttle sets speed	aster	40	line		
 flight.aster.7dc83137b9f0	aster/flight.aster.7dc83137b9f0.wav	Pick an AUTOLAND airport on the GPS map to fly there	aster	40	line		
@@ -647,15 +647,15 @@ flight.aster.859b3a1b40bb	aster/flight.aster.859b3a1b40bb.wav	Starting engine...
 flight.aster.ce6408a8674b	aster/flight.aster.ce6408a8674b.wav	Time acceleration off	aster	40	line		
 flight.instructor.be2eb00d875a	instructor/flight.instructor.be2eb00d875a.wav	Engine running. Release the parking brake with B.	instructor	40	line		
 lesson_event.rosa.be2eb00d875a	rosa/lesson_event.rosa.be2eb00d875a.wav	Engine running. Release the parking brake with B.	rosa	60	line		
-flight.spectre.8e1c3feac92e	spectre/flight.spectre.8e1c3feac92e.wav	Spectre display pair: climb away from the field first	spectre	40	line		
+flight.nocturne.9c30f6db41fc	nocturne/flight.nocturne.9c30f6db41fc.wav	Nocturne display pair: climb away from the field first	nocturne	40	line		
 flight.aster.e5cc5a54dfec	aster/flight.aster.e5cc5a54dfec.wav	Positive climb!	aster	40	line		
 lesson_event.instructor.e5cc5a54dfec	instructor/lesson_event.instructor.e5cc5a54dfec.wav	Positive climb!	instructor	60	line		
 lesson_event.rosa.e5cc5a54dfec	rosa/lesson_event.rosa.e5cc5a54dfec.wav	Positive climb!	rosa	60	line		
 flight.aster.7a44031dc200	aster/flight.aster.7a44031dc200.wav	All checkpoints passed!	aster	40	line		
 flight.aster.61a4dca45ff1	aster/flight.aster.61a4dca45ff1.wav	LOW FUEL	aster	100	line		
 flight.aster.7e71a736df26	aster/flight.aster.7e71a736df26.wav	Checkpoints remaining - take off again to continue	aster	40	line		
-research.nyx.40f73b948f15	nyx/research.nyx.40f73b948f15.wav	XR-40 WRAITH // RESEARCH FLIGHT	nyx	40	line		
-research.nyx.66b2b06e84de	nyx/research.nyx.66b2b06e84de.wav	XR-30 SPECTER // RESEARCH FLIGHT	nyx	40	line		
+research.nyx.549f46c8e819	nyx/research.nyx.549f46c8e819.wav	XR-40 SOMNUS // RESEARCH FLIGHT	nyx	40	line		
+research.nyx.63a004c17e7c	nyx/research.nyx.63a004c17e7c.wav	XR-30 NOCTURNE // RESEARCH FLIGHT	nyx	40	line		
 research.nyx.2110c8d235dc	nyx/research.nyx.2110c8d235dc.wav	F/V tilts the four thruster pods: full down for vertical takeoff	nyx	40	line		
 research.nyx.180fecf7b001	nyx/research.nyx.180fecf7b001.wav	F/V swivels the nozzles: full down for vertical takeoff	nyx	40	line		
 research.nyx.089b6e4c8963	nyx/research.nyx.089b6e4c8963.wav	MACH 1 - SONIC BOOM	nyx	40	line		
@@ -1008,15 +1008,6 @@ fragment.nyx.degrees	nyx/fragment.nyx.degrees.wav	degrees	nyx	40	fragment
 fragment.nyx.splash	nyx/fragment.nyx.splash.wav	Splash	nyx	40	fragment		
 fragment.nyx.down	nyx/fragment.nyx.down.wav	down	nyx	40	fragment		
 fragment.nyx.aircraft_in_blast	nyx/fragment.nyx.aircraft_in_blast.wav	aircraft caught in the blast	nyx	40	fragment		
-fragment.nyx.craft_kestrel	nyx/fragment.nyx.craft_kestrel.wav	Kestrel T2	nyx	40	fragment		
-fragment.nyx.craft_wren	nyx/fragment.nyx.craft_wren.wav	Wren 180	nyx	40	fragment		
-fragment.nyx.craft_bush	nyx/fragment.nyx.craft_bush.wav	Bushmaster STOL	nyx	40	fragment		
-fragment.nyx.craft_islander	nyx/fragment.nyx.craft_islander.wav	Islander Twin	nyx	40	fragment		
-fragment.nyx.craft_pelican	nyx/fragment.nyx.craft_pelican.wav	Pelican Caravan	nyx	40	fragment		
-fragment.nyx.craft_meridian	nyx/fragment.nyx.craft_meridian.wav	Meridian Q400	nyx	40	fragment		
-fragment.nyx.craft_starling	nyx/fragment.nyx.craft_starling.wav	Starling 500 Jet	nyx	40	fragment		
-fragment.nyx.craft_xr9	nyx/fragment.nyx.craft_xr9.wav	XR-30 Specter	nyx	40	fragment		
-fragment.nyx.craft_xr11	nyx/fragment.nyx.craft_xr11.wav	XR-40 Wraith	nyx	40	fragment		
 key.559aead0	aster/key.559aead0.wav	A key	aster	40	fragment		
 key.df7e70e5	aster/key.df7e70e5.wav	B key	aster	40	fragment		
 key.6b23c0d5	aster/key.6b23c0d5.wav	C key	aster	40	fragment		
@@ -1251,15 +1242,6 @@ key.5ca24005	aster/key.5ca24005.wav	key	aster	40	fragment
 @atom.nyx.splash	fragment.nyx.splash
 @atom.nyx.down	fragment.nyx.down
 @atom.nyx.aircraft_in_blast	fragment.nyx.aircraft_in_blast
-@atom.nyx.craft_kestrel	fragment.nyx.craft_kestrel
-@atom.nyx.craft_wren	fragment.nyx.craft_wren
-@atom.nyx.craft_bush	fragment.nyx.craft_bush
-@atom.nyx.craft_islander	fragment.nyx.craft_islander
-@atom.nyx.craft_pelican	fragment.nyx.craft_pelican
-@atom.nyx.craft_meridian	fragment.nyx.craft_meridian
-@atom.nyx.craft_starling	fragment.nyx.craft_starling
-@atom.nyx.craft_xr9	fragment.nyx.craft_xr9
-@atom.nyx.craft_xr11	fragment.nyx.craft_xr11
 @key.A	key.559aead0
 @key.B	key.df7e70e5
 @key.C	key.6b23c0d5
@@ -1354,77 +1336,64 @@ key.5ca24005	aster/key.5ca24005.wav	key	aster	40	fragment
 @key.NUM /	key.a28b1b97
 @key.--	key.d8156bae
 @key.KEY	key.5ca24005
-@craft.Kestrel T2	kestrel
-@craft.Wren 180	wren
-@craft.Bushmaster STOL	bush
-@craft.Islander Twin	islander
-@craft.Pelican Caravan	pelican
-@craft.Meridian Q400	meridian
-@craft.Starling 500 Jet	starling
-@craft.XR-30 Specter	xr9
-@craft.XR-40 Wraith	xr11
-fragment.nyx.craft_swift	nyx/fragment.nyx.craft_swift.wav	Swift S6	nyx	40	fragment		
-fragment.nyx.craft_osprey	nyx/fragment.nyx.craft_osprey.wav	Osprey C6	nyx	40	fragment		
-fragment.nyx.craft_xr10_nightjar	nyx/fragment.nyx.craft_xr10_nightjar.wav	XR-10 Nightjar	nyx	40	fragment		
-fragment.nyx.craft_xr20_mantis	nyx/fragment.nyx.craft_xr20_mantis.wav	XR-20 Mantis	nyx	40	fragment		
-research.nyx.f421606213a1	nyx/research.nyx.f421606213a1.wav	XR-10 NIGHTJAR // RESEARCH FLIGHT	nyx	40	line		
-research.nyx.98c32f6d770d	nyx/research.nyx.98c32f6d770d.wav	XR-20 MANTIS // RESEARCH FLIGHT	nyx	40	line		
-research.nyx.5e5473bb44be	nyx/research.nyx.5e5473bb44be.wav	XR-10 NIGHTJAR // TEST CARD TRANSONIC DASH	nyx	40	line		
+research.nyx.00a603d05e20	nyx/research.nyx.00a603d05e20.wav	XR-10 VIGIL // RESEARCH FLIGHT	nyx	40	line		
+research.nyx.e03b90c1bd5c	nyx/research.nyx.e03b90c1bd5c.wav	XR-20 REVERIE // RESEARCH FLIGHT	nyx	40	line		
+research.nyx.f988c35160dd	nyx/research.nyx.f988c35160dd.wav	XR-10 VIGIL // TEST CARD TRANSONIC DASH	nyx	40	line		
 research.nyx.f1786f8430a4	nyx/research.nyx.f1786f8430a4.wav	TEST CARD XR10-1 COMPLETE - TRANSONIC DASH SIGNED OFF	nyx	40	line		
 research.nyx.a3abc88eb60a	nyx/research.nyx.a3abc88eb60a.wav	STEP 1 of 3: Hold Mach 0.95	nyx	40	line		
 research.nyx.01e1d7754e99	nyx/research.nyx.01e1d7754e99.wav	STEP 2 of 3: Climb through 11,000 m	nyx	40	line		
 research.nyx.9c1cec5d8454	nyx/research.nyx.9c1cec5d8454.wav	STEP 3 of 3: Land back at the range	nyx	40	line		
-research.nyx.5a131b659e77	nyx/research.nyx.5a131b659e77.wav	XR-10 NIGHTJAR // TEST CARD AGILITY	nyx	40	line		
+research.nyx.b493d82f450c	nyx/research.nyx.b493d82f450c.wav	XR-10 VIGIL // TEST CARD AGILITY	nyx	40	line		
 research.nyx.21052a006afe	nyx/research.nyx.21052a006afe.wav	TEST CARD XR10-2 COMPLETE - AGILITY SIGNED OFF	nyx	40	line		
 research.nyx.3bc5e702dff6	nyx/research.nyx.3bc5e702dff6.wav	STEP 1 of 4: Roll at 170 deg/s	nyx	40	line		
 research.nyx.f76b2c38b4a8	nyx/research.nyx.f76b2c38b4a8.wav	STEP 2 of 4: Pull 8 g	nyx	40	line		
 research.nyx.de913c35b6b8	nyx/research.nyx.de913c35b6b8.wav	STEP 3 of 4: Push to -3 g	nyx	40	line		
 research.nyx.63bbeba4dc59	nyx/research.nyx.63bbeba4dc59.wav	STEP 4 of 4: Land back at the range	nyx	40	line		
-research.nyx.dc66658330de	nyx/research.nyx.dc66658330de.wav	XR-10 NIGHTJAR // TEST CARD SLOW FLIGHT	nyx	40	line		
+research.nyx.02d329c4cfa5	nyx/research.nyx.02d329c4cfa5.wav	XR-10 VIGIL // TEST CARD SLOW FLIGHT	nyx	40	line		
 research.nyx.be6c99107e5f	nyx/research.nyx.be6c99107e5f.wav	TEST CARD XR10-3 COMPLETE - SLOW FLIGHT SIGNED OFF	nyx	40	line		
 research.nyx.d94b9be0ae11	nyx/research.nyx.d94b9be0ae11.wav	STEP 1 of 3: Hold 115 kt (above 150 m)	nyx	40	line		
 research.nyx.747b89cc1ee7	nyx/research.nyx.747b89cc1ee7.wav	STEP 2 of 3: Stall warning above 600 m	nyx	40	line		
-research.nyx.fb7f941d47d3	nyx/research.nyx.fb7f941d47d3.wav	XR-20 MANTIS // TEST CARD SUPERSONIC	nyx	40	line		
+research.nyx.ae0d6c9ee6dc	nyx/research.nyx.ae0d6c9ee6dc.wav	XR-20 REVERIE // TEST CARD SUPERSONIC	nyx	40	line		
 research.nyx.491824bb301c	nyx/research.nyx.491824bb301c.wav	TEST CARD XR20-1 COMPLETE - SUPERSONIC SIGNED OFF	nyx	40	line		
 research.nyx.5713ae00d94f	nyx/research.nyx.5713ae00d94f.wav	STEP 1 of 3: Hold Mach 1.8	nyx	40	line		
 research.nyx.729feea58158	nyx/research.nyx.729feea58158.wav	STEP 2 of 3: Climb through 15,000 m	nyx	40	line		
-research.nyx.a38d3d667d2a	nyx/research.nyx.a38d3d667d2a.wav	XR-20 MANTIS // TEST CARD CANARD AGILITY	nyx	40	line		
+research.nyx.39b760d4e99b	nyx/research.nyx.39b760d4e99b.wav	XR-20 REVERIE // TEST CARD CANARD AGILITY	nyx	40	line		
 research.nyx.4a586ab0418c	nyx/research.nyx.4a586ab0418c.wav	TEST CARD XR20-2 COMPLETE - CANARD AGILITY SIGNED OFF	nyx	40	line		
 research.nyx.a094be7d0677	nyx/research.nyx.a094be7d0677.wav	STEP 1 of 4: Roll at 250 deg/s	nyx	40	line		
 research.nyx.bd42af7457ce	nyx/research.nyx.bd42af7457ce.wav	STEP 2 of 4: Pull 12 g	nyx	40	line		
 research.nyx.64f491fc75d8	nyx/research.nyx.64f491fc75d8.wav	STEP 3 of 4: Push to -5 g	nyx	40	line		
-research.nyx.2e802011c3b7	nyx/research.nyx.2e802011c3b7.wav	XR-20 MANTIS // TEST CARD HIGH ALPHA	nyx	40	line		
+research.nyx.56c223371161	nyx/research.nyx.56c223371161.wav	XR-20 REVERIE // TEST CARD HIGH ALPHA	nyx	40	line		
 research.nyx.67809a8a8bf6	nyx/research.nyx.67809a8a8bf6.wav	TEST CARD XR20-3 COMPLETE - HIGH ALPHA SIGNED OFF	nyx	40	line		
 research.nyx.1a5cbc011bb1	nyx/research.nyx.1a5cbc011bb1.wav	STEP 1 of 4: Stall warning above 600 m	nyx	40	line		
 research.nyx.a8aa73183f07	nyx/research.nyx.a8aa73183f07.wav	STEP 2 of 4: Hold 135 kt (above 150 m)	nyx	40	line		
 research.nyx.3510ef84951a	nyx/research.nyx.3510ef84951a.wav	STEP 3 of 4: Climb at 120 m/s	nyx	40	line		
-research.nyx.481c9ddbb6fd	nyx/research.nyx.481c9ddbb6fd.wav	XR-30 SPECTER // TEST CARD MACH 2.7	nyx	40	line		
+research.nyx.d1519e5eb451	nyx/research.nyx.d1519e5eb451.wav	XR-30 NOCTURNE // TEST CARD MACH 2.7	nyx	40	line		
 research.nyx.726c288d8543	nyx/research.nyx.726c288d8543.wav	TEST CARD XR30-1 COMPLETE - MACH 2.7 SIGNED OFF	nyx	40	line		
 research.nyx.e5abb4eb9d76	nyx/research.nyx.e5abb4eb9d76.wav	STEP 1 of 3: Hold Mach 2.7	nyx	40	line		
 research.nyx.5b94f8258218	nyx/research.nyx.5b94f8258218.wav	STEP 2 of 3: Climb through 20,000 m	nyx	40	line		
-research.nyx.99ced8b9b035	nyx/research.nyx.99ced8b9b035.wav	XR-30 SPECTER // TEST CARD VECTORED PULL	nyx	40	line		
+research.nyx.e827d9dce2b9	nyx/research.nyx.e827d9dce2b9.wav	XR-30 NOCTURNE // TEST CARD VECTORED PULL	nyx	40	line		
 research.nyx.75ec8efb62dc	nyx/research.nyx.75ec8efb62dc.wav	TEST CARD XR30-2 COMPLETE - VECTORED PULL SIGNED OFF	nyx	40	line		
 research.nyx.8fdcc5617a0d	nyx/research.nyx.8fdcc5617a0d.wav	STEP 1 of 4: Pull 35 g	nyx	40	line		
 research.nyx.41484182eed6	nyx/research.nyx.41484182eed6.wav	STEP 2 of 4: Push to -15 g	nyx	40	line		
 research.nyx.be06edbd0355	nyx/research.nyx.be06edbd0355.wav	STEP 3 of 4: Roll at 300 deg/s	nyx	40	line		
-research.nyx.81d213cd0801	nyx/research.nyx.81d213cd0801.wav	XR-30 SPECTER // TEST CARD ZOOM CLIMB	nyx	40	line		
+research.nyx.b1ddf946048a	nyx/research.nyx.b1ddf946048a.wav	XR-30 NOCTURNE // TEST CARD ZOOM CLIMB	nyx	40	line		
 research.nyx.1fbbf3521476	nyx/research.nyx.1fbbf3521476.wav	TEST CARD XR30-3 COMPLETE - ZOOM CLIMB SIGNED OFF	nyx	40	line		
 research.nyx.58dbbcf548c3	nyx/research.nyx.58dbbcf548c3.wav	STEP 1 of 3: Climb at 300 m/s	nyx	40	line		
 research.nyx.2c27d9905fe8	nyx/research.nyx.2c27d9905fe8.wav	STEP 2 of 3: Climb through 28,000 m	nyx	40	line		
-research.nyx.c68aeb72ef56	nyx/research.nyx.c68aeb72ef56.wav	XR-40 WRAITH // TEST CARD MACH 4	nyx	40	line		
+research.nyx.5f59167f4643	nyx/research.nyx.5f59167f4643.wav	XR-40 SOMNUS // TEST CARD MACH 4	nyx	40	line		
 research.nyx.28803147b1fd	nyx/research.nyx.28803147b1fd.wav	TEST CARD XR40-1 COMPLETE - MACH 4 SIGNED OFF	nyx	40	line		
 research.nyx.4de47b13be66	nyx/research.nyx.4de47b13be66.wav	STEP 1 of 3: Hold Mach 4.0	nyx	40	line		
 research.nyx.16bd245c55a0	nyx/research.nyx.16bd245c55a0.wav	STEP 2 of 3: Climb through 25,000 m	nyx	40	line		
-research.nyx.81274a29ddb1	nyx/research.nyx.81274a29ddb1.wav	XR-40 WRAITH // TEST CARD VERTICAL FLIGHT	nyx	40	line		
+research.nyx.776b807b759e	nyx/research.nyx.776b807b759e.wav	XR-40 SOMNUS // TEST CARD VERTICAL FLIGHT	nyx	40	line		
 research.nyx.77a205d4e301	nyx/research.nyx.77a205d4e301.wav	TEST CARD XR40-2 COMPLETE - VERTICAL FLIGHT SIGNED OFF	nyx	40	line		
 research.nyx.f7c3995854aa	nyx/research.nyx.f7c3995854aa.wav	STEP 1 of 2: Hover for 10 s	nyx	40	line		
 research.nyx.fcdc57575f14	nyx/research.nyx.fcdc57575f14.wav	STEP 2 of 2: Land vertically	nyx	40	line		
-research.nyx.bfae07063723	nyx/research.nyx.bfae07063723.wav	XR-40 WRAITH // TEST CARD SYSTEMS	nyx	40	line		
+research.nyx.caaba22a7299	nyx/research.nyx.caaba22a7299.wav	XR-40 SOMNUS // TEST CARD SYSTEMS	nyx	40	line		
 research.nyx.d06b64a1661a	nyx/research.nyx.d06b64a1661a.wav	TEST CARD XR40-3 COMPLETE - SYSTEMS SIGNED OFF	nyx	40	line		
 research.nyx.78baa9cec85c	nyx/research.nyx.78baa9cec85c.wav	STEP 1 of 4: Cloak for 10 s	nyx	40	line		
 research.nyx.e8f1b0d31993	nyx/research.nyx.e8f1b0d31993.wav	STEP 2 of 4: Fire 6 laser bolts	nyx	40	line		
 research.nyx.3c784eb876aa	nyx/research.nyx.3c784eb876aa.wav	STEP 3 of 4: Release a plasma bomb	nyx	40	line		
-research.nyx.b7a7ec6dbb6c	nyx/research.nyx.b7a7ec6dbb6c.wav	XR-40 WRAITH // TEST CARD EXTREMES	nyx	40	line		
+research.nyx.b75e739d189a	nyx/research.nyx.b75e739d189a.wav	XR-40 SOMNUS // TEST CARD EXTREMES	nyx	40	line		
 research.nyx.58211501e3ad	nyx/research.nyx.58211501e3ad.wav	TEST CARD XR40-4 COMPLETE - EXTREMES SIGNED OFF	nyx	40	line		
 research.nyx.ad1521dba439	nyx/research.nyx.ad1521dba439.wav	STEP 1 of 4: Pull 80 g	nyx	40	line		
 research.nyx.4abcac3d963e	nyx/research.nyx.4abcac3d963e.wav	STEP 2 of 4: Push to -40 g	nyx	40	line		
@@ -1511,14 +1480,6 @@ fragment.aster.airport_GLS	aster/fragment.aster.airport_GLS.wav	Glacier Station	
 fragment.aster.airport_FAR	aster/fragment.aster.airport_FAR.wav	Far Isle	aster	40	fragment		
 fragment.aster.airport_ORC	aster/fragment.aster.airport_ORC.wav	Orchard Valley	aster	40	fragment		
 hud_failure.aster.627723aa234e	aster/hud_failure.aster.627723aa234e.wav	ENGINE POWER LOSS	aster	95	line		
-@atom.nyx.craft_swift_s6	fragment.nyx.craft_swift
-@craft.Swift S6	swift_s6
-@atom.nyx.craft_osprey_c6	fragment.nyx.craft_osprey
-@craft.Osprey C6	osprey_c6
-@atom.nyx.craft_xr10_nightjar	fragment.nyx.craft_xr10_nightjar
-@craft.XR-10 Nightjar	xr10_nightjar
-@atom.nyx.craft_xr20_mantis	fragment.nyx.craft_xr20_mantis
-@craft.XR-20 Mantis	xr20_mantis
 @atom.aster.wind_shift_runway	fragment.aster.wind_shift_runway
 @atom.aster.at	fragment.aster.at
 @atom.aster.belly_landing_too_hard_hit_at	fragment.aster.belly_landing_too_hard_hit_at
@@ -1544,3 +1505,49 @@ hud_failure.aster.627723aa234e	aster/hud_failure.aster.627723aa234e.wav	ENGINE P
 @atom.aster.airport_GLS	fragment.aster.airport_GLS
 @atom.aster.airport_FAR	fragment.aster.airport_FAR
 @atom.aster.airport_ORC	fragment.aster.airport_ORC
+
+fragment.nyx.craft_dawnlark	nyx/fragment.nyx.craft_dawnlark.wav	Dawnlark T2	nyx	40	fragment		
+fragment.nyx.craft_ambler	nyx/fragment.nyx.craft_ambler.wav	Ambler 180	nyx	40	fragment		
+fragment.nyx.craft_scrubrunner	nyx/fragment.nyx.craft_scrubrunner.wav	Scrubrunner STOL	nyx	40	fragment		
+fragment.nyx.craft_skerry	nyx/fragment.nyx.craft_skerry.wav	Skerry Twin	nyx	40	fragment		
+fragment.nyx.craft_longshore	nyx/fragment.nyx.craft_longshore.wav	Longshore Hauler	nyx	40	fragment		
+fragment.nyx.craft_archipel	nyx/fragment.nyx.craft_archipel.wav	Archipel 400	nyx	40	fragment		
+fragment.nyx.craft_emissary	nyx/fragment.nyx.craft_emissary.wav	Emissary 500	nyx	40	fragment		
+fragment.nyx.craft_cutwater_s6	nyx/fragment.nyx.craft_cutwater_s6.wav	Cutwater S6	nyx	40	fragment		
+fragment.nyx.craft_wavecrest_c6	nyx/fragment.nyx.craft_wavecrest_c6.wav	Wavecrest C6	nyx	40	fragment		
+fragment.nyx.craft_xr10_vigil	nyx/fragment.nyx.craft_xr10_vigil.wav	XR-10 Vigil	nyx	40	fragment		
+fragment.nyx.craft_xr30_nocturne	nyx/fragment.nyx.craft_xr30_nocturne.wav	XR-30 Nocturne	nyx	40	fragment		
+fragment.nyx.craft_xr20_reverie	nyx/fragment.nyx.craft_xr20_reverie.wav	XR-20 Reverie	nyx	40	fragment		
+fragment.nyx.craft_xr40_somnus	nyx/fragment.nyx.craft_xr40_somnus.wav	XR-40 Somnus	nyx	40	fragment		
+fragment.nyx.craft_thistledown_l4	nyx/fragment.nyx.craft_thistledown_l4.wav	Thistledown L4	nyx	40	fragment		
+fragment.nyx.craft_galleon_180	nyx/fragment.nyx.craft_galleon_180.wav	Galleon 180	nyx	40	fragment		
+@atom.nyx.craft_dawnlark	fragment.nyx.craft_dawnlark
+@craft.Dawnlark T2	dawnlark
+@atom.nyx.craft_ambler	fragment.nyx.craft_ambler
+@craft.Ambler 180	ambler
+@atom.nyx.craft_scrubrunner	fragment.nyx.craft_scrubrunner
+@craft.Scrubrunner STOL	scrubrunner
+@atom.nyx.craft_skerry	fragment.nyx.craft_skerry
+@craft.Skerry Twin	skerry
+@atom.nyx.craft_longshore	fragment.nyx.craft_longshore
+@craft.Longshore Hauler	longshore
+@atom.nyx.craft_archipel	fragment.nyx.craft_archipel
+@craft.Archipel 400	archipel
+@atom.nyx.craft_emissary	fragment.nyx.craft_emissary
+@craft.Emissary 500	emissary
+@atom.nyx.craft_cutwater_s6	fragment.nyx.craft_cutwater_s6
+@craft.Cutwater S6	cutwater_s6
+@atom.nyx.craft_wavecrest_c6	fragment.nyx.craft_wavecrest_c6
+@craft.Wavecrest C6	wavecrest_c6
+@atom.nyx.craft_xr10_vigil	fragment.nyx.craft_xr10_vigil
+@craft.XR-10 Vigil	xr10_vigil
+@atom.nyx.craft_xr30_nocturne	fragment.nyx.craft_xr30_nocturne
+@craft.XR-30 Nocturne	xr30_nocturne
+@atom.nyx.craft_xr20_reverie	fragment.nyx.craft_xr20_reverie
+@craft.XR-20 Reverie	xr20_reverie
+@atom.nyx.craft_xr40_somnus	fragment.nyx.craft_xr40_somnus
+@craft.XR-40 Somnus	xr40_somnus
+@atom.nyx.craft_thistledown_l4	fragment.nyx.craft_thistledown_l4
+@craft.Thistledown L4	thistledown_l4
+@atom.nyx.craft_galleon_180	fragment.nyx.craft_galleon_180
+@craft.Galleon 180	galleon_180

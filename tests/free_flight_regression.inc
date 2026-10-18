@@ -55,7 +55,7 @@
       // membership, not merely by that flag, including out-of-range/negative indices.
       q.beginFreeFlightSetup();
       bool rejected = true;
-      for (int craft : {-1, kNightjar, kResearchJet, kMantis, kWraith, 1000000}) {
+      for (int craft : {-1, kVigil, kResearchJet, kReverie, kSomnus, 1000000}) {
         q.freeCraft = craft; q.launchFreeFlight();
         rejected &= q.screen == SCR_FREE_FLIGHT && !q.freeFlight;
       }
@@ -65,7 +65,7 @@
         rejected &= q.screen == SCR_FREE_FLIGHT && !q.freeFlight;
       }
       check(rejected && snapshot(q.career) == before, "all research aircraft and invalid selections rejected without side effects");
-      q.freeCraft = kWraith; q.freeAirport = -17; q.beginFreeFlightSetup();
+      q.freeCraft = kSomnus; q.freeAirport = -17; q.beginFreeFlightSetup();
       check(isCareerAircraft(q.freeCraft) && q.freeAirport == 0, "stale setup choices are clamped to available ordinary aircraft/airports");
     }
 

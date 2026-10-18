@@ -5,7 +5,7 @@
 #include <string>
 #include <filesystem>
 #include "../src/shaders.h"
-#include "../src/shaders_wraith_cockpit.h"
+#include "../src/shaders_somnus_cockpit.h"
 #include "../src/shader_prune.h"
 #include "../src/hangar_preview.h"
 #include "../src/models.h"
@@ -90,11 +90,11 @@ int main(int argc, char** argv) {
       bake(dir, ("hullbake_normals_af" + n + ".frag").c_str(), hullBakeFSAssembly(d + "#define HULL_BAKE_NORMALS\n"));
       bake(dir, ("hullbake_out_af" + n + ".frag").c_str(), hullBakeFSAssembly(d + "#define AF_OUTSIDE\n"));   // (the outside body's: no cabin)
       bake(dir, ("hullbake_normals_out_af" + n + ".frag").c_str(), hullBakeFSAssembly(d + "#define AF_OUTSIDE\n#define HULL_BAKE_NORMALS\n"));
-      if (m == kWraith) put(dir, "plane_mesh_af12_probe.frag", planeMeshFSAssembly(d + "#define PROBE_MESH_SHADE\n"));   // (the analysis's probe build)
+      if (m == kSomnus) put(dir, "plane_mesh_af12_probe.frag", planeMeshFSAssembly(d + "#define PROBE_MESH_SHADE\n"));   // (the analysis's probe build)
       // and its own full-screen passes (raster_renderer.cpp afPassProgram): the march, its shadows; the XR-40's effects
       put(dir, ("objects_af" + n + ".frag").c_str(), objectsFSAssembly(d));
       put(dir, ("shadow_proxy_af" + n + ".frag").c_str(), shadowProxyFSAssembly(d));
-      if (m == kWraith) put(dir, "effects_af12.frag", effectsFSAssembly(d));
+      if (m == kSomnus) put(dir, "effects_af12.frag", effectsFSAssembly(d));
     }
   }
   // the small programs (Renderer::compilePrograms), as assembled and as pruned

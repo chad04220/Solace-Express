@@ -6,7 +6,7 @@
 void planeToGB(vec3 p, vec3 rd, float t, int mid, vec3 ln, bool pod, bool trafHit, float aoIn){
   float sunVis = smoothstep(-0.05, 0.05, uSunDir.y);
   int eng = int(gM[0].z + 0.5);
-  bool wr = WRAITH_ON && (!JET_ON || eng == 6);
+  bool wr = SOMNUS_ON && (!JET_ON || eng == 6);
   // a research jet's display from the pilot's seat: its camera's picture, with the display's own look and symbology
 #if HAS_RESEARCH
   if (RESEARCH_ON && pod && eng >= 5 && ((mid >= 41 && mid <= 43) || (mid >= 61 && mid <= 63))) {
@@ -14,14 +14,14 @@ void planeToGB(vec3 p, vec3 rd, float t, int mid, vec3 ln, bool pod, bool trafHi
     bool bomb; vec3 rdc;
     vec3 col = feedScreen(mid, scrL, rdc, bomb);
     if (uScrWin == 1 && !bomb) discard;   // a window: the world drawn before the airframe stays
-#if HAS_WRAITH && HAS_JET
-    col = bomb ? wrFeedOverlay(col, scrL) : wr ? wraithScreen(col, rdc, mid, scrL) : jetScreen(col, rdc, mid, scrL);
-#elif HAS_WRAITH
-    col = bomb ? wrFeedOverlay(col, scrL) : wraithScreen(col, rdc, mid, scrL);
+#if HAS_SOMNUS && HAS_JET
+    col = bomb ? wrFeedOverlay(col, scrL) : wr ? somnusScreen(col, rdc, mid, scrL) : jetScreen(col, rdc, mid, scrL);
+#elif HAS_SOMNUS
+    col = bomb ? wrFeedOverlay(col, scrL) : somnusScreen(col, rdc, mid, scrL);
 #else
     col = jetScreen(col, rdc, mid, scrL);   // (the XR-30's own: no bomb camera)
 #endif
-#if HAS_WRAITH
+#if HAS_SOMNUS
     if (wr) col += wrHolo(uCamPos, rd, t);   // the hologram floats inside the cabin, in front of the displays
 #endif
     if (any(isnan(col)) || any(isinf(col))) col = vec3(0.0);
@@ -46,7 +46,7 @@ void planeToGB(vec3 p, vec3 rd, float t, int mid, vec3 ln, bool pod, bool trafHi
     gInteriorAO = aoIn;
     vec3 col = planeLight(p, rd, t, mid, m, n, lp, lnOut, interior, podMat, sunVis > 0.0 ? tsh*self : 0.0);
     gInteriorAO = -1.0;
-#if HAS_WRAITH
+#if HAS_SOMNUS
     if (pod && wr) col += wrHolo(uCamPos, rd, t);   // the hologram floats inside the cabin, in front of everything
 #endif
     if (any(isnan(col)) || any(isinf(col))) col = vec3(0.0);

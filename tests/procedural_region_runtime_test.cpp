@@ -57,7 +57,7 @@ struct GameTest {
       "explicit selected fuel takes precedence over a research jet plan");
     game.launchFuelKg = -1;
     bool finiteResearchStarts = true;
-    for (int craft : {kNightjar, kMantis, kResearchJet, kWraith}) for (bool airborne : {false, true}) {
+    for (int craft : {kVigil, kReverie, kResearchJet, kSomnus}) for (bool airborne : {false, true}) {
       game.resCraft = craft; game.resAirport = 0; game.resAirborne = airborne; game.resCard = -1;
       game.launchResearch();
       finiteResearchStarts &= game.screen == SCR_FLIGHT && game.researchFlight &&
@@ -199,7 +199,7 @@ struct GameTest {
     const Plane beforeAccelerated = game.plane;
     const int beforeAcceleratedSpec = game.specIdx;
     const float beforeAcceleratedClock = game.flightClock;
-    for (int craft : {kAtlas, kNightjar}) {
+    for (int craft : {kGalleon, kVigil}) {
       const auto& spec = kAircraft[craft];
       vec3 start = oldPosition; start.y = 10000.f;
       game.specIdx = craft;
@@ -439,8 +439,8 @@ struct GameTest {
     // and traffic spawning so publication cannot leave stale airport references.
     game.retireEarthPrefetch(); game.earthFlight = false; game.set.traffic = true;
     const Airport& residentAirport = g_world.airports.front();
-    game.plane.reset(&kAircraft[kAtlas], vec3(residentAirport.x, g_world.height(residentAirport.x, residentAirport.z) + 1200.f, residentAirport.z),
-      0.f, kAircraft[kAtlas].maxFuel, 85.f, true, kAircraft[kAtlas].cruise);
+    game.plane.reset(&kAircraft[kGalleon], vec3(residentAirport.x, g_world.height(residentAirport.x, residentAirport.z) + 1200.f, residentAirport.z),
+      0.f, kAircraft[kGalleon].maxFuel, 85.f, true, kAircraft[kGalleon].cruise);
     game.settleAirborneStart(); game.plane.apEngage(Plane::AP_HOLD, -1, game.wx);
     game.plane.apAlt = game.plane.pos.y; game.plane.apHeading = 0.f;
     const float trafficClock = game.flightClock;

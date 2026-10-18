@@ -4,7 +4,7 @@
 #include "../src/models.h"
 #include "../src/aircraft.h"
 #include "../src/shaders.h"
-#include "../src/shaders_wraith_cockpit.h"
+#include "../src/shaders_somnus_cockpit.h"
 #include <dlfcn.h>
 #include <filesystem>
 #include <chrono>
@@ -73,7 +73,7 @@ vec4 fitProbe() {
     z=0.145; halfZ=0.09;
 #endif
     vec3 p=E+vec3(side*(0.575+uv.x*0.1),-0.4275,z+uv.y*halfZ);
-    gCkSkip=2;return vec4(mapWraithCockpit(p).x,0.0,0.0,1.0);
+    gCkSkip=2;return vec4(mapSomnusCockpit(p).x,0.0,0.0,1.0);
   }
   if(vMode==4) {   // skin height probe: lowest surface (scanning up from below) at bay hinge points, gear up
     int k=int(gl_FragCoord.x)%4; vec4 G0=gM[18];
@@ -167,7 +167,7 @@ int main(int argc,char**argv) {
   printf("Renderer: %s\n",glGetString(GL_RENDERER));
   std::string defines;
   if(std::string(kSceneUniforms).find("vec4 gCab0")!=std::string::npos)defines+="#define FIT_PATCH\n";
-  if(std::string(kWraithCockpitSDF).find("abs(cq.z - 0.265)")!=std::string::npos)defines+="#define TOUCH_PATCH\n";
+  if(std::string(kSomnusCockpitSDF).find("abs(cq.z - 0.265)")!=std::string::npos)defines+="#define TOUCH_PATCH\n";
   std::string fs=sdfAssembly(defines)+inspection;
   GLuint prog=program(fs),vao; glGenVertexArrays(1,&vao); glBindVertexArray(vao); glUseProgram(prog); glViewport(0,0,W,H);
   auto loc=[&](const char* n){ return glGetUniformLocation(prog,n); };
@@ -236,7 +236,7 @@ int main(int argc,char**argv) {
   glViewport(0,0,64,16);std::vector<float> px(64*16*4);int failures=0;
   auto readProbe=[&](int mode){glUniform1i(loc("vMode"),mode);glDrawArrays(GL_TRIANGLES,0,3);glFinish();glReadPixels(0,0,64,16,GL_RGBA,GL_FLOAT,px.data());};
   for(int a=first;a<=last;a++){
-    if(a==kWraith)continue;   // (its cockpit is its own field: the touchpad probe below)
+    if(a==kSomnus)continue;   // (its cockpit is its own field: the touchpad probe below)
     Plane p;p.spec=&kAircraft[a];float M[96];packModel(kAircraft[a],a,p.gearHeight(),M);glUniform4fv(loc("uM"),24,M);glUniform4f(loc("uPS"),1,0,0,1);
     readProbe(1);int buried=0;float worst=-1e5;
     for(size_t i=0;i<px.size();i+=4)if(px[i+3]>.5f){worst=std::max(worst,px[i]);if(!std::isfinite(px[i])||px[i]>0.001f)buried++;}
@@ -244,16 +244,16 @@ int main(int argc,char**argv) {
     readProbe(3);float jump=0;for(size_t i=0;i<px.size();i+=4){if(!std::isfinite(px[i]))failures++;else jump=std::max(jump,px[i]);}
     printf("ENDCAP %s: maximum seam jump %.6f m\n",kAircraft[a].id,jump);if(jump>.001f)failures++;
   }
-  if(first<=kWraith&&last>=kWraith){
-    Plane p;p.spec=&kAircraft[kWraith];float M[96];packModel(kAircraft[kWraith],kWraith,p.gearHeight(),M);glUniform4fv(loc("uM"),24,M);glUniform4f(loc("uPS"),1,0,0,1);
+  if(first<=kSomnus&&last>=kSomnus){
+    Plane p;p.spec=&kAircraft[kSomnus];float M[96];packModel(kAircraft[kSomnus],kSomnus,p.gearHeight(),M);glUniform4fv(loc("uM"),24,M);glUniform4f(loc("uPS"),1,0,0,1);
     int buried=0;float worst=1e5;int states=0;
     for(float pitch:{-1.f,0.f,1.f})for(float roll:{-1.f,0.f,1.f})for(float throttle:{0.f,.5f,1.f}){
       glUniform4f(loc("uCtl"),pitch,roll,0,throttle);readProbe(2);states++;
       for(size_t i=0;i<px.size();i+=4){worst=std::min(worst,px[i]);if(!std::isfinite(px[i])||px[i]<-.0001f)buried++;}
     }
-    printf("WRAITH TOUCHPADS (%s): %d buried samples in %d stick/throttle states; minimum clearance %.4f m\n",kAircraft[kWraith].id,buried,states,worst);if(buried)failures++;
+    printf("SOMNUS TOUCHPADS (%s): %d buried samples in %d stick/throttle states; minimum clearance %.4f m\n",kAircraft[kSomnus].id,buried,states,worst);if(buried)failures++;
   }
-  if(getenv("AVT_PROBE")) for(int a=5;a<=kOsprey;a++){
+  if(getenv("AVT_PROBE")) for(int a=5;a<=kWavecrest;a++){
     Plane p;p.spec=&kAircraft[a];float M[96];packModel(kAircraft[a],a,p.gearHeight(),M);glUniform4fv(loc("uM"),24,M);glUniform4f(loc("uPS"),0,0,0,0);
     readProbe(4); printf("SKIN %s: main hinge in %.3f out %.3f (aft %.3f %.3f) | nose hinge %.3f centre %.3f (aft %.3f %.3f)\n",kAircraft[a].id,px[0],px[4],px[64*4],px[64*4+4],px[8],px[12],px[64*4+8],px[64*4+12]);
   }

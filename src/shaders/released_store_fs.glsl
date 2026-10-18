@@ -10,7 +10,7 @@ void main(){
  vec3 n=normalize(vN),localNormal=transpose(uRot)*n;
  Mat m;m.alb=vec3(.1);m.rough=.4;m.metal=0.;m.nrm=vec3(0,0,1);m.emit=vec3(0);
  // Texture coordinates equal its bay-local authored coordinates, including veins.
- shadeWraithStore(m,mid,vB+vec3(0.,-.305,.1),localNormal);
+ shadeSomnusStore(m,mid,vB+vec3(0.,-.305,.1),localNormal);
  n=applyTS(n,m.nrm,.12);
  gbWrite(length(vW),n,GB_ENEMY,m,vAo);
  oG3.y=enemyShadowMaps(uCamPos+vW,n)*storeShadowMaps(uCamPos+vW,n);

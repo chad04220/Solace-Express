@@ -57,7 +57,7 @@ inline ExhaustVisual buildExhaustVisual(const Plane& p, const ModelDef& m) {
       const float yaw = exhaustFinite(p.podYaw[i], -.7f, .7f);
       const float thrust = exhaustPodThrust(p, i);
       if (thrust <= 0.f) continue;
-      pos = kWraithPods[i] + vec3(0, -sinf(tilt), cosf(tilt))*1.57f;
+      pos = kSomnusPods[i] + vec3(0, -sinf(tilt), cosf(tilt))*1.57f;
       dir = vec3(-sinf(yaw), -sinf(a)*cosf(yaw), cosf(a)*cosf(yaw));
       rx = ry = .28f + .1f*clampf(thrust, 0.f, 1.f);
       // Differential thrust modulates emission without falsely enabling boost below actual reheat spool.
@@ -69,7 +69,7 @@ inline ExhaustVisual buildExhaustVisual(const Plane& p, const ModelDef& m) {
       pos = vec3(i == 0 ? -.82f : .82f, -.12f, 7.75f) + dir*1.06f;
       rx = .36f; ry = .23f;
     } else if (m.engine == 4) {
-      // Revised Mantis has exactly one circular centerline nozzle; ordinary twins retain their actual nacelles.
+      // Revised Reverie has exactly one circular centerline nozzle; ordinary twins retain their actual nacelles.
       const bool single = s.engines == 1;
       pos = vec3(single ? 0.f : (i == 0 ? -m.nacX : m.nacX), m.nacY, m.nacZ0 + m.nacLen);
       rx = ry = m.nacR*(single ? .72f : .6f);

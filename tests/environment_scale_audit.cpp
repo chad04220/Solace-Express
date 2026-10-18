@@ -98,7 +98,7 @@ int main(int argc, char** argv) {
     for(int i=0;i<360;i++){float a=i*DEG;elevation.add(g_world.height(vx+radius*cosf(a),vz+radius*sinf(a)));}
     std::printf("VOLCANO,radius_m=%.0f,elevation_m=%.2f..%.2f,height_above_centre_m=%.2f..%.2f\n",radius,elevation.lo,elevation.hi,elevation.lo-centre,elevation.hi-centre);
   }
-  std::printf("VOLCANO_RATIO,floor_diameter_m=290,rim_diameter_m=680,outer_blend_diameter_m=1040,audit_disk_diameter_m=1200,cone_footprint_diameter_m=10400,rim_in_Kestrel_spans=%.2f,rim_in_Meridian_spans=%.2f\n",680.f/kAircraft[0].span,680.f/kAircraft[5].span);
+  std::printf("VOLCANO_RATIO,floor_diameter_m=290,rim_diameter_m=680,outer_blend_diameter_m=1040,audit_disk_diameter_m=1200,cone_footprint_diameter_m=10400,rim_in_Dawnlark_spans=%.2f,rim_in_Archipel_spans=%.2f\n",680.f/kAircraft[0].span,680.f/kAircraft[5].span);
   std::printf("CHECKS,%d failures\n",failures);
   return failures?1:0;
 }

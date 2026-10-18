@@ -46,7 +46,7 @@ inline std::vector<Vertex> geometry(float s) {
   for (int i=-4;i<=4;++i) box(vec3(i*.245f*s,.285f*s,1.015f*s),vec3(.12f*s,.28f*s,.027f*s),vec3(.18f,.23f,.27f),2);
   box(vec3(0,.58f*s,.98f*s),vec3(1.1f*s,.006f*s,.008f*s),vec3(.14f,.65f,.82f),3);
   // All vertices are in world metres. Only the furniture's location follows
-  // the aircraft-sized room; a 0.90 m workbench must not become an Atlas-sized
+  // the aircraft-sized room; a 0.90 m workbench must not become a Galleon-sized
   // cabinet. Keep these rear service bays clear of the full rotating airframe.
   const vec3 bench(-.98f*s,0,.74f*s);
   box(bench+vec3(0,.425f,0),vec3(1.10f,.425f,.38f),vec3(.11f,.24f,.30f));

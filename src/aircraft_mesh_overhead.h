@@ -10,7 +10,7 @@ namespace aircraftMesh {
 // Keep simplified overhead triangles local in camera space. Logging vertex depth on a
 // long triangle that spans the eye can put the ceiling behind the roof beyond it.
 // This bounded material-14 patch leaves positions and all exterior fixtures unchanged.
-// Call only for the verified Nightjar interior/cockpit-2 mesh, after static/fine merge and
+// Call only for the verified Vigil interior/cockpit-2 mesh, after static/fine merge and
 // before flat shading. Other models need their own boundary/camera-envelope validation.
 inline size_t boundOverheadEdges(std::vector<float>& vb, std::vector<uint32_t>& ib,
                                 uint32_t& fineStart, const float eye[3]) {

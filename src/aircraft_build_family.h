@@ -1,12 +1,12 @@
 // Aircraft shader/build families. Geometry and behavior stay with their existing owners.
 #pragma once
 namespace aircraftBuild {
-enum class Family { Fleet, Specter, Wraith };
+enum class Family { Fleet, Nocturne, Somnus };
 inline Family familyOf(const float* packed) {
   const int engine = (int)(packed[2] + 0.5f);
-  return engine == 6 ? Family::Wraith : engine == 5 ? Family::Specter : Family::Fleet;
+  return engine == 6 ? Family::Somnus : engine == 5 ? Family::Nocturne : Family::Fleet;
 }
 inline const char* shaderDefine(Family family) {
-  return family == Family::Wraith ? "#define AF_WRAITH\n" : family == Family::Specter ? "#define AF_JET\n" : "#define AF_LIGHT\n";
+  return family == Family::Somnus ? "#define AF_SOMNUS\n" : family == Family::Nocturne ? "#define AF_JET\n" : "#define AF_LIGHT\n";
 }
 } // namespace aircraftBuild

@@ -16,7 +16,7 @@
 #include <cmath>
 
 // a CSV field: quoted, with its quotes doubled, when it holds a comma, a quote or a line break (a refusal's reason
-// does: "runway too short for the Islander Twin (600 m, it needs 709 m)")
+// does: "runway too short for the Skerry Twin (600 m, it needs 709 m)")
 static std::string csvField(const std::string& f) {
   if (f.find_first_of(",\"\n\r") == std::string::npos) return f;
   std::string q = "\"";

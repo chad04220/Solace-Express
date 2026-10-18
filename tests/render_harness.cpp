@@ -8,7 +8,7 @@
 #include <dlfcn.h>
 #include "../src/renderer.h"
 #include "../src/shaders.h"
-#include "../src/shaders_wraith_cockpit.h"
+#include "../src/shaders_somnus_cockpit.h"
 #include "../src/font_data.h"
 #include "../src/world.h"
 #include "../src/aircraft.h"
@@ -44,10 +44,10 @@ struct GameTest {
   }
   // the XR-40 in flight: outside, then the cockpit, then bombs away, then outside and back in - each frame's update and
   // render timed, and the slow ones named by what they did (programs compiled, bodies baked or loaded, scenery gathered)
-  static int wraithHitch(Game& game) {
+  static int somnusHitch(Game& game) {
     for (int i : kCareerAircraft) Plane::perf(&kAircraft[i]);   // (as Game::init learns them: the traffic reads them)
     game.headless = false; g_ren.entSync = false;   // (the launch as the game runs it: its loading screen, and its warm-ups)
-    game.resCraft = kWraith; game.resCard = getenv("HITCHCARD") ? atoi(getenv("HITCHCARD")) : -1; game.resAirborne = true; game.resAirport = 0; game.realTime = 20;
+    game.resCraft = kSomnus; game.resCard = getenv("HITCHCARD") ? atoi(getenv("HITCHCARD")) : -1; game.resAirborne = true; game.resAirport = 0; game.realTime = 20;
     game.launchResearch();
     int lf = 0; const int b0 = g_ren.bakeCount, m0 = g_shaderCacheMisses;
     for (; lf < 4000 && (game.screen == SCR_LOADING || lf < 3); lf++) { game.update(1.f / 30.f); game.render(); game.framePresented(); }
@@ -68,7 +68,7 @@ struct GameTest {
       all.push_back(u + r);
       printf("frame %3d %-14s update %7.1f ms  render %8.1f ms  programs compiled %d (%.0f ms)  bodies %d  feeds %d  bombs %d  scenery built now %d (%.0f ms)\n",
              i, what, u, r, (int)g_shaderCacheMisses - miss0, (g_shaderCompileUs - us0) / 1000.0, g_ren.bakeCount - bake0,
-             g_feedMounts[2].ok ? 1 : 0, (int)game.wraith.bombs.size(), g_scenery.syncBuilt - gen0, g_scenery.syncBuildMs - genMs0);
+             g_feedMounts[2].ok ? 1 : 0, (int)game.somnus.bombs.size(), g_scenery.syncBuilt - gen0, g_scenery.syncBuildMs - genMs0);
       if (g_ren.profileRegionRender) {   // (HITCHPASSES: the render's passes, each timed to its end)
         const auto& a = g_ren.regionAuxRenderMs;
         printf("          world %.0f  ground shadow %.0f  lighting %.0f  aircraft shadow %.0f  traffic shadow %.0f  stores %.0f  displays %.0f  feeds %.0f  objects %.0f  shadow proxy %.0f  post %.0f ms\n",
@@ -82,20 +82,20 @@ struct GameTest {
       return 0;
     }
     if (getenv("HITCHBOMB")) {   // (outside only: the drop and the impact)
-      game.wraith.armed = true; game.wraith.bombQueue = 1;
-      for (; i < 140; i++) { frame(i, game.wraith.bombs.empty() ? "outside" : "bomb falling"); if (i > 20 && game.wraith.bombs.empty() && !game.wraith.blasts.empty() && i > 60) break; }
+      game.somnus.armed = true; game.somnus.bombQueue = 1;
+      for (; i < 140; i++) { frame(i, game.somnus.bombs.empty() ? "outside" : "bomb falling"); if (i > 20 && game.somnus.bombs.empty() && !game.somnus.blasts.empty() && i > 60) break; }
       return 0;
     }
     for (; i < 8; i++) frame(i, "outside");
     game.camMode = 1;
     for (; i < 20; i++) frame(i, i == 8 ? "-> cockpit" : "cockpit");
-    game.wraith.armed = true; game.wraith.bombQueue = 1;
+    game.somnus.armed = true; game.somnus.bombQueue = 1;
     for (; i < 70; i++) frame(i, i == 20 ? "bomb queued" : "cockpit, bomb");
     game.camMode = 0;
     for (; i < 78; i++) frame(i, i == 70 ? "-> outside" : "outside");
     game.camMode = 1;
     for (; i < 90; i++) frame(i, i == 78 ? "-> cockpit" : "cockpit");
-    game.wraith.bombQueue = 1;
+    game.somnus.bombQueue = 1;
     for (; i < 130; i++) frame(i, i == 90 ? "2nd bomb" : "cockpit, bomb");
     std::vector<double> s = all; std::sort(s.begin(), s.end());
     printf("median frame %.1f ms, worst %.1f ms\n", s[s.size() / 2], s.back());
@@ -133,7 +133,7 @@ struct GameTest {
       for (int i = 0; i < 11; i++) g.payout.push_back({lines[i], amt[i]});
       g.screen = SCR_DEBRIEF; g.drawDebrief();
     }
-    else if (what == "osprey_free") {   // the review of v3.31.0, U1: a CPL pilot owning only the Osprey, Free Flight MDB -> HFS
+    else if (what == "wavecrest_free") {   // the review of v3.31.0, U1: a CPL pilot owning only the Wavecrest, Free Flight MDB -> HFS
       g.career.license = LIC_CPL; g.career.money = 50000; g.career.storyIndex = (int)g_story.size();
       g.career.location = g_world.findAirport("MDB"); g.career.fleet.clear(); g.career.fleet.push_back({8, g.career.location, 1000, 1});
       g.freeDest = g_world.findAirport("HFS");
@@ -142,9 +142,9 @@ struct GameTest {
         if (f) { g_ren.uiEnd(); glClear(GL_COLOR_BUFFER_BIT); g_ren.uiBegin(); }
         g.drawHub();
       }
-      printf("osprey_free: selected aircraft %d (%s)\n", g.selAircraft, g.selAircraft >= 0 ? kAircraft[g.selAircraft].name : "-");
+      printf("wavecrest_free: selected aircraft %d (%s)\n", g.selAircraft, g.selAircraft >= 0 ? kAircraft[g.selAircraft].name : "-");
     }
-    else if (what.rfind("contracts_", 0) == 0) {   // a story job's briefing at ATP with one owned Starling at its airport (the review of v3.24.0, R1)
+    else if (what.rfind("contracts_", 0) == 0) {   // a story job's briefing at ATP with one owned Emissary at its airport (the review of v3.24.0, R1)
       const std::string id = what.substr(10);
       for (int i = 0; i < (int)g_story.size(); i++) if (g_story[i].id == id) g.career.storyIndex = i;
       const Contract* st = g.career.nextStory();
@@ -408,7 +408,7 @@ void main(){
   Game game;
   game.initHeadless();
   if (scene == "hubfly") return GameTest::hubFly(game);
-  if (scene == "wraithhitch") return GameTest::wraithHitch(game);
+  if (scene == "somnushitch") return GameTest::somnusHitch(game);
   if (scene == "prewarm") {   // the launch prewarm, then the menu's first frames as a player would see them open
     game.debugScene("menu");
     auto t0 = std::chrono::steady_clock::now();

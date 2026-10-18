@@ -12,51 +12,51 @@ const AircraftSpec kAircraft[] = {
   // id, name, role, eng, n, cyl, blades, idle, max, empty, fuel, cargo, pax, S, b, c, CL0, CLa, CLmax, flapCL, CD0, gearCD, flapCD, e,
   // power, v0, vr, vref, cruise, range, runway, rough, tail, retract, Ixx, Iyy, Izz, elev, ail, rud, lic, price, rent,
   // fusLen, fusRad, wingY, wingZ, engLayout, tail, colBase, colStripe
-  {"kestrel", "Kestrel T2", "Two-seat trainer", ENG_PISTON, 1, 4, 2, 750, 2600, 530, 70, 120, 1, 14.9f, 10.1f, 1.5f,
+  {"dawnlark", "Dawnlark T2", "Two-seat trainer", ENG_PISTON, 1, 4, 2, 750, 2600, 530, 70, 120, 1, 14.9f, 10.1f, 1.5f,
    0.30f, 4.8f, 1.45f, 0.55f, 0.030f, 0.004f, 0.045f, 0.75f, 110000, 22, 25, 30, 50, 45, 400, false, false, false,
    900, 1300, 1900, 0.40f, 0.060f, 0.060f, LIC_STUDENT, 18000, 120,
    7.3f, 0.62f, 1.19f, -0.92f, 0, 0, vec3(0.92f, 0.92f, 0.95f), vec3(0.85f, 0.12f, 0.10f), 0, 0, 6.0f, -3.0f},
-  {"wren", "Wren 180", "Four-seat tourer", ENG_PISTON, 1, 6, 2, 700, 2700, 820, 110, 320, 3, 16.2f, 11.0f, 1.5f,
+  {"ambler", "Ambler 180", "Four-seat tourer", ENG_PISTON, 1, 6, 2, 700, 2700, 820, 110, 320, 3, 16.2f, 11.0f, 1.5f,
    0.30f, 4.9f, 1.50f, 0.65f, 0.028f, 0.004f, 0.050f, 0.76f, 180000, 23, 28, 33, 60, 70, 450, false, false, false,
    1500, 2000, 3000, 0.40f, 0.058f, 0.060f, LIC_PPL, 30000, 250,
    8.3f, 0.68f, 1.18f, -1.07f, 0, 0, vec3(0.95f, 0.95f, 0.92f), vec3(0.10f, 0.30f, 0.70f), 0, 0, 3.8f, -1.52f},
-  {"bush", "Bushmaster STOL", "Backcountry taildragger", ENG_PISTON, 1, 6, 3, 700, 2700, 760, 120, 480, 4, 21.5f, 12.4f, 1.75f,
+  {"scrubrunner", "Scrubrunner STOL", "Backcountry taildragger", ENG_PISTON, 1, 6, 3, 700, 2700, 760, 120, 480, 4, 21.5f, 12.4f, 1.75f,
    0.35f, 5.0f, 1.85f, 0.95f, 0.034f, 0.006f, 0.070f, 0.74f, 220000, 18, 18, 24, 55, 72, 220, true, true, false,
    1500, 2100, 3200, 0.42f, 0.065f, 0.070f, LIC_CPL, 40000, 450,
    8.0f, 0.70f, 1.17f, -1.05f, 0, 0, vec3(0.95f, 0.75f, 0.10f), vec3(0.12f, 0.12f, 0.12f), 0, 0, 4.4f, -1.76f},
-  {"islander", "Islander Twin", "Nine-seat utility twin", ENG_PISTON, 2, 6, 2, 700, 2700, 1750, 260, 900, 9, 30.2f, 14.9f, 2.05f,
+  {"skerry", "Skerry Twin", "Nine-seat utility twin", ENG_PISTON, 2, 6, 2, 700, 2700, 1750, 260, 900, 9, 30.2f, 14.9f, 2.05f,
    0.32f, 4.9f, 1.55f, 0.70f, 0.036f, 0.006f, 0.060f, 0.76f, 195000, 22, 26, 31, 65, 90, 420, true, false, false,
    9000, 9500, 17000, 0.40f, 0.055f, 0.060f, LIC_CPL, 85000, 900,
    10.9f, 0.85f, 1.12f, -1.38f, 1, 0, vec3(0.96f, 0.96f, 0.96f), vec3(0.05f, 0.55f, 0.45f), 0, 0, 3.8f, -1.52f},
-  {"pelican", "Pelican Caravan", "Single turboprop hauler", ENG_TURBOPROP, 1, 0, 3, 1100, 1900, 2150, 420, 1400, 12, 25.9f, 15.9f, 1.95f,
+  {"longshore", "Longshore Hauler", "Single turboprop hauler", ENG_TURBOPROP, 1, 0, 3, 1100, 1900, 2150, 420, 1400, 12, 25.9f, 15.9f, 1.95f,
    0.32f, 5.0f, 1.60f, 0.90f, 0.030f, 0.005f, 0.060f, 0.78f, 540000, 30, 31, 38, 85, 130, 550, true, false, false,
    12000, 14000, 24000, 0.40f, 0.052f, 0.060f, LIC_CPL, 120000, 1600,
    11.5f, 0.92f, 1.09f, -1.83f, 0, 0, vec3(0.95f, 0.95f, 0.95f), vec3(0.85f, 0.45f, 0.05f), 0, 0, 3.8f, -1.52f},
-  {"meridian", "Meridian Q400", "Regional turboprop airliner", ENG_TURBOPROP, 2, 0, 4, 900, 1300, 12000, 1500, 4500, 40, 54.0f, 27.4f, 2.1f,
+  {"archipel", "Archipel 400", "Regional turboprop airliner", ENG_TURBOPROP, 2, 0, 4, 900, 1300, 12000, 1500, 4500, 40, 54.0f, 27.4f, 2.1f,
    0.30f, 5.2f, 1.50f, 0.80f, 0.026f, 0.010f, 0.060f, 0.80f, 1800000, 40, 52, 60, 140, 170, 1100, false, false, true,
    180000, 300000, 450000, 0.40f, 0.048f, 0.055f, LIC_ATP, 600000, 8000,
    26.0f, 1.35f, 0.93f, -0.38f, 1, 1, vec3(0.96f, 0.96f, 0.98f), vec3(0.08f, 0.18f, 0.45f), 0, 0, 2.5f, -1.0f},
-  {"starling", "Starling 500 Jet", "Light business jet", ENG_JET, 2, 0, 0, 0, 0, 4600, 2200, 700, 7, 30.0f, 15.9f, 2.0f,
+  {"emissary", "Emissary 500", "Light business jet", ENG_JET, 2, 0, 0, 0, 0, 4600, 2200, 700, 7, 30.0f, 15.9f, 2.0f,
    0.25f, 5.0f, 1.40f, 0.75f, 0.022f, 0.012f, 0.070f, 0.80f, 15000, 0, 55, 62, 200, 4350, 1250, false, false, true,
    30000, 60000, 85000, 0.42f, 0.050f, 0.055f, LIC_ATP, 260000, 0,
    14.0f, 0.95f, -0.58f, 1.0f, 2, 1, vec3(0.97f, 0.97f, 0.97f), vec3(0.55f, 0.08f, 0.12f), 0, 0, 3.0f, -1.2f, false, 0, .2f, 0, 1.55e-5f, 0, 11000, 200, .547f, 8000},
-  // ---- Codex's aircraft (docs/design/additional-aircraft, proposals on codex/*): Swift S6, Osprey C6, XR-10 Nightjar
-  // Swift S6: four-seat retractable touring piston
-  {"swift_s6", "Swift S6", "Retractable low-wing tourer", ENG_PISTON, 1, 6, 3, 700.0f, 2700.0f,
+  // ---- Codex's aircraft (docs/design/additional-aircraft, proposals on codex/*): Cutwater S6, Wavecrest C6, XR-10 Vigil
+  // Cutwater S6: four-seat retractable touring piston
+  {"cutwater_s6", "Cutwater S6", "Retractable low-wing tourer", ENG_PISTON, 1, 6, 3, 700.0f, 2700.0f,
   980.0f, 180.0f, 420.0f, 3, 17.10f, 11.40f, 1.552f,
   0.28f, 4.9f, 1.65f, 0.78f, 0.025f, 0.010f, 0.052f, 0.80f,
   260000.0f, 23.0f, 31.0f, 36.0f, 76.0f, 140.0f, 600.0f, false, false, true,
   7600.0f, 6500.0f, 14100.0f, 0.42f, 0.065f, 0.068f, LIC_PPL, 68000, 600,
   8.60f, 0.66f, -1.121212f, -0.155f, 0, 0,
   vec3(0.91f, 0.88f, 0.80f), vec3(0.13f, 0.26f, 0.32f), 0, 0, 4.4f, -1.76f},
-  // Osprey C6: six-seat coastal charter piston twin (its cabin trim: plane_sdf.glsl mapOspreyCabinTrim, by kOsprey)
-  {"osprey_c6", "Osprey C6", "Six-seat coastal charter twin", ENG_PISTON, 2, 6, 3, 700.0f, 2700.0f, 1420.0f, 220.0f, 270.0f, 5, 22.5f, 12.4f, 1.82f,
+  // Wavecrest C6: six-seat coastal charter piston twin (its cabin trim: plane_sdf.glsl mapWavecrestCabinTrim, by kWavecrest)
+  {"wavecrest_c6", "Wavecrest C6", "Six-seat coastal charter twin", ENG_PISTON, 2, 6, 3, 700.0f, 2700.0f, 1420.0f, 220.0f, 270.0f, 5, 22.5f, 12.4f, 1.82f,
   0.30f, 4.9f, 1.65f, 0.80f, 0.028f, 0.006f, 0.060f, 0.78f, 180000.0f, 24.0f, 30.2f, 35.0f, 74.0f, 110.0f, 550.0f, false, false, true,
   9000.0f, 10800.0f, 19800.0f, 0.41f, 0.056f, 0.062f, LIC_CPL, 68000, 650,
   9.8f, 0.90f, -0.68f, -0.80f, 1, 0, vec3(0.91f, 0.88f, 0.79f), vec3(0.82f, 0.24f, 0.06f), 0, 0, 3.8f, -1.52f},
   // ---- the research craft (stable roster indices 9 through 12; excluded by kCareerAircraft)
-  // XR-10 Nightjar: conventional twin-jet research demonstrator (special 0: the generic flight model and field)
-  {"xr10_nightjar", "XR-10 Nightjar", "Tapered-wing research demonstrator", ENG_JET, 2, 0, 0, 0.0f, 0.0f,
+  // XR-10 Vigil: conventional twin-jet research demonstrator (special 0: the generic flight model and field)
+  {"xr10_vigil", "XR-10 Vigil", "Tapered-wing research demonstrator", ENG_JET, 2, 0, 0, 0.0f, 0.0f,
   5700.0f, 2200.0f, 100.0f, 0, 38.18f, 16.60f, 2.508f,
   0.15f, 4.6f, 1.55f, 0.55f, 0.020f, 0.010f, 0.045f, 0.80f,
   30000.0f, 0.0f, 43.0f, 50.0f, 260.0f, 2150.0f, 1250.0f, false, false, true,
@@ -66,38 +66,38 @@ const AircraftSpec kAircraft[] = {
   // Supersonic research model with finite fuel and pitch thrust vectoring (see Plane::substep special path).
   // It lands fast and long on its small unflapped wing: 1,400 m of hard runway (250 m and rough fields once said here,
   // and the autoland took it to fields it overran or broke its gear on - the review of v3.33.0, A1)
-  {"xr30_specter", "XR-30 Specter", "Confidential research model", ENG_JET, 2, 0, 0, 0, 0, 9000, 6000, 0, 0, 46.0f, 11.2f, 4.6f,
+  {"xr30_nocturne", "XR-30 Nocturne", "Confidential research model", ENG_JET, 2, 0, 0, 0, 0, 9000, 6000, 0, 0, 46.0f, 11.2f, 4.6f,
    0.05f, 3.6f, 1.70f, 0.0f, 0.013f, 0.010f, 0.0f, 0.75f, 132000, 0, 60, 70, 420, 1930, 1400, false, false, true,
    25000, 90000, 110000, 0.40f, 0.060f, 0.060f, LIC_STUDENT, 0, 0,
    17.2f, 1.0f, -0.2f, 1.6f, 2, 1, vec3(0.11f, 0.12f, 0.14f), vec3(0.2f, 0.85f, 1.0f), 1, 2.7f, 180.f, -180.f, false, 0, .2f, 0, 2.3e-5f, 5.8e-5f, 10000, 250, .216f, 15800},
-  // XR-20 Mantis: forward-swept single-jet systems demonstrator (special 0: conventional flight model and controls).
+  // XR-20 Reverie: forward-swept single-jet systems demonstrator (special 0: conventional flight model and controls).
   // One centerline 88 kN-rated engine preserves the prior pair's combined thrust (176 kN static at full reheat).
   // Its foreplanes are the model's horizontal tail placed forward; the two fins remain independently ruddered.
-  {"xr20_mantis", "XR-20 Mantis", "Forward-swept systems demonstrator", ENG_JET, 1, 0, 0, 0.0f, 0.0f,
+  {"xr20_reverie", "XR-20 Reverie", "Forward-swept systems demonstrator", ENG_JET, 1, 0, 0, 0.0f, 0.0f,
    6100.0f, 3200.0f, 0.0f, 0, 30.0f, 13.2f, 2.27f,
    0.25f, 5.0f, 1.55f, 0.60f, 0.026f, 0.012f, 0.070f, 0.78f,
    88000.0f, 0.0f, 55.0f, 62.0f, 330.0f, 2800.0f, 1350.0f, false, false, true,
    30000.0f, 70000.0f, 100000.0f, 0.45f, 0.070f, 0.070f, LIC_ATP, 480000, 0,
    16.0f, 1.05f, -0.62f, 0.65f, 2, 0, vec3(0.105f, 0.125f, 0.15f), vec3(0.92f, 0.43f, 0.08f), 0, 1.9f, 34.f, -34.f, false, 0, .2f, 0, 2.3e-5f, 5.8e-5f, 10000, 240, .208f, 10300},
   // Stealth aerobatic research model: four tilting pods (power = one pod's rated thrust).
-  // Finite fuel; a fictional +300 / -300 g structure, past all it can pull either way (see Plane::wraithThrust).
-  {"xr40_wraith", "XR-40 Wraith", "Stealth aerobatic research model", ENG_JET, 4, 0, 0, 0, 0, 10500, 6000, 0, 0, 52.0f, 12.4f, 5.2f,
+  // Finite fuel; a fictional +300 / -300 g structure, past all it can pull either way (see Plane::somnusThrust).
+  {"xr40_somnus", "XR-40 Somnus", "Stealth aerobatic research model", ENG_JET, 4, 0, 0, 0, 0, 10500, 6000, 0, 0, 52.0f, 12.4f, 5.2f,
    0.03f, 3.4f, 1.60f, 0.0f, 0.012f, 0.010f, 0.0f, 0.72f, 72000, 0, 60, 70, 480, 3400, 200, true, false, true,
    30000, 80000, 100000, 0.90f, 0.090f, 0.070f, LIC_STUDENT, 0, 0,
    16.5f, 1.0f, -0.15f, 0.8f, 2, 1, vec3(0.075f, 0.08f, 0.09f), vec3(0.72f, 0.3f, 1.0f), 2, 4.3f, 300.f, -300.f, false, 0, .2f, 0, 2.5e-5f, 6.2e-5f, 10000, 250, .070f, 18000},
-  // Larkspur L4: a four-seat cantilever shoulder-wing touring single. Full payload includes passengers
+  // Thistledown L4: a four-seat cantilever shoulder-wing touring single. Full payload includes passengers
   // in maxMass(); cargo is baggage, not an additional four-seat cabin. Range is intentionally game-scaled.
-  {"larkspur_l4", "Larkspur L4", "Four-seat shoulder-wing tourer", ENG_PISTON, 1, 6, 3, 700, 2700,
+  {"thistledown_l4", "Thistledown L4", "Four-seat shoulder-wing tourer", ENG_PISTON, 1, 6, 3, 700, 2700,
    930, 135, 130, 3, 18.40f, 11.60f, 1.5862f,
    0.30f, 4.9f, 1.58f, 0.78f, 0.026f, 0.005f, 0.055f, 0.80f,
    190000, 24, 29.5f, 29.5f, 69, 115, 600, false, false, false,
    2100, 3300, 4900, 0.40f, 0.058f, 0.062f, LIC_PPL, 46000, 360,
    8.80f, 0.72f, 1.305556f, -1.90f, 0, 0,
    vec3(0.88f, 0.92f, 0.86f), vec3(0.18f, 0.34f, 0.22f), 0, 0, 3.8f, -1.52f, true, 0, .2f, 0},
-  // Atlas A180: the fleet's largest conventional transport. Two 105 kN underwing turbofans,
+  // Galleon 180: the fleet's largest conventional transport. Two 105 kN underwing turbofans,
   // 180 passengers plus hold cargo, 79 t design maximum, transport-category +2.5/-1 g.
   // Cruise is subsonic (the ordinary jet thrust path); fuel burn uses the shared thrust-specific model, not range compression.
-  {"atlas_a180", "Atlas A180", "180-seat twin-engine transport", ENG_JET, 2, 0, 0, 0, 0,
+  {"galleon_180", "Galleon 180", "180-seat twin-engine transport", ENG_JET, 2, 0, 0, 0, 0,
    42000, 20000, 6500, 180, 138.0f, 39.80f, 3.4673f,
    0.23f, 5.0f, 1.55f, 1.05f, 0.022f, 0.015f, 0.070f, 0.83f,
    105000, 0, 73, 68, 235, 5800, 1900, false, false, true,
@@ -141,7 +141,7 @@ float Plane::thrustAt(float spool, float V, float vf, float rho) const {
   float thrust = P * 0.8f / sqrtf(vf * vf + s.v0 * s.v0);
   // a propeller can't make more thrust than momentum theory allows for its disk: T = FM (2 rho A P^2)^(1/3) per
   // engine, figure of merit 0.75, diameter from the power it absorbs (1.75 m for a 110 kW trainer, 2.7 m for a
-  // Caravan) - it's what limits the static thrust, at speed the power-over-speed term is the smaller
+  // Longshore) - it's what limits the static thrust, at speed the power-over-speed term is the smaller
   float Pe = P / s.engines, D = 0.55f * powf(s.power / 1000.f, 0.25f), A = PI * D * D * 0.25f;
   return std::min(thrust, s.engines * 0.75f * cbrtf(2.f * dens * A * Pe * Pe));
 }
@@ -313,7 +313,7 @@ void Plane::step(float dt, const Weather& wx, float time) {
   // away, the stop is checked again by the plan's own rule. Too long now, it goes around, and clear of the ground the
   // approach is planned afresh in the wind there is - the other end, or neither (then it holds, and says why). It
   // never turns for the other end low down, and lands from inside 800 m whatever the wind does (the review of
-  // v3.34.0, F4: the Starling, admitted at Cedar Ridge in 5 m/s, landed with the wind swung to 8 m/s behind it and
+  // v3.34.0, F4: the Emissary, admitted at Cedar Ridge in 5 m/s, landed with the wind swung to 8 m/s behind it and
   // stopped 24 m past the end)
   if (apOn && apMode == AP_APPR && apAirport >= 0) {
     const Airport& a = g_world.airports[apAirport];
@@ -542,7 +542,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     // no g or angle-of-attack limiting: the stick commands rotation directly and the pilot owns the airframe's limits
     float ms0 = m / s.emptyMass, k = onGround ? 4.f : 9.f, kp = onGround ? 4.f : 18.f;   // stiffer pitch loop: snap reversals
     vec3 Ii(s.Iyy * ms0, s.Izz * ms0, s.Ixx * ms0);
-    if (wr) wraithThrust(F, T, thrust * 0.25f, wd, Taero, surfMax, dt);
+    if (wr) somnusThrust(F, T, thrust * 0.25f, wd, Taero, surfMax, dt);
     else T += vec3(Ii.x * kp * (wd.x - w.x), Ii.y * k * (wd.y - w.y), Ii.z * k * (wd.z - w.z));
   }
 
@@ -657,7 +657,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
       float rollRes = 0.015f + 0.06f * rough;
       // (the toe brakes on the rudder pedals: steering with the rudder while braking brakes that side's wheel harder and
       // eases the other's - how a taildragger is held straight on its brakes. Its main wheels stand ahead of its centre of
-      // gravity, and braked evenly any swing grows: the Bushmaster ground-looped through 60 deg at Summit Pass on full
+      // gravity, and braked evenly any swing grows: the Scrubrunner ground-looped through 60 deg at Summit Pass on full
       // opposite rudder. The parking brake holds both)
       const float bk = c.kind > 1 ? 0.f : ctl.brake >= 0.99f ? 1.f : clampf(ctl.brake * (1.f + (c.kind == 0 ? -0.6f : 0.6f) * ctl.yaw), 0.f, 1.f);
       float brakeF = bk * 0.7f;   // (enough for the main wheels to hold full power when parked)
@@ -755,7 +755,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   if (apOn) apControl(dt);
 }
 
-// ------------------------------------------------------------------ XR-40 Wraith thruster pods
+// ------------------------------------------------------------------ XR-40 Somnus thruster pods
 // Four pods pivot from thrust-aft (0) to thrust-down (pi/2). Each carries vanes that deflect its jet in pitch and yaw,
 // and can trim its own thrust. The fly-by-wire turns the stick's rate demand into an angular acceleration, takes
 // what the control surfaces can give (authority grows with dynamic pressure), then solves for the pod controls that
@@ -771,7 +771,7 @@ void podForces(const PodCmd& c, float tilt, float Tp, vec3& F, vec3& Tq, float* 
     vec3 d(sinf(y), sinf(a) * cosf(y), -cosf(a) * cosf(y));   // jet force direction (opposite the exhaust)
     float T = Tp * (1.f + c.diff[i]);
     vec3 f = d * T;
-    F += f; Tq += cross(kWraithPods[i], f);
+    F += f; Tq += cross(kSomnusPods[i], f);
     if (outTilt) { outTilt[i] = tilt + c.dt[i]; outYaw[i] = y; outThr[i] = T; outVane[i] = c.dp[i]; }
   }
 }
@@ -791,7 +791,7 @@ void applyVirtual(PodCmd& c, int k, float u) {
 }
 }
 
-void Plane::wraithThrust(vec3& F, vec3& T, float Tp, vec3 wd, vec3 Taero, vec3 surfMax, float dt) {
+void Plane::somnusThrust(vec3& F, vec3& T, float Tp, vec3 wd, vec3 Taero, vec3 surfMax, float dt) {
   const AircraftSpec& s = *spec;
   float ms0 = mass() / s.emptyMass, k = onGround ? 4.f : 9.f, kp = onGround ? 4.f : 18.f;
   vec3 I(s.Iyy * ms0, s.Izz * ms0, s.Ixx * ms0);
@@ -1028,7 +1028,7 @@ void Plane::apSense() {
   // against the air, rather than zooming)
   E.highAlpha = P.gUse >= 8.f && P.rearPitch >= 45.f;
   // the approach: down no faster than it sinks at idle in landing trim at its approach speed (faster gains speed it
-  // has to lose again before the flare - the heavy Q400 oscillated about the glidepath into the trees short of Solace
+  // has to lose again before the flare - the heavy Archipel 400 oscillated about the glidepath into the trees short of Solace
   // Capital at 10 m/s) - except an airframe that sheds speed with a belly-up, which may dive at up to ~8.5 deg; a
   // glidepath no steeper than 0.6 of its idle glide in landing trim, and shallow (3.5 deg) for engines slow to spool -
   // the power stays on and a go-around isn't waiting for them - unless it is built to land short (a STOL airframe)
@@ -1079,7 +1079,7 @@ static bool transportGoAroundControl(const Plane& p) {
   return true;
 }
 // the hold and intercept speed: well above the approach speed, below cruise
-// (a professional's: 1.4 to 1.5 times it, an airliner's manoeuvring speed in the pattern - at 1.8 the Starling's 25 deg
+// (a professional's: 1.4 to 1.5 times it, an airliner's manoeuvring speed in the pattern - at 1.8 the Emissary's 25 deg
 // orbit took three minutes a lap and its pattern ran 12 km out)
 static float apHoldSpeed(float vApp, float cruise, bool pro = false) {
   return pro ? std::max(vApp * 1.4f, std::min(cruise * 0.6f, vApp * 1.5f)) : std::max(vApp * 1.45f, std::min(cruise * 0.6f, vApp * 1.8f));
@@ -1115,9 +1115,9 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   auto margin = [](float d) { return clampf(d * 0.02f, 8.f, 60.f); };
   float need = tanf(3.f * DEG);
   // (the final clears what stands on the ground too - the trees on a rise short of Harlan Farm Strip's runway 17 stood
-  // 25 m above the terrain the glidepath was planned over, and the Osprey flew into them a kilometre short - by half the
+  // 25 m above the terrain the glidepath was planned over, and the Wavecrest flew into them a kilometre short - by half the
   // ground's margin: an obstacle clearance surface, not a second terrain margin on top of the treetops, which closed
-  // Far Isle to the Starling)
+  // Far Isle to the Emissary)
   auto clear = [&](vec3 q, float d) { return std::max(H(q) + margin(d), g_scenery.obstacleTop(q.x, q.z, 40.f) + clampf(d * 0.01f, 5.f, 20.f)); };
   for (float d = 300.f; d <= 3500.f; d += 50.f) { vec3 q = td - ld * d; need = std::max(need, (clear(q, d) - a.elev) / d); }
   float gs = std::min(need, tanf(maxAng * DEG));
@@ -1173,13 +1173,13 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   // speed at the weight and ice it has now, in the field's thinner air, with the tailwind and half its gusts on top; a
   // rough surface brakes worse. All of it against the whole runway (the review of v3.33.0, A1: the learned still-air
   // distance x1.6, cut to 90% of the runway, was over twice the props' roll and short of the jets', and only the jets'
-  // tailwind was added). QA F1: the Starling overran Cedar Ridge's 1,000 m with a 4-7 m/s tailwind.
+  // tailwind was added). QA F1: the Emissary overran Cedar Ridge's 1,000 m with a 4-7 m/s tailwind.
   const float hw = dot(ld, from) * wx.windSpeed;
   float tw = 0.f;
   const float ldgNeed = apStopNeed(a, rev, wx, &tw);
   // every field, whatever got it chosen (the GPS offers them all): the runway the type may use at all - the career's own
   // dispatch rule, its surface (surfaceOK) and length (AircraftSpec::runwayNeeded) - comes first, then the landing
-  // distance (the review of v3.31.0, F2: the Starling took Gull Rock's 480 m and overran it; of v3.33.0, A1: Harlan
+  // distance (the review of v3.31.0, F2: the Emissary took Gull Rock's 480 m and overran it; of v3.33.0, A1: Harlan
   // Farm's grass and Palm Bay's sand, which the career never sends it to, and it overran them)
   const bool surfBad = !E.hover && !surfaceOK(s, a.surface);
   const float rwyNeed = s.runwayNeeded(a.elev), fieldShort = E.hover ? 0.f : rwyNeed - a.length;
@@ -1195,7 +1195,7 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   const float hAtGate = std::max(bestAlt - lose(legOut), std::max(intAlt, gpF));
   // ...and from the turn-in: the outbound leg and the turn back (the guidance's own geometry: out past the gate by its
   // minimum and a turn's width, a turn and a half across - gentle turns are wide) at the ground's height there plus the
-  // en-route margin, then down the final (QA F1: a passenger Starling at Kettle Lake turning in wide over the ridge
+  // en-route margin, then down the final (QA F1: a passenger Emissary at Kettle Lake turning in wide over the ridge
   // beyond runway 20 was lifted too high to land, round and round, until it met the ridge)
   const float Rin = apTurnR(vh, vh, apComfort, apPro ? apProBank() : 45.f);   // (as the guidance's)
   const float outReach = F + 1300.f + vh * 15.f + 2.f * Rin, crossReach = 3.4f * Rin;
@@ -1207,7 +1207,7 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   const float turnHigh = turnMsa + 250.f - (intAlt + 150.f);
   // ...and whether it stays on the chart: the orbit was chosen inside it, but the outbound leg and the turn back onto
   // the final reach out beyond the gate - from the gate to the turn back, two turns' width either side (the review of
-  // v3.33.0, A1: the passenger Starling flew off the chart's edge from Palm Bay and was lost. Far Isle, in the chart's
+  // v3.33.0, A1: the passenger Emissary flew off the chart's edge from Palm Bay and was lost. Far Isle, in the chart's
   // corner, still fits from the north-west)
   float offChart = 0.f;
   for (int k = 0; k < 4; k++) {
@@ -1226,7 +1226,7 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   // stabilised approach. Where the other end needs none, a professional takes it: 15 per metre to lose, about as much
   // as a 5 kt headwind for every 15 m. But only what it can't lose between the gate and the height it is to be stable
   // by, at the 1,000 fpm a stable approach may sink at - a trainer can lose 140 m there, and to save itself a 150 m
-  // drop the Kestrel flew 15 km to Meadowbrook's far end)
+  // drop the Dawnlark flew 15 km to Meadowbrook's far end)
   const float spareDrop = (gateH - apStabHeight(E.vApp)) * std::max(0.f, 5.1f / std::max(E.vApp, 10.f) / std::max(gs, 0.02f) - 1.f);
   const float dive = apPro ? std::max(0.f, intAlt - iafAlt - spareDrop) : 0.f;
   float score = hw * 40.f - bestCost - (F0 - F) * 0.3f - length(bestC - P) * 0.02f - blocked - dive * 15.f
@@ -1310,7 +1310,7 @@ void Plane::apGuidance(float dt) {
         // the chart)
         const float vNow = std::max(ias, vh), slowDist = apPro ? (vNow * vNow - vh * vh) / (2.f * 2.f) + vh * 20.f + 2500.f : 2500.f + s.cruise * 20.f;
         // (once slowed, it stays slow unless it is taken well away again: the slowing distance shrinks as the speed comes
-        // off, and the Meridian, turning round onto the hold, sped up to cruise and slowed again twice over)
+        // off, and the Archipel, turning round onto the hold, sped up to cruise and slowed again twice over)
         const bool slowed = apPro && apSpeed > 0.f && apSpeed <= vh + 0.5f;
         // A missed approach is still a terminal maneuver. Do not accelerate a
         // transport back to cruise simply because its return to the descent hold
@@ -1355,7 +1355,7 @@ void Plane::apGuidance(float dt) {
           vec3 r = pos - C;   // orbit the way we are already turning
           apHoldDir = (r.x * vel.z - r.z * vel.x) > 0 ? -1 : 1;
           // already down at the orbit's height: no need to circle (a full orbit costs minutes of fuel), go for the final
-          // (a professional: or near enough to lose the rest on the way to the gate, at a gentle 3 deg - the Meridian
+          // (a professional: or near enough to lose the rest on the way to the gate, at a gentle 3 deg - the Archipel
           // circled for 100 s to lose 35 m)
           const vec3 gate = td - ld * F;
           const float onWay = apPro ? 0.05f * len2(vec3(gate.x - pos.x, 0, gate.z - pos.z)) : 0.f;
@@ -1423,7 +1423,7 @@ void Plane::apGuidance(float dt) {
       apUseVS = true;
       // (with passengers or a fragile load, a stabilized approach: no more than ~500 fpm beyond the glidepath's own
       // descent, whatever the airframe could do - inside the comfort g a deeper dive to the path from a high gate isn't
-      // arrested in time, and the Q400 porpoised about it down into the trees short of Solace Capital)
+      // arrested in time, and the Archipel 400 porpoised about it down into the trees short of Solace Capital)
       const float dMax = apComfort ? std::min(E.descentMax, std::max(vg * gs + 2.5f, 5.f)) : E.descentMax;
       apVS = err > 25.f ? 0.3f : clampf(-vg * gs + err * apAltGain(), -dMax, 3.f);
       // low down, never chase the glidepath faster than its own descent (and 1 m/s more at 60 m, none by 15 m): after a
@@ -1433,14 +1433,14 @@ void Plane::apGuidance(float dt) {
       // outside the gate the glideslope can run below the safe intercept altitude: hold that until the gate
       if (dist > F && pos.y < apIntAlt + 30.f) apVS = std::max(apVS, clampf((apIntAlt - pos.y) * 0.1f, -1.f, 3.f));
       // and above the ground ahead: the planned corridor ends at the gate, and beyond it the extended glidepath can run
-      // into high ground (QA F1: a Starling captured 19 km out at Kettle Lake descended into the ridge on its path)
+      // into high ground (QA F1: an Emissary captured 19 km out at Kettle Lake descended into the ridge on its path)
       float hiAhead = -1e9f;
       for (int i = 1; i <= 8; i++) { vec3 q = pos + vec3(ld.x, 0, ld.z) * (i * 250.f); if (dist - i * 250.f > 400.f) hiAhead = std::max(hiAhead, g_world.height(q.x, q.z)); }
       if (dist > F) apVS = std::max(apVS, clampf((hiAhead + 150.f - pos.y) * 0.1f, -1.f, std::max(E.climbPlan, 1.f)));
       // a short field - the book speed's stop over the ground here (the wind along the runway, this air) needing more
       // than 60% of the runway past the aim point - is landed as short as it can be: full flap, at 1.3 times the stall
       // with it (the speed its learned landing distance was flown at). Full flap at the book speed instead flew the
-      // Starling onto Meadowbrook nose first, 3 deg down: at 1.6 times that stall the wing lifts with the nose low
+      // Emissary onto Meadowbrook nose first, 3 deg down: at 1.6 times that stall the wing lifts with the nose low
       const float kGs = clampf((vel.x * ld.x + vel.z * ld.z) / std::max(ias, 10.f), 0.5f, 2.f);
       const bool shortField = !fail.flapAsym && clampf(a.length * 0.12f, 80.f, 300.f) + 0.2f * (kGs * vref) * (kGs * vref) * (s.taildragger ? 1.35f : 1.f) * (surfaceRough(a.surface) ? 1.1f : 1.f) > 0.6f * a.length;
       const float vBase = shortField ? std::min(vref, 1.3f * E.vs0) : vref;
@@ -1454,7 +1454,7 @@ void Plane::apGuidance(float dt) {
       else {   // landing flap: what leaves a nose-up attitude (~4.5 deg angle of attack) for a main-wheels-first touchdown
         float clReq = mass() * G0 / (0.5f * 1.225f * apSpeed * apSpeed * s.wingArea);
         float fl = s.flapCL > 0.01f ? (clReq - s.CL0 - aeroCLa(aeroModel(s), ias / 340.f) * 4.5f * DEG) / s.flapCL : 0.f;
-        // (a short field: all of it, at its own slower speed, above - full flap at the book speed instead, the Wren
+        // (a short field: all of it, at its own slower speed, above - full flap at the book speed instead, the Ambler
         // came down a gusting final nose low and skipped off the runway)
         fl = shortField ? 1.f : clampf(fl, 0.34f, 1.f);
         ctl.flaps = approach(ctl.flaps, fl, 0.3f, dt);
@@ -1559,11 +1559,11 @@ void Plane::apGuidance(float dt) {
         apFlareVs = law > apFlareVs ? law : std::max(law, apFlareVs - 0.8f * dt);
         apUseVS = true; apVS = apFlareVs;
         // the main wheels first: low down the nose comes up to at least 2.5 deg (a tricycle sits level on its wheels),
-        // holding off and letting the speed bleed - with its flaps out at the book speed the Q400 flew onto Far Isle a
+        // holding off and letting the speed bleed - with its flaps out at the book speed the Archipel 400 flew onto Far Isle a
         // degree nose down, and its nosewheel met the runway with its mains at 8.8 g
-        // (less sink, never a climb: asked to climb a metre up, the Wren skipped off Fjordhaven's runway and flew on)
+        // (less sink, never a climb: asked to climb a metre up, the Ambler skipped off Fjordhaven's runway and flew on)
         // (...until it is past the aim point: there the runway is running out and it settles on - held off at 0.3 m/s
-        // with the power on for the passengers, the loaded Q400 skimmed 850 m in ground effect and ran off Meadowbrook)
+        // with the power on for the passengers, the loaded Archipel 400 skimmed 850 m in ground effect and ran off Meadowbrook)
         if (!s.taildragger && hab < 4.f) apVS = std::min(apVS + clampf((2.5f - pitchDeg()) * 0.3f, 0.f, 1.5f) * clampf((4.f - hab) / 2.f, 0.f, 1.f) * (1.f - late), std::max(apVS, -0.3f - 1.2f * late));
       }
       // (idle from the start of the flare, unless the passengers or a fragile load are aboard: then the speed is held on
@@ -1574,7 +1574,7 @@ void Plane::apGuidance(float dt) {
       // reference speed while it settles: at idle the XR-10 ballooned to 6 m at Fjordhaven, slowed to 1.14 Vs and fell
       // back in at 3.5 m/s with nothing left to flare with)
       // (not after a touchdown, though - a skip back off the runway, apFlareMin < 0 - which is held and settles: with
-      // the power on the Wren flew the length of Fjordhaven a metre up in a gusting tailwind)
+      // the power on the Ambler flew the length of Fjordhaven a metre up in a gusting tailwind)
       if (apFlareMin >= 0.f) {
         apFlareMin = std::min(apFlareMin, hab);
         if (hab > apFlareMin + 1.5f && hab > 1.f && late < 1.f) apSpeed = std::max(apSpeed, vref * (1.f - 0.12f * late));   // (not once it is well past the aim point)
@@ -1641,7 +1641,7 @@ void Plane::apGuidance(float dt) {
   if (transportPathControl(s) && apComfort && apStage == APS_FINAL)
     ctl.flaps = clampf(ctl.flaps, flapBefore - 0.05f * dt, flapBefore + 0.05f * dt);
   // the chart's edge: en route or going around (a slow climb straight out past the runway runs a long way), beyond where
-  // any plan reaches it turns back for the field (the review of v3.33.0, A1: a passenger Starling flew off the chart
+  // any plan reaches it turns back for the field (the review of v3.33.0, A1: a passenger Emissary flew off the chart
   // from Palm Bay and was lost. The map wraps now, but the plan's patterns stay on this side of its seam)
   if ((apStage == APS_NAV || apStage == APS_GOAROUND) && std::max(fabsf(pos.x), fabsf(pos.z)) > WORLD_HALF * 1.12f)
     apHeading = atan2f(g_world.nearPoint(apTd.x, pos.x) - pos.x, -(g_world.nearPoint(apTd.z, pos.z) - pos.z)) / DEG;
@@ -1680,7 +1680,7 @@ float Plane::apAltGain() const { return (apPro || transportPathControl(*spec)) ?
 // how fast the flight-path loop may close (1/s): no faster than this airframe's pitch answers, and - a professional's -
 // no faster than the time its path takes to follow the nose allows (the gain times that lag at most 1: apControl damps
 // what the lag would leave, with the path's own rate). A heavy airliner's path follows its nose seconds late: its loop
-// closed as fast as a trainer's, the Meridian porpoised down its final at 17 s, -12 to +5 m/s, in calm air
+// closed as fast as a trainer's, the Archipel porpoised down its final at 17 s, -12 to +5 m/s, in calm air
 float Plane::apPathGain(bool approach) const {
   const float k = std::min(approach ? 0.8f : 1.6f, 1.f / apPitchLag());
   return apPro || transportPathControl(*spec) ? std::min(k, 1.f / apPathLag()) : k;
@@ -1715,7 +1715,7 @@ void Plane::apRates(float qT, float pT, float rollCap, float nzMin, float nzMax,
   }
   // pitch: the rate, tracked with stick scaled by the learned pitch power here - and by the weight: the same stick
   // trims the same angle of attack, which pulls fewer g (and bends the path more slowly) the heavier it is. (Taken
-  // as learned, the full Q400's g limiter held it to a fifth of a g and it porpoised about the glidepath into the sea)
+  // as learned, the full Archipel 400's g limiter held it to a fifth of a g and it porpoised about the glidepath into the sea)
   float tQv = pitchLag(P, s, V);
   const float loadK = clampf(apEnv.wRatio, 0.5f, 3.f);
   float qPS = std::max(P.qPerStick * clampf(V / s.cruise, 0.3f, 2.f) / loadK, 0.05f);   // rad/s per unit stick here
@@ -1740,7 +1740,7 @@ void Plane::apRates(float qT, float pT, float rollCap, float nzMin, float nzMax,
   // as rudder trim, so the sideslip is flown out instead of standing at what the sideslip term alone would answer)
   if (!fbw) {
     // Symmetric transports use the coordinated-rate/sideslip damper rather than
-    // persistent rudder trim. With real fuel burn the Atlas stays heavy through
+    // persistent rudder trim. With real fuel burn the Galleon stays heavy through
     // a whole approach; the former integral winds into Dutch roll there and after
     // ~15 minutes at 11 km cruise. Preserve trim for degraded/asymmetric engines
     // and flap failures, as well as every non-transport type.
@@ -1782,7 +1782,7 @@ void Plane::apControl(float dt) {
     ctl.throttle = 0;
     // (a taildragger: the stick a little back while it could still fly, then all the way back to hold the tail down)
     // (the nose down only on the wheels: a skip back off the runway - a jet with full flap still flying at 57 m/s - is
-    // held in its attitude while the flaps come up under it; pushed over in the air, the Starling came back down on its
+    // held in its attitude while the flaps come up under it; pushed over in the air, the Emissary came back down on its
     // nosewheel at 9 g)
     apGroundT = apStageT <= dt * 1.5f || !onGround ? 0.f : apGroundT + dt;
     ctl.pitch = s.taildragger ? (ias > E.vApp * 0.8f ? 0.15f : 1.f) : (apGroundT > 1.2f ? -0.1f : 0.f);
@@ -1798,7 +1798,7 @@ void Plane::apControl(float dt) {
     he = hdgErrDeg(atan2f(apLd.x, -apLd.z) / DEG - copysignf(std::min(off, 10.f), steerCross), heading());
     // (and held in: a crosswind weathervanes it into the wind with a moment that grows as fast as the rudder's does,
     // so the rudder that holds the runway heading builds up as an integral - proportional alone stood 3.5 deg off
-    // the runway at 60 m/s and the Starling slid 20 m sideways before the nosewheel could steer)
+    // the runway at 60 m/s and the Emissary slid 20 m sideways before the nosewheel could steer)
     if (apStageT <= dt * 1.5f) apYawI = 0;
     // The same horizon anticipates yaw still in progress, before rudder authority
     // falls away as the transport slows. Otherwise its heading crosses the target
@@ -1814,7 +1814,7 @@ void Plane::apControl(float dt) {
     // over onto its propeller. The brakes come in as the tail comes down, and let go the moment the nose starts down
     if (s.taildragger) ctl.brake *= smoothstepf(4.f, 9.f, pitchDeg()) * (w.x < -0.02f ? 0.f : 1.f);
     // flaps up once it is down to stay: the wing stops carrying the weight and the brakes get their grip (at 64 m/s the
-    // Starling's full flaps held it to 1.5 m/s^2 of braking for its first ten seconds, and it ran off Meadowbrook's end)
+    // Emissary's full flaps held it to 1.5 m/s^2 of braking for its first ten seconds, and it ran off Meadowbrook's end)
     if (apStageT > 1.f) ctl.flaps = 0.f;
     return;
   }
@@ -1843,7 +1843,7 @@ void Plane::apControl(float dt) {
   // (commanded inside 0.85..1.25 g so the response - which overshoots a little - stays within 0.8..1.3)
   // (but a stall or an upset comes first: near the stall, pitched far up or down or banked steeply, the whole envelope
   // is flown until it is well clear again - a 0.85 g floor in a steep, slowing climb held the nose up until the
-  // Bushmaster went over the top at 170 deg of bank: review F1)
+  // Scrubrunner went over the top at 170 deg of bank: review F1)
   const float pd = pitchDeg(), bd = fabsf(bankDeg());
   // (and the chart's edge, for a professional: a turn at its bank that would carry it past the edge - a fast jet's at its
   // speed is kilometres wide - is flown at its sharpest, 2.5 g and 60 deg of bank, not the whole airframe (the XR-20's
@@ -2039,7 +2039,7 @@ void Plane::apControl(float dt) {
       // took eight minutes and 150 km to come down from 400 m/s to its terminal speed, and flew off the chart)
       const float aLim = 0.6f + 1.4f * apProScale();
       // (a gust's gain is let pass, a loss is answered at once, as a pilot does: filtered both ways, a storm's shear took
-      // 9 m/s off the Islander 20 m up before the power came, and it flared from a 5 m/s sink)
+      // 9 m/s off the Skerry 20 m up before the power came, and it flared from a 5 m/s sink)
       const float vMeas = std::min(apSpdEst, ias);
       const float vdotT = clampf((apSpeed - vMeas) * 0.12f, -aLim, aLim);
       eE = (gT - g) + (vdotT - vdot) / G0;
@@ -2060,7 +2060,7 @@ void Plane::apControl(float dt) {
   // (held through the flare: a few seconds of rounding out from the approach sink would wind it up, and at a fast
   // jet's speed a full integral is 0.4 g - enough to hold it level metres up, then drop it in) - but not a push: wound
   // down chasing the glidepath through a final's porpoising, it took half the pull out of the round-out, and a loaded
-  // Starling met the runway at 3.6 m/s from a flare that asked for 0.4 (review F3)
+  // Emissary met the runway at 3.6 m/s from a flare that asked for 0.4 (review F3)
   float gDot;
   if (!proAny && !transportPathControl(s)) {
     if (!flare) apGamI = clampf(apGamI + eD * kGam * 0.35f * dt, -0.05f, 0.05f);
@@ -2069,7 +2069,7 @@ void Plane::apControl(float dt) {
   } else {
     // (damped with the path's own rate - from the g it is pulling, so with none of the lag between the nose and the path:
     // the loop's gain times the path's lag of it. Without it a heavy airframe's path overshot what the nose had asked
-    // for and porpoised; with it the Meridian's and the Starling's finals hold the path to a metre)
+    // for and porpoised; with it the Archipel's and the Emissary's finals hold the path to a metre)
     const float gRate = G0 * (gLoad * cosf(clampf(bankDeg(), -85.f, 85.f) * DEG) - cosf(g)) / spd;
     gDot = clampf(eD * kGam + apGamI - apPathLag() * kGam * gRate, -1.5f, 1.5f);
     // (a professional's anti-windup: the integral grows only while the load factor it asks for is inside the limits)

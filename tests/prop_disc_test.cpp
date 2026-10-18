@@ -10,9 +10,9 @@ static void check(bool good, const char* what) { ++checks; if (!good) { ++failur
 static bool close(float a, float b) { return fabsf(a - b) < 2e-5f; }
 
 int main() {
-  // Explicit roster contract: nine prop aircraft, including the appended Larkspur.
+  // Explicit roster contract: nine prop aircraft, including the appended Thistledown.
   // Keep the expected count independent of both modelProps and the packed shader row.
-  static constexpr int propAircraft[] = {0, 1, 2, 3, 4, 5, 7, kOsprey, kLarkspur};
+  static constexpr int propAircraft[] = {0, 1, 2, 3, 4, 5, 7, kWavecrest, kThistledown};
   static_assert(sizeof(propAircraft) / sizeof(propAircraft[0]) == 9, "nine native prop aircraft");
   int types = 0, hubs = 0;
   for (int m = 0; m < kAircraftCount; ++m) {
@@ -26,8 +26,8 @@ int main() {
     check(got == n, "hub count equals modelProps, including jets excluded");
     bool expectedProp = false;
     for (int id : propAircraft) expectedProp |= m == id;
-    check((n > 0) == expectedProp, "exact nine-aircraft prop roster, including Larkspur; Atlas and research jets excluded");
-    if (m == kLarkspur) check(n == 1 && got == 1 && out[0].blades == 3, "Larkspur owns one native three-blade prop disc");
+    check((n > 0) == expectedProp, "exact nine-aircraft prop roster, including Thistledown; Galleon and research jets excluded");
+    if (m == kThistledown) check(n == 1 && got == 1 && out[0].blades == 3, "Thistledown owns one native three-blade prop disc");
     if (n) { ++types; hubs += n; }
     for (int i = 0; i < n; ++i) {
       check(close(out[i].centre.x, expected[i][0]) && close(out[i].centre.y, expected[i][1]) && close(out[i].centre.z, expected[i][2]), "camera-relative hubs exactly match modelProps at map edge");
@@ -94,7 +94,7 @@ int main() {
     }
   }
   check(wreckHubs==12, "all twelve model prop hubs keep visible blade geometry through breakup");
-  check(types == 9 && hubs == 12, "all nine prop types covered with 12 total discs, including Larkspur");
+  check(types == 9 && hubs == 12, "all nine prop types covered with 12 total discs, including Thistledown");
   PropDiscBounds bounds;
   check(propDiscBounds(vec3(0,0,-100),1,.7f,16.f/9,0,vec2(),bounds), "visible perspective disc kept");
   check((bounds.x1-bounds.x0)*(bounds.y1-bounds.y0)<.002f, "distant prop shades a small bound, not a fullscreen draw");

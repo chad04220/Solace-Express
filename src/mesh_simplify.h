@@ -11,7 +11,7 @@
 //   - turn any triangle by more than ~45 degrees or to nothing, or break the surface's manifold (the link condition),
 //   - leave an edge longer than maxEdge (0: no limit). The raster passes' logarithmic depth is set per vertex and
 //     interpolated across the triangle, which on a long one close to the camera runs metres off: the far side of the
-//     Q400's fuselage came through its belly in long patches from a few metres below.
+//     Archipel 400's fuselage came through its belly in long patches from a few metres below.
 // Only the triangles before triEnd take part; the rest (the cabin's fine patch) are kept as they are.
 #pragma once
 #include "common.h"

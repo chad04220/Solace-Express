@@ -4,8 +4,8 @@ How to add an aircraft to Somnium Volandi, from its numbers to its shape, materi
 sound, career role and tests. It is written for whoever adds the next type, a person or an AI assistant, and reflects
 the original v3.33.0 architecture, with roster, cache and capability guidance updated for the October 2026 two-aircraft review. Where the code and this guide disagree, the code wins: fix the guide in the same change.
 
-Older material, kept for its history: `docs/design/additional-aircraft/` (Codex's proposals for the Swift S6, the
-Osprey C6 and the XR-10 / XR-20).
+Older material, kept for its history: `docs/design/additional-aircraft/` (Codex's proposals for the Cutwater S6, the
+Wavecrest C6 and the XR-10 / XR-20).
 
 ---
 
@@ -28,10 +28,10 @@ textures (§7.2), never one made for an aircraft:
 Two tiers:
 
 - **Tier A, the normal way.** One `AircraftSpec` row and one `ModelDef` row. No renderer code. Every career aircraft and
-  two of the four research craft (the XR-10 Nightjar and the XR-20 Mantis) are Tier A.
+  two of the four research craft (the XR-10 Vigil and the XR-20 Reverie) are Tier A.
 - **Tier B, only when the shape can't be described by a model row.** A hand-written GLSL distance field with its own
-  moving parts, like the XR-30 Specter (`mapJet`, `plane_sdf.glsl`) and the XR-40 Wraith (`wraith_sdf.glsl`,
-  `wraith_cockpit_sdf.glsl`). These use the same registered build interface and lazy per-aircraft bake/cache lifecycle
+  moving parts, like the XR-30 Nocturne (`mapJet`, `plane_sdf.glsl`) and the XR-40 Somnus (`somnus_sdf.glsl`,
+  `somnus_cockpit_sdf.glsl`). These use the same registered build interface and lazy per-aircraft bake/cache lifecycle
   as Tier A, with separate family mesh modules and shader specializations (§6, §9). Their custom geometry still needs
   careful ownership and performance checks. A hand-built XR-20 once cost four times the frame in the research terminal
   and was put back to Tier A.
@@ -61,21 +61,21 @@ Today:
 
 | Index | id | Name | Notes |
 |---|---|---|---|
-| 0 | `kestrel` | Kestrel T2 | the lessons' aircraft (`Contract::forceAircraft = 0`) |
-| 1 | `wren` | Wren 180 | |
-| 2 | `bush` | Bushmaster STOL | taildragger |
-| 3 | `islander` | Islander Twin | |
-| 4 | `pelican` | Pelican Caravan | |
-| 5 | `meridian` | Meridian Q400 | |
-| 6 | `starling` | Starling 500 Jet | |
-| 7 | `swift_s6` | Swift S6 | |
-| 8 | `osprey_c6` | Osprey C6 | `kOsprey`; its own cabin trim, keyed by index in GLSL (`kOspreyModel = 8`) |
-| 9 | `xr10_nightjar` | XR-10 Nightjar | `kNightjar`; research, Tier A |
-| 10 | `xr30_specter` | XR-30 Specter | `kResearchJet`; research, Tier B (`special = 1`, engine code 5) |
-| 11 | `xr20_mantis` | XR-20 Mantis | `kMantis`; research, Tier A |
-| 12 | `xr40_wraith` | XR-40 Wraith | `kWraith`; research, Tier B (`special = 2`, engine code 6), the only armed type |
-| 13 | `larkspur_l4` | Larkspur L4 | `kLarkspur`; conventional career/free-flight piston tourer |
-| 14 | `atlas_a180` | Atlas A180 | `kAtlas`; conventional career/free-flight twin-underwing transport, largest fleet airframe |
+| 0 | `dawnlark` | Dawnlark T2 | the lessons' aircraft (`Contract::forceAircraft = 0`) |
+| 1 | `ambler` | Ambler 180 | |
+| 2 | `bush` | Scrubrunner STOL | taildragger |
+| 3 | `skerry` | Skerry Twin | |
+| 4 | `longshore` | Longshore Hauler | |
+| 5 | `meridian` | Archipel 400 | |
+| 6 | `emissary` | Emissary 500 | |
+| 7 | `cutwater_s6` | Cutwater S6 | |
+| 8 | `wavecrest_c6` | Wavecrest C6 | `kWavecrest`; its own cabin trim, keyed by index in GLSL (`kWavecrestModel = 8`) |
+| 9 | `xr10_vigil` | XR-10 Vigil | `kVigil`; research, Tier A |
+| 10 | `xr30_nocturne` | XR-30 Nocturne | `kResearchJet`; research, Tier B (`special = 1`, engine code 5) |
+| 11 | `xr20_reverie` | XR-20 Reverie | `kReverie`; research, Tier A |
+| 12 | `xr40_somnus` | XR-40 Somnus | `kSomnus`; research, Tier B (`special = 2`, engine code 6), the only armed type |
+| 13 | `thistledown_l4` | Thistledown L4 | `kThistledown`; conventional career/free-flight piston tourer |
+| 14 | `galleon_180` | Galleon 180 | `kGalleon`; conventional career/free-flight twin-underwing transport, largest fleet airframe |
 
 Rules and limits:
 
@@ -92,7 +92,7 @@ Rules and limits:
    strings. Forced-aircraft contract fields, shader models, settings/diagnostic selections and loading image names
    can carry numeric identities, so string-based fleet saves are not permission to shift indices. The `id` also
    seeds the registration ("SX-" plus three letters, `registrationOf`) and call sign.
-4. **Career access is explicit, not a physics special flag.** Both Nightjar and Mantis have `special == 0` but
+4. **Career access is explicit, not a physics special flag.** Both Vigil and Reverie have `special == 0` but
    remain research-only. The career hangar orders ordinary craft before four locked research teasers without moving
    the underlying tables. Market, finance, dispatch, save loading and standalone Free Flight enforce membership.
 5. **Performance caches use career row order.** `perf.bin` stores one learned model per explicit career entry,
@@ -180,7 +180,7 @@ struct ModelDef {
 };
 ```
 
-An annotated row (the Wren 180):
+An annotated row (the Ambler 180):
 
 ```cpp
 { {{-4.15f,0.100f,0.090f,-0.020f},{-3.92f,0.380f,0.350f,-0.050f},{-2.80f,0.520f,0.445f,-0.035f},{-1.80f,0.600f,0.645f,0.095f},
@@ -293,9 +293,9 @@ width, headrest, dome light, armrests, visor height and slope, overhead, vents).
 Read §7–§10 first: a Tier B shape must obey the material, part and bake rules as well.
 
 **Dispatch.** `mapPlaneBody` (`plane_sdf.glsl`) routes on the engine code in `gM[0].z`: 5 → `mapJet`, 6 →
-`mapWraith`, everything else → the packed model. A new Tier B type takes the next code (7) and a new branch. Research
+`mapSomnus`, everything else → the packed model. A new Tier B type takes the next code (7) and a new branch. Research
 code sits behind `RESEARCH_ON`, which the `AF_LIGHT` builds compile out, so the light aircraft don't pay for it, and its
-call sites behind `#if HAS_JET` / `HAS_WRAITH` (a new one gets its own), so no other aircraft's program holds it (§8).
+call sites behind `#if HAS_JET` / `HAS_SOMNUS` (a new one gets its own), so no other aircraft's program holds it (§8).
 
 **Field rules.** These are what the mesh bake needs; break them and it makes holes, slivers or ragged edges:
 
@@ -355,10 +355,10 @@ Material ids (`plane_material.glsl`, `planeMaterialN`), as the field returns the
 | 16, 17, 18, 19, 21 | spinner, exhaust, nav lights, beacon, fan face | the first chain |
 | 30–59 | the XR-30's airframe and the research cockpits | `RESEARCH_ON && mid >= 30 && mid < 60` |
 | 60–69, 78 | light-aircraft cockpit: brushed metal, rubber, trim, lenses, radio stack, satin black, centre display, red knobs, harness; the compass card | `mid >= 60` |
-| 61–79 on the XR-40 | its cockpit | `shadeWraithCockpit`, when engine code is 6 |
-| 80–93 | the XR-40's airframe | `shadeWraith` |
+| 61–79 on the XR-40 | its cockpit | `shadeSomnusCockpit`, when engine code is 6 |
+| 80–93 | the XR-40's airframe | `shadeSomnus` |
 | 94, 95–100, 101–104 | light fixture housings, own lenses, traffic lenses | the second chain |
-| 120–124 | the Osprey's cabin trim (`gModelId == 8`) | its own block |
+| 120–124 | the Wavecrest's cabin trim (`gModelId == 8`) | its own block |
 
 Rules learned the hard way:
 
@@ -468,7 +468,7 @@ The constants live in `scene_uniforms.glsl` (and `ent_fs1.glsl` for the scenery)
 Learned the hard way:
 
 - **Speckle is usually relief, not shadows.** The generated fabric and plastic had strong, coarse bumps; under a
-  grazing sun the Osprey's window arches looked like shadow acne. The scans and a soft `nT` fixed it.
+  grazing sun the Wavecrest's window arches looked like shadow acne. The scans and a soft `nT` fixed it.
 - **A flat scan raised to the generator's relief amplifies its grain** (asphalt by 8×, concrete by 23× before the 2×
   clamp): its noise becomes speckle. The clamp is there for that.
 - **A dark scan matched to a light layer keeps its contrast**: white siding from dark boards came out striped black
@@ -511,8 +511,8 @@ puts whitecaps on the crests as the wind rises. A seaplane or a ditching reads t
   with its type's own build, and the bake builds each body with its own pair: `aircraftDefines` (`shaders.h`) gives
   `AF_MODEL` (the roster index), the family's switch and the packed model as the constant `gM`, so every branch on the
   shape is settled as the program compiles. Code only some types run goes behind the preprocessor switches in
-  `plane_common.glsl` - `HAS_FLEET`, `HAS_JET`, `HAS_WRAITH`, `HAS_RESEARCH`, `HAS_FLEET_CABIN` and one per type with its
-  own code (`HAS_SWIFT`, `HAS_BUSHMASTER`, `HAS_OSPREY`, `HAS_MANTIS`...) - and a test of the player's type is
+  `plane_common.glsl` - `HAS_FLEET`, `HAS_JET`, `HAS_SOMNUS`, `HAS_RESEARCH`, `HAS_FLEET_CABIN` and one per type with its
+  own code (`HAS_CUTWATER`, `HAS_SCRUBRUNNER`, `HAS_WAVECREST`, `HAS_REVERIE`...) - and a test of the player's type is
   `MODEL_IS(n)`, never `gModelId == n`. The pruner (`shader_prune.h`) settles those conditionals before it drops what
   nothing calls, so another type's code is not in the program at all: wrap the **call site** (an `if (...) {...} else`
   with `#if HAS_X` ... `#endif` round it keeps the chain whole), and the functions only it calls go too.
@@ -545,7 +545,7 @@ puts whitecaps on the crests as the wind rises. A seaplane or a ditching reads t
     evaluates each page once for that reason);
   - `shader_check` validates every assembled program.
 - **Cost.** The owner plays at 60 fps on a mid-range GPU and prefers performance to fancy graphics. Baseline from the
-  owner's v3.29.2 diagnostic: cockpit 7.4 ms, Mantis cockpit 10.1 ms, night 7.7 ms. Every line in the field or the
+  owner's v3.29.2 diagnostic: cockpit 7.4 ms, Reverie cockpit 10.1 ms, night 7.7 ms. Every line in the field or the
   material code runs for every aircraft pixel of several passes, so bound sub-fields, keep loops short, and never trace
   the field per pixel in the mesh pass (v3.30.0 did, and the cockpit went from 7.4 to 98.9 ms). The gate
   (`docs/WORK_PLAN.md`): the owner's `diagnostics.bat` before and after; the targeted pass improves and nothing else
@@ -560,9 +560,9 @@ Everything that moves is a **rigid part** (`plane_parts.glsl`): a solid with its
 the other side, a hinged surface's deflection about its swept and tapered hinge, or a stretch along an axis).
 
 - **Ids 0–46 are taken**: the cockpit controls 0–10, the light aircraft's surfaces 11–14, the XR-40's 15–29 and 45,
-  the XR-30's 30–32 and 38–44, the packed model's gear 33–37, and the Atlas turbofan 46. A new part takes 47 or above.
+  the XR-30's 30–32 and 38–44, the packed model's gear 33–37, and the Galleon turbofan 46. A new part takes 47 or above.
 - **One build contract, separate owners.** `aircraft_mesh_build.h` selects a `MeshBuilder` using the same packed-model
-  family as `shaders.h` (`aircraft_build_family.h`). Fleet, Specter and Wraith implement `parts`, `partPlan` and
+  family as `shaders.h` (`aircraft_build_family.h`). Fleet, Nocturne and Somnus implement `parts`, `partPlan` and
   `appendHullStates` in separate `aircraft_mesh_build_<family>.h` modules. The renderer owns the generic sampling,
   simplification, caching and drawing lifecycle. No family shader or geometry is merged into another.
 - **`partList`** dispatches to that family's ordered instances (type, side, which one), used by both the bake and
@@ -571,7 +571,7 @@ the other side, a hinged surface's deflection about its swept and tapered hinge,
   512 posed instances per frame (`kMaxPoseInst`). CPU part IDs in `aircraft_mesh_build_types.h` match the unchanged
   GLSL IDs and serialized mesh records; `aircraft_build_interface_test.py` guards this ABI.
 - **A bake plan per part.** Each family returns fixed bounds or a surveyed box and its existing lattice spacing.
-  Fleet surfaces and gear remain fleet-owned; Specter owns its surfaces and nozzles; Wraith owns its pods, weapons,
+  Fleet surfaces and gear remain fleet-owned; Nocturne owns its surfaces and nozzles; Somnus owns its pods, weapons,
   actuators and surfaces. The two research craft share only their existing research-gear bounds. Cockpit controls
   keep their centered 1 cm survey. `aircraft_build_contract_test` freezes all 15 types' ordered part instances,
   bounds, lattice spacing and hull sweeps against the pre-refactor behavior.
@@ -600,7 +600,7 @@ update is most of the step's time. A build, in `bakePlaneMesh`:
    the surface band is static.
 3. **Thin cells** (cockpit only). A plate or rod under about 2.5 cells through is re-meshed on a lattice twice as fine
    (0.78 cm), as a patch over the first mesh; the first mesh sinks its ring 3 mm under it.
-   Specter's unchanged 9 mm overhead toggles alone use a bounded 3.90625 mm patch (`aircraft_mesh_specter_detail.h`);
+   Nocturne's unchanged 9 mm overhead toggles alone use a bounded 3.90625 mm patch (`aircraft_mesh_nocturne_detail.h`);
    its one-cell overlap sinks the older fine patch 1.5 mm. This does not refine the whole cabin.
 4. **Surface nets** on the 1.56 cm lattice: one vertex per lattice cube the surface crosses. Inside, sharp edges use
    dual contouring (the vertex where the face planes meet). Each vertex is pulled onto the surface, and normals,
@@ -624,7 +624,7 @@ triangle counts. A slow or huge bake usually means a thin feature, a knife edge 
 - **Generated fittings:** seats with headrests (dropped where the roof is too low), the yokes and pedals (parts), the
   pedestal with its throttle, fuel selector and trim wheel, the switch row, the radio stack, side trim with armrests,
   the overhead console with dome and map lights, the visors, the compass and the glareshield light strip.
-- **One type's own fittings** go in the field gated by `gModelId` (the Osprey's `mapOspreyCabinTrim`) with their own
+- **One type's own fittings** go in the field gated by `gModelId` (the Wavecrest's `mapWavecrestCabinTrim`) with their own
   material ids. Keep existing index constants immutable and append new identities (§2).
 - **Lighting** inside: the sun through the windows with the cabin's own sun map (`texShCab`, 2048², hardware-filtered),
   the sun's bounce off the cabin, the sky through the windows, the fixtures at night, and baked ambient occlusion.
@@ -638,7 +638,7 @@ triangle counts. A slow or huge bake usually means a thin feature, a knife edge 
 - **Propellers** are not geometry: the effects pass draws each prop as a motion-blurred disc (`effects_fs.glsl`) at
   the hubs `modelProps` derives from the model row, with the spec's blade count. The blades show solid below 250 rpm (an engine stopped or
   starting) and blur fully by 700 rpm.
-- **Jet plumes** exist for the research codes 5 and 6 (`jetPlumes`, `wraithPlumes`). The transonic vapour cone shows
+- **Jet plumes** exist for the research codes 5 and 6 (`jetPlumes`, `somnusPlumes`). The transonic vapour cone shows
   on any type between Mach 0.9 and 1.07 in humid low air, sized by its span. A new plume shape is effects-pass code behind `RESEARCH_ON`.
 - **Lights:** the nav lights, strobes and beacon are placed from the model (`modelWingTip`, `modelFinTop`,
   `modelTailTip`) for Tier A. The player's own lamps are up to six lenses (`uLensP/D`). Their light on the ground and
@@ -648,18 +648,18 @@ triangle counts. A slow or huge bake usually means a thin feature, a knife edge 
 
 ## 13. Weapons
 
-Only the XR-40 is armed, and its systems are written for it (`game_wraith.cpp`, gated by `special == 2`). The XR-15's
+Only the XR-40 is armed, and its systems are written for it (`game_somnus.cpp`, gated by `special == 2`). The XR-15's
 belly Gatling was tried and reverted. To arm another type, generalise rather than copy: a per-type weapon table, with
-`WraithState`'s parts split into a weapons state. Every piece a weapon touches:
+`SomnusState`'s parts split into a weapons state. Every piece a weapon touches:
 
 | Piece | Where | Notes |
 |---|---|---|
-| Controls | `ACT_WEAPONS`, `ACT_FIRE`, `ACT_BOMB`, `ACT_CLOAK` (`game.h`); `wraithControls` | rebindable; voices never name a rebound control |
-| State | `WraithState` (`game.h`): armed, turrets and bay travel, bolts, bombs, blasts, craters, scorch marks, counters | |
+| Controls | `ACT_WEAPONS`, `ACT_FIRE`, `ACT_BOMB`, `ACT_CLOAK` (`game.h`); `somnusControls` | rebindable; voices never name a rebound control |
+| State | `SomnusState` (`game.h`): armed, turrets and bay travel, bolts, bombs, blasts, craters, scorch marks, counters | |
 | Firing | `fireLaser`: muzzle points in body space (`kLaserLens`), convergence 650 m ahead, 2000 m/s plus the craft's own velocity, a 0.12 s cooldown | the bolt leaves after the physics step, from where the turret is now |
 | Hits | `updateBolts`: each segment swept against the ground and sea (`groundHit`), traffic (`traffic.rayHit`), scenery (`g_scenery.raycast`) and the UFO | `laserImpact` downs aircraft, damages or destroys scenery (`g_scenery.damage`) and scorches the ground |
-| Bombs | `updateWraith`: the bay opens, the bomb drops from the cradle (`kBayBomb`), falls with gravity and a little drag, and goes off on contact or near an aircraft | `detonate`: a blast, a crater, everything within 230 m, a shock on the player |
-| Visuals | `wraithVisual` fills `FrameParams::fx`: up to 16 beams, 8 bombs, 6 blasts, the impact pip; `effects_fs.glsl` `weaponsFx` draws them | the craters and scorch marks join the wreck's crater list (24 at most) |
+| Bombs | `updateSomnus`: the bay opens, the bomb drops from the cradle (`kBayBomb`), falls with gravity and a little drag, and goes off on contact or near an aircraft | `detonate`: a blast, a crater, everything within 230 m, a shock on the player |
+| Visuals | `somnusVisual` fills `FrameParams::fx`: up to 16 beams, 8 bombs, 6 blasts, the impact pip; `effects_fs.glsl` `weaponsFx` draws them | the craters and scorch marks join the wreck's crater list (24 at most) |
 | Moving hardware | the turrets, hatches, arms and bay doors are rigid parts posed from `pv.wr[]` | their travel is state, never time |
 | Cockpit | the bomb-impact pip on the floor displays; the bomb camera on feed slot 12 | |
 | Sound | `SFX_LASER`, `SFX_PLASMA`, `SFX_BOOM`, `SFX_CLOAK`, `SFX_GEAR_CLUNK` | |
@@ -808,26 +808,26 @@ Spec values (the learned numbers are in the README's table):
 
 | Aircraft | Type | Seats / cargo | Range | Cruise | Runway | Licence | Price / rent |
 |---|---|---|---|---|---|---|---|
-| Kestrel T2 | Two-seat trainer | 1 / 120 kg | 45 km | 97 kt | 400 m | Student | 18 000 / 120 |
-| Wren 180 | Four-seat tourer | 3 / 320 kg | 70 km | 117 kt | 450 m | PPL | 30 000 / 250 |
-| Bushmaster STOL | Backcountry taildragger | 4 / 480 kg | 72 km | 107 kt | 220 m, rough | CPL | 40 000 / 450 |
-| Islander Twin | Nine-seat utility twin | 9 / 900 kg | 90 km | 126 kt | 420 m, rough | CPL | 85 000 / 900 |
-| Pelican Caravan | Single turboprop hauler | 12 / 1400 kg | 130 km | 165 kt | 550 m, rough | CPL | 120 000 / 1600 |
-| Meridian Q400 | Regional turboprop airliner | 40 / 4500 kg | 170 km | 272 kt | 1100 m | ATP | 600 000 / 8000 |
-| Starling 500 Jet | Light business jet | 7 / 700 kg | 4350 km | 389 kt | 1250 m | ATP | 260 000 / — |
-| Swift S6 | Retractable low-wing tourer | 3 / 420 kg | 140 km | 148 kt | 600 m | PPL | 68 000 / 600 |
-| Osprey C6 | Six-seat coastal charter twin | 5 / 270 kg | 110 km | 144 kt | 550 m | CPL | 68 000 / 650 |
+| Dawnlark T2 | Two-seat trainer | 1 / 120 kg | 45 km | 97 kt | 400 m | Student | 18 000 / 120 |
+| Ambler 180 | Four-seat tourer | 3 / 320 kg | 70 km | 117 kt | 450 m | PPL | 30 000 / 250 |
+| Scrubrunner STOL | Backcountry taildragger | 4 / 480 kg | 72 km | 107 kt | 220 m, rough | CPL | 40 000 / 450 |
+| Skerry Twin | Nine-seat utility twin | 9 / 900 kg | 90 km | 126 kt | 420 m, rough | CPL | 85 000 / 900 |
+| Longshore Hauler | Single turboprop hauler | 12 / 1400 kg | 130 km | 165 kt | 550 m, rough | CPL | 120 000 / 1600 |
+| Archipel 400 | Regional turboprop airliner | 40 / 4500 kg | 170 km | 272 kt | 1100 m | ATP | 600 000 / 8000 |
+| Emissary 500 | Light business jet | 7 / 700 kg | 4350 km | 389 kt | 1250 m | ATP | 260 000 / — |
+| Cutwater S6 | Retractable low-wing tourer | 3 / 420 kg | 140 km | 148 kt | 600 m | PPL | 68 000 / 600 |
+| Wavecrest C6 | Six-seat coastal charter twin | 5 / 270 kg | 110 km | 144 kt | 550 m | CPL | 68 000 / 650 |
 
 Research craft (the research terminal only):
 
 | Craft | Tier | What it is | Top Mach | Structure |
 |---|---|---|---|---|
-| XR-10 Nightjar | A | conventional twin-jet demonstrator | 0.96 | +45 / −28 g |
-| XR-20 Mantis | A | forward-swept systems demonstrator, canards | 1.9 | +34 / −34 g |
-| XR-30 Specter | B | fly-by-wire, pitch thrust vectoring, sealed cockpit | 2.7 | +180 / −180 g |
-| XR-40 Wraith | B | four tilting thruster pods, vertical flight, cloak, lasers, plasma bombs | 4.3 | +300 / −300 g |
+| XR-10 Vigil | A | conventional twin-jet demonstrator | 0.96 | +45 / −28 g |
+| XR-20 Reverie | A | forward-swept systems demonstrator, canards | 1.9 | +34 / −34 g |
+| XR-30 Nocturne | B | fly-by-wire, pitch thrust vectoring, sealed cockpit | 2.7 | +180 / −180 g |
+| XR-40 Somnus | B | four tilting thruster pods, vertical flight, cloak, lasers, plasma bombs | 4.3 | +300 / −300 g |
 
-Gaps worth filling: a light-sport two-seater below the Kestrel, a 19-seat turboprop commuter, a medium business jet or
+Gaps worth filling: a light-sport two-seater below the Dawnlark, a 19-seat turboprop commuter, a medium business jet or
 small regional jet, an agricultural or utility taildragger. Not possible without new physics: floats and amphibians
 (no water handling), biplanes (one wing only), gliders (an engine is assumed).
 

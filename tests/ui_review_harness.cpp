@@ -38,7 +38,7 @@ struct GameTest {
     const std::string id=scene.substr(9);
     auto start=procedural::find(id);require(start.has_value(),"seamless fixture needs a canonical region ID or solace");
     g.cacheDir=getenv("SHADERCACHE")?getenv("SHADERCACHE"):"";g.buildStamp="seamless-egl-v1";
-    g.debugScene("region-"+id);g.freeCraft=kAtlas;g.freeAirport=0;g.freeAirborne=true;g.launchFreeFlight();
+    g.debugScene("region-"+id);g.freeCraft=kGalleon;g.freeAirport=0;g.freeAirborne=true;g.launchFreeFlight();
     g.set.traffic=airTrafficEnabled();g_ren.entSync=false;g_ren.profileRegionRender=true;g.hudOn=false;g.set.fov=40;g.toasts.clear();
     // Clear diagnostic weather only; ordinary Free Flight defaults are unchanged.
     g.wx.visibility=150000.f;g.wx.cloudCover=0;g.wx.precip=0;g.wx.storm=false;
@@ -87,7 +87,7 @@ struct GameTest {
       hi/1000.,publicationDistance/1000.,oldClearance/1000.,newClearance/1000.);
     const regionTravel::Chart initial(start->origin);
     auto place=[&](geo::Position p){const vec3 local=initial.local(p);const float heading=float(*initial.bearing(local,neighbor.origin));
-      g.plane.reset(&kAircraft[kAtlas],local,heading,kAircraft[kAtlas].maxFuel*.8f,85.f,true,kAircraft[kAtlas].cruise);
+      g.plane.reset(&kAircraft[kGalleon],local,heading,kAircraft[kGalleon].maxFuel*.8f,85.f,true,kAircraft[kGalleon].cruise);
       g.settleAirborneStart();g.plane.apEngage(Plane::AP_HOLD,-1,g.wx);g.plane.apAlt=5000;g.plane.apHeading=heading;
       g.camPos=g.plane.pos;g.camQ=g.plane.q;};
     place(before);g.earthFlight=false;g.paused=false;g.botControl=true;
@@ -178,7 +178,7 @@ struct GameTest {
     }
     const float pitch=pitchDegrees*DEG;
     g.cacheDir=getenv("SHADERCACHE")?getenv("SHADERCACHE"):"";g.buildStamp="seamless-egl-v1";
-    g.debugScene("region-"+descriptor->id);g.freeCraft=kAtlas;g.freeAirborne=true;g.launchFreeFlight();
+    g.debugScene("region-"+descriptor->id);g.freeCraft=kGalleon;g.freeAirborne=true;g.launchFreeFlight();
     g.set.traffic=airTrafficEnabled();g.botControl=true;g.paused=false;g.hudOn=false;g.set.fov=55;g.dbgCam=true;g.dbgFollow=false;
     g.plane.apEngage(Plane::AP_HOLD,-1,g.wx);g.plane.apAlt=g.plane.pos.y;
     g.wx.visibility=200000.f;g.wx.cloudCover=0;g.wx.precip=0;g.wx.storm=false;
@@ -200,7 +200,7 @@ struct GameTest {
       require(bytes<=2*1024*1024,"high-altitude combined upload budget exceeded");require(g_ren.horizonError.empty(),"high-altitude horizon worker failed");
       if(frames%30==0)printf("HORIZON frame=%d wanted=%d ready=%d resident=%d bytes=%zu flight=%.3f\n",frames,g_ren.horizonWantedMeshes,g_ren.horizonReadyMeshes,g_ren.horizonResidentMeshes,bytes,g.flightClock);
     };
-    printf("HORIZON FIXTURE camera-only altitude=%.0fm, downward_pitch_deg=%.2f, static all-direction views, clear200km/no cloud. Aircraft remains in normal low-altitude Atlas Free Flight; 30km is a visibility stress, not aircraft performance. Initial cache ready=%d wanted=%d.\n",altitude,pitchDegrees,g_ren.horizonReadyMeshes,g_ren.horizonWantedMeshes);
+    printf("HORIZON FIXTURE camera-only altitude=%.0fm, downward_pitch_deg=%.2f, static all-direction views, clear200km/no cloud. Aircraft remains in normal low-altitude Galleon Free Flight; 30km is a visibility stress, not aircraft performance. Initial cache ready=%d wanted=%d.\n",altitude,pitchDegrees,g_ren.horizonReadyMeshes,g_ren.horizonWantedMeshes);
     printf("HARNESS_AIR_TRAFFIC=%d (diagnostic fixture setting; road traffic and scenery enabled)\n",int(g.set.traffic));
     const auto deadline=started+std::chrono::minutes(5);
     do{step();}while((g_ren.horizonWantedMeshes<=0||g_ren.horizonReadyMeshes<g_ren.horizonWantedMeshes||g_ren.horizonCpuPending||g_ren.horizonPendingMeshes>0)&&std::chrono::steady_clock::now()<deadline);
@@ -217,7 +217,7 @@ struct GameTest {
   static void checkInteractions(Game& g) {
     auto require=[](bool ok,const char* why){if(!ok){fprintf(stderr,"FAIL: %s\n",why);exit(3);}};
     auto frame=[&](){g.focusList.clear();g_ren.uiBegin();FrameParams fp{};g.drawResearch(fp);g_ren.uiEnd();g.in=Input{};};
-    const int ids[]={kNightjar,kMantis,kResearchJet,kWraith};
+    const int ids[]={kVigil,kReverie,kResearchJet,kSomnus};
     require(g.resCraft==kResearchJet,"original research default is XR-30");
     g.debugScene("research10");
     for(int cycle=0;cycle<3;cycle++) for(int i=0;i<4;i++){
@@ -232,7 +232,7 @@ struct GameTest {
       g.in.mx=target.x+target.w*.5f;g.in.my=target.y+target.h*.5f;g.in.mPressed[0]=true;frame();
       require(g.resCraft==ids[i],"research mouse airframe selection");
     }
-    g.resCard=0;g.resCraft=kWraith;frame();require(g.resCard==-1,"incompatible research test cleared");
+    g.resCard=0;g.resCraft=kSomnus;frame();require(g.resCard==-1,"incompatible research test cleared");
     g.resAirport=0;g.in.pressed[K_LEFT]=true;frame();require(g.resAirport==(int)g_world.airports.size()-1,"site wraps left");
     g.in.pressed[K_RIGHT]=true;frame();require(g.resAirport==0,"site wraps right");
     const float x1=g_ren.W-24*s,hs=s*std::clamp((x1-L.lx)/(1232.f*s),.55f,1.f);
@@ -280,7 +280,7 @@ struct GameTest {
       g.in.mDown[0]=false;frame();
     }
     FrameParams equipped{};g.researchPreviewCamera(equipped);
-    require(equipped.plane.model==kWraith && equipped.plane.wrBombSet==int(g.practiceBomb) &&
+    require(equipped.plane.model==kSomnus && equipped.plane.wrBombSet==int(g.practiceBomb) &&
       int(equipped.plane.wr[6][3])==int(g.practiceForward) && equipped.plane.wr[6][0]>0,
       "research render frame carries selected weapon and payload model");
     for(uint32_t id:{0x7E5F0030u,0x7E5F0031u,0x7E5F0032u,0x7E5F0033u,0x7E5F0034u}) {
@@ -361,7 +361,7 @@ struct GameTest {
     g.beginFreeFlightSetup();g.freeCraft=0;g.freeAirport=0;g.in=Input{};
     auto frame=[&](){g.gamepadMenus(1.f/60);g.focusNavigate();g_ren.uiBegin();FrameParams fp{};g.drawFreeFlightSetup(fp);g_ren.uiEnd();g.in=Input{};};
     frame();g.focusId=id(0,"free-flight-airframe");g.focusNav=true;
-    for(int i=0;i<kNumAircraft;i++){if(i){g.in.pressed[K_DOWN]=true;frame();}require(g.focusId==id(careerSpecAt(i),"free-flight-airframe"),"free-flight keyboard reaches every career aircraft");g.in.pressed[K_ENTER]=true;frame();require(g.freeCraft==careerSpecAt(i),"free-flight selects each aircraft without licence gate");g.selHangar=kWraith;FrameParams preview{};g.hangarPreviewCamera(preview);require(preview.plane.model==careerSpecAt(i)&&preview.hangarPreview&&!preview.hangarClassified,"free-flight actual preview uses freeCraft, never career/classified selection");}
+    for(int i=0;i<kNumAircraft;i++){if(i){g.in.pressed[K_DOWN]=true;frame();}require(g.focusId==id(careerSpecAt(i),"free-flight-airframe"),"free-flight keyboard reaches every career aircraft");g.in.pressed[K_ENTER]=true;frame();require(g.freeCraft==careerSpecAt(i),"free-flight selects each aircraft without licence gate");g.selHangar=kSomnus;FrameParams preview{};g.hangarPreviewCamera(preview);require(preview.plane.model==careerSpecAt(i)&&preview.hangarPreview&&!preview.hangarClassified,"free-flight actual preview uses freeCraft, never career/classified selection");}
     g.focusId=id(0,"free-flight-airport");g.focusNav=true;frame();
     for(int i=0;i<(int)g_world.airports.size();i++){if(i){g.in.pressed[K_DOWN]=true;frame();}require(g.focusId==id(i,"free-flight-airport"),"free-flight keyboard reaches every airport");g.in.pressed[K_ENTER]=true;frame();require(g.freeAirport==i,"free-flight selects each airport");}
     const float ss=g.S();auto L=hangarLayout(24*ss,126*ss,g_ren.W-48*ss,g_ren.H-146*ss,ss);float px=L.rightX+18*ss,iw=L.rightWidth-36*ss,yy=g_ren.H-189*ss;
@@ -443,7 +443,7 @@ struct GameTest {
       g.debugScene("research40");g.researchView.select(g.resCraft);
       if(sc.find("kinetic_emp")!=std::string::npos){g.practiceForward=hive::ForwardSet::Kinetic;g.practiceBomb=hive::BombSet::EMP;g.practiceWave=3;}
       if(sc.find("heavy_penetrator")!=std::string::npos){g.practiceForward=hive::ForwardSet::Heavy;g.practiceBomb=hive::BombSet::Penetrator;g.practiceWave=1;}
-      if(sc.find("testcard")!=std::string::npos)for(int i=0;i<Game::kNumResCards;++i)if(Game::kResCards[i].craft==kWraith){g.resCard=i;break;}
+      if(sc.find("testcard")!=std::string::npos)for(int i=0;i<Game::kNumResCards;++i)if(Game::kResCards[i].craft==kSomnus){g.resCard=i;break;}
       if(sc.find("underside")!=std::string::npos){g.researchView.pitch=-.35f;g.researchView.yaw=2.15f;g.researchView.zoom=1.1f;}
       if(sc.find("focus")!=std::string::npos){g.focusScreen=SCR_RESEARCH*4;g.focusNav=true;g.focusId=0x7E5F0011u;}
       if(sc.find("face")!=std::string::npos)g.realTime=61;
@@ -528,7 +528,7 @@ struct GameTest {
       for(int i=0;i<6;++i)ids[i]=pace.add(labels[i],10,0,labels[i]);
       const int at=std::min(5,int(p*6));pace.begin(ids[at]);pace.setSub(p*6-at);pace.task("Surface field / GPU rows",32,128);
       if(p>=1)pace.end();
-      g.drawIntro(p,p>=1?"All flight systems ready":"Preparing aircraft geometry: XR-40 Wraith / exterior | Surface field evaluation",t,g.iconTex,1.f,g_ren,&pace);
+      g.drawIntro(p,p>=1?"All flight systems ready":"Preparing aircraft geometry: XR-40 Somnus / exterior | Surface field evaluation",t,g.iconTex,1.f,g_ren,&pace);
     }
     else if(sc.rfind("loading",0)==0)g.drawLoading();
     else if(sc.rfind("research",0)==0){FrameParams fp{};g.drawResearch(fp);}

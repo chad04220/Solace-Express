@@ -10,9 +10,9 @@ vec4 gearWheelFrame(vec3 p, out float halfWidth, out bool braked){
   bool research = RESEARCH_ON && engine >= 5;
   float gh = G1.x;
   float wr = research ? 0.38 : G0.y;
-  float mh = isAtlas() ? .145 : research ? JT_TYRE_H : kind == 3 ? 0.11 : kind == 0 ? 0.065 : kind == 1 ? 0.09 : kind == 2 ? 0.14 : 0.10;
+  float mh = isGalleon() ? .145 : research ? JT_TYRE_H : kind == 3 ? 0.11 : kind == 0 ? 0.065 : kind == 1 ? 0.09 : kind == 2 ? 0.14 : 0.10;
   float nwr = research ? .33 : gearNoseR();
-  float nh = isAtlas()?.115:research || kind == 3 ? .07 : .055;
+  float nh = isGalleon()?.115:research || kind == 3 ? .07 : .055;
   vec3 mq, nq;
 #if HAS_RESEARCH
   if (research) {   // (the research jets' wheels from their parts' poses: plane_parts.glsl jtMainPose, jtNosePose)
@@ -26,7 +26,7 @@ vec4 gearWheelFrame(vec3 p, out float halfWidth, out bool braked){
     Pose X = gearPartPose(PT_GEAR_MAIN, vec2(p.x < 0.0 ? -1.0 : 1.0, 0.0));
     mq = transpose(X.R)*(p - X.T) - vec3(G0.x, wr - gh, G0.z);
     if (kind == 3) mq.x = abs(mq.x) - 0.22;
-    if (isAtlas()) {mq.x=abs(mq.x)-.34;mq.z=abs(mq.z)-.62;}
+    if (isGalleon()) {mq.x=abs(mq.x)-.34;mq.z=abs(mq.z)-.62;}
     if (G1.z > 0.5) {
       nwr = 0.10; nh = 0.035;
       nq = p - vec3(0.0, 0.0, G1.y); nq.xz = rot2(nq.xz, -gPS.z);
@@ -35,7 +35,7 @@ vec4 gearWheelFrame(vec3 p, out float halfWidth, out bool braked){
       float ns = max(gearNoseShow(), 1e-3); Pose N = gearNosePose(ns);
       nq = transpose(N.R)*(p - N.T)/ns - vec3(0.0, nwr - gh, 0.0);
       if (kind == 3) nq.x = abs(nq.x) - 0.15;
-      if (isAtlas()) nq.x=abs(nq.x)-.25;
+      if (isGalleon()) nq.x=abs(nq.x)-.25;
     }
   }
   braked = dot(mq, mq) < dot(nq, nq);
@@ -126,7 +126,7 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
           float fd = length(vec2(arc - 0.09*floor(arc/0.09 + 0.5), lp.z - zs + 0.02));
           rv = max(rv, (1.0 - smoothstep(0.005, 0.005 + px, fd))*smoothstep(0.012, 0.003, px)*step(-0.2, yr));
         }
-        if(isAtlas() && lp.z < -19.60) {
+        if(isGalleon() && lp.z < -19.60) {
           // A smooth composite radome has one service joint, no metal skin stringer grid.
           sm=1.0-smoothstep(.004,.004+px,abs(lp.z+19.76));rv=0.0;
         }
@@ -154,13 +154,13 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
         }
       }
       float post = ck == 2 ? min(abs(lp.x) - 0.03, abs(abs(lp.x) - abs(E.x) - 0.42) - 0.035) : abs(lp.x) - 0.025;
-      bool ws = lp.z > WS.x && lp.z < WS.y && lp.y > WS.z && (!isAtlas() || lp.y<1.20);
-      float sideTop = isAtlas()?min(sec.z+sec.y*.78,1.22):sec.z+sec.y*.78;
-      bool sideW = lp.z > WS.y && lp.z < WS.w && lp.y > (isAtlas()?WS.z:WS.z-.12) && lp.y < sideTop && abs(lp.x) > 0.3 && abs(lp.z - WS.y - 0.04) > 0.025;
+      bool ws = lp.z > WS.x && lp.z < WS.y && lp.y > WS.z && (!isGalleon() || lp.y<1.20);
+      float sideTop = isGalleon()?min(sec.z+sec.y*.78,1.22):sec.z+sec.y*.78;
+      bool sideW = lp.z > WS.y && lp.z < WS.w && lp.y > (isGalleon()?WS.z:WS.z-.12) && lp.y < sideTop && abs(lp.x) > 0.3 && abs(lp.z - WS.y - 0.04) > 0.025;
       bool frame = (ws && post <= 0.0) || (lp.z > WS.x - 0.03 && lp.z < WS.w + 0.03 && lp.y > WS.z - 0.15 && lp.y < sideTop + 0.03 && abs(lp.x) > 0.3 && !sideW && lp.z > WS.y);
-#if HAS_ATLAS
-      if(isAtlas()) {
-        float pane=atlasWindow(lp);ws=pane<0.0;sideW=false;post=1.0;
+#if HAS_GALLEON
+      if(isGalleon()) {
+        float pane=galleonWindow(lp);ws=pane<0.0;sideW=false;post=1.0;
         frame=pane>=0.0&&pane<.040;
       }
 #endif
@@ -172,7 +172,7 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
         if (wd < 0.0) { m.alb = vec3(0.02, 0.025, 0.03); m.rough = 0.05; m.emit = vec3(1.0, 0.85, 0.6)*uNight*0.5; }
         else if (wd < 0.022) m.alb *= 0.7;
       }
-      if(isAtlas() && abs(lp.x)>sec.x*.70) {
+      if(isGalleon() && abs(lp.x)>sec.x*.70) {
         // Real-size forward/aft entry doors and two overwing emergency exits.
         float dz=min(abs(lp.z+14.55),abs(lp.z-12.90));
         vec2 dq=abs(vec2(dz,lp.y-.08))-vec2(.47,.98)+.11;
@@ -183,7 +183,7 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
         if(dz<.08 && abs(lp.y+.11)<.026) {m.alb=vec3(.57,.60,.62);m.metal=.8;}
         if(dz<.12 && abs(lp.y-.60)<.15) {m.alb=vec3(.03,.065,.075);m.rough=.08;}
       }
-      if (ck == 2 && !isAtlas() && lp.z < WS.x && lp.z > WS.x - 2.0 && yr > 0.2) { m.alb = vec3(0.02); m.rough = 0.85; }
+      if (ck == 2 && !isGalleon() && lp.z < WS.x && lp.z > WS.x - 2.0 && yr > 0.2) { m.alb = vec3(0.02); m.rough = 0.85; }
       if (int(gM[0].z + 0.5) == 0 && lp.z < gM[1].x + 0.3 && ln.z < -0.4 && abs(lp.x) > 0.11 && abs(lp.x) < sec.x*0.8 && abs(yr + 0.15) < 0.35) m.alb = vec3(0.02);
       if (int(gM[0].z + 0.5) == 1 && lp.z < gM[1].x + 0.7 && lp.y < sec.z - sec.y*0.45 && ln.z < -0.3) m.alb = vec3(0.02);
     }
@@ -193,7 +193,7 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
     float cc = (lp.z - gM[10].y - le)/ch;
     m.alb = gColBase*0.98;
     if (s > gM[9].x*0.9) m.alb = gColStripe;
-    if(isAtlas()) {
+    if(isGalleon()) {
       m.alb=vec3(.65,.69,.72);
       if(cc<.09){m.alb=vec3(.73,.78,.80);m.metal=.7;m.rough=.23;}
       if(lp.y>gM[10].x+s*gM[10].z+.18 && s>gM[9].x-.20)m.alb=gColStripe;
@@ -221,19 +221,19 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
     float fh = (lp.y - gM[15].x)/max(gM[14].x, 0.1), fle = gM[15].y + gM[14].w*clamp(fh, 0.0, 1.0);
     if (fh > 0.42 - 0.18*clamp((lp.z - fle)/max(gM[14].y, 0.1), 0.0, 1.0) && abs(lp.x) < 0.25) m.alb = gColStripe;
     if (lp.y > tailTop - 0.12 && abs(lp.x) < 0.25) m.alb = vec3(0.9);
-    if(isAtlas() && lp.y>gM[15].x && abs(lp.x)<.6) {
+    if(isGalleon() && lp.y>gM[15].x && abs(lp.x)<.6) {
       m.alb=gColStripe*.85;
       float ribbon=lp.z-fle-1.15-.42*(lp.y-gM[15].x);
       if(abs(ribbon)<.18)m.alb=vec3(.27,.67,.72);
       if(ribbon>.25 && ribbon<.40)m.alb=vec3(.91,.94,.93);
     }
-    if(isLarkspur() && fh>.35 && abs(lp.x)<.20) {
+    if(isThistledown() && fh>.35 && abs(lp.x)<.20) {
       m.alb=gColStripe;
       if(abs(lp.z-fle-.38)<.035)m.alb=vec3(.78,.39,.16);
     }
   } else if (mid == 5) {
     m.alb = gColBase*0.96; m.rough = 0.3;
-    if(isAtlas()) {
+    if(isGalleon()) {
       float dz=lp.z-gM[16].w;
       if(lp.y<gM[16].y+.80)m.alb=mix(gColStripe,gColBase,.15);
       float seam=1.0-smoothstep(.009,.022,min(abs(dz-1.8),abs(dz-3.4)));
@@ -286,11 +286,11 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
       else m.emit = vec3(0.0);   // traffic has no landing-light command in its packed state
     }
   }
-#if HAS_WRAITH
-  else if (WRAITH_ON && mid >= 80 && mid < 94) shadeWraith(m, mid, lp, ln, t);
-  else if (WRAITH_ON && mid >= 61 && mid < 80 && (!JET_ON || int(gM[0].z + 0.5) == 6)) {   // XR-40 cockpit
+#if HAS_SOMNUS
+  else if (SOMNUS_ON && mid >= 80 && mid < 94) shadeSomnus(m, mid, lp, ln, t);
+  else if (SOMNUS_ON && mid >= 61 && mid < 80 && (!JET_ON || int(gM[0].z + 0.5) == 6)) {   // XR-40 cockpit
     gPixM = t*uTanHalf*2.0/uRes.y; gPixG = gPixM/max(abs(dot(ln, transpose(uPlaneRot)*rd)), 0.2);
-    shadeWraithCockpit(m, mid, lp, ln, E.xyz);
+    shadeSomnusCockpit(m, mid, lp, ln, E.xyz);
   }
 #endif
 #if HAS_JET
@@ -346,7 +346,7 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
     else if (mid == 45 || mid == 52 || mid == 53) {  // multi-function displays
       vec3 qd = lp - E.xyz; int page; vec2 uv; float panelScale;
       if (mid == 45) {
-        ResearchPanel panel = specterPanel(specterPanelIndex(qd));
+        ResearchPanel panel = nocturnePanel(nocturnePanelIndex(qd));
         vec3 l = researchPanelFrame(qd, panel);
         page = panel.page; uv = l.xy/panel.h; panelScale = min(panel.h.x, panel.h.y);
       } else {
@@ -494,19 +494,19 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
   }
 #endif
   if (mid == 6 || mid == 8) m = gearFinish(lp, mid, m, t*2.0*uTanHalf/uRes.y);
-#if HAS_OSPREY
-  if (FLEET_ON && MODEL_IS(8)) {   // the Osprey C6's cabin: ivory composite, copper trim, tobacco leather, cocoa textile (its own fittings and the shared ones)
+#if HAS_WAVECREST
+  if (FLEET_ON && MODEL_IS(8)) {   // the Wavecrest C6's cabin: ivory composite, copper trim, tobacco leather, cocoa textile (its own fittings and the shared ones)
     if (mid >= 120 && mid <= 124) {
-      m.alb = ospreyCabinAlbedo(mid); m.metal = mid == 121 ? 0.85 : 0.0; m.rough = mid == 121 ? 0.3 : mid == 122 ? 0.5 : mid == 124 ? 0.2 : 0.75; m.nrm = vec3(0.0, 0.0, 1.0);
+      m.alb = wavecrestCabinAlbedo(mid); m.metal = mid == 121 ? 0.85 : 0.0; m.rough = mid == 121 ? 0.3 : mid == 122 ? 0.5 : mid == 124 ? 0.2 : 0.75; m.nrm = vec3(0.0, 0.0, 1.0);
       if (mid == 124) m.emit = vec3(1.0, 0.9, 0.7)*0.4; interior = true;
     }
     else if (mid == 11) m.alb = vec3(0.58, 0.54, 0.44); else if (mid == 12) m.alb = vec3(0.30, 0.115, 0.052);
     else if (mid == 63) m.alb = vec3(0.72, 0.66, 0.53); else if (mid == 69) m.alb = vec3(0.062, 0.040, 0.028);
   }
 #endif
-#if HAS_MANTIS
-  if (FLEET_ON && isMantis()) {
-    if(mid==1 && mantisWindow(lp)<0.0) { m.alb=vec3(.018,.035,.045); m.rough=.055; m.metal=.30; }
+#if HAS_REVERIE
+  if (FLEET_ON && isReverie()) {
+    if(mid==1 && reverieWindow(lp)<0.0) { m.alb=vec3(.018,.035,.045); m.rough=.055; m.metal=.30; }
     if(mid==2 || mid==3 || mid==5) {
       m.alb=vec3(.115,.14,.17); m.rough=.42; m.metal=.16;
       if(mid==2) {

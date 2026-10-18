@@ -157,7 +157,7 @@ all 1,470 flights matching the baseline):
 | Fuel, median | 23.8 kg | 24.4 kg |
 
 - **Gusts:** a gust's gain is let pass, a loss answered at once (filtered both ways, a storm's shear took 9 m/s off the
-  Islander 20 m up before the power came). Below 100 m on the final, firm hands: 0.6-1.6 g, changed quickly.
+  Skerry 20 m up before the power came). Below 100 m on the final, firm hands: 0.6-1.6 g, changed quickly.
 - **The height before the turn:** up to half a g kept back from the bank when below the height it wants or sinking.
 - **The chart's edge:** a turn as tight as the room left needs (up to 80 deg), when even its sharpest is too wide.
 - **The sea's surface**, not its bed, is the ground the look-ahead keeps clear of.

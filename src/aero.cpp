@@ -38,7 +38,7 @@ AeroModel build(const AircraftSpec& s) {
     if (idx >= 0 && idx < kAircraftCount && s.special == 0) {
       const ModelDef& m = kModels[idx];
       if (m.ht[0] > 0.f) sh = m.ht[0] * (m.ht[1] + m.ht[2]);
-      if (m.vt[0] > 0.f) sv = m.vt[0] * 0.5f * (m.vt[1] + m.vt[2]) * (idx == kMantis ? 2.f : 1.f);
+      if (m.vt[0] > 0.f) sv = m.vt[0] * 0.5f * (m.vt[1] + m.vt[2]) * (idx == kReverie ? 2.f : 1.f);
     }
   }
   float tailQ = s.tail == 1 ? 1.08f : 1.04f;

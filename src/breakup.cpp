@@ -58,7 +58,7 @@ int breakPieces(const AircraftSpec& s, float gearDown, float gearHeight, BreakPi
     const bool fixed = !s.special && m.gear <= 2;
     if (!fixed && gearDown <= .2f) return;
     const GearStations gs = gearStations(s);
-    const bool atlas = &s == &kAircraft[kAtlas];
+    const bool galleon = &s == &kAircraft[kGalleon];
     const float wr = s.special ? .38f : m.wheelR;
     const auto main = gearBreakup::mainPose(s,m,gs,gearHeight,gearDown);
     const vec3 wheel(gs.track,wr-gearHeight,gs.mainZ);
@@ -75,14 +75,14 @@ int breakPieces(const AircraftSpec& s, float gearDown, float gearHeight, BreakPi
     // The leg's endpoints/links and each complete wheel, transformed before making
     // their contact AABB. Rotating a deployed AABB leaves large empty corners and
     // makes a partly folded leg land above the ground or rotate around empty air.
-    const float shaft = fixed ? .08f : atlas ? .24f : .20f;
+    const float shaft = fixed ? .08f : galleon ? .24f : .20f;
     grow(mainBounds,main.hinge,vec3(shaft));
     grow(mainBounds,place(wheel,main.hinge,main.rotation),vec3(shaft));
-    // Atlas uses a vertical oleo and a lower trailing link. The knee is not
+    // Galleon uses a vertical oleo and a lower trailing link. The knee is not
     // collinear with hinge/contact, so include it before forming posed bounds.
     const vec3 mainKnee(gs.track,-2.40f,2.72f);
-    if(atlas) grow(mainBounds,place(mainKnee,main.hinge,main.rotation),vec3(shaft));
-    if(atlas) for(float x:{-.34f,.34f}) for(float z:{-.62f,.62f})
+    if(galleon) grow(mainBounds,place(mainKnee,main.hinge,main.rotation),vec3(shaft));
+    if(galleon) for(float x:{-.34f,.34f}) for(float z:{-.62f,.62f})
       cylinderBounds(mainBounds,wheel+vec3(x,0,z),wr,.189f,main.hinge,main.rotation);
     else if(m.gear==3 && !s.special) for(float x:{-.22f,.22f})
       cylinderBounds(mainBounds,wheel+vec3(x,0,0),wr,.154f,main.hinge,main.rotation);
@@ -102,14 +102,14 @@ int breakPieces(const AircraftSpec& s, float gearDown, float gearHeight, BreakPi
         grow(mainBounds,place(rest,main.hinge,main.rotation),vec3(.04f));
       }
     }
-    const vec3 mainMass=place(lerp(main.hinge,wheel,.68f)+(atlas?(mainKnee-main.hinge)*.15f:vec3(0)),main.hinge,main.rotation);
+    const vec3 mainMass=place(lerp(main.hinge,wheel,.68f)+(galleon?(mainKnee-main.hinge)*.15f:vec3(0)),main.hinge,main.rotation);
     for(int sd:{-1,1}) {
       Bounds b=mainBounds;
       if(sd<0) { b.lo.x=-mainBounds.hi.x;b.hi.x=-mainBounds.lo.x; }
       BreakPiece p=fromBounds(b,BK_GEAR,sd);p.rigidOnly=true;p.massCenter=mainMass;p.massCenter.x*=sd;push(p);
     }
     const float z=s.taildragger?gs.tailZ:gs.noseZ;
-    const float nwr=s.taildragger?.10f:s.special?.33f:wr*(atlas?.74f:m.gear==3?.75f:.85f);
+    const float nwr=s.taildragger?.10f:s.special?.33f:wr*(galleon?.74f:m.gear==3?.75f:.85f);
     const vec3 nw(0,nwr-gearHeight+(s.taildragger?.11f*s.fusLen:0.f),z);
     float hw,hh,cy;modelSection(m,z-(s.taildragger?.3f:0.f),hw,hh,cy);
     vec3 pivot(0,cy-hh*(s.taildragger?.6f:.7f),z-(s.taildragger?.3f:.05f));
@@ -121,8 +121,8 @@ int breakPieces(const AircraftSpec& s, float gearDown, float gearHeight, BreakPi
       pivot=vec3(0,py,z);nr=quat::axisAngle(vec3(1,0,0),-.5f*PI*clampf((1-gearDown)*1.25f,0,1));
     }
     Bounds nose;grow(nose,pivot,vec3(.20f));grow(nose,place(nw,pivot,nr),vec3(.12f));
-    const float offset=s.special?.10f:atlas?.25f:m.gear==3?.15f:0.f;
-    const float half=s.taildragger?.079f:s.special?.114f:atlas?.159f:m.gear==3?.114f:.099f;
+    const float offset=s.special?.10f:galleon?.25f:m.gear==3?.15f:0.f;
+    const float half=s.taildragger?.079f:s.special?.114f:galleon?.159f:m.gear==3?.114f:.099f;
     // The breakup API has no steering angle. Bound the entire permitted steering
     // sweep, with extra travel margin, so a turned tyre/pant never lies outside it.
     const vec3 steeringPivot=fixed?vec3(0,0,z):pivot;
@@ -139,7 +139,7 @@ int breakPieces(const AircraftSpec& s, float gearDown, float gearHeight, BreakPi
 
   };
   if (s.special) {
-    // the XR-30 and XR-40 draw their own airframes (mapJet, the Wraith's): their pieces fitted to those - nose, centre,
+    // the XR-30 and XR-40 draw their own airframes (mapJet, the Somnus's): their pieces fitted to those - nose, centre,
     // tail and both outer wings, no overlaps
     gearPieces();
     const float y0j = -1.7f, y1j = 2.9f;
@@ -158,7 +158,7 @@ int breakPieces(const AircraftSpec& s, float gearDown, float gearHeight, BreakPi
   // engine nacelles that stand clear of the fuselage: on the wings, or podded on the tail cone
   const bool podded = m.engine >= 2 && m.nacR > 0.05f && m.nacX - m.nacR * 0.5f > hwAt(m, m.nacZ0 + 0.5f * m.nacLen);
   if (podded) for (int sd = -1; sd <= 1; sd += 2)
-    push({vec3(sd * m.nacX, m.nacY, m.nacZ0 + 0.5f * m.nacLen), vec3(m.nacR + 0.1f, m.nacR + 0.14f, 0.5f * m.nacLen + (&s == &kAircraft[kAtlas] ? .50f : .12f)), BK_NACELLE, sd});
+    push({vec3(sd * m.nacX, m.nacY, m.nacZ0 + 0.5f * m.nacLen), vec3(m.nacR + 0.1f, m.nacR + 0.14f, 0.5f * m.nacLen + (&s == &kAircraft[kGalleon] ? .50f : .12f)), BK_NACELLE, sd});
   gearPieces();
   // wing struts: from the lower fuselage out to the wing, below its skin
   if (m.strut) {

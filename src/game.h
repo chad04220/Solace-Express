@@ -348,9 +348,9 @@ private:
   std::unordered_map<std::string, unsigned> loadImg;   // loading pictures by name (0: none on disk)
   // UFO encounter: pulls up alongside, opens its hatch on two dancing aliens, laughs, waves and zooms off
   struct Ufo { bool on = false; float t = 0, next = 0, side = 1, hatch = 0, laugh = 0, wave = 0; vec3 pos, fwd, right, up; bool sfxLaugh = false, sfxZoom = false; };
-  float escortSummon = 0; bool escortLatch = false;   // O + P held: the Spectre display pair
-  // XR-40 Wraith systems: cloak, retracting laser turrets, bomb bay and the dark-energy weapons in the world
-  struct WraithState {
+  float escortSummon = 0; bool escortLatch = false;   // O + P held: the Nocturne display pair
+  // XR-40 Somnus systems: cloak, retracting laser turrets, bomb bay and the dark-energy weapons in the world
+  struct SomnusState {
     bool cloakOn = false; float stealth = 0, front = -12.f, padATap = 9.f;        // cloak: strength 0..1 and the wavefront along the craft (body z)
     bool armed = false; float lasers = 0;                          // turrets deployed 0..1
     bool fireLatch = true;   // a click / Enter still held from the launch menu doesn't fire (or arm) until released
@@ -368,7 +368,7 @@ private:
     int wrecked = 0;              // trees, rocks and buildings destroyed
     int kills = 0;
     int shots = 0, dropped = 0;   // laser bolts fired, bombs released (the test cards count them)
-  } wraith;
+  } somnus;
   hive::Combat hiveCombat;
   hive::Loadout combatLoadout;
   hive::ForwardSet practiceForward = hive::ForwardSet::Pulse;
@@ -416,9 +416,9 @@ private:
   hive::WorldCallbacks hiveWorld();
   std::string hiveObjectiveText() const;
   void drawCombatPractice(float x, float y, float width);
-  void wraithControls(float dt);
-  void updateWraith(float dt);
-  void wraithVisual(FrameParams& fp);
+  void somnusControls(float dt);
+  void updateSomnus(float dt);
+  void somnusVisual(FrameParams& fp);
   void buildFeedCameras(FrameParams& fp);
   void buildLights(FrameParams& fp);
   void fireLaser();

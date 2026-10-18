@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sample authored L4/Atlas control travel and pilot-to-instrument rays.
+"""Sample authored L4/Galleon control travel and pilot-to-instrument rays.
 Uses the production layout/stations and fails closed if mirrored control formulae change.
 This is a CPU geometry contract, not a substitute for native raster inspection.
 """
@@ -15,8 +15,8 @@ src=(ROOT/'src/shaders/plane_parts.glsl').read_text();compact=lambda x:re.sub(r'
 s=compact(src)
 for contract in [
  'X.R=transpose(partRxy(cRoll*.24)*partRyz(-cPitch*.24));',
- 'X.T=larkspurStickPivot(sd.x);',
- 'vec3larkspurStickPivot(floatside){returncockpitYokeMount(side);}',
+ 'X.T=thistledownStickPivot(sd.x);',
+ 'vec3thistledownStickPivot(floatside){returncockpitYokeMount(side);}',
  'vec3(0,.151,-.024),.018)',
  'D*transpose(partRxy(-cRoll*0.75))',
  '0.22+pull',
@@ -74,7 +74,7 @@ for model in (13,14):
       if d<=0 and len(violations)<20:violations.append({'model':model,'reason':'primary control blocks live instrument ray','sdf':d,**worst})
  summary.append({'model':model,'name':L['name'],'sampled_states_per_seat':81,'minimum_control_to_instrument_ray_m':minimum,'worst':worst})
 fittings=compact((ROOT/'src/shaders/cockpit_fittings.glsl').read_text())
-assert 'vec3atlasNavFrame(vec3p){vec3q=p-vec3(0,gM[22].y-.590,gM[21].w+.335);q.yz=rot2(q.yz,1.15);returnq;}' in fittings,'Navigation mount changed; reconcile pedestal clearance check'
+assert 'vec3galleonNavFrame(vec3p){vec3q=p-vec3(0,gM[22].y-.590,gM[21].w+.335);q.yz=rot2(q.yz,1.15);returnq;}' in fittings,'Navigation mount changed; reconcile pedestal clearance check'
 E=models[14]['eye'];L=layouts[14];pw,ph,pd,shift=L['pedestal'];pz=E[2]-.85
 pc=[0,E[1]-1.06+ph,pz+.06+pd+shift];nav_clearance=1e6
 for ix in range(11):
@@ -83,7 +83,7 @@ for ix in range(11):
   y,z=rot(y,z,-1.15);p=[x,E[1]-.590+y,pz+.335+z]
   d=rb(sub(p,pc),[pw,ph,pd],.03);nav_clearance=min(nav_clearance,d);checks+=1
   if d<=.01:violations.append({'model':14,'reason':'navigation glass buried in thrust pedestal','clearance':d})
-assert 'X.T=vec3(L.controls.z,E.y-L.controls.w,E.z-.290-.100*cThr)' in s,'Larkspur throttle changed; reconcile visibility contract'
+assert 'X.T=vec3(L.controls.z,E.y-L.controls.w,E.z-.290-.100*cThr)' in s,'Thistledown throttle changed; reconcile visibility contract'
 E=models[13]['eye'];L=layouts[13];m,h=module(13,L,3);status=[m[0],E[1]-m[1],E[2]-.68+m[2]];power_clearance=1e6
 for side in (-1,1):
  eye=[side*abs(E[0]),E[1],E[2]]
@@ -103,7 +103,7 @@ for side in (-1,1):
     p=[a+(b-a)*j/121 for a,b in zip(eye,target)];q=sub(p,[0,E[1]-.590,E[2]-.85+.335]);q[1],q[2]=rot(q[1],q[2],1.15)
     d=rb(q,[.187,.137,.022],.012);status_clearance=min(status_clearance,d);checks+=1
     if d<=.003:violations.append({'model':14,'reason':'navigation tablet blocks shared status from a pilot eye','clearance':d,'seat':side})
-# Atlas thrust shafts/handles must clear the navigation housing and both crew sightlines.
+# Galleon thrust shafts/handles must clear the navigation housing and both crew sightlines.
 # These guards bind the mirror to the production rigid-part pose and unchanged local shape.
 for contract in [
  'X.R=Dq*partLever(mix(-0.55,0.6,cThr));',
@@ -147,5 +147,5 @@ for it in range(21):
 for kind,d in thrust_min.items():
  if d<=.003:violations.append({'model':14,'reason':kind,'clearance_m':d})
 
-result={'atlas_thrust_clearance':thrust_min,'checks':checks,'failures':len(violations),'control_scan':summary,'atlas_navigation_pedestal_clearance_m':nav_clearance,'larkspur_power_sightline_clearance_m':power_clearance,'atlas_status_sightline_clearance_m':status_clearance,'violations':violations,'source_sha256':{str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in [ROOT/'src/shaders/plane_parts.glsl',ROOT/'src/shaders/cockpit_fittings.glsl',ROOT/'assets/cockpits/layouts.json',ROOT/'src/models.cpp']},'limits':'Sampled primary-control/display-ray, power/status visibility and navigation/pedestal contract. Native raster, pedal floor contact, physical reach and performance are separate checks.'}
+result={'galleon_thrust_clearance':thrust_min,'checks':checks,'failures':len(violations),'control_scan':summary,'galleon_navigation_pedestal_clearance_m':nav_clearance,'thistledown_power_sightline_clearance_m':power_clearance,'galleon_status_sightline_clearance_m':status_clearance,'violations':violations,'source_sha256':{str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in [ROOT/'src/shaders/plane_parts.glsl',ROOT/'src/shaders/cockpit_fittings.glsl',ROOT/'assets/cockpits/layouts.json',ROOT/'src/models.cpp']},'limits':'Sampled primary-control/display-ray, power/status visibility and navigation/pedestal contract. Native raster, pedal floor contact, physical reach and performance are separate checks.'}
 print(json.dumps(result,indent=2));raise SystemExit(bool(violations))

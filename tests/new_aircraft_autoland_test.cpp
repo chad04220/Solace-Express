@@ -1,5 +1,5 @@
 // Native gameplay regression: real AP_NAV -> approach -> flare -> rollout, no test-pilot controls.
-// Both new aircraft, both Atlas-compatible fields, legal mid/max loads, calm/windy, standard/comfort.
+// Both new aircraft, both Galleon-compatible fields, legal mid/max loads, calm/windy, standard/comfort.
 #include "../src/aircraft.h"
 #include "test_world.h"
 #include <cstdio>
@@ -65,7 +65,7 @@ static void run(int craft,const char* code,int load,float wind,bool comfort,int 
 // engines must never ask for a climb.
 static void lateralGateCases(){
   for(const char* code:{"CAP","PVI"})for(int failed:{0,1,2})for(float drift:{-3.f,3.f}){
-    const int ai=g_world.findAirport(code);const Airport& a=g_world.airports[ai];const AircraftSpec& s=kAircraft[kAtlas];
+    const int ai=g_world.findAirport(code);const Airport& a=g_world.airports[ai];const AircraftSpec& s=kAircraft[kGalleon];
     Weather wx;wx.windSpeed=wx.turbulence=wx.gust=0;
     Plane p;p.reset(&s,a.pos()+vec3(0,1200,0),a.heading,s.maxFuel*.75f,s.cargoKg+s.pax*85.f+85.f,true,90);
     p.apComfort=true;p.apEngage(Plane::AP_APPR,ai,wx);
@@ -83,7 +83,7 @@ static void lateralGateCases(){
   }
   // A newly acquired ground contact must enter rollout, never take the new
   // early-break go-around path before FINAL's ordinary on-ground transition.
-  const int ai=g_world.findAirport("PVI");const Airport& a=g_world.airports[ai];const AircraftSpec& s=kAircraft[kAtlas];
+  const int ai=g_world.findAirport("PVI");const Airport& a=g_world.airports[ai];const AircraftSpec& s=kAircraft[kGalleon];
   Weather wx;wx.windSpeed=wx.turbulence=wx.gust=0;
   Plane p;p.reset(&s,a.pos()+vec3(0,1200,0),a.heading,s.maxFuel*.75f,s.cargoKg+s.pax*85.f+85.f,true,75);
   p.apComfort=true;p.apEngage(Plane::AP_APPR,ai,wx);const vec3 rr(-p.apLd.z,0,p.apLd.x);
@@ -100,7 +100,7 @@ static void lateralGateCases(){
   printf("LATERAL_GATE jammed-flap safe-height returns to NAV %s\n",jamOk?"PASS":"FAIL");failures+=!jamOk;
 }
 static void terminalStateCases(){
-  const int ai=g_world.findAirport("CAP");const Airport& a=g_world.airports[ai];const AircraftSpec& s=kAircraft[kAtlas];
+  const int ai=g_world.findAirport("CAP");const Airport& a=g_world.airports[ai];const AircraftSpec& s=kAircraft[kGalleon];
   Weather wx;wx.windSpeed=wx.turbulence=wx.gust=0;
   auto fresh=[&](){Plane p;p.reset(&s,a.pos()+vec3(0,3000,0),a.heading,s.maxFuel*.75f,s.cargoKg+s.pax*85.f+85.f,true,100);p.apEngage(Plane::AP_APPR,ai,wx);return p;};
   auto check=[&](bool ok,const char* name){printf("TERMINAL_STATE %s %s\n",name,ok?"PASS":"FAIL");failures+=!ok;};
@@ -122,21 +122,21 @@ static void terminalStateCases(){
 int main(int argc,char**argv){
   buildTestWorld();const int only=argc>1?atoi(argv[1]):-1;
   printf("aircraft,airport,load,engines_out,induced_go_around,initial_mass_kg,wind_mps,mode,seconds,touchdown_sink_mps,stop_from_centre_m,cross_track_m,go_arounds,nav_max_bank_deg,nav_min_g,nav_max_g,max_rollout_cross_m,max_contact_cross_m,result,reason\n");
-  if(argc>1&&!strcmp(argv[1],"--comfort-fixture")){run(kAtlas,"CAP",2,0.f,true);return failures?1:0;}
+  if(argc>1&&!strcmp(argv[1],"--comfort-fixture")){run(kGalleon,"CAP",2,0.f,true);return failures?1:0;}
   lateralGateCases();terminalStateCases();
   if(argc>1&&!strcmp(argv[1],"--gate-cases"))return failures?1:0;
   if(argc>1&&!strcmp(argv[1],"--engine-out")){
-    for(const char* airport:{"CAP","PVI"})for(int load:{0,1})for(float wind:{0.f,6.f})run(kAtlas,airport,load,wind,true,1);
+    for(const char* airport:{"CAP","PVI"})for(int load:{0,1})for(float wind:{0.f,6.f})run(kGalleon,airport,load,wind,true,1);
     printf("%s: %d engine-out failures\n",failures?"FAILED":"PASS",failures);return failures?1:0;
   }
   if(argc>1&&!strcmp(argv[1],"--go-around")){
-    for(const char* airport:{"CAP","PVI"})for(int load:{0,1})for(float wind:{0.f,6.f})run(kAtlas,airport,load,wind,true,0,true);
+    for(const char* airport:{"CAP","PVI"})for(int load:{0,1})for(float wind:{0.f,6.f})run(kGalleon,airport,load,wind,true,0,true);
     printf("%s: %d induced-go-around failures\n",failures?"FAILED":"PASS",failures);return failures?1:0;
   }
-  for(int craft:{kLarkspur,kAtlas})if(only<0||only==craft)
+  for(int craft:{kThistledown,kGalleon})if(only<0||only==craft)
     for(const char* airport:{"CAP","PVI"})for(int load:{0,1})for(float wind:{0.f,6.f})for(bool comfort:{false,true})run(craft,airport,load,wind,comfort);
-  if(only<0||only==kAtlas)run(kAtlas,"CAP",2,6.f,false); // exact aggregate regression fixture
-  if(only<0||only==kAtlas)run(kAtlas,"CAP",2,0.f,true); // exact full-fuel comfort NAV route and envelope
+  if(only<0||only==kGalleon)run(kGalleon,"CAP",2,6.f,false); // exact aggregate regression fixture
+  if(only<0||only==kGalleon)run(kGalleon,"CAP",2,0.f,true); // exact full-fuel comfort NAV route and envelope
   printf("%s: %d native-autoland failures\n",failures?"FAILED":"PASS",failures);
   return failures?1:0;
 }

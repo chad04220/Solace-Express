@@ -4,7 +4,7 @@ Dynamic combat and equipment behavior are covered by their CPU tests.
 from pathlib import Path
 root=Path(__file__).resolve().parents[1]
 g=(root/'src/game.cpp').read_text()
-w=(root/'src/game_wraith.cpp').read_text()
+w=(root/'src/game_somnus.cpp').read_text()
 u=(root/'src/game_ui.cpp').read_text()
 r=(root/'src/game_research_ui.cpp').read_text()
 def body(name,next_name):
@@ -18,7 +18,7 @@ assert 'gs < 2.5f && !researchFlight && !militaryFlight' in g
 assert g.count('if (k.military.activeAttempt) { k.abandonMilitaryAttempt(); return; }')==2
 assert 'researchFlight || isolatedFlight || militaryFlight || crashed' in g
 assert 'militaryFlight || hiveCombat.aliveCount()>0' in g
-assert 'if (!researchFlight || resCard>=0 || specIdx!=kWraith' in g
+assert 'if (!researchFlight || resCard>=0 || specIdx!=kSomnus' in g
 assert 'hiveCombat.aliveCount()<hive::MaxActors' in g
 assert 'hiveCombat.playerShot' in w and 'hiveCombat.playerEMP' in w and 'hiveCombat.playerBlast' in w
 assert 'combatLoadout.releaseBomb()' in w and 'combatLoadout.step(' in w

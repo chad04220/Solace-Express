@@ -1,4 +1,4 @@
-// Test-only staged 1:1 scale review: actual flyable Kestrel and production house/car.
+// Test-only staged 1:1 scale review: actual flyable Dawnlark and production house/car.
 // Uses the existing standard-fleet diagnostic adapter; no geometry changes or rescaling.
 #include "renderer.h"
 #include "materials.h"
@@ -48,7 +48,7 @@ int main(int argc,char**argv) {
   const std::string out=argv[1];const int frames=argc>2?atoi(argv[2]):8;std::filesystem::create_directories(out);
   if(!initGL(1920,1080)){puts("EGL unavailable");return 77;}
   printf("GL: %s; native 1920x1080; Medium; renderScale=1\n",glGetString(GL_RENDERER));
-  puts("STAGED SCALE DIAGNOSTIC: exact current flyable Kestrel, unit-scale production house and sedan placed on a real flat apron. Placement is a test fixture, not a generated town. Every production startup program is built; exact per-aircraft production programs are compiled on demand. Not hardware performance evidence.");
+  puts("STAGED SCALE DIAGNOSTIC: exact current flyable Dawnlark, unit-scale production house and sedan placed on a real flat apron. Placement is a test fixture, not a generated town. Every production startup program is built; exact per-aircraft production programs are compiled on demand. Not hardware performance evidence.");
   const std::string cache=getenv("SHADERCACHE")?getenv("SHADERCACHE"):out+"/cache";std::filesystem::create_directories(cache);
   struct stat st{};stat("/proc/self/exe",&st);g_world.build(cache+"/world.bin","scale-review-"+std::to_string((long long)st.st_mtime));
   g_shaderCacheDir=cache;g_ren.matDir="assets/materials";g_ren.quality=1;g_ren.renderScale=1;g_ren.entSync=true;
@@ -70,15 +70,15 @@ int main(int argc,char**argv) {
   {std::ofstream m(out+"/aircraft.csv");m<<"scene,model,span_m,fuselage_length_m,position_x,position_y,position_z,camera_x,camera_y,camera_z\n";m<<"apron,"<<fp.plane.model<<','<<a.span<<','<<a.fusLen<<','<<fp.plane.pos.x<<','<<fp.plane.pos.y<<','<<fp.plane.pos.z<<','<<fp.camPos.x<<','<<fp.camPos.y<<','<<fp.camPos.z<<'\n';}
   printf("ACTUAL FLEET model=%d span=%.3f fuselage=%.3f position %.3f %.3f %.3f; no scale matrix\n",fp.plane.model,a.span,a.fusLen,fp.plane.pos.x,fp.plane.pos.y,fp.plane.pos.z);
   for(int i=0;i<frames;i++){auto t=std::chrono::steady_clock::now();g_ren.renderScene(fp,{},{});glFinish();const GLenum err=glGetError();if(err){fprintf(stderr,"GL error %x\n",err);return 3;}printf("FRAME %d %.1fms entity instances=%d pending=%d\n",i,std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-t).count(),g_ren.entDrawn,g_ren.entPending);}
-  if(!g_ren.screenshotPNG((out+"/kestrel_house_car.png").c_str()))return 1;
+  if(!g_ren.screenshotPNG((out+"/dawnlark_house_car.png").c_str()))return 1;
   // A second explicitly staged view puts the same unscaled production airframe in
   // the real volcano scene. It is an airborne spatial reference, not a physics test.
   g_ren.resetTemporal();fp.groundVehicles.clear();fp.plane.pos=vec3(25200,2050,-8760);
   const vec3 bowl(25000,1860,-9000);fp.camPos=vec3(25500,2260,-8400);fp.camBack=normalize(fp.camPos-bowl);fp.camRight=normalize(cross(vec3(0,1,0),fp.camBack));fp.camUp=cross(fp.camBack,fp.camRight);fp.fovY=60*DEG;
   {std::ofstream m(out+"/aircraft.csv",std::ios::app);m<<"volcano,"<<fp.plane.model<<','<<a.span<<','<<a.fusLen<<','<<fp.plane.pos.x<<','<<fp.plane.pos.y<<','<<fp.plane.pos.z<<','<<fp.camPos.x<<','<<fp.camPos.y<<','<<fp.camPos.z<<'\n';}
   std::vector<SpriteVert>alpha,add;volcano::append(fp,g_ren.quality,alpha,add);
-  printf("VOLCANO SCALE: unscaled Kestrel camera distance %.3fm; vent distance %.3fm; bowl wall radius340m, changed terrain disk radius520m. Airframe is staged airborne, not a flight-simulation replay.\n",length(fp.plane.pos-fp.camPos),length(bowl-fp.camPos));
+  printf("VOLCANO SCALE: unscaled Dawnlark camera distance %.3fm; vent distance %.3fm; bowl wall radius340m, changed terrain disk radius520m. Airframe is staged airborne, not a flight-simulation replay.\n",length(fp.plane.pos-fp.camPos),length(bowl-fp.camPos));
   for(int i=0;i<frames;i++){g_ren.renderScene(fp,alpha,add);glFinish();if(glGetError())return 3;printf("VOLCANO SCALE FRAME %d pending=%d\n",i,g_ren.entPending);}
-  if(!g_ren.screenshotPNG((out+"/kestrel_volcano_scale.png").c_str()))return 1;
+  if(!g_ren.screenshotPNG((out+"/dawnlark_volcano_scale.png").c_str()))return 1;
   return 0;
 }

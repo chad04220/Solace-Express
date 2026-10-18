@@ -40,7 +40,7 @@ inline std::string stripComments(const std::string& s) {
 
 // ---- the preprocessor's conditionals, settled where the program's own text settles them. A program's source is
 // whole: the build's switches are #defines at its top, and the driver defines nothing else but GL_* and __*__ names.
-// So "#ifdef PART_BAKE" in a program without it, or "#if AF_MODEL == 7" in the Kestrel's build, is known here, and
+// So "#ifdef PART_BAKE" in a program without it, or "#if AF_MODEL == 7" in the Dawnlark's build, is known here, and
 // the branch the driver would skip goes before anything is pruned - with the functions only it called. A condition
 // it can't settle (a GL_ or __ name, a function-like macro, an undefined name, a float, anything it can't parse) keeps
 // its group as written; the groups inside it are still settled, and a macro its branches define differently is

@@ -12,7 +12,7 @@
       q.plane.ctl.throttle=.65f;q.plane.rpm=1200;q.propAngle=1.234f;q.camMode=0;
       q.plane.nozzle=.4f;q.plane.fanAngle=7.5f;q.plane.surf=vec3(.12f,.2f,-.1f);
       for(int i=0;i<4;++i){q.plane.podTilt[i]=.3f+.13f*i;q.plane.podYaw[i]=.07f*i;q.plane.podVane[i]=-.05f*i;}
-      q.wraith.bay=.32f;q.wraith.lasers=.15f;
+      q.somnus.bay=.32f;q.somnus.lasers=.15f;
       for(int i=0;i<3;++i)q.plane.wheelMotion[i].travel=.21*(i+1);
       q.camPos=q.plane.pos+vec3(20,10,30);
       const PlaneVisual before=q.buildFrame().plane;
@@ -32,7 +32,7 @@
       // data rather than the snapshot, including the research nozzle/pod poses.
       q.plane.ctlSurf=vec3(-.9f,.8f,-.6f);q.plane.gear=1.f-gear;q.plane.flaps=.9f;
       q.plane.nozzle=.7f;q.plane.fanAngle+=2;for(int i=0;i<4;++i){q.plane.podTilt[i]+=.3f;q.plane.podYaw[i]-=.2f;}
-      q.wraith.bay=.8f;q.wraith.lasers=.7f;q.propAngle=2.345f;q.plane.fail.engineHealth[0]=0;
+      q.somnus.bay=.8f;q.somnus.lasers=.7f;q.propAngle=2.345f;q.plane.fail.engineHealth[0]=0;
       for(int i=0;i<3;++i)q.plane.wheelMotion[i].travel+=.5;
       ok=ok&&poseSame(q.buildFrame().plane,before);
       // The followed centre section can drift far from the separation point.
@@ -70,16 +70,16 @@
       traffic.craft.push_back(c);TrafficVisual visual{};
       const PlaneVisual player=q.buildFrame().plane;
       bool ok=traffic.fillVisuals(q.plane.pos,&visual,1,nullptr)==1;
-      // Independent expected radii retain every legacy value. Atlas's .4218 m
+      // Independent expected radii retain every legacy value. Galleon's .4218 m
       // nose tyre is .74 of the .57 m main, matching gearNoseR in the field.
       const float mainR=s.special?.38f:m.wheelR;
-      const float noseR=type==kAtlas?.4218f:s.special?.33f:s.taildragger?.10f:m.gear==3?mainR*.75f:mainR*.85f;
+      const float noseR=type==kGalleon?.4218f:s.special?.33f:s.taildragger?.10f:m.gear==3?mainR*.75f:mainR*.85f;
       for(int wi=0;wi<3;++wi) {
         const float expected=q.plane.wheelMotion[wi].angle(wi==2?noseR:mainR);
         ok=ok&&fabsf(player.wheel[wi]-expected)<1e-5f&&fabsf(visual.t[(25+wi)*4+3]-expected)<1e-5f;
       }
       for(int i=0;i<96;++i)ok=ok&&fabsf(player.M[i]-visual.t[i])<1e-6f;
-      if(type==kAtlas)ok=ok&&fabsf(visual.t[19*4]-3.65f)<1e-6f&&fabsf(visual.t[18*4]-3.45f)<1e-6f;
+      if(type==kGalleon)ok=ok&&fabsf(visual.t[19*4]-3.65f)<1e-6f&&fabsf(visual.t[18*4]-3.45f)<1e-6f;
       ++cases;if(!ok){++failures;printf("FAIL wheel visual parity: %s travel %.2f\n",s.name,travel);}
     }
     printf("Wheel visual parity: %d cases, %d failures; all player/traffic radii, signed travel and packed dimensions\n",cases,failures);

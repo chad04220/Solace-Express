@@ -102,7 +102,7 @@ vec3 cabinLight(vec3 p, vec3 n, vec3 v, Mat m, vec3 E, float pz, float phw){
 
 // cabin light: the big displays light it with what they show (sky ahead and above, ground below), plus the emitter
 // strips, headrest slits and a soft key from the overhead rail
-vec3 wraithPodLight(vec3 p, vec3 n, vec3 v, Mat m, vec3 E){
+vec3 somnusPodLight(vec3 p, vec3 n, vec3 v, Mat m, vec3 E){
   vec3 fw = uPlaneRot*vec3(0.0, 0.0, -1.0), upw = uPlaneRot*vec3(0.0, 1.0, 0.0);
   float day = smoothstep(-0.08, 0.15, uSunDir.y);
   vec3 skyF = skyColor(normalize(fw + upw*0.15))*0.9, skyU = skyColor(normalize(upw + fw*0.2))*0.9;

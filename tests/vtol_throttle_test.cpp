@@ -4,7 +4,7 @@
 #include <cmath>
 
 struct GameTest {
-  static void prepare(Game& g, int model = kWraith, float notch = 1.f) {
+  static void prepare(Game& g, int model = kSomnus, float notch = 1.f) {
     g.initHeadless();
     g.screen = SCR_FLIGHT; g.specIdx = model; g.set.traffic = false;
     g.freeFlight = g.isolatedFlight = true; g.engineAutoStarted = g.takeoffAnnounced = true;
@@ -100,7 +100,7 @@ struct GameTest {
     {
       // Conventional planes, the XR-30, and partial pod tilts still retain their incremental throttle.
       for (int model = 0; model < kAircraftCount; ++model) {
-        Game g; prepare(g, model, model == kWraith ? 0.f : 1.f);
+        Game g; prepare(g, model, model == kSomnus ? 0.f : 1.f);
         g.flightControls(dt);
         check(near(g.plane.ctl.throttle, 0.45f), "every non-hover aircraft retains its throttle on release");
         g.in.down[K_SHIFT] = true; g.flightControls(dt);
@@ -110,7 +110,7 @@ struct GameTest {
         check(near(g.plane.ctl.throttle, value), "normal flight still latches the selected power");
       }
       for (float notch : {0.f, 1.f / 3.f, 2.f / 3.f}) {
-        Game g; prepare(g, kWraith, notch); g.in.pad = true; g.in.rt = 0.5f;
+        Game g; prepare(g, kSomnus, notch); g.in.pad = true; g.in.rt = 0.5f;
         g.flightControls(dt);
         const float value = 0.45f + 0.5f * 0.6f * dt;
         check(near(g.plane.ctl.throttle, value), "intermediate notches retain incremental analog throttle");
@@ -121,7 +121,7 @@ struct GameTest {
       }
     }
     {
-      Game g; prepare(g, kWraith, 2.f / 3.f); g.plane.ctl.throttle = 0.9f;
+      Game g; prepare(g, kSomnus, 2.f / 3.f); g.plane.ctl.throttle = 0.9f;
       g.set.keyBind[ACT_THR_UP] = 'J';
       g.in.pressed[g.set.keyBind[ACT_FLAPS_DN]] = true; g.flightControls(dt);
       check(g.plane.ctl.flaps > 0.99f && g.plane.nozzle < 0.99f && g.plane.ctl.throttle == 0.f,

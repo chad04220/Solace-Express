@@ -35,13 +35,13 @@ struct SpriteVert { float x, y, z, u, v, r, g, b, a, kind, soft, bill = 0; };   
 enum SpriteKind { SPR_SMOKE = 0, SPR_GLOW = 1, SPR_RING = 2, SPR_RAIN = 3, SPR_FIRE = 4, SPR_SNOW = 5, SPR_SHOCK = 6, SPR_SPARK = 7, SPR_RIBBON = 8, SPR_FLAME = 9 };
 
 struct PlaneVisual {
-  int wrBombSet = 0; // Wraith carried payload: plasma / penetrator / EMP
+  int wrBombSet = 0; // Somnus carried payload: plasma / penetrator / EMP
   bool on = false;
   vec3 pos; float rot[9];  // body->world, column-major
   float M[24 * 4];          // model geometry (models.cpp packModel)
   float PS[4], Ctl[4], Pr[4], I0[4], I1[4], I2[4];  // state, controls, prop, instruments
   float wheel[3] = {};      // the wheels' roll (radians about body +x): main left, main right, nose / tail (Plane::wheelMotion)
-  int model = -1;           // the type (index into kAircraft): the field reads it for a type's own fittings (kOsprey)
+  int model = -1;           // the type (index into kAircraft): the field reads it for a type's own fittings (kWavecrest)
   vec3 colBase, colStripe;
   float reg[3] = {65, 65, 65};   // registration letters (character codes)
   float prop[2][4]; int propCount = 0;
@@ -313,7 +313,7 @@ public:
   GLuint mapTex() const { return texMap; }
   void resize(int w, int h);
   void setRenderScale(float s);   // the render resolution only: the TAA history stays at display resolution, no pop
-  void warmWraithStores(const FrameParams& fp); // explicit exterior hardware warmup even from cockpit view
+  void warmSomnusStores(const FrameParams& fp); // explicit exterior hardware warmup even from cockpit view
   void warmEnemyTypes(); // explicit loading bake: no scene actors or phantom shadows
   void renderScene(const FrameParams& fp, const std::vector<SpriteVert>& alphaSprites, const std::vector<SpriteVert>& addSprites);
   // A UI-free scene already rendered on this context, retained wholly on the GPU for instant loading cards.

@@ -8,7 +8,7 @@
 // orientation in the world, field of view and resolution (FeedCamera, in FrameParams). The renderer draws the scene
 // from each one into a tile of its feed atlas (a few cameras per frame, in turn) and the panels show those tiles.
 //
-// A rig lists a craft's cameras by slot. The shader's feedScreen (shaders_wraith_cockpit.h) maps a point on a panel
+// A rig lists a craft's cameras by slot. The shader's feedScreen (shaders_somnus_cockpit.h) maps a point on a panel
 // to the same slot, so the pane geometry below must match the shader's.
 static const int kMaxFeeds = 13;
 static const int kFeedBombSlot = 12;   // XR-40: the bomb camera (a free-flying camera, not on the airframe)

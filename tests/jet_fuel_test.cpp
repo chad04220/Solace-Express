@@ -48,7 +48,7 @@ void curves() {
 // rounding and engine state from the separate unrestrained flight test below.
 void metering() {
   const Weather wx=calm();
-  for(int i:{6,kNightjar,kResearchJet,kMantis,kWraith,kAtlas}) {
+  for(int i:{6,kVigil,kResearchJet,kReverie,kSomnus,kGalleon}) {
     const auto&s=kAircraft[i];
     for(float spool:{0.f,.65f,1.f}) {
       Plane p;p.reset(&s,vec3(-39000,2000,35000),0,s.maxFuel,85,true,180);p.sceneryHits=false;
@@ -71,9 +71,9 @@ void metering() {
 }
 void cruiseFlights(int seconds, int only=-1, bool rangeRun=false) {
   const Weather wx=calm();
-  for(int i:{6,kNightjar,kMantis,kResearchJet,kWraith,kAtlas}) {
+  for(int i:{6,kVigil,kReverie,kResearchJet,kSomnus,kGalleon}) {
     if(only>=0 && i!=only)continue;
-    const auto&s=kAircraft[i];const float payload=i==kAtlas?15385.f:i==6?500.f:85.f;
+    const auto&s=kAircraft[i];const float payload=i==kGalleon?15385.f:i==6?500.f:85.f;
     Plane p;p.reset(&s,vec3(-39000,s.fuelCruiseAlt,35000),0,s.maxFuel,payload,true,s.fuelCruiseTas);p.sceneryHits=false;
     p.engineSpool=s.fuelCruiseSpool;p.ctl.throttle=p.engineSpool;
     p.apEngage(Plane::AP_HOLD,-1,wx);p.apAlt=s.fuelCruiseAlt;
@@ -95,14 +95,14 @@ void cruiseFlights(int seconds, int only=-1, bool rangeRun=false) {
     check(!p.ev.crashed&&n>0&&p.engineRunning,"cruise stays airborne with finite fuel");
     check(std::fabs(actual-modelKg)<std::max(.05,modelKg*.004),"free-running simulation burn agrees with estimator");
     check(std::fabs(p.pos.y-s.fuelCruiseAlt)<150 && std::fabs(v-s.fuelCruiseTas)<s.fuelCruiseTas*.12f,"jet holds efficient cruise altitude and TAS");
-    if(i==kAtlas)check(maxSlip<3.f&&maxBank<3.f,"long transport cruise does not develop drag-inducing Dutch roll");
+    if(i==kGalleon)check(maxSlip<3.f&&maxBank<3.f,"long transport cruise does not develop drag-inducing Dutch roll");
     check(range>1000 && range<11000,"measured jet range is plausible and finite");
     check(std::fabs(p.rangeLeftKm()-p.fuel/p.fuelFlowKgS()*p.airspeed/1000)<.01f,"HUD actual range uses current fuel flow and TAS");
   }
 }
 void hoverAndLoadout() {
-  const auto&s=kAircraft[kWraith];
-  for(int gun=0;gun<3;++gun)for(int bomb=0;bomb<3;++bomb){hive::Loadout l;l.reset((hive::ForwardSet)gun,(hive::BombSet)bomb);check(s.emptyMass+s.maxFuel+85+l.massKg()<=s.maxMass(),"every loaded Wraith equipment choice fits MTOW with full fuel");}
+  const auto&s=kAircraft[kSomnus];
+  for(int gun=0;gun<3;++gun)for(int bomb=0;bomb<3;++bomb){hive::Loadout l;l.reset((hive::ForwardSet)gun,(hive::BombSet)bomb);check(s.emptyMass+s.maxFuel+85+l.massKg()<=s.maxMass(),"every loaded Somnus equipment choice fits MTOW with full fuel");}
   Plane p;p.reset(&s,vec3(-39000,800,35000),0,s.maxFuel,85,true,.1f);p.vel=vec3();p.ctl.flaps=p.flaps=p.nozzle=1;p.sceneryHits=false;
   float integral=.68f;double used=0;const Weather wx=calm();
   for(int k=0;k<120*60&&!p.ev.crashed;++k) {
@@ -115,7 +115,7 @@ void hoverAndLoadout() {
   check(p.rangeLeftKm()<30,"hover does not claim cruise distance while burning fuel");
 }
 void missionQuotes() {
-  for(int si:{6,kAtlas}) {
+  for(int si:{6,kGalleon}) {
     Career c;c.newGame();Contract q;q.from=g_world.findAirport("CAP");q.to=g_world.findAirport("PVI");
     q.type=CT_PAX;q.pax=si==6?4:120;q.cargoKg=si==6?100:1200;q.wx=calm();
     auto plan=c.plan(q,si,Career::SRC_OWNED);const float quick=plan.fuelKgEst;
@@ -133,7 +133,7 @@ void missionQuotes() {
 void saveAndCost() {
   Career c;c.newGame();c.money=1000000;c.fleet.clear();
   // Historical saved kilograms remain kilograms: no tank-percent migration or free uplift.
-  c.fleet.push_back({6,c.location,1100,1});c.fleet.push_back({kAtlas,c.location,14000,1});
+  c.fleet.push_back({6,c.location,1100,1});c.fleet.push_back({kGalleon,c.location,14000,1});
   const std::string path=(std::filesystem::temp_directory_path()/
     ("somnium-jet-fuel-save-"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())+".cfg")).string();
   check(c.save(path),"save old jet fuel quantities");Career d;check(d.load(path),"load old jet fuel quantities");

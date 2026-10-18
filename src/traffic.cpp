@@ -171,7 +171,7 @@ void Traffic::spawnDisplayTeam(int ai) {
   int leadIdx = (int)craft.size();
   for (int i = 0; i < 2; i++) {
     TrafficCraft c; c.id = nextId++;
-    c.spec = 0;   // Kestrel T2 aerobatic trainers
+    c.spec = 0;   // Dawnlark T2 aerobatic trainers
     c.role = TrafficCraft::STUNT; c.state = TrafficCraft::FLY; c.airport = ai;
     c.leader = i == 0 ? -1 : leadIdx; c.offset = vec3(13.f, -1.5f, 11.f);
     c.hdg = (a.heading + 90.f * side) * DEG;
@@ -585,7 +585,7 @@ void Traffic::spawnEscort(vec3 player, vec3 playerVel) {
     c.hdg = atan2f(escF.x, -escF.z); attitudeToQuat(c);
     craft.push_back(c);
   }
-  radio.push_back("SPECTRE DISPLAY PAIR: Two Specters joining on your wing - enjoy the show!");
+  radio.push_back("NOCTURNE DISPLAY PAIR: Two Nocturnes joining on your wing - enjoy the show!");
 }
 
 // an act change mid-manoeuvre: each jet blends from where it is onto the new act's path
@@ -625,7 +625,7 @@ int Traffic::destroyNear(vec3 c, float R, std::vector<vec3>& where) {
 void Traffic::dismissEscort() {
   if (count(TrafficCraft::ESCORT) == 0 || escAct == ESC_LEAVE) return;
   escAct = ESC_LEAVE; escT = 0; escMark();
-  radio.push_back("SPECTRE: That's the show - Specters breaking off. Fly safe!");
+  radio.push_back("NOCTURNE: That's the show - Nocturnes breaking off. Fly safe!");
 }
 
 void Traffic::updateEscorts(float dt, vec3 player, vec3 playerVel) {
@@ -640,15 +640,15 @@ void Traffic::updateEscorts(float dt, vec3 player, vec3 playerVel) {
   // act sequencing: an act can only change at its end, when both jets are back in their slots
   escT += dt;
   if (escortStop && escAct != ESC_LEAVE && (escAct == ESC_FORM || escT >= escDur(escAct))) {
-    escAct = ESC_LEAVE; escT = 0; escMark(); radio.push_back("SPECTRE: You're on approach - we'll leave you to it. Specters out!");
+    escAct = ESC_LEAVE; escT = 0; escMark(); radio.push_back("NOCTURNE: You're on approach - we'll leave you to it. Nocturnes out!");
   }
   if (escT >= escDur(escAct)) {
     if (escAct == ESC_LEAVE) { for (auto& c : craft) if (c.role == TrafficCraft::ESCORT) c.alive = false; return; }
     if (escAct == ESC_SPLIT) for (auto& c : craft) if (c.role == TrafficCraft::ESCORT) c.escSide = -c.escSide;   // they crossed over
     static const int order[] = {ESC_FORM, ESC_HELIX, ESC_CROSS, ESC_FORM, ESC_LOOPS, ESC_SPLIT};
-    static const char* calls[] = {"SPECTRE: Smoke on... now. Tight formation, hold her steady.", "SPECTRE: Helix - we'll wrap you up. Don't flinch!",
-                                  "SPECTRE: Opposition pass coming at you, knife-edge!", "SPECTRE: Back in formation. Nice flying, partner.",
-                                  "SPECTRE: Synchronised loops off your nose - watch this.", "SPECTRE: Split and cross - one high, one low!"};
+    static const char* calls[] = {"NOCTURNE: Smoke on... now. Tight formation, hold her steady.", "NOCTURNE: Helix - we'll wrap you up. Don't flinch!",
+                                  "NOCTURNE: Opposition pass coming at you, knife-edge!", "NOCTURNE: Back in formation. Nice flying, partner.",
+                                  "NOCTURNE: Synchronised loops off your nose - watch this.", "NOCTURNE: Split and cross - one high, one low!"};
     escAct = order[escNext % 6]; radio.push_back(calls[escNext % 6]); escNext++;
     escT = 0; escMark();
   }

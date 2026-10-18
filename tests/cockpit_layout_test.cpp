@@ -14,7 +14,7 @@ int main(){
     test(!memcmp(f,f2,sizeof f)&&!memcmp(s,s2,sizeof s),"deterministic cabin fit/cache data",model);
     for(float v:f)test(std::isfinite(v),"finite foot fit",model);
     for(float v:s)test(std::isfinite(v),"finite seat fit",model);
-    if(model<10||model==kLarkspur||model==kAtlas){
+    if(model<10||model==kThistledown||model==kGalleon){
       test(f[0]<m.eye.y-.5f,"pedal contacts below hand/yoke band",model);
       test(f[1]<m.eye.z-.5f,"pedals forward in real footwell",model);
       test(s[0]+.028f<=m.eye.y-s[1]-.055f,"seat support extends from floor to pan",model);
@@ -22,26 +22,26 @@ int main(){
       test(!memcmp(data,kCockpitLayouts[model].value,sizeof data),"exact bounded authored record packing",model);
       for(float v:data)test(std::isfinite(v),"finite layout data",model);
       test(data[3]>0&&data[7]>0&&data[11]>0&&data[15]>0,"positive instrument/module scale",model);
-      const float neutralYoke=z+data[5*4+1]+(model<=2||model==kLarkspur?0.f:.22f);
+      const float neutralYoke=z+data[5*4+1]+(model<=2||model==kThistledown?0.f:.22f);
       test(neutralYoke-f[1]>.19f,"pedals distinctly ahead of primary control",model);
       if(model==2){
-        test(fabsf(m.eye.x+.250f)<1e-6f&&fabsf(m.eye.y-.530f)<1e-6f,"Bushmaster matched seated eye",model);
-        test(fabsf(f[2]-.252f)<1e-6f&&fabsf(f[3]-.080f)<1e-6f,"Bushmaster preserves pedal spread",model);
-        test(fabsf(f[0]+.326259047f)<2e-6f&&fabsf(f[1]+1.8950001f)<2e-6f,"Bushmaster preserves pedal world height/station",model);
-        test(fabsf(neutralYoke+1.500f)<2e-6f,"Bushmaster floor-stick station",model);
-        test(fabsf(s[1]-.640f)<1e-6f,"Bushmaster supported cushion drop",model);
+        test(fabsf(m.eye.x+.250f)<1e-6f&&fabsf(m.eye.y-.530f)<1e-6f,"Scrubrunner matched seated eye",model);
+        test(fabsf(f[2]-.252f)<1e-6f&&fabsf(f[3]-.080f)<1e-6f,"Scrubrunner preserves pedal spread",model);
+        test(fabsf(f[0]+.326259047f)<2e-6f&&fabsf(f[1]+1.8950001f)<2e-6f,"Scrubrunner preserves pedal world height/station",model);
+        test(fabsf(neutralYoke+1.500f)<2e-6f,"Scrubrunner floor-stick station",model);
+        test(fabsf(s[1]-.640f)<1e-6f,"Scrubrunner supported cushion drop",model);
       }
     }
     CockpitFocusTarget target[24];int n=modelCockpitFocusTargets(model,target,24);
     test(n>0 && n<=24,"bounded focus surfaces for each flyable craft",model);
-    if(model==kLarkspur){
-      test(n==15,"Larkspur has two six-packs, power/fuel and shared live status",model);
-      test(kCockpitLayouts[model].value[5][0]>.60f,"Larkspur stick mount remains below scan and above floor",model);
+    if(model==kThistledown){
+      test(n==15,"Thistledown has two six-packs, power/fuel and shared live status",model);
+      test(kCockpitLayouts[model].value[5][0]>.60f,"Thistledown stick mount remains below scan and above floor",model);
     }
-    if(model==kAtlas){
-      test(n==8,"Atlas includes both crews, engines, status, navigation and overhead",model);
-      test(target[0].normal.x>0 && target[2].normal.x<0,"Atlas wraparound displays face inward toward crew",model);
-      test(target[6].normal.y>.80f && target[7].normal.y<-.99f,"Atlas navigation and overhead gaze targets follow real glass",model);
+    if(model==kGalleon){
+      test(n==8,"Galleon includes both crews, engines, status, navigation and overhead",model);
+      test(target[0].normal.x>0 && target[2].normal.x<0,"Galleon wraparound displays face inward toward crew",model);
+      test(target[6].normal.y>.80f && target[7].normal.y<-.99f,"Galleon navigation and overhead gaze targets follow real glass",model);
     }
     for(int i=0;i<n;i++){
       test(std::abs(length(target[i].normal)-1.f)<1e-5f,"unit display normal",model);

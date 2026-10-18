@@ -51,7 +51,7 @@ public:
   void followSeam(vec3 d);   // the player came back in over the map's seam: the craft flying with it come too (the fields' own stay)
   int fillVisuals(vec3 camPos, TrafficVisual* out, int maxN, int* order) const;   // nearest first
   int count(int role) const;
-  // O+P entertainment: a pair of XR-9s flies a display around the player until dismissed or the player lands
+  // O+P entertainment: a pair of XR-30 Nocturnes flies a display around the player until dismissed or the player lands
   void spawnEscort(vec3 player, vec3 playerVel);
   // the player's airline (C11): a scheduled flight of the given type, from "at" towards the destination airport, tagged
   void spawnRoute(int spec, vec3 at, int destAirport, int tag);

@@ -29,7 +29,7 @@ struct AircraftSpec {
   // visual model
   float fusLen, fusRad, wingY, wingZ; int engLayout, tail;
   vec3 colBase, colStripe;
-  int special = 0;             // 1 = XR-30 research jet: fly-by-wire, pitch thrust vectoring; 2 = XR-40 Wraith (both consume fuel)
+  int special = 0;             // 1 = XR-30 research jet: fly-by-wire, pitch thrust vectoring; 2 = XR-40 Somnus (both consume fuel)
   // the research craft's performance tier (0: a conventional type). Below 1 the type is held just under the sound
   // barrier by its drag rise; above 1 the engines have reheat and the drag rise is the research jets'. gPos / gNeg are
   // the structural limits (0: the type's defaults); the airframe takes a sustained overstress before it lets go
@@ -72,18 +72,18 @@ inline std::string registrationOf(const AircraftSpec& s) {
   for (int i = 0; i < 3; i++) { h = h * 1664525u + 1013904223u; r += (char)('A' + (h >> 8) % 26); }
   return r;
 }
-static const int kOsprey = 8;       // the Osprey C6: the only type with its own cabin trim in the field (plane_sdf.glsl)
+static const int kWavecrest = 8;       // the Wavecrest C6: the only type with its own cabin trim in the field (plane_sdf.glsl)
 // Stable aircraft identities: append new types; never renumber existing saves, diagnostics or shader models.
 // Research craft are reachable only from the research terminal, independent of their flight-model special flag.
-static const int kNightjar = 9;     // XR-10 Nightjar: a conventional twin jet (special 0, the generic field and flight model)
-static const int kResearchJet = 10; // XR-30 Specter
-static const int kMantis = 11;      // XR-20 Mantis: forward-swept systems demonstrator (special 0; the generic field)
-static const int kWraith = 12;      // XR-40 Wraith stealth aerobatic research craft
-static constexpr int kLarkspur = 13; // Larkspur L4: four-seat piston tourer
-static constexpr int kAtlas = 14;    // Atlas A180: twin-underwing transport
+static const int kVigil = 9;     // XR-10 Vigil: a conventional twin jet (special 0, the generic field and flight model)
+static const int kResearchJet = 10; // XR-30 Nocturne
+static const int kReverie = 11;      // XR-20 Reverie: forward-swept systems demonstrator (special 0; the generic field)
+static const int kSomnus = 12;      // XR-40 Somnus stealth aerobatic research craft
+static constexpr int kThistledown = 13; // Thistledown L4: four-seat piston tourer
+static constexpr int kGalleon = 14;    // Galleon 180: twin-underwing transport
 static constexpr int kAircraftCount = 15; // all aircraft, including research
-static constexpr int kResearchAircraft[] = {kNightjar, kMantis, kResearchJet, kWraith};
-static constexpr int kCareerAircraft[] = {0, 1, 2, 3, 4, 5, 6, 7, kOsprey, kLarkspur, kAtlas};
+static constexpr int kResearchAircraft[] = {kVigil, kReverie, kResearchJet, kSomnus};
+static constexpr int kCareerAircraft[] = {0, 1, 2, 3, 4, 5, 6, 7, kWavecrest, kThistledown, kGalleon};
 static constexpr int kNumAircraft = sizeof(kCareerAircraft) / sizeof(kCareerAircraft[0]); // career roster count, never an index bound
 inline constexpr bool validAircraft(int spec) { return spec >= 0 && spec < kAircraftCount; }
 inline constexpr int careerRowFor(int spec) {
@@ -101,7 +101,7 @@ inline float performanceReferencePayload(const AircraftSpec& s) {
   return s.fullCabinEnvelope ? 0.5f * (s.cargoKg + s.pax * 85.f + 85.f) : 150.f;
 }
 // XR-40 thruster pods (body coords, +z aft): front left, front right, rear left, rear right pivot points
-static const vec3 kWraithPods[4] = {vec3(-2.35f, -0.08f, -3.3f), vec3(2.35f, -0.08f, -3.3f), vec3(-2.75f, 0.05f, 3.45f), vec3(2.75f, 0.05f, 3.45f)};
+static const vec3 kSomnusPods[4] = {vec3(-2.35f, -0.08f, -3.3f), vec3(2.35f, -0.08f, -3.3f), vec3(-2.75f, 0.05f, 3.45f), vec3(2.75f, 0.05f, 3.45f)};
 
 // What an aircraft can do, learned by flying it: Plane::perf() flies a few short test sorties through the flight model
 // (once per type, cached) and measures its envelope. The autopilot flies to these numbers, so it pushes every type to
@@ -337,7 +337,7 @@ private:
   float apStopNeed(const Airport& a, bool rev, const Weather& wx, float* tw) const;
   void apHover(float dt);
   void apBellyUp(float dt);   // the research craft's speed-shedding pitch-up on the final (APS_BLEED)
-  void wraithThrust(vec3& F, vec3& T, float podThrust, vec3 wd, vec3 Taero, vec3 surfMax, float dt);
+  void somnusThrust(vec3& F, vec3& T, float podThrust, vec3 wd, vec3 Taero, vec3 surfMax, float dt);
   vec3 gust;
   float cd0 = 0.03f;
 };

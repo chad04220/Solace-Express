@@ -39,13 +39,13 @@ static float panelBody(vec3 q,ResearchPanel p,bool wr){
   float d=box(l+vec3(0,0,depth),vec3(p.h.x+border-.012f,p.h.y+border-.012f,depth-.012f))-.012f;
   return max(d,(std::abs(l.x)+std::abs(l.y)-p.h.x-p.h.y-2*border+p.corner)*.70710678f);
 }
-static bool specterWindowCut(vec3 q){
+static bool nocturneWindowCut(vec3 q){
   float r=std::hypot(q.x,q.z);
   if(r>.626f){vec3 p=q*(.634f/r);if(std::abs(atan(p.x,-p.z))<1.25f&&std::abs(p.y-.02f)<.30f)return true;}
   if(std::abs(q.x)>.622f){vec3 p=q*(.63f/std::abs(q.x));if(std::abs(p.y-.04f)<.2f&&std::abs(p.z-.24f)<.3f)return true;}
   return false;
 }
-static bool wraithFrontCut(vec3 q){
+static bool somnusFrontCut(vec3 q){
   // The unchanged panoramic window's cylindrical analytic cut.
   vec2 d(q.x,q.z+.15f);float r=std::hypot(d.x,d.y);if(1.f-r>.023f)return false;
   float qa=q.x*q.x+q.z*q.z,qb=-q.z*.15f;
@@ -56,27 +56,27 @@ static bool wraithFrontCut(vec3 q){
   }
   return true;
 }
-static bool wraithChinCut(vec3 q){
+static bool somnusChinCut(vec3 q){
   ResearchPanel pane;pane.c=vec3(0,-.5f,-1);pane.n=vec3(0,.7509f,.6604f);pane.h=vec2(.38f,.2f);pane.corner=.07f;
   vec3 l=researchPanelFrame(q,pane);if(l.z>.023f)return false;
   float qn=dot(q,pane.n),cn=dot(pane.c,pane.n);if(qn>-1e-5f)return false;
   for(float h:{.019f,.004f}){vec3 p=q*(h==.019f?min((h+cn)/qn,1.f):(h+cn)/qn);vec3 a=researchPanelFrame(p,pane);if(researchPanelShape(vec2(a.x,a.y),pane)>=0.f)return false;}
   return true;
 }
-static float wraithBridge(vec3 q){
-  vec3 l=researchPanelFrame(q,wraithPanel(1));
+static float somnusBridge(vec3 q){
+  vec3 l=researchPanelFrame(q,somnusPanel(1));
   return box(l-WR_BRIDGE_C,WR_BRIDGE_HALF-vec3(WR_BRIDGE_ROUND))-WR_BRIDGE_ROUND;
 }
-static float specterSaddle(vec3 q){
+static float nocturneSaddle(vec3 q){
   float r=std::hypot(q.x,q.z),a=atan(q.x,-q.z);
   float d=max(max(r-.71f,.47f-r),max(std::abs(a)-1.18f,max(q.y+.505f,-.56f-q.y)));
   return max(d,.47f+std::clamp(-.54f-q.y,0.f,.02f)-r);
 }
 static float structure(vec3 q,bool wr){
-  float d=1e6f;for(int i=0;i<(wr?3:5);++i)d=min(d,panelBody(q,wr?wraithPanel(i):specterPanel(i),wr));
-  if(!wr)return min(d,min(specterSaddle(q),footwellLight(q)));
-  ResearchPanel p=wraithPanel(1);vec3 l=researchPanelFrame(q,p);
-  float bridge=wraithBridge(q);
+  float d=1e6f;for(int i=0;i<(wr?3:5);++i)d=min(d,panelBody(q,wr?somnusPanel(i):nocturnePanel(i),wr));
+  if(!wr)return min(d,min(nocturneSaddle(q),footwellLight(q)));
+  ResearchPanel p=somnusPanel(1);vec3 l=researchPanelFrame(q,p);
+  float bridge=somnusBridge(q);
   float rail=box(l-vec3(0,-.155f,-.019f),vec3(.282f,.009f,.019f))-.008f;
   return min(d,min(bridge,rail));
 }
@@ -91,8 +91,8 @@ int main(){
   // Exact physical shin-surface witnesses from the explicit seated proxy at full rudder.
   // The former square lower rim put each point 2.38 mm inside the saddle.
   // These fixed regression points avoid importing a body-fitting search into the layout contract.
-  for(float side:{-1.f,1.f})check(structure(vec3(side*.193134832f,-.557051054f,-.431092489f),false)>.010f,"Specter lower saddle rim clears full-rudder shin witness");
-  check(structure(vec3(.2f,-.520f,-.44f),false)<-.010f,"Specter upper saddle support remains solid");
+  for(float side:{-1.f,1.f})check(structure(vec3(side*.193134832f,-.557051054f,-.431092489f),false)>.010f,"Nocturne lower saddle rim clears full-rudder shin witness");
+  check(structure(vec3(.2f,-.520f,-.44f),false)<-.010f,"Nocturne upper saddle support remains solid");
   for(float side:{-1.f,1.f}){
     check(footwellLight(vec3(side*.159208171f,-.599872070f,-.419991894f))>.20f,"recessed footwell strip clears former shin/crossbar witness");
     check(footwellLight(vec3(side*.195f,-.83031036f,-.516947934f))>.080f,"footwell strip clears full-rudder shoe witness");
@@ -102,18 +102,18 @@ int main(){
   for(bool wr:{false,true}){
     std::set<int> pages;int count=wr?3:5;
     for(int i=0;i<count;++i){
-      ResearchPanel p=wr?wraithPanel(i):specterPanel(i);pages.insert(p.page);
+      ResearchPanel p=wr?somnusPanel(i):nocturnePanel(i);pages.insert(p.page);
       check(std::abs(length(p.n)-1.f)<1e-5f,"unit front normal");
       check(dot(p.n,-p.c)>.1f,"screen faces eye");
       for(int x=-25;x<=25;++x)for(int y=-25;y<=25;++y){
         vec3 l(p.h.x*x/25.f,p.h.y*y/25.f,0);if(researchPanelShape(vec2(l.x,l.y),p)>-.0001f)continue;
         vec3 q=point(p,l),back=researchPanelFrame(q,p);
         check(length(back-l)<1e-5f,"glass coordinate round trip");
-        check((wr?wraithPanelIndex(q):specterPanelIndex(q))==i,"analytic material mask owns entire page");
-        if(!wr)check(!specterWindowCut(q),"Specter glass is never removed by direct-window cut");
-        else check(!wraithFrontCut(q)&&!wraithChinCut(q),"Wraith glass is never removed by front/chin direct-window cuts");
+        check((wr?somnusPanelIndex(q):nocturnePanelIndex(q))==i,"analytic material mask owns entire page");
+        if(!wr)check(!nocturneWindowCut(q),"Nocturne glass is never removed by direct-window cut");
+        else check(!somnusFrontCut(q)&&!somnusChinCut(q),"Somnus glass is never removed by front/chin direct-window cuts");
         for(int j=0;j<count;++j)if(j!=i){
-          float d=panelBody(q,wr?wraithPanel(j):specterPanel(j),wr);minFaceGap=min(minFaceGap,d);
+          float d=panelBody(q,wr?somnusPanel(j):nocturnePanel(j),wr);minFaceGap=min(minFaceGap,d);
           check(d>.005f,"glass clear of other module bodies");
         }
         // No other new body crosses the glass-to-eye ray.
@@ -121,7 +121,7 @@ int main(){
       }
     }
     check(pages.count(3)==1&&pages.count(2)==1&&pages.count(0)==1,"flight, map, engine retained");
-    if(!wr)check(pages==std::set<int>({0,1,2,3,4}),"all five Specter arc pages retained once");
+    if(!wr)check(pages==std::set<int>({0,1,2,3,4}),"all five Nocturne arc pages retained once");
     // Conservative boxes contain the complete moving grip/stem shape. Every box corner and edge/interior point
     // is sampled over combined pitch/roll and full throttle travel; intentional original base joints are excluded.
     float side=wr?.5f:.42f,baseY=wr?-.41f:-.375f,baseZ=wr?-.06f:-.02f;
@@ -138,33 +138,33 @@ int main(){
       float d=structure(q,wr);minControlGap=min(minControlGap,d);check(d>.025f,"pedal travel clears new primary bridge");
     }
   }
-  // The primary Specter glass used to intersect the lower panoramic bezel. Checking only
+  // The primary Nocturne glass used to intersect the lower panoramic bezel. Checking only
   // the five new modules missed that older structure, and its cylindrical lip cut a ragged
   // arch across the top of the flat display. Use the production bezel field, with a 10 mm
   // margin for the cabin mesh. Include the outline and the first ~1 mm steps toward the eye;
   // a coarse sightline test can step completely over a shallow glass/bezel intersection.
-  ResearchPanel primary=specterPanel(2);
+  ResearchPanel primary=nocturnePanel(2);
   const vec3 eyes[]={vec3(0),vec3(-.025f,0,0),vec3(.025f,0,0),vec3(0,-.025f,0),
                      vec3(0,.025f,0),vec3(0,0,-.025f),vec3(0,0,.025f)};
   float minPrimaryBezelGap=1e6f,minPrimaryOutlineGap=1e6f;
   auto checkPrimaryPoint=[&](vec2 local){
     vec3 q=point(primary,vec3(local.x,local.y,0));
-    check(specterPanelIndex(q)==2,"Specter primary outline belongs to its own material mask");
-    check(!specterWindowCut(q),"Specter primary outline survives the direct-window cut");
+    check(nocturnePanelIndex(q)==2,"Nocturne primary outline belongs to its own material mask");
+    check(!nocturneWindowCut(q),"Nocturne primary outline survives the direct-window cut");
     // The exact outline comes closer to neighboring mounts than the interior grid above;
     // require separation here without changing that existing grid's 5 mm margin.
     for(int i:{0,1,3,4}){
-      float gap=panelBody(q,specterPanel(i),false);
+      float gap=panelBody(q,nocturnePanel(i),false);
       minPrimaryOutlineGap=min(minPrimaryOutlineGap,gap);
-      check(gap>0.f,"Specter primary outline clears adjacent module bodies");
+      check(gap>0.f,"Nocturne primary outline clears adjacent module bodies");
     }
     for(vec3 eye:eyes)for(int ray=0;ray<=40;++ray){
       float t=ray*.001f;
       vec3 probe=q*(1.f-t)+eye*t;
-      float gap=specterPanoramaBezel(probe);
+      float gap=nocturnePanoramaBezel(probe);
       minPrimaryBezelGap=min(minPrimaryBezelGap,gap);
-      check(gap>.010f,"Specter primary glass and near-face eye rays clear panoramic bezel by 10 mm");
-      check(specterSaddle(probe)>.005f,"Specter primary glass and near-face eye rays clear saddle support by 5 mm");
+      check(gap>.010f,"Nocturne primary glass and near-face eye rays clear panoramic bezel by 10 mm");
+      check(nocturneSaddle(probe)>.005f,"Nocturne primary glass and near-face eye rays clear saddle support by 5 mm");
     }
   };
   for(int x=-80;x<=80;++x)for(int y=-51;y<=51;++y){
@@ -179,39 +179,39 @@ int main(){
   // The local bezel relief preserves the existing module's broad mechanical saddle connection.
   for(float x:{-.12f,0.f,.12f}){
     vec3 joint=point(primary,vec3(x,-.105f,-.040f));
-    check(specterSaddle(joint)<-.010f&&panelBody(joint,primary,false)<-.010f,
-          "Specter primary rear remains embedded at least 10 mm in saddle support");
+    check(nocturneSaddle(joint)<-.010f&&panelBody(joint,primary,false)<-.010f,
+          "Nocturne primary rear remains embedded at least 10 mm in saddle support");
   }
   for(vec3 bezel:{vec3(0,-.290f,-.675f),vec3(0,.340f,-.675f),
                   vec3(-.5f,-.300f,-.4534589f),vec3(.5f,-.300f,-.4534589f)})
-    check(specterPanoramaBezel(bezel)<-.009f,"Specter panoramic bezel remains solid outside local primary mounting relief");
-  std::printf("Specter primary near-face panoramic-bezel clearance: %.1f mm; outline-to-module clearance: %.1f mm\n",
+    check(nocturnePanoramaBezel(bezel)<-.009f,"Nocturne panoramic bezel remains solid outside local primary mounting relief");
+  std::printf("Nocturne primary near-face panoramic-bezel clearance: %.1f mm; outline-to-module clearance: %.1f mm\n",
               minPrimaryBezelGap*1000,minPrimaryOutlineGap*1000);
   // The old 12-step sightline test skipped the first ~77 mm in front of each display. The bridge
   // actually penetrated the side glass by 13.7 mm there. Sample the face and the first 4% of every
   // ray densely (about 1 mm steps), requiring at least 15 mm of analytic clearance.
   float minBridgeGap=1e6f;
   for(int i:{0,2}){
-    ResearchPanel p=wraithPanel(i);
+    ResearchPanel p=somnusPanel(i);
     for(int x=-60;x<=60;++x)for(int y=-36;y<=36;++y){
       vec3 local(p.h.x*x/60.f,p.h.y*y/36.f,0);
       if(researchPanelShape(vec2(local.x,local.y),p)>-.0001f)continue;
       vec3 q=point(p,local);
       for(int ray=0;ray<=40;++ray){
-        float gap=wraithBridge(q*(1.f-ray*.001f));minBridgeGap=min(minBridgeGap,gap);
-        check(gap>.015f,"recessed Wraith bridge clears adjacent glass and near-face pilot rays");
+        float gap=somnusBridge(q*(1.f-ray*.001f));minBridgeGap=min(minBridgeGap,gap);
+        check(gap>.015f,"recessed Somnus bridge clears adjacent glass and near-face pilot rays");
       }
     }
     // The recessed bridge still meets the solid rear of both side modules, rather than leaving
     // their brackets floating. This point is 52 mm behind and 60 mm below each glass centre.
     vec3 joint=point(p,vec3(0,-.060f,-.052f));
-    check(wraithBridge(joint)<-.003f&&panelBody(joint,p,true)<-.003f,"Wraith side-module rear remains joined to bridge");
+    check(somnusBridge(joint)<-.003f&&panelBody(joint,p,true)<-.003f,"Somnus side-module rear remains joined to bridge");
   }
-  check(wraithBridge(point(wraithPanel(1),vec3(0,-.090f,-.053f)))<-.003f,
-        "Wraith centre-module rear remains joined to bridge");
-  std::printf("Wraith adjacent-screen near-face bridge clearance: %.1f mm\n",minBridgeGap*1000);
-  check(wraithPanel(1).h.x*wraithPanel(1).h.y>2*wraithPanel(0).h.x*wraithPanel(0).h.y,"Wraith primary area hierarchy");
-  check(specterPanel(2).h.x*specterPanel(2).h.y>1.8f*specterPanel(1).h.x*specterPanel(1).h.y,"Specter primary area hierarchy");
+  check(somnusBridge(point(somnusPanel(1),vec3(0,-.090f,-.053f)))<-.003f,
+        "Somnus centre-module rear remains joined to bridge");
+  std::printf("Somnus adjacent-screen near-face bridge clearance: %.1f mm\n",minBridgeGap*1000);
+  check(somnusPanel(1).h.x*somnusPanel(1).h.y>2*somnusPanel(0).h.x*somnusPanel(0).h.y,"Somnus primary area hierarchy");
+  check(nocturnePanel(2).h.x*nocturnePanel(2).h.y>1.8f*nocturnePanel(1).h.x*nocturnePanel(1).h.y,"Nocturne primary area hierarchy");
   check(std::abs(WR_HOLO_CENTRE.x)-WR_HOLO_RADIUS>.6f,"hologram outside central flight scan");
   // Front floor/bomb pane remains fully visible below the new instrument bridge. Pedal/rib coverage is unchanged.
   for(int x=-15;x<=15;++x)for(int z=-15;z<=15;++z){

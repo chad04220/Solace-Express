@@ -54,9 +54,9 @@ struct GameTest {
       struct Case { const char* msg; const char* mission; bool pad, want; } cases[] = {
         {"Checkpoint 2 of 6", "", false, true}, {"Flaps 33%", "", false, true}, {"Gear down", "", false, true},
         {"Runway 05, Wind 050@4kt, scattered 4500ft, vis 10+km, 09:30", "", false, true}, {"MDB - Meadowbrook Field", "", false, true},
-        {"BUTTER!  42 fpm", "", false, true}, {"Gear collapsed - hit at 812 fpm", "", false, true}, {"SPLASH 2 - Wren 180 down", "", false, true},
+        {"BUTTER!  42 fpm", "", false, true}, {"Gear collapsed - hit at 812 fpm", "", false, true}, {"SPLASH 2 - Ambler 180 down", "", false, true},
         {"3 aircraft caught in the blast", "", false, true}, {"ENGINE OFF - press I to restart", "", false, true}, {"STALL", "", false, true},
-        {"SPECTRE: That's the show - Specters breaking off. Fly safe!", "", false, true}, {"Pods 60 deg", "", false, true},
+        {"NOCTURNE: That's the show - Nocturnes breaking off. Fly safe!", "", false, true}, {"Pods 60 deg", "", false, true},
         {"Nice! Hold a gentle climb about 7 degrees nose-up. Fly through the green rings.", "L1", false, true},
         {"Press B to release the parking brake, then hold SHIFT (or gamepad RT) to add full throttle.", "L1", true, false},   // lesson speech uses semantic phase identity
         {"Press B to release the parking brake, then hold SHIFT (or gamepad RT) to add full throttle.", "L1", false, false},  // not for keyboard
@@ -124,7 +124,7 @@ struct GameTest {
       for (auto& l : g.payout) if (l.label.find("landing") != std::string::npos) { printf("FAIL: landing line '%s' on an airborne finish\n", l.label.c_str()); fails++; }
     }
 
-    // ---- Approach and landing at Orchard Valley (contract C1 style), Wren rental
+    // ---- Approach and landing at Orchard Valley (contract C1 style), Ambler rental
     g.career.license = LIC_PPL; g.career.storyIndex = 4; g.career.location = g_world.findAirport("ORC");
     int money0 = g.career.money;
     Contract c = g_story[4];  // C1 ORC -> MDB
@@ -340,7 +340,7 @@ struct GameTest {
       {   // WLD-1..3 (the v3.44.0 review): a plasma crater is dug into the ground the aircraft and the wreckage meet; what eight
           // bombs flattened stays flattened; a wreck on a chunk seam is the business of the chunks either side of it
         Game q; q.initHeadless(); q.botControl = true; q.set.traffic = false;
-        q.resCraft = kWraith; q.resAirborne = false; q.launchResearch();
+        q.resCraft = kSomnus; q.resAirborne = false; q.launchResearch();
         const Airport& a = g_world.airports[q.contract.from];
         vec3 p0 = a.pos() + vec3(-a.dir().z, 0, a.dir().x) * 600.f; p0.y = g_world.height(p0.x, p0.z);
         const float g0 = p0.y;
@@ -362,7 +362,7 @@ struct GameTest {
         Ent e{Scenery::chunkX0(cx) + 0.05f, 0.f, Scenery::chunkX0(cz) + 100.f, 0.f, 1.f, 1.f, 1.f, 0.37f};
         const bool gone = g_scenery.damage(e, 0, 100) && g_scenery.destroyed(e);
         const bool seam = gone && g_scenery.chunkAffected(cx, cz) && g_scenery.chunkAffected(cx - 1, cz);
-        g_scenery.resetDamage(); q.wraith = Game::WraithState(); q.refreshGroundPits();
+        g_scenery.resetDamage(); q.somnus = Game::SomnusState(); q.refreshGroundPits();
         const bool ok = dug && rests && kept && seam;
         printf("Craters and wrecks: crater dug into the ground %d, aircraft rests on its floor %d (rose %.1f m), the first bomb's damage kept after eight %d, a seam wreck in both chunks %d: %s\n",
                dug, rests, rise, kept, seam, ok ? "ok" : "FAIL"); fails += !ok;
@@ -389,7 +389,7 @@ struct GameTest {
       }
       if (voices) {   // FLT-3 (the v3.44.0 review): the same, on the autopilot's autoland - the tower's go-around is flown (it
                       // landed anyway, and the player was fined $500 for it); and an aircraft that can't climb away lands unfined
-        // (the load past which the Wren can't climb away at approach speed - the autopilot's own sense of it, apEnv)
+        // (the load past which the Ambler can't climb away at approach speed - the autopilot's own sense of it, apEnv)
         float unableLoad = 150;
         for (float kg = 150; kg <= 1500; kg += 50) {
           Plane q; q.reset(&kAircraft[1], start, a.heading, 60, kg, true, kAircraft[1].vref + 6); q.apEngage(Plane::AP_NAV, c.to, c.wx);
@@ -441,7 +441,7 @@ struct GameTest {
         }
         g.botControl = true;
       }
-      // ---- E1: the quote is honest. A4 (the Minister's Jet, an owned Starling) flown on the autopilot after a scripted
+      // ---- E1: the quote is honest. A4 (the Minister's Jet, an owned Emissary) flown on the autopilot after a scripted
       // takeoff lands within the quoted time +- its uncertainty; the job card's plan is the one the flight settles with
       {
         Career keep = g.career;
@@ -450,7 +450,7 @@ struct GameTest {
         const bool trafficWas = g.set.traffic; g.set.traffic = false;
         int a4 = -1; for (size_t i = 0; i < g_story.size(); i++) if (g_story[i].id == "A4") a4 = (int)i;
         const Contract& c = g_story[a4];
-        int spec = -1; for (int i : kCareerAircraft) if (std::string(kAircraft[i].id) == "starling") spec = i;
+        int spec = -1; for (int i : kCareerAircraft) if (std::string(kAircraft[i].id) == "emissary") spec = i;
         g.career.license = LIC_ATP; g.career.location = c.from; g.career.money = 500000;
         g.career.fleet.clear(); g.career.fleet.push_back({spec, c.from, kAircraft[spec].maxFuel, 0.f});
         Career::LaunchPlan pl = g.career.plan(c, spec, Career::SRC_OWNED);
@@ -476,13 +476,13 @@ struct GameTest {
         g.career = keep; g.set.traffic = trafficWas;
       }
       // ---- the quick fuel estimate covers what the flight burns without overstating it: the PPL checkride in the
-      // Kestrel (quoted 78 kg for its 70 kg tanks - "expect to run dry" - when it burns 43), and legs in a single, a
+      // Dawnlark (quoted 78 kg for its 70 kg tanks - "expect to run dry" - when it burns 43), and legs in a single, a
       // turboprop and the jet, each flown on the autopilot in the background as a job quote is. (Legs the autopilot flies
       // in about the time it planned: when it goes around or circles longer than planned - the A4 leg, 11 minutes planned
       // and 17 flown - the burn per minute still matches, the minutes don't)
       {
         int ok = 0, n = 0;
-        for (auto [id, specId] : std::vector<std::pair<const char*, const char*>>{{"L4", "kestrel"}, {"C2", "wren"}, {"C7", "pelican"}, {"C2", "starling"}}) {
+        for (auto [id, specId] : std::vector<std::pair<const char*, const char*>>{{"L4", "dawnlark"}, {"C2", "ambler"}, {"C7", "longshore"}, {"C2", "emissary"}}) {
           int si = -1; for (int i : kCareerAircraft) if (std::string(kAircraft[i].id) == specId) si = i;
           const Contract* c = nullptr; for (auto& k : g_story) if (k.id == id) c = &k;
           if (si < 0 || !c) { printf("   fuel estimate: %s / %s not found\n", id, specId); n++; continue; }
@@ -582,7 +582,7 @@ struct GameTest {
           fails += !(once && taken && resumed);
         }
         // the XR-40 armed: both bumpers held 1.5 s
-        g.resCraft = kWraith; g.resAirborne = true; g.launchResearch(); g.wraith.armed = true;
+        g.resCraft = kSomnus; g.resAirborne = true; g.launchResearch(); g.somnus.armed = true;
         bool hid0 = g.uiHidden;
         for (int i = 0; i < 90; i++) { pad(PAD_LB | PAD_RB, i == 0 ? (PAD_LB | PAD_RB) : 0); g.update(dt); }
         bool ok4 = g.uiHidden == hid0;
@@ -601,7 +601,7 @@ struct GameTest {
         bool ok1 = r.isolatedFlight;
         printf("Restart of a trial: still off the books %d: %s\n", r.isolatedFlight, ok1 ? "ok" : "FAIL"); fails += !ok1;
         Game q; q.initHeadless(); q.botControl = true;
-        q.contract = g_story[1]; q.specIdx = 5; q.source = Career::SRC_RENT;   // a Meridian on a student's lesson: not allowed
+        q.contract = g_story[1]; q.specIdx = 5; q.source = Career::SRC_RENT;   // an Archipel on a student's lesson: not allowed
         q.screen = SCR_DEBRIEF; const int att = q.career.attempt;
         q.retryFromDebrief();
         bool ok2 = q.screen == SCR_HUB && q.career.attempt == att && !q.career.attemptOpen;
@@ -611,7 +611,7 @@ struct GameTest {
       {
         Game r; r.initHeadless(); r.botControl = true;
         bool ok = true;
-        for (int craft : {kResearchJet, kWraith}) {
+        for (int craft : {kResearchJet, kSomnus}) {
           r.resCraft = craft; r.resAirborne = true; r.launchResearch();
           r.update(1.f / 60.f);
           bool good = !r.parkingBrake && r.plane.ctl.brake == 0.f && !r.plane.onGround && (!r.plane.spec->retract || (!r.plane.ctl.gearDown && r.plane.gear < 0.01f));
@@ -621,11 +621,11 @@ struct GameTest {
         fails += !ok;
       }
       // ---- a research runway start takes its own fuel, not the job card's choice, which stays for the career (the
-      //      review of v3.44.0, CAR-7: a 7 kg Kestrel selection launched the XR-10 and XR-20 with 7 kg)
+      //      review of v3.44.0, CAR-7: a 7 kg Dawnlark selection launched the XR-10 and XR-20 with 7 kg)
       {
         Game r; r.initHeadless(); r.botControl = true; r.set.traffic = false;
         bool ok = true;
-        for (int craft : {kNightjar, kMantis}) {
+        for (int craft : {kVigil, kReverie}) {
           r.resCraft = craft; r.resAirborne = false; r.launchFuelKg = -1; r.launchResearch();
           const float own = r.plane.fuel;
           r.launchFuelKg = 7.f; r.launchResearch();
@@ -715,7 +715,7 @@ struct GameTest {
         bool crashEnds = !q.career.job && q.career.crashes == 1;
         // QA C3 / C4 / C6: the leg carries its checkpoints, the patient's state and charges the ferry once
         Contract mv = c; mv.id = "MEDTEST"; mv.type = CT_MEDEVAC; mv.payout = 2000; mv.wps.push_back({g_world.airports[via].x, g_world.airports[via].z, 500.f}); mv.wps.push_back({g_world.airports[to].x, g_world.airports[to].z, 500.f});
-        fresh(); q.career.fleet.push_back({1, to, kAircraft[1].maxFuel, 1.f});   // (an owned Wren parked at the destination: a ferry to the departure)
+        fresh(); q.career.fleet.push_back({1, to, kAircraft[1].maxFuel, 1.f});   // (an owned Ambler parked at the destination: a ferry to the departure)
         q.beginCareerFlight(mv, 1, Career::SRC_OWNED);
         int ferryQuote = q.launchPlan.ferry;
         q.wpIndex = 1; q.result.wpDone = 1; q.result.patient = 0.16f;
@@ -766,7 +766,7 @@ struct GameTest {
         int from = g_world.findAirport("ORC"), to = g_world.findAirport("MDB");
         Contract c; c.id = "FUELTEST"; c.title = "Fuel test"; c.type = CT_CARGO; c.from = from; c.to = to; c.cargoKg = 40; c.payout = 1000; c.minLicense = LIC_PPL; c.wx = Weather();
         q.pendingCareer.reset(); q.career.newGame(); q.career.money = 50000; q.career.license = LIC_PPL; q.career.location = from; q.saveDir.clear();
-        q.career.fleet.push_back({1, from, 20.f, 0.f});   // an owned Wren with 20 kg in the tanks
+        q.career.fleet.push_back({1, from, 20.f, 0.f});   // an owned Ambler with 20 kg in the tanks
         q.launchFuelKg = -1;
         q.beginCareerFlight(c, 1, Career::SRC_OWNED);
         float fuel0 = q.plane.fuel, uplift = q.launchPlan.fuelUpliftKg; int cost = q.launchPlan.fuelCostEst;
@@ -801,7 +801,7 @@ struct GameTest {
           if ((t.crashes != c.crashes) != wantCrash || repaired != wantCrash) fails++;
         }
       }
-      // ---- engine-out landing (C7): the engine stops on a 2.8 km final in an owned Wren; the pilot glides it in. The
+      // ---- engine-out landing (C7): the engine stops on a 2.8 km final in an owned Ambler; the pilot glides it in. The
       // flight succeeds, the settlement pays the emergency bonus and charges the repair (or the insurance covers it),
       // and the aircraft's condition falls with the hours
       for (int ins = 0; ins < 2; ins++) {
@@ -1007,7 +1007,7 @@ struct GameTest {
       // sold while on the route; recall frees it; a worn aircraft with a weak pilot has incidents over time
       {
         Career k; k.newGame(); k.license = LIC_ATP; k.money = 400000; k.location = g_world.findAirport("CAP");
-        int spec = 5;   // the Q400: a real airliner
+        int spec = 5;   // the Archipel 400: a real airliner
         k.fleet.push_back({spec, k.location, kAircraft[spec].maxFuel, 1.f});
         std::string m; bool noLic = false;
         { Career s = k; s.license = LIC_CPL; noLic = !s.hirePilot(s.pilotCandidates()[0], &m); }
@@ -1015,7 +1015,7 @@ struct GameTest {
         bool hired = cands.size() == 3 && k.hirePilot(cands[0], &m);
         int pvi = g_world.findAirport("PVI"), cap = g_world.findAirport("CAP");
         bool assigned = k.assignRoute(0, pvi, 0, &m);
-        Contract big; big.from = cap; big.to = pvi; big.type = CT_CARGO; big.cargoKg = 500;   // (a job the Q400 could fly)
+        Contract big; big.from = cap; big.to = pvi; big.type = CT_CARGO; big.cargoKg = 500;   // (a job the Archipel 400 could fly)
         std::string why; bool blocked = k.canFly(big, spec, &why) == Career::SRC_NONE && why.find("route") != std::string::npos && !k.sell(0, &m);
         FlightResult r; r.success = true; r.landed = true; r.touchdownFpm = 200; r.flightMin = 10; int st = 0; int money0 = k.money;
         Contract c = g_story[4]; c.story = false; c.payout = 0;
@@ -1106,7 +1106,7 @@ struct GameTest {
         printf("Tools keep off the career: fresh career in memory %d, the save's bytes and folder untouched %d (%d file%s): %s\n", fresh, untouched, files, files == 1 ? "" : "s", ok ? "ok" : "FAIL"); fails += !ok;
       }
       // ---- UI-1 (the v3.44.0 review): the radio panel owns the pointer over it. A click on a station reached the hub
-      // beneath it first - one at 1080p over the Hangar bought a Wren ($30,000, saved) - and in an XR-40 flight armed the
+      // beneath it first - one at 1080p over the Hangar bought an Ambler ($30,000, saved) - and in an XR-40 flight armed the
       // weapons and fired. Clicks over the whole panel, on every tab: nothing beneath it moves
       {
         const int W0 = g_ren.W, H0 = g_ren.H; g_ren.W = 1920; g_ren.H = 1080;
@@ -1127,10 +1127,10 @@ struct GameTest {
           }
         }
         // the XR-40, weapons safe, the radio open: holding the mouse button over it neither arms nor fires
-        g.wraith = Game::WraithState(); g.showRadio = true; g.in.mDown[0] = true; g.in.mPressed[0] = true;
-        g.wraithControls(dt);
-        const bool safe = !g.wraith.armed && !g.wraith.wantFire;
-        g.in.mDown[0] = g.in.mPressed[0] = false; g.showRadio = false; g.wraith = Game::WraithState();
+        g.somnus = Game::SomnusState(); g.showRadio = true; g.in.mDown[0] = true; g.in.mPressed[0] = true;
+        g.somnusControls(dt);
+        const bool safe = !g.somnus.armed && !g.somnus.wantFire;
+        g.in.mDown[0] = g.in.mPressed[0] = false; g.showRadio = false; g.somnus = Game::SomnusState();
         remove("./settings.cfg"); g.saveDir = sd; g.settingsWritten.clear(); g.stations = st0; g_ren.W = W0; g_ren.H = H0; g_ren.uiBegin();
         bool ok = moved == 0 && clicks == 600 && safe;
         printf("Radio panel owns its clicks: %d of %d clicks over it moved the hub beneath, XR-40 weapons stay safe %d: %s\n", moved, clicks, safe, ok ? "ok" : "FAIL"); fails += !ok;
@@ -1257,7 +1257,7 @@ struct GameTest {
       }
       {   // XR-20 has one real engine: its live HUD and spoken warning must not retain a second-engine channel.
         Plane saved = g.plane;
-        const AircraftSpec& s = kAircraft[kMantis];
+        const AircraftSpec& s = kAircraft[kReverie];
         g.plane.reset(&s, vec3(-39000, 8000, 35000), 0, s.maxFuel * 0.7f, 85, true, 200);
         g.plane.failNow(FAIL_ENGINE_PARTIAL, 0);
         auto partial = g.hudAnnunciators();
@@ -1541,7 +1541,7 @@ struct GameTest {
         printf("Next leg planned over the checkpoints left: same as without those flown %d, checkpoints keep their numbers %d: %s\n", same, numbered, ok ? "ok" : "FAIL");
         fails += !ok;
       }
-      {   // a refused autoland (the review of v3.31.0, F3): the Starling asked to land at Gull Rock's 480 m is told it can't
+      {   // a refused autoland (the review of v3.31.0, F3): the Emissary asked to land at Gull Rock's 480 m is told it can't
           // and circles clear of the ground - and, as the toast says, the stick takes the aircraft back
         Game q; q.initHeadless(); q.career.license = LIC_ATP; q.botControl = false; q.set.traffic = false;
         Contract c = g_story[4]; c.wx = Weather(); c.wx.windSpeed = 0; c.wx.gust = 0; c.wx.turbulence = 0; c.wps.clear(); c.startAirborne = true;
@@ -1559,7 +1559,7 @@ struct GameTest {
         printf("Refused autoland: holds %d (%s), says the stick takes over %d, stick takes over %d: %s\n", held, q.plane.apDecline.c_str(), told, !q.plane.apOn, ok ? "ok" : "FAIL");
         fails += !ok;
       }
-      {   // the fuel chosen is the fuel billed (the review of v3.34.0, S1): an owned Wren with its flown quote in, launched
+      {   // the fuel chosen is the fuel billed (the review of v3.34.0, S1): an owned Ambler with its flown quote in, launched
           // with full tanks rather than the quote's uplift - the tanks, the plan's uplift and charge and the job's saved plan agree
         Game q; q.initHeadless(); q.career.license = LIC_CPL; q.career.money = 50000; q.career.location = g_world.findAirport("ORC");
         Contract c = g_story[4]; const int si = 1; q.career.fleet.push_back({si, c.from, 0.f, 1.f});

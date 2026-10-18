@@ -10,9 +10,9 @@ vec4 cockpitUtilityTex(vec2 q,vec2 footprint){
 void shadeFleetCabin(inout Mat m,int mid,vec3 lp,vec3 ln,float px){
   if(!fleetCabin())return;
   CockpitLayout L=cockpitLayout();
-#if HAS_ATLAS
+#if HAS_GALLEON
   if(MODEL_IS(14)&&(mid==147||mid==148)){
-    vec3 q=mid==147?atlasNavFrame(lp):atlasOverheadFrame(lp);
+    vec3 q=mid==147?galleonNavFrame(lp):galleonOverheadFrame(lp);
     bool face=mid==147?ln.z>.35:ln.y<-.55;vec3 sc=vec3(.003,.010,.017);
     if(face){
       if(mid==147)sc=pageTex(2,q.xy/vec2(.165,.115),px/.115);

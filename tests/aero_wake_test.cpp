@@ -44,7 +44,7 @@ int main() {
     for (int k = 0; k < w.nv; k++) if (w.v[k].surf == AS_TAIL && w.v[k].r.x > 0.f) tailGam += w.v[k].gam;
     check(w.gamPair > 0.f && fabsf(w.gamPair - kj) < 0.2f * kj, "pair circulation = wing lift / (rho V b0)", s.name);
     // Betz spacing follows the actual loading. Pi/4 is an elliptic special case, not a
-    // lower bound: the Atlas's highly tapered, washed-out wing rolls up nearer the centre.
+    // lower bound: the Galleon's highly tapered, washed-out wing rolls up nearer the centre.
     float peakGamma = 0;
     for (int k = 0; k < g.nSt; ++k) if (g.st[k].surf == AS_WING) peakGamma = std::max(peakGamma, fabsf(o.gam[k]));
     const float loadSpan = L / (in.rho * V * std::max(peakGamma, .01f));

@@ -159,7 +159,7 @@ const Renderer::PartMesh* Renderer::releasedStoreMesh(const FrameParams& fp,int 
  for(const auto& mesh:model->second.parts)if(mesh.type==part&&mesh.idx>0)return &mesh;
  return nullptr;
 }
-void Renderer::warmWraithStores(const FrameParams& fp){
+void Renderer::warmSomnusStores(const FrameParams& fp){
  if(int(fp.plane.M[2]+.5f)!=6)return;
  enemyBake::Lease warm(enemyBakeState,true);if(!warm)return;
  enemyBake::Lease bake(enemyBakeState,false);if(!bake)return;
@@ -177,7 +177,7 @@ void Renderer::warmWraithStores(const FrameParams& fp){
 void Renderer::prepareReleasedStores(const FrameParams& fp){
  storeMeshOn=0;
  if(fp.fx.bombs<=0||int(fp.plane.M[2]+.5f)!=6)return;
- warmWraithStores(fp); // normal loading already did this; recover a missing exterior safely
+ warmSomnusStores(fp); // normal loading already did this; recover a missing exterior safely
  for(int i=0;i<std::clamp(fp.fx.bombs,0,8);i++)
   {int kind=std::clamp(int(fp.fx.bombStyle[i][3]+.5f),0,2);if(progReleasedStore[kind]&&releasedStoreMesh(fp,kind))storeMeshOn|=1<<i;}
 }

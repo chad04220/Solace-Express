@@ -163,7 +163,7 @@ Before releasing actual art, additionally run the native integration checks:
 4. Remove or corrupt one shipped mesh in a disposable copy. Confirm only that
    body falls back, without changing/deleting the shipped file or valid siblings.
 5. Exercise gear/control/flap/steering poses, cockpit controls, research animation,
-   Atlas fans, damage and breakup on the intended Windows GPU. Portable-file unit
+   Galleon fans, damage and breakup on the intended Windows GPU. Portable-file unit
    tests and Mesa captures alone do not establish Windows driver frame rate or
    complete visual acceptance.
 

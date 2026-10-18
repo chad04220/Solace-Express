@@ -28,7 +28,7 @@ int main() {
     Career a = live; a.attempt = 17; a.attemptOpen = true;
     check(a.save("save_test_v3.sav"), "v3 save writes");
     Career b; b.newGame(); check(b.load("save_test_v3.sav") && b.attempt == 17 && b.attemptOpen, "v3 round trip keeps the attempt marker");
-    writeFile("save_test_v2.sav", "somnium_save 2\nmoney 900\nlicense 1\nrep 3\nlocation 1\nstory 4\nflights 2\nlandings 2\ncrashes 0\nhours 1.5\nbest 200\nseed 9\nfinished 0\nfleet 1\nplane kestrel 1 20\nend\n");
+    writeFile("save_test_v2.sav", "somnium_save 2\nmoney 900\nlicense 1\nrep 3\nlocation 1\nstory 4\nflights 2\nlandings 2\ncrashes 0\nhours 1.5\nbest 200\nseed 9\nfinished 0\nfleet 1\nplane dawnlark 1 20\nend\n");
     Career v2; v2.newGame(); check(v2.load("save_test_v2.sav") && v2.money == 900 && v2.attempt == 0 && !v2.attemptOpen, "v2 save loads with the marker closed");
     writeFile("save_test_bad.sav", "somnium_save 3\nmoney 900\nlicense 1\nrep 3\nlocation 1\nstory 4\nflights 2\nlandings 2\ncrashes 0\nhours 1.5\nbest 200\nseed 9\nfinished 0\nattempt 3\nattempt_open 7\nfleet 0\nend\n");
     Career x = r; check(!x.load("save_test_bad.sav"), "a marker that isn't 0 or 1 is rejected");
@@ -61,7 +61,7 @@ int main() {
       remove("save_test_air.sav"); remove("save_test_air.sav.bak"); remove("save_test_air_bad.sav");
     }
     { Career i2 = a; i2.insured = true; check(i2.save("save_test_ins.sav"), "insured save writes"); Career j; j.newGame(); check(j.load("save_test_ins.sav") && j.insured && !b.insured, "round trip keeps the insurance"); remove("save_test_ins.sav"); remove("save_test_ins.sav.bak"); }
-    writeFile("save_test_v2b.sav", "somnium_save 2\nmoney 900\nlicense 1\nrep 3\nlocation 1\nstory 4\nflights 2\nlandings 2\ncrashes 0\nhours 1.5\nbest 200\nseed 9\nfinished 0\nfleet 1\nplane kestrel 1 20\nend\n");
+    writeFile("save_test_v2b.sav", "somnium_save 2\nmoney 900\nlicense 1\nrep 3\nlocation 1\nstory 4\nflights 2\nlandings 2\ncrashes 0\nhours 1.5\nbest 200\nseed 9\nfinished 0\nfleet 1\nplane dawnlark 1 20\nend\n");
     Career v2; v2.newGame(); check(v2.load("save_test_v2b.sav") && v2.fleet.size() == 1 && v2.fleet[0].condition > 0.99f && !v2.loan.open(), "v2 plane line reads as a new aircraft without a loan");
     {   // a payment comes off each settlement; three missed payments repossess the aircraft
       Career d = b; std::vector<PayoutLine> L; int bal = d.loan.balance; d.money = 1000000;
@@ -102,7 +102,7 @@ int main() {
   }
 
   {   // Stable IDs survive the non-contiguous career roster; existing saves need no migration.
-    const char* legacyIds[] = {"kestrel", "wren", "bush", "islander", "pelican", "meridian", "starling", "swift_s6", "osprey_c6"};
+    const char* legacyIds[] = {"dawnlark", "ambler", "scrubrunner", "skerry", "longshore", "archipel", "emissary", "cutwater_s6", "wavecrest_c6"};
     std::string legacy = "airxpress_save 1\nmoney 900\nlicense 3\nlocation 1\nstory 4\n";
     for (const char* id : legacyIds) legacy += std::string("plane ") + id + " 1 20\n";
     writeFile("save_test_roster.sav", legacy.c_str());
@@ -111,17 +111,17 @@ int main() {
 
     Career a; a.newGame(); a.license = LIC_ATP;
     for (int spec : kCareerAircraft) a.fleet.push_back({spec, 1, kAircraft[spec].maxFuel * .5f, .8f});
-    a.loan = {kAtlas, 10000, 500, 0, .12f};
-    Career::JobState job; job.spec = kLarkspur; job.src = Career::SRC_OWNED; job.at = 1;
-    job.c.id = "ROSTER_COMPAT"; job.c.from = 1; job.c.to = 2; job.c.forceAircraft = kLarkspur;
-    job.plan.spec = kLarkspur; job.plan.startAirport = 1; a.job = job;
+    a.loan = {kGalleon, 10000, 500, 0, .12f};
+    Career::JobState job; job.spec = kThistledown; job.src = Career::SRC_OWNED; job.at = 1;
+    job.c.id = "ROSTER_COMPAT"; job.c.from = 1; job.c.to = 2; job.c.forceAircraft = kThistledown;
+    job.plan.spec = kThistledown; job.plan.startAirport = 1; a.job = job;
     check(a.save("save_test_roster.sav"), "all career aircraft, appended loan and appended job save");
     Career b; b.newGame(); check(b.load("save_test_roster.sav") && b.fleet.size() == kNumAircraft, "expanded career save loads");
     for (int row = 0; row < (int)b.fleet.size(); ++row) check(b.fleet[row].spec == careerSpecAt(row), "career fleet saved ID maps to original stable index");
-    check(b.loan.spec == kAtlas && b.job && b.job->spec == kLarkspur && b.job->c.forceAircraft == kLarkspur,
+    check(b.loan.spec == kGalleon && b.job && b.job->spec == kThistledown && b.job->c.forceAircraft == kThistledown,
           "new loan/job/forced aircraft identities round-trip without research substitution");
 
-    for (int spec : {kLarkspur, kAtlas}) {
+    for (int spec : {kThistledown, kGalleon}) {
       Career market; market.newGame(); market.license = LIC_ATP; market.money = 100000000;
       market.location = g_world.findAirport("CAP"); std::string message;
       check(market.buy(spec, &message) && market.ownedIndexFor(spec) >= 0, "new ordinary type can be purchased in career");
@@ -148,7 +148,7 @@ int main() {
 
   // each of these must be rejected and leave the career as it was
   const char* bad[] = {
-    "somnium_save 1\nlicense 1\nplane kestrel 999 70\n",                                   // fleet airport out of range
+    "somnium_save 1\nlicense 1\nplane dawnlark 999 70\n",                                   // fleet airport out of range
     "somnium_save 1\n",                                                                    // header only
     "somnium_save 7\nmoney 5\nlicense 0\nlocation 0\nstory 0\n",                           // unknown future version
     "somnium_save 6\nmoney 5\nlicense 0\nlocation 0\nstory 0\n",                           // current version, missing mandatory records
@@ -157,15 +157,15 @@ int main() {
     "somnium_save 1\nmoney 5\nlicense 0\nlocation 0\nstory 999\n",                         // story past the end
     "somnium_save 1\nmoney 5\nlicense 0\nlocation 0\nstory 0\nhours nan\n",                // non-finite
     "somnium_save 1\nmoney 5\nlicense 0\nlocation 0\nstory 0\nplane nosuchplane 0 10\n",   // unknown aircraft
-    "somnium_save 1\nmoney 5\nlicense 0\nlocation 0\nstory 0\nplane kestrel 0\n",          // truncated line
+    "somnium_save 1\nmoney 5\nlicense 0\nlocation 0\nstory 0\nplane dawnlark 0\n",          // truncated line
     "somnium_save 1\nmoney 5\nlicense 0\nlocation\n",                                      // truncated value
     "garbage",
     // malformed states (the review of v3.44.0, CAR-11)
     "somnium_save 1\nmoney 5\nlicense 0\nlocation 0\nstory 0\nfinished 999\n",                                   // a marker past 0 / 1
     "somnium_save 1\nmoney 5\nlicense 0\nrep -4\nlocation 0\nstory 0\n",                                         // negative reputation
-    "somnium_save 1\nmoney 5\nlicense 3\nlocation 0\nstory 0\nplane kestrel 0 10\nplane kestrel 0 10\n",         // two of one type
-    "somnium_save 1\nmoney 5\nlicense 3\nlocation 0\nstory 0\nplane kestrel 0 10\nloan kestrel 5000 0 0 0.05\n", // an open loan with no payment
-    "somnium_save 1\nmoney 5\nlicense 3\nlocation 0\nstory 0\nplane kestrel 0 10\nplane wren 0 10\npilot Ann 1 100\npilot Bo 1 100\nroute 0 0 1 0 0 0\nroute 0 1 2 1 0 0\n",   // one aircraft on two routes
+    "somnium_save 1\nmoney 5\nlicense 3\nlocation 0\nstory 0\nplane dawnlark 0 10\nplane dawnlark 0 10\n",         // two of one type
+    "somnium_save 1\nmoney 5\nlicense 3\nlocation 0\nstory 0\nplane dawnlark 0 10\nloan dawnlark 5000 0 0 0.05\n", // an open loan with no payment
+    "somnium_save 1\nmoney 5\nlicense 3\nlocation 0\nstory 0\nplane dawnlark 0 10\nplane ambler 0 10\npilot Ann 1 100\npilot Bo 1 100\nroute 0 0 1 0 0 0\nroute 0 1 2 1 0 0\n",   // one aircraft on two routes
   };
   int i = 0;
   for (const char* b : bad) {
@@ -176,10 +176,10 @@ int main() {
     check(!ok && c.money == r.money && c.storyIndex == r.storyIndex && c.fleet.size() == r.fleet.size(), msg);
   }
   // old saves without the end marker still load
-  writeFile("save_test_old.sav", "airxpress_save 1\nmoney 900\nlicense 1\nrep 3\nlocation 1\nstory 4\nplane kestrel 1 20\n");
+  writeFile("save_test_old.sav", "airxpress_save 1\nmoney 900\nlicense 1\nrep 3\nlocation 1\nstory 4\nplane dawnlark 1 20\n");
   { Career c; c.newGame(); check(c.load("save_test_old.sav") && c.money == 900 && c.fleet.size() == 1, "legacy save loads"); }
   // a career copied by hand from the Solace Express folder (the game's previous name) loads too
-  writeFile("save_test_old.sav", "solace_save 1\nmoney 700\nlicense 1\nrep 3\nlocation 1\nstory 4\nplane kestrel 1 20\n");
+  writeFile("save_test_old.sav", "solace_save 1\nmoney 700\nlicense 1\nrep 3\nlocation 1\nstory 4\nplane dawnlark 1 20\n");
   { Career c; c.newGame(); check(c.load("save_test_old.sav") && c.money == 700 && c.fleet.size() == 1, "Solace Express save loads"); }
 
   // a failed write keeps the previous save

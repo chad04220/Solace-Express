@@ -13,7 +13,7 @@ float afSunSelf(vec3 p, vec3 n, bool interior){
   float ndl = dot(n, uSunDir);
   // (inside, a surface the sun barely faces is lit by the fixtures and the ambient alone - its thin frames alias in the
   // map - faded in over a band rather than cut off; outside, over a band too: the sun skimming a fuselage's round belly
-  // drew the map's texels across it as a stair-stepped edge between glare and shadow, the Q400's from close underneath)
+  // drew the map's texels across it as a stair-stepped edge between glare and shadow, the Archipel 400's from close underneath)
   float lo = interior ? 0.15 : 0.05, hi = interior ? 0.35 : 0.22;
   float ms = (uAfShOn & 1) != 0 ? (ndl < lo ? 0.0 : shMapLookupB(0, p, n, 1.0 + 2.0*(1.0 - ndl))*smoothstep(lo, hi, ndl)) : -1.0;
   if (ms >= 0.0) return ms;
@@ -36,10 +36,10 @@ vec3 planeLight(vec3 p, vec3 rd, float t, int mid, Mat m, vec3 n, vec3 lp, vec3 
   if (RESEARCH_ON && podMat) {  // sealed research cockpit: lit only by its modelled fixtures, low and moody
     mat3 inv = transpose(gPR);
     int engP = int(gM[0].z + 0.5);
-#if HAS_WRAITH && HAS_JET
-    col = (engP == 6 ? wraithPodLight(lp, inv*n, inv*(-rd), m, E.xyz) : podLight(lp, inv*n, inv*(-rd), m, E.xyz))*ao + m.emit;
-#elif HAS_WRAITH
-    col = wraithPodLight(lp, inv*n, inv*(-rd), m, E.xyz)*ao + m.emit;
+#if HAS_SOMNUS && HAS_JET
+    col = (engP == 6 ? somnusPodLight(lp, inv*n, inv*(-rd), m, E.xyz) : podLight(lp, inv*n, inv*(-rd), m, E.xyz))*ao + m.emit;
+#elif HAS_SOMNUS
+    col = somnusPodLight(lp, inv*n, inv*(-rd), m, E.xyz)*ao + m.emit;
 #else
     col = podLight(lp, inv*n, inv*(-rd), m, E.xyz)*ao + m.emit;
 #endif

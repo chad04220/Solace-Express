@@ -174,8 +174,8 @@ void natureBroadleaf(MB& mb,int kind,int lod) {
   const float oakR[7]={2.65f,2.25f,2.35f,2.2f,2.25f,1.95f,1.95f};
   const vec3 birchC[9]={{.2f,11.4f,-.1f},{-1.f,9.f,-.4f},{1.1f,9.9f,.5f},{.4f,7.4f,1.1f},{-.3f,10.4f,-1.1f},{-1.2f,7.8f,.6f},{1.2f,8.f,-.8f},{.5f,6.4f,-.3f},{-.4f,12.1f,.5f}};
   const float birchR[9]={1.13f,1.25f,1.3f,1.19f,1.16f,1.1f,1.15f,.96f,.77f};
-  const vec3 bushC[4]={{0,1.05f,0},{.71f,.65f,.2f},{-.61f,.68f,.43f},{.1f,.57f,-.72f}};
-  const float bushR[4]={.81f,.66f,.7f,.67f};
+  const vec3 scrubrunnerC[4]={{0,1.05f,0},{.71f,.65f,.2f},{-.61f,.68f,.43f},{.1f,.57f,-.72f}};
+  const float scrubrunnerR[4]={.81f,.66f,.7f,.67f};
   int cells=bush?4:birch?9:7;
   auto stem=[&](float t){return vec3((birch?.17f:.11f)*t*t,H*(birch?.965f:.39f)*t,-.09f*t*t);};
   if(!bush) {
@@ -184,8 +184,8 @@ void natureBroadleaf(MB& mb,int kind,int lod) {
     if(close) natureRoots(mb,r,birch?4:6,.41f);
   }
   for(int i=0;i<cells;++i) {
-    vec3 c=bush?bushC[i]:birch?birchC[i]:oakC[i];
-    float r=bush?bushR[i]:birch?birchR[i]:oakR[i],squash=birch?1.02f:bush?.75f:.71f;
+    vec3 c=bush?scrubrunnerC[i]:birch?birchC[i]:oakC[i];
+    float r=bush?scrubrunnerR[i]:birch?birchR[i]:oakR[i],squash=birch?1.02f:bush?.75f:.71f;
     float seed=.17f+i*.719f+kind*.11f;
     vec3 a=bush?vec3(0,-.08f,0):birch?stem(clampf((c.y-1.8f)/(H*.965f),0,1)):stem(.64f+.052f*i);
     vec3 b=c+vec3(0,-r*.4f,0);

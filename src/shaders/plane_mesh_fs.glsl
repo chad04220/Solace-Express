@@ -74,29 +74,29 @@ void main(){
 #if HAS_FLEET_CABIN
   if (FLEET_ON && !traf && gPS.w > .5 && uPartInst < 0) mid = fleetPanelId(vB, mid);
 #endif
-#if HAS_ATLAS || HAS_MERIDIAN
+#if HAS_GALLEON || HAS_ARCHIPEL
   vec3 bezelN;
   if(FLEET_ON && !traf && gPS.w>.5 && uPartInst<0 && fleetPrimaryBezelNormal(vB,mid,bezelN)) ln=bezelN;
 #endif
 #if HAS_JET
-  vec3 specterN;
-  if(JET_ON && !traf && gPS.w>.5 && uPartInst<0 && specterFittingNormal(vB-gM[22].xyz,mid,specterN)) ln=specterN;
+  vec3 nocturneN;
+  if(JET_ON && !traf && gPS.w>.5 && uPartInst<0 && nocturneFittingNormal(vB-gM[22].xyz,mid,nocturneN)) ln=nocturneN;
 #endif
-#if HAS_ATLAS
+#if HAS_GALLEON
   vec3 tabletN;
-  if(FLEET_ON && !traf && gPS.w>.5 && uPartInst<0 && atlasNavHousingNormal(vB,mid,tabletN)) ln=tabletN;
+  if(FLEET_ON && !traf && gPS.w>.5 && uPartInst<0 && galleonNavHousingNormal(vB,mid,tabletN)) ln=tabletN;
 #endif
   vec3 conN;   // (the XR-40's consoles and display mounts: their own field's normal, cabin_windows.glsl)
-#if HAS_WRAITH   // (the XR-40's alone: cabin_windows.glsl)
+#if HAS_SOMNUS   // (the XR-40's alone: cabin_windows.glsl)
   if (RESEARCH_ON && !traf && gPS.w > 0.5 && uPartInst < 0 && cabinConsoleNormal(vB - gM[22].xyz, int(gM[0].z + 0.5), mid, conN)) ln = conN;
 #endif
   vec3 wallN;   // (a window's frame: the surface the eye truly sees there, not the mesh's zigzag one)
-#if HAS_WRAITH   // (the XR-40's alone: cabin_windows.glsl)
+#if HAS_SOMNUS   // (the XR-40's alone: cabin_windows.glsl)
   if (RESEARCH_ON && uScrSkip == 1 && uPartInst < 0 && cabinWallNormal(vB - uScrEye, uScrModel, mid, wallN)) ln = wallN;
 #endif
   vec3 frN;   // (a light aircraft's cluster frames)
 #if HAS_FLEET
-  if (FLEET_ON && !traf && gPS.w > 0.5 && uPartInst < 0 && int(gM[0].z + 0.5) < 5 && !fleetCabin() && !isMantis() && clusterFrame(vB, -transpose(uRot)*uPos, mid, frN)) ln = frN;
+  if (FLEET_ON && !traf && gPS.w > 0.5 && uPartInst < 0 && int(gM[0].z + 0.5) < 5 && !fleetCabin() && !isReverie() && clusterFrame(vB, -transpose(uRot)*uPos, mid, frN)) ln = frN;
 #endif
   bool pod = !traf && uPlaneOn == 1 && gPS.w > 0.5 && uWreck == 0;
 #ifdef PROBE_MESH_SHADE

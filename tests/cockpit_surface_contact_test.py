@@ -110,7 +110,7 @@ for iz in range(41):
             assert physical_aperture == exterior_glass
             checks += 1
 
-# Atlas vents now contact their existing console's flat top, with the complete footprint on it.
+# Galleon vents now contact their existing console's flat top, with the complete footprint on it.
 require('cockpit_fittings.glsl', 'if(MODEL_IS(14)) vent=vec3(float(side)*1.170,E.y-.548,E.z-.630);')
 require('cockpit_fittings.glsl', 'sdRoundBox(q,vec3(.023,.019,.028),.014)')
 require('cockpit_fittings.glsl', 'vec3 sq=p-vec3(side*1.170,E.y-.615,E.z-.330);')
@@ -119,11 +119,11 @@ assert abs((-.548-.019)-(-.615+.048)) < 1e-12
 assert .023 < .170-.032 and abs(-.630+.330)+.028 < .410-.032
 checks += 3
 
-# Atlas overhead glass is read from below. Derive its texture tangents from the
+# Galleon overhead glass is read from below. Derive its texture tangents from the
 # actual material expression: their handedness must face the same side as glass.
 # Project asymmetric text axes from each crew seat and an oblique head position;
 # the old (x, -z) mapping has a negative determinant in every one of these views.
-require('cockpit_fittings.glsl', 'vec3 atlasOverheadFrame(vec3 p){return p-vec3(0,gM[22].y+.480,gM[22].z-.260);}')
+require('cockpit_fittings.glsl', 'vec3 galleonOverheadFrame(vec3 p){return p-vec3(0,gM[22].y+.480,gM[22].z-.260);}')
 require('cockpit_fittings.glsl', 'oh.y<-.012&&abs(oh.x)<.150&&abs(oh.z)<.108?148.0:145.0')
 require('cockpit_material.glsl', 'if(MODEL_IS(14)&&(mid==147||mid==148))')
 require('cockpit_material.glsl', 'bool face=mid==147?ln.z>.35:ln.y<-.55;')
@@ -132,7 +132,7 @@ overhead = re.search(r'else\{vec2scale=vec2\(\.150,\.108\)/vec2\(\.038,\.100\);'
                      r'vec4pt=cockpitUtilityTex\(vec2\(([-+]?)q\.x,([-+]?)q\.z\)'
                      r'/scale\+vec2\(\.376,0\),vec2\(px\)/scale\);',
                      source['cockpit_material.glsl'])
-assert overhead, 'Atlas overhead UV formula changed; reconcile the source-bound mapping'
+assert overhead, 'Galleon overhead UV formula changed; reconcile the source-bound mapping'
 u_axis = [-1. if overhead[1] == '-' else 1., 0., 0.]
 v_axis = [0., 0., -1. if overhead[2] == '-' else 1.]
 def dot(a, b): return sum(x*y for x,y in zip(a,b))
@@ -155,16 +155,16 @@ for viewpoint in views:
             origin = project(p)
             du = [a-b for a,b in zip(project([a+.001*b for a,b in zip(p,u_axis)]),origin)]
             dv = [a-b for a,b in zip(project([a+.001*b for a,b in zip(p,v_axis)]),origin)]
-            assert du[0] > 0. and du[0]*dv[1]-du[1]*dv[0] > 0., 'Atlas overhead text is mirrored from crew view'
+            assert du[0] > 0. and du[0]*dv[1]-du[1]*dv[0] > 0., 'Galleon overhead text is mirrored from crew view'
             checks += 1
-assert dot(cross(u_axis, v_axis), [0., -1., 0.]) > .99, 'Atlas texture must face the underside'
+assert dot(cross(u_axis, v_axis), [0., -1., 0.]) > .99, 'Galleon texture must face the underside'
 checks += 1
 
 # Normal recovery is bounded to static own-cockpit surfaces and selected primary housings.
 require('cockpit_fittings.glsl', 'if((!MODEL_IS(14) && !MODEL_IS(5)) || mid!=145) return false;')
 require('cockpit_fittings.glsl', 'if(MODEL_IS(14)) n.xz=rot2(n.xz,i==0?-.16:.16);')
 require('plane_mesh_fs.glsl', 'if(FLEET_ON && !traf && gPS.w>.5 && uPartInst<0 && fleetPrimaryBezelNormal(vB,mid,bezelN)) ln=bezelN;')
-require('plane_mesh_fs.glsl', 'if(JET_ON && !traf && gPS.w>.5 && uPartInst<0 && specterFittingNormal(vB-gM[22].xyz,mid,specterN)) ln=specterN;')
+require('plane_mesh_fs.glsl', 'if(JET_ON && !traf && gPS.w>.5 && uPartInst<0 && nocturneFittingNormal(vB-gM[22].xyz,mid,nocturneN)) ln=nocturneN;')
 require('plane_sdf.glsl', 'sdCapsule(tq,vec3(0.0),vec3(0.0,-0.022,0.008),0.0045)')
 require('cabin_windows.glsl', 'vec3 axis=vec3(0,-.022,.008);')
 require('cabin_windows.glsl', 'n=radial/r;n.yz=mat2(c,-s,s,c)*n.yz;')
@@ -185,7 +185,7 @@ for y in [-.512,-.520,-.536,-.547,-.553]:
             gradient.append((saddle(hi)-saddle(lo))/2e-6)
         assert max(abs(a-b) for a,b in zip(gradient,expected)) < 1e-7
         checks += 1
-# Verified light-aircraft deck and Swift/Nightjar firewall contacts overlap the
+# Verified light-aircraft deck and Cutwater/Vigil firewall contacts overlap the
 # 60 mm shell by 20 mm. They cannot escape its outer 40 mm or alter window cuts.
 require('plane_sdf.glsl', 'float shell = abs(f + 0.03) - 0.03;')
 require('cockpit_fittings.glsl', 'if(MODEL_IS(14)) deckFit=-smin(-deck,-(fuselage+.065),.020);')
@@ -205,13 +205,13 @@ for model in [0, 1, 2, 7, 9]:
 assert min(abs(-.0625+.03)-.03, max(-.015, -.0625+.065)) > .0024
 checks += 1
 
-# Atlas navigation housing normals include its visible side/back bevel as well
+# Galleon navigation housing normals include its visible side/back bevel as well
 # as the front. Its exact rounded-box field and inclined frame remain authored.
-require('cockpit_fittings.glsl', 'vec3 atlasNavFrame(vec3 p){vec3 q=p-vec3(0,gM[22].y-.590,gM[21].w+.335);q.yz=rot2(q.yz,1.15);return q;}')
+require('cockpit_fittings.glsl', 'vec3 galleonNavFrame(vec3 p){vec3 q=p-vec3(0,gM[22].y-.590,gM[21].w+.335);q.yz=rot2(q.yz,1.15);return q;}')
 require('cockpit_fittings.glsl', 'float box=sdRoundBox(nav,vec3(.187,.137,.022),.012);')
-require('cockpit_fittings.glsl', '''bool atlasNavHousingNormal(vec3 p,int mid,out vec3 n){
+require('cockpit_fittings.glsl', '''bool galleonNavHousingNormal(vec3 p,int mid,out vec3 n){
  if(!MODEL_IS(14) || mid!=145) return false;
- vec3 q=atlasNavFrame(p);
+ vec3 q=galleonNavFrame(p);
  if(abs(q.x)>.193 || abs(q.y)>.143 || abs(q.z)>.028) return false;
  vec3 d=abs(q)-vec3(.187,.137,.022)+.012,outer=max(d,vec3(0));
  float field=length(outer)+min(max(d.x,max(d.y,d.z)),0.0)-.012;
@@ -223,7 +223,7 @@ require('cockpit_fittings.glsl', '''bool atlasNavHousingNormal(vec3 p,int mid,ou
  n.yz=rot2(n.yz,-1.15);
  return true;
 }''')
-require('plane_mesh_fs.glsl', 'if(FLEET_ON && !traf && gPS.w>.5 && uPartInst<0 && atlasNavHousingNormal(vB,mid,tabletN)) ln=tabletN;')
+require('plane_mesh_fs.glsl', 'if(FLEET_ON && !traf && gPS.w>.5 && uPartInst<0 && galleonNavHousingNormal(vB,mid,tabletN)) ln=tabletN;')
 import random
 rng = random.Random(148)
 for _ in range(6000):
@@ -249,7 +249,7 @@ for _ in range(6000):
     assert max(abs(a-b) for a,b in zip(local,normal)) < 1e-12
     checks += 1
 
-# Kestrel's pilot brow gets only an outboard structural return. The unchanged
+# Dawnlark's pilot brow gets only an outboard structural return. The unchanged
 # inboard half remains exactly identical, and the return stays below glazing.
 require('cockpit_fittings.glsl', 'float brow=sdRoundBox(lip,vec3(h.x+.027,.014,.083),.012);')
 require('cockpit_fittings.glsl', 'if(MODEL_IS(0) && i==0) brow=max(sdRoundBox(lip+vec3(.025,0,0),vec3(h.x+.052,.014,.083),.012),fuselage+.040);')
@@ -285,4 +285,4 @@ for ix in range(21):
             assert abs(old-new)<1e-12
             checks+=1
 
-print(json.dumps({'checks':checks,'failures':0,'scope':'Shoulder contact, shared Larkspur glazing, Atlas vent/tablet normals and overhead text orientation, hidden deck/firewall shell overlap, bounded normal dispatch and Specter support gradients; native rendering remains required.', 'source_sha256':{name:hashlib.sha256(raw[name].encode()).hexdigest() for name in paths}},indent=2))
+print(json.dumps({'checks':checks,'failures':0,'scope':'Shoulder contact, shared Thistledown glazing, Galleon vent/tablet normals and overhead text orientation, hidden deck/firewall shell overlap, bounded normal dispatch and Nocturne support gradients; native rendering remains required.', 'source_sha256':{name:hashlib.sha256(raw[name].encode()).hexdigest() for name in paths}},indent=2))

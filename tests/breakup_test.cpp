@@ -43,7 +43,7 @@ int main() {
       }
       assert(ng == (separate ? 3 : 0));
       assert(gn<=kMaxBreakPieces && wings==2 && gp[gn-1].kind==BK_CENTRE);
-      if(t==kLarkspur || t==kAtlas) {
+      if(t==kThistledown || t==kGalleon) {
         int kinds[BK_COUNT]={};
         for(int j=0;j<gn;++j) {
           ++kinds[gp[j].kind];
@@ -51,12 +51,12 @@ int main() {
         }
         assert(kinds[BK_WING]==2 && kinds[BK_TAIL]==2 && kinds[BK_FIN]==1);
         assert(kinds[BK_NOSE]==1 && kinds[BK_AFT]==1 && kinds[BK_CENTRE]==1);
-        assert(kinds[BK_PROP]==(t==kLarkspur?1:0) && kinds[BK_NACELLE]==(t==kAtlas?2:0));
-        assert(gn==(t==kLarkspur?12:separate?13:10));
-        if(t==kAtlas) for(int side:{-1,1}) {
+        assert(kinds[BK_PROP]==(t==kThistledown?1:0) && kinds[BK_NACELLE]==(t==kGalleon?2:0));
+        assert(gn==(t==kThistledown?12:separate?13:10));
+        if(t==kGalleon) for(int side:{-1,1}) {
           // Both real fan assemblies (including their spinner noses) and the
           // aft core cone belong to their complete, separate nacelle body.
-          // The old legacy +.12 m end bound left the Atlas +.42 m tip behind.
+          // The old legacy +.12 m end bound left the Galleon +.42 m tip behind.
           for(float z:{m.nacZ0+.74f-.32f,m.nacZ0+.74f,m.nacZ0+m.nacLen+.42f}) {
             const int owner=breakOwner(gp,gn,vec3(side*m.nacX,m.nacY,z));
             assert(gp[owner].kind==BK_NACELLE && gp[owner].side==side);
@@ -106,18 +106,18 @@ int main() {
         for(int side:{-1,1}) {
           inside(side,pose.hinge);inside(side,posed(wheel));
           const vec3 knee(gs.track,-2.40f,2.72f);
-          if(t==kAtlas) inside(side,posed(knee));
-          vec3 expected=posed(lerp(pose.hinge,wheel,.68f)+(t==kAtlas?(knee-pose.hinge)*.15f:vec3(0)));expected.x*=side;
+          if(t==kGalleon) inside(side,posed(knee));
+          vec3 expected=posed(lerp(pose.hinge,wheel,.68f)+(t==kGalleon?(knee-pose.hinge)*.15f:vec3(0)));expected.x*=side;
           assert(length(bodies[owners[side<0?0:1]].cg-expected)<.001f);
           for(float axle:{-1.f,1.f})for(float tyre:{-1.f,1.f})for(int angle=0;angle<360;angle+=15)for(float shoulder:{-1.f,1.f}) {
-            const bool atlas=t==kAtlas;
-            const float x=atlas?tyre*.34f:!s.special&&m.gear==3?tyre*.22f:0.f;
-            const float z=atlas?axle*.62f:0.f;
-            const float half=atlas?.189f:!s.special&&m.gear==3?.154f:fixed?(m.gear==0?.065f:m.gear==1?.134f:.184f):.144f;
+            const bool galleon=t==kGalleon;
+            const float x=galleon?tyre*.34f:!s.special&&m.gear==3?tyre*.22f:0.f;
+            const float z=galleon?axle*.62f:0.f;
+            const float half=galleon?.189f:!s.special&&m.gear==3?.154f:fixed?(m.gear==0?.065f:m.gear==1?.134f:.184f):.144f;
             inside(side,posed(wheel+vec3(x+shoulder*half,cosf(angle*DEG)*radius,z+sinf(angle*DEG)*radius)));
           }
         }
-        if(t==kAtlas) { // independent matrix witness, including the yaw/roll order
+        if(t==kGalleon) { // independent matrix witness, including the yaw/roll order
           const float up=clampf((1-gear)*1.25f,0,1);
           const vec3 hinge(gs.track,-1.30f,2.72f),d=wheel-hinge;
           const float dx=1.85f-gs.track,dz=-sqrtf(d.y*d.y+d.z*d.z-dx*dx);

@@ -10,7 +10,7 @@
 // keyword test, the geometry previewer - takes the list from here, so they always check what the game runs.
 
 // One aircraft's own build of the airframe programs: its index in kAircraft (AF_MODEL), its family's switch (AF_LIGHT,
-// AF_JET for the XR-30, AF_WRAITH for the XR-40) and its packed model (models.cpp packModel, the same for the player's
+// AF_JET for the XR-30, AF_SOMNUS for the XR-40) and its packed model (models.cpp packModel, the same for the player's
 // aircraft and every traffic aircraft of the type) as the constant gM. Every branch on another aircraft's type or
 // shape is settled as the program compiles, and the code only another aircraft runs is cut from its source
 // (plane_common.glsl HAS_*, shader_prune.h): the program holds this aircraft and nothing else.
@@ -33,7 +33,7 @@ inline std::string aircraftDefines(int model, const float packed[96]) {
 inline std::string worldLibAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kRtIO + kViewUniforms + kSceneUniforms + kRoads + kPlaneCommon + kCockpitLayout + kPlaneParts + kCockpitFittings + kResearchCockpitLayout + kPlaneSDF + kPlaneTrace + kTerrainTrace +
          kMaterialCommon + kPlanet + kLightCommon + kClouds + kTerrainMaterial + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRtPrims + kPlaneScreens +
-         kFeeds + kPlaneFx + kWraithWeaponSDF + kWraithSDF + kWraithStoreMaterial + kWraithMaterial + kWraithFx + kWraithCockpitCommon + kWraithCockpitSDF + kWraithCockpitMaterial +
+         kFeeds + kPlaneFx + kSomnusWeaponSDF + kSomnusSDF + kSomnusStoreMaterial + kSomnusMaterial + kSomnusFx + kSomnusCockpitCommon + kSomnusCockpitSDF + kSomnusCockpitMaterial +
          kCockpitMaterial + kPlaneMaterial + kWater + kAfShMap + kPlaneLight;
 }
 // the GPS map's aerial imagery: the ground's material over the islands (GROUND_ROADS: the roads painted, roads.glsl)
@@ -43,7 +43,7 @@ inline std::string mapFSAssembly(const std::string& defines) { return worldLibAs
 inline std::string hullBakeFSAssembly(const std::string& defines) { return worldLibAssembly(defines + "#define PART_BAKE\n") + kHullBakeMain; }
 // The aircraft distance fields alone (tests/aircraft_visual_test.cpp adds its own main)
 inline std::string sdfAssembly(const std::string& defines) {
-  return std::string("#version 330 core\n") + defines + kCommonGLSL + kRtIO + kViewUniforms + kSceneUniforms + kRoads + kPlaneCommon + kCockpitLayout + kPlaneParts + kCockpitFittings + kResearchCockpitLayout + kPlaneSDF + kWraithWeaponSDF + kWraithSDF + kWraithCockpitCommon + kWraithCockpitSDF;
+  return std::string("#version 330 core\n") + defines + kCommonGLSL + kRtIO + kViewUniforms + kSceneUniforms + kRoads + kPlaneCommon + kCockpitLayout + kPlaneParts + kCockpitFittings + kResearchCockpitLayout + kPlaneSDF + kSomnusWeaponSDF + kSomnusSDF + kSomnusCockpitCommon + kSomnusCockpitSDF;
 }
 
 // ---- the scenery's instanced meshes (entity_render.cpp): a build for each class (ENT_CLASS, ent_common.glsl: the trees,
@@ -72,7 +72,7 @@ inline std::string waterFSAssembly(const std::string& defines) {
 inline std::string objectsFSAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kRoads + kPlaneCommon + kCockpitLayout + kPlaneParts + kCockpitFittings + kResearchCockpitLayout + kPlaneSDF + kPlaneTrace +
          kMaterialCommon + kPlanet + kLightCommon + kClouds + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRtPrims + kPlaneScreens +
-         kFeeds + kPlaneFx + kWraithWeaponSDF + kWraithSDF + kWraithStoreMaterial + kWraithMaterial + kWraithFx + kWraithCockpitCommon + kWraithCockpitSDF + kWraithCockpitMaterial +
+         kFeeds + kPlaneFx + kSomnusWeaponSDF + kSomnusSDF + kSomnusStoreMaterial + kSomnusMaterial + kSomnusFx + kSomnusCockpitCommon + kSomnusCockpitSDF + kSomnusCockpitMaterial +
          kCockpitMaterial + kPlaneMaterial + kAfShMap + kPlaneLight + kGBuffer + kGBWrite + kPlaneGB + kObjectsFS;
 }
 // the rigid parts' poses (plane_parts.glsl partPose), once a frame into a small texture the part draws read
@@ -92,7 +92,7 @@ inline std::string partPoseFSAssembly() {
 inline std::string planeMeshVSAssembly(const std::string& defines) { return std::string("#version 330 core\n") + defines + "uniform int uWreck;\n" + kWreckClip + kPlaneMeshVS; }
 // the aircraft mesh's depth pre-pass: the cut of the research cockpits' windows (cabin_windows.glsl) and the cloak's front
 inline std::string planeMeshDepthFSAssembly() {
-  return std::string("#version 330 core\n") + kResearchCockpitLayout + kWraithCockpitCommon + kCabinWindows +
+  return std::string("#version 330 core\n") + kResearchCockpitLayout + kSomnusCockpitCommon + kCabinWindows +
          "flat in float vId; in vec3 vW; in vec3 vN; in float vIdS; in float vAo; in vec3 vB; flat in int vPc;\n"
          "uniform int uScrSkip; uniform vec3 uScrEye; uniform int uScrModel; uniform int uBombPane; uniform int uPartInst;\n"
          "uniform float uCloakZ; uniform int uWreck;\n" + kWreckClip +
@@ -105,19 +105,19 @@ inline std::string planeMeshDepthFSAssembly() {
 inline std::string planeMeshFSAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + "#define AF_MESH\n" + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kRoads + kWreckClip + kPlaneCommon + kCockpitLayout + kPlaneParts + kCockpitFittings + kResearchCockpitLayout + kPlaneSDF + kPlaneTrace +
          kMaterialCommon + kPlanet + kLightCommon + kClouds + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRtPrims + kPlaneScreens +
-         kFeeds + kPlaneFx + kWraithWeaponSDF + kWraithSDF + kWraithStoreMaterial + kWraithMaterial + kWraithFx + kWraithCockpitCommon + kCabinWindows + kWraithCockpitSDF + kWraithCockpitMaterial +
+         kFeeds + kPlaneFx + kSomnusWeaponSDF + kSomnusSDF + kSomnusStoreMaterial + kSomnusMaterial + kSomnusFx + kSomnusCockpitCommon + kCabinWindows + kSomnusCockpitSDF + kSomnusCockpitMaterial +
          kCockpitMaterial + kPlaneMaterial + kAfShMap + kPlaneLight + kGBuffer + kGBWrite + kPlaneGB + kPlaneMeshFS;
 }
 // the shadow proxy: the airframe fields' shadows on what is in the G-buffer, for the lighting pass
 inline std::string shadowProxyFSAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kRoads + kPlaneCommon + kCockpitLayout + kPlaneParts + kCockpitFittings + kResearchCockpitLayout + kPlaneSDF + kPlaneTrace +
-         kWraithWeaponSDF + kWraithSDF + kWraithCockpitCommon + kWraithCockpitSDF + kMaterialCommon + kPlanet + kLightCommon + kGBuffer + kAfShMap + kEnemyShadow + kShadowProxyFS;
+         kSomnusWeaponSDF + kSomnusSDF + kSomnusCockpitCommon + kSomnusCockpitSDF + kMaterialCommon + kPlanet + kLightCommon + kGBuffer + kAfShMap + kEnemyShadow + kShadowProxyFS;
 }
 // the effects pass: the effects over the lit frame (its cloak needs the airframe's field)
 inline std::string effectsFSAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kRoads + kPlaneCommon + kCockpitLayout + kPlaneParts + kCockpitFittings + kResearchCockpitLayout + kPlaneSDF + kPlaneTrace +
          kMaterialCommon + kPlanet + kLightCommon + kClouds + kRaytraceUfo + kRaytraceText + kRaytraceDisplays + kRtPrims + kPlaneScreens +
-         kFeeds + kPlaneFx + kWraithWeaponSDF + kWraithSDF + kWraithStoreMaterial + kWraithMaterial + kWraithFx + kWraithCockpitCommon + kWraithCockpitSDF + kWraithCockpitMaterial +
+         kFeeds + kPlaneFx + kSomnusWeaponSDF + kSomnusSDF + kSomnusStoreMaterial + kSomnusMaterial + kSomnusFx + kSomnusCockpitCommon + kSomnusCockpitSDF + kSomnusCockpitMaterial +
          kGBuffer + kPropellerGLSL + kEffectsFS;
 }
 // the composite and the interface, each after the g-force lens they draw (g_lens.glsl: over the scene and the flight HUD)
@@ -160,10 +160,10 @@ void main(){
 
 inline std::string releasedStoreFSAssembly(int kind=0) {
  const char* field=kind==1?"wrPenetratorPayload":kind==2?"wrEmpPayload":"wrPlasmaPayload";
- return std::string("#version 330 core\n#define AF_WRAITH\n#define AF_MESH\n") +
+ return std::string("#version 330 core\n#define AF_SOMNUS\n#define AF_MESH\n") +
    kCommonGLSL+kViewUniforms+kSceneUniforms+kRoads+kPlaneCommon+
    "const int PT_WR_KINETIC=47,PT_WR_CHARGED=48,PT_WR_PENETRATOR=49,PT_WR_EMP=50;\n"+
-   kWraithWeaponSDF+kMaterialCommon+kWraithStoreMaterial+
+   kSomnusWeaponSDF+kMaterialCommon+kSomnusStoreMaterial+
    "vec2 releasedStoreField(vec3 p){return "+field+"(p); }\nuniform sampler2DArray uAfShMap;\n"+
    kGBuffer+kGBWrite+kEnemyShadow+kReleasedStoreFS;
 }

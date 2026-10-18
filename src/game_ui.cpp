@@ -922,7 +922,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   py = chooserTop;
   header(px, py, iw, "CHOOSE AIRCRAFT"); const float chooserY = py; py += 26 * s;
   // every aircraft's eligibility first, then the flyable ones listed ahead of the rest: a panel too short for all the
-  // rows drops unavailable aircraft, never one the job can be flown in (the review of v3.24.0: an owned Starling, the
+  // rows drops unavailable aircraft, never one the job can be flown in (the review of v3.24.0: an owned Emissary, the
   // seventh row, went unseen and unselectable on a long briefing)
   int firstOk = -1;
   std::vector<Career::Source> srcs(kAircraftCount); std::vector<std::string> whys(kAircraftCount);
@@ -940,7 +940,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   float rowH = 44 * s, rowStep = rowH + 6 * s;
   float colW = (iw - 10 * s) * 0.5f;
   // the rows scroll (mouse wheel, or the right stick) when the panel can't show them all: every aircraft stays
-  // reachable (the review of v3.31.0, U1: an owned Osprey sat below six rentals, out of reach)
+  // reachable (the review of v3.31.0, U1: an owned Wavecrest sat below six rentals, out of reach)
   const float chooserBot = y + h - 70 * s;
   const int totalRows = (kNumAircraft + 1) / 2, visRows = std::max(1, (int)floorf((chooserBot - py + 6 * s) / rowStep));
   static int chooserScroll = 0; static int chooserFor = -1;
@@ -1651,7 +1651,7 @@ void Game::drawHubLogbook(float x, float y, float w, float h) {
       g_ren.text(px, py, 12 * s, "SOFTEST LANDING", C_DIM, 1, 0, false);
       g_ren.text(px + iw, py, 15 * s, career.bestLandingFpm < 9000 ? fmt("%.0f fpm", career.bestLandingFpm) : "No landings yet", C_TEXT, 1, 2); py += 40 * s;
       header(px, py, iw, "LICENCES"); py += 30 * s;
-      const char* unlocks[] = {"Kestrel trainer / flight school", "Kestrel and Wren rentals / cargo work", "Bushmaster, Islander and Pelican / passengers / ownership", "Meridian and Starling / airline operations"};
+      const char* unlocks[] = {"Dawnlark trainer / flight school", "Dawnlark and Ambler rentals / cargo work", "Scrubrunner, Skerry and Longshore / passengers / ownership", "Archipel and Emissary / airline operations"};
       for (int i = 0; i < 4; ++i) {
         bool got = career.license >= i;
         g_ren.rect(px, py + 4 * s, 7 * s, 7 * s, got ? C_GOOD : C_DIM, got ? 1.f : 0.4f, 2 * s);
@@ -2180,7 +2180,7 @@ void Game::drawHud(const FrameParams& fp) {
       if (earthFacilitiesPending) obj = earthPromotionDeferred ? "TERRAIN CONTACT PROTECTED / AIRPORTS PENDING" : "DETAIL PREPARING / LOCAL AIRPORTS UNAVAILABLE";
     }
     else if (researchFlight) obj = resCard >= 0 ? (resCardDone ? std::string(kResCards[resCard].id) + "  CARD COMPLETE" : fmt("%s  STEP %d/%d  %s", kResCards[resCard].id, resStep + 1, kResCards[resCard].n, kResCards[resCard].steps[std::min(resStep, kResCards[resCard].n - 1)].label)) : fmt("FREE ROAM  -  MACH %.2f", plane.mach);
-    if(militaryFlight || (researchFlight && resCard<0 && specIdx==kWraith)) obj=hiveObjectiveText();
+    if(militaryFlight || (researchFlight && resCard<0 && specIdx==kSomnus)) obj=hiveObjectiveText();
     g_ren.text(14 * s, 24 * s, 12 * s, ellipsize(obj, leftW, 12 * s), mag, 1, 0, false);
     {   // the nav line under it: distance and time to the target
       std::string nav = fmt("%s   BRG %03.0f   ETE %s", dist < 1000.f ? fmt("%.0f m", dist).c_str() : set.metric ? fmt("%.1f km", dist / 1000.f).c_str() : fmt("%.1f nm", dist / 1852.f).c_str(), brg, gs > 10 ? fmt("%d:%02d", (int)(dist / gs) / 60, (int)(dist / gs) % 60).c_str() : "--:--");
@@ -2396,9 +2396,9 @@ void Game::drawHud(const FrameParams& fp) {
     if (sp.special == 2) {
       const vec3 VIO(0.8f, 0.5f, 1.f);
       tiles.push_back({"PODS", fmt("%.0f deg%s", plane.nozzle * 90, plane.nozzle > 0.99f ? " VTOL" : ""), C_TEXT, plane.nozzle});
-      tiles.push_back({"CLOAK", wraith.stealth > 0.99f ? "ACTIVE" : wraith.stealth > 0.01f ? fmt("%.0f%%", wraith.stealth * 100) : "OFF", wraith.stealth > 0.01f ? VIO : C_DIM, wraith.stealth});
-      tiles.push_back({"WEAPONS", wraith.lasers > 0.97f ? "HOT" : wraith.lasers > 0.01f ? "DEPLOY" : "SAFE", wraith.lasers > 0.97f ? C_BAD : C_DIM, -1.f});
-      tiles.push_back({"PLASMA", wraith.bay > 0.05f ? "BAY OPEN" : wraith.bombLoaded >= 1.f ? "READY" : "CHARGING", wraith.bombLoaded >= 1.f ? VIO : C_WARN, wraith.bombLoaded});
+      tiles.push_back({"CLOAK", somnus.stealth > 0.99f ? "ACTIVE" : somnus.stealth > 0.01f ? fmt("%.0f%%", somnus.stealth * 100) : "OFF", somnus.stealth > 0.01f ? VIO : C_DIM, somnus.stealth});
+      tiles.push_back({"WEAPONS", somnus.lasers > 0.97f ? "HOT" : somnus.lasers > 0.01f ? "DEPLOY" : "SAFE", somnus.lasers > 0.97f ? C_BAD : C_DIM, -1.f});
+      tiles.push_back({"PLASMA", somnus.bay > 0.05f ? "BAY OPEN" : somnus.bombLoaded >= 1.f ? "READY" : "CHARGING", somnus.bombLoaded >= 1.f ? VIO : C_WARN, somnus.bombLoaded});
     } else if (sp.special) tiles.push_back({"TVC", fmt("%+.0f deg", -clampf(plane.ctl.pitch + plane.ctl.trim * 0.3f, -1, 1) * 0.5f / DEG), C_TEXT, -1.f});
     else tiles.push_back({"FLAPS", fmt("%.0f%%", plane.flaps * 100), plane.flaps > 0.01f ? C_ACCENT : C_TEXT, plane.flaps});
     std::string gearS = !sp.retract ? "FIXED" : plane.gear > 0.99f ? "DOWN" : plane.gear < 0.01f ? "UP" : "TRANSIT";
@@ -2586,8 +2586,8 @@ void Game::drawHud(const FrameParams& fp) {
       label(ex2 - dir.x * 48 * s, ey2 - dir.y * 48 * s - 8 * s, lab);
     }
   }
-  if(militaryFlight || (researchFlight && specIdx==kWraith)) {
-    if(specIdx==kWraith) {
+  if(militaryFlight || (researchFlight && specIdx==kSomnus)) {
+    if(specIdx==kSomnus) {
       const auto& gun=hive::forwardSpec(combatLoadout.forward);
       const auto& bomb=hive::bombSpec(combatLoadout.bomb);
       const float xx=rail+16*s, yy=band+32*s;
@@ -2890,7 +2890,7 @@ void Game::drawPause() {
     if (settingsPage == 1 && button(W * 0.5f - pw * 0.5f + 24 * s, H - 120 * s - 4 * s - 48 * s, 150 * s, 36 * s, "Back", true, true)) { settingsFromPause = false; bindCapture = -1; }
     return;
   }
-  const bool combatPractice=researchFlight && resCard<0 && specIdx==kWraith;
+  const bool combatPractice=researchFlight && resCard<0 && specIdx==kSomnus;
   s = std::min(s, std::min(H / (combatPractice?820.f:freeFlight?600.f:540.f), W / 520.f));
   float pw = 410 * s, ph = (combatPractice?740.f:freeFlight?510.f:450.f) * s, x = W * 0.5f - pw * 0.5f, y = H * 0.5f - ph * 0.5f;
   panel(x, y, pw, ph, 0.95f);

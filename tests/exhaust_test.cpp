@@ -25,7 +25,7 @@ int main() {
   int expected[4] = {2, 2, 1, 4};
   for (int m = 0; m < kAircraftCount; ++m) {
     Plane p = running(m); ExhaustVisual e = build(p); valid(e);
-    check(e.count == (isCareerAircraft(m) ? 0 : expected[m - kNightjar]), "fleet capability and exact 2/2/1/4 nozzle counts");
+    check(e.count == (isCareerAircraft(m) ? 0 : expected[m - kVigil]), "fleet capability and exact 2/2/1/4 nozzle counts");
     if (isCareerAircraft(m)) continue;
     for (float spool : {0.f, .019f, .02f, .3f, .7f, .85f, .9f, .925f, 1.f}) {
       p.engineSpool = spool; e = build(p); valid(e);
@@ -45,18 +45,18 @@ int main() {
       for (int j = 0; j < e.count; ++j) check(e.engine[j] != k, "compacted active slots retain the correct physical engine");
       p.fail.engineHealth[k] = .45f; e = build(p);
       check(e.count == p.spec->engines, "partially healthy engine still emits");
-      if (m != kWraith) check(close(e.power[k][2], .45f), "partial health attenuates emission");
+      if (m != kSomnus) check(close(e.power[k][2], .45f), "partial health attenuates emission");
     }
     p = running(m); for (float& h : p.fail.engineHealth) h = 0.f;
     check(build(p).count == 0, "all failed engines take exact-empty render path");
     p = running(m); p.engineSpool = std::numeric_limits<float>::quiet_NaN(); check(build(p).count == 0, "invalid spool fails closed");
   }
   {
-    const auto n = build(running(kNightjar)), m = build(running(kMantis));
-    check(close(exhaustPosition(n, 0), vec3(-1.63f, .16f, 5.91f)) && close(exhaustPosition(n, 1), vec3(1.63f, .16f, 5.91f)), "Nightjar plumes start at both actual rear nacelle exits");
-    check(close(n.exit[0][3], .27f) && close(n.axis[1][3], .27f), "Nightjar radii match circular bores");
-    check(m.count == 1 && close(exhaustPosition(m, 0), vec3(0.f, -.08f, 7.52f)), "Mantis has exactly one actual centerline exit");
-    check(close(m.exit[0][3], .4896f) && close(m.axis[0][3], .4896f), "Mantis larger circular bore scales the shared appearance");
+    const auto n = build(running(kVigil)), m = build(running(kReverie));
+    check(close(exhaustPosition(n, 0), vec3(-1.63f, .16f, 5.91f)) && close(exhaustPosition(n, 1), vec3(1.63f, .16f, 5.91f)), "Vigil plumes start at both actual rear nacelle exits");
+    check(close(n.exit[0][3], .27f) && close(n.axis[1][3], .27f), "Vigil radii match circular bores");
+    check(m.count == 1 && close(exhaustPosition(m, 0), vec3(0.f, -.08f, 7.52f)), "Reverie has exactly one actual centerline exit");
+    check(close(m.exit[0][3], .4896f) && close(m.axis[0][3], .4896f), "Reverie larger circular bore scales the shared appearance");
     printf("Anchors: XR-10 (+/-1.630,0.160,5.910) radius .270; XR-20 (0,-.080,7.520) radius .4896\n");
   }
   for (int ni = 0; ni <= 10; ++ni) for (int pi = -10; pi <= 10; ++pi) {
@@ -71,19 +71,19 @@ int main() {
     }
   }
   for (int ti = 0; ti <= 10; ++ti) for (float vane : {-.7f, 0.f, .7f}) for (float yaw : {-.7f, 0.f, .7f}) {
-    Plane p = running(kWraith); const float tilt = ti*.05f*PI;
+    Plane p = running(kSomnus); const float tilt = ti*.05f*PI;
     for (int i = 0; i < 4; ++i) { p.podTilt[i] = tilt; p.podVane[i] = vane; p.podYaw[i] = yaw; p.podThr[i] = .25f + .4f*i; }
     const auto e = build(p); valid(e);
     for (int i = 0; i < 4; ++i) {
-      check(close(exhaustPosition(e, i), kWraithPods[i] + vec3(0, -sinf(tilt), cosf(tilt))*1.57f), "all Wraith anchors move with their actual pod");
-      check(close(exhaustDirection(e, i), vec3(-sinf(yaw), -sinf(tilt + vane)*cosf(yaw), cosf(tilt + vane)*cosf(yaw))), "all Wraith plumes follow tilt plus pitch and yaw vanes");
-      check(close(e.exit[i][3], .28f + .1f*clampf(exhaustPodThrust(p, i), 0, 1)), "Wraith plume radius follows the same iris state as its mesh");
+      check(close(exhaustPosition(e, i), kSomnusPods[i] + vec3(0, -sinf(tilt), cosf(tilt))*1.57f), "all Somnus anchors move with their actual pod");
+      check(close(exhaustDirection(e, i), vec3(-sinf(yaw), -sinf(tilt + vane)*cosf(yaw), cosf(tilt + vane)*cosf(yaw))), "all Somnus plumes follow tilt plus pitch and yaw vanes");
+      check(close(e.exit[i][3], .28f + .1f*clampf(exhaustPodThrust(p, i), 0, 1)), "Somnus plume radius follows the same iris state as its mesh");
       check(close(e.power[i][2], clampf(p.podThr[i]*1.3f, 0.f, 1.6f)), "per-pod differential thrust scales intensity");
     }
   }
   {
-    Plane p = running(kWraith); p.podThr[2] = 0.f; check(build(p).count == 3, "zero-thrust live pod takes no raymarch work");
-    p = running(kWraith); p.fail.engineHealth[2] = .45f;
+    Plane p = running(kSomnus); p.podThr[2] = 0.f; check(build(p).count == 3, "zero-thrust live pod takes no raymarch work");
+    p = running(kSomnus); p.fail.engineHealth[2] = .45f;
     check(close(exhaustPodThrust(p, 2), .45f), "iris/plume share failure-scaled thrust");
     p.fuel = 0.f; check(exhaustPodThrust(p, 2) == 0.f, "iris/plume share fuel gating");
     check(exhaustPodThrust(p, -1) == 0.f && exhaustPodThrust(p, 4) == 0.f, "pod helper rejects invalid indices");

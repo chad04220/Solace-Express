@@ -53,7 +53,7 @@ All proposed views read the baseline's frozen absolute camera positions, rather 
 
 ## Actual flyable-aircraft scale review
 
-`aircraft_scale_review_harness OUTPUT [FRAMES]` uses the current production Kestrel model through the ordinary fleet bake/render path. A unit-scale production house and sedan are deliberately staged on the Capital apron: this is a clearly labelled scale fixture, not a claim that a generated town contains this arrangement. No model is rescaled. The house has a 3m buried foundation, so its total mesh AABB is taller than its above-grade height; both values are recorded separately.
+`aircraft_scale_review_harness OUTPUT [FRAMES]` uses the current production Dawnlark model through the ordinary fleet bake/render path. A unit-scale production house and sedan are deliberately staged on the Capital apron: this is a clearly labelled scale fixture, not a claim that a generated town contains this arrangement. No model is rescaled. The house has a 3m buried foundation, so its total mesh AABB is taller than its above-grade height; both values are recorded separately.
 
 A second view places the same unscaled airframe in the actual Mount Kaleo environment as a staged airborne reference. Its camera distance and the crater's camera distance are recorded because perspective is not an equal-depth measurement. The nominal crater wall radius is 340m (680m across), and the localized terrain edit fades out by radius520m. The fixture is not a flight-simulation replay. Current upstream startup compiles every renderer program and specializes aircraft shaders on demand; the old pre-integration diagnostic omitted eight unused startup programs and identifies that mode in its log.
 

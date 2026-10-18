@@ -17,5 +17,5 @@ inline int hangarRowFor(int spec) {
 // airframe is unconditionally locked in the career hangar, regardless of money or licence.
 inline bool hangarResearchLocked(int spec) { return isResearchAircraft(spec); }
 inline const char* hangarResearchDesignation(int spec) {
-  return spec == kNightjar ? "XR-10" : spec == kMantis ? "XR-20" : spec == kResearchJet ? "XR-30" : "XR-40";
+  return spec == kVigil ? "XR-10" : spec == kReverie ? "XR-20" : spec == kResearchJet ? "XR-30" : "XR-40";
 }

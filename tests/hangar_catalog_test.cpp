@@ -8,12 +8,12 @@ static void check(bool ok, const char* message) {
 }
 int main() {
   // These are persisted identities, not list positions. Additions must never shift them.
-  static_assert(kOsprey == 8 && kNightjar == 9 && kResearchJet == 10 && kMantis == 11 && kWraith == 12,
+  static_assert(kWavecrest == 8 && kVigil == 9 && kResearchJet == 10 && kReverie == 11 && kSomnus == 12,
                 "Existing aircraft indices must remain save/shader compatible");
-  static_assert(kLarkspur == 13 && kAtlas == 14 && kAircraftCount == 15 && kNumAircraft == 11,
+  static_assert(kThistledown == 13 && kGalleon == 14 && kAircraftCount == 15 && kNumAircraft == 11,
                 "The two conventional aircraft append to the existing roster");
-  const char* ids[] = {"kestrel", "wren", "bush", "islander", "pelican", "meridian", "starling", "swift_s6", "osprey_c6",
-                      "xr10_nightjar", "xr30_specter", "xr20_mantis", "xr40_wraith", "larkspur_l4", "atlas_a180"};
+  const char* ids[] = {"dawnlark", "ambler", "scrubrunner", "skerry", "longshore", "archipel", "emissary", "cutwater_s6", "wavecrest_c6",
+                      "xr10_vigil", "xr30_nocturne", "xr20_reverie", "xr40_somnus", "thistledown_l4", "galleon_180"};
   for (int spec = 0; spec < kAircraftCount; ++spec) check(std::strcmp(kAircraft[spec].id, ids[spec]) == 0, "Stable aircraft identity changed");
   check(hangarCatalogCount() == kAircraftCount, "Catalog must include every aircraft once");
   bool seen[kAircraftCount] = {};
@@ -29,8 +29,8 @@ int main() {
     }
     if (row < 9) check(spec == row, "Existing career order must remain unchanged");
   }
-  check(hangarSpecAt(9) == kLarkspur && hangarSpecAt(10) == kAtlas, "New conventional aircraft precede research teasers");
-  const int ordered[] = {kNightjar, kMantis, kResearchJet, kWraith};
+  check(hangarSpecAt(9) == kThistledown && hangarSpecAt(10) == kGalleon, "New conventional aircraft precede research teasers");
+  const int ordered[] = {kVigil, kReverie, kResearchJet, kSomnus};
   const char* names[] = {"XR-10", "XR-20", "XR-30", "XR-40"};
   for (int i = 0; i < 4; ++i) {
     check(hangarSpecAt(kNumAircraft + i) == ordered[i], "Research designation order is incorrect");
@@ -41,7 +41,7 @@ int main() {
   for (int invalid : {-1, kAircraftCount, 1000000})
     check(!validAircraft(invalid) && !isCareerAircraft(invalid) && !isResearchAircraft(invalid) && validCareerSelection(invalid) == 0,
           "Invalid aircraft selections fail closed");
-  check(hangarSpecAt(-1) == 0 && hangarSpecAt(999) == kWraith, "Catalog bounds must be safe");
+  check(hangarSpecAt(-1) == 0 && hangarSpecAt(999) == kSomnus, "Catalog bounds must be safe");
 
   // Performance cache rows use the career mapping rather than the stable-index prefix, which contains research.
   const char* cache = "hangar_catalog_perf_test.bin";

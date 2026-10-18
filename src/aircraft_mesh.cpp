@@ -15,12 +15,12 @@
 #include "shaders.h"
 #include "hull_mesh.h"
 #include "aircraft_mesh_build.h"
-#include "wraith_loadout_parts.h"
-#include "wraith_hardware_normals.h"
+#include "somnus_loadout_parts.h"
+#include "somnus_hardware_normals.h"
 #include "mesh_simplify.h"
 #include "mesh_validation.h"
 #include "aircraft_mesh_overhead.h"
-#include "aircraft_mesh_specter_detail.h"
+#include "aircraft_mesh_nocturne_detail.h"
 #include "aircraft_mesh_orientation.h"
 #include "aircraft_mesh_planar.h"
 #include "aircraft_geometry_source.h"
@@ -373,16 +373,16 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
       std::vector<float> dIn; mode(1, 0); hullEval(behind, dIn);
       for (size_t q = 0; q < cand.size(); q++) if (!moving[q] && fabsf(dRest[q]) < band && dIn[q] > -0.5f * kH) { thin[q] = 1; nThin++; }
     }
-    // Specter's 9 mm overhead stems need more than the ordinary 7.8125 mm
+    // Nocturne's 9 mm overhead stems need more than the ordinary 7.8125 mm
     // thin lattice. Force only their tightly bounded static cells into a local
     // 3.90625 mm patch. The authored field, materials and all moving parts stay
     // unchanged; the neighbouring fine cells form its submerged overlap ring.
     std::vector<uint8_t> toggleDetail(cand.size(), 0);
     std::unordered_set<int> toggleSet;
-    if (aircraftMesh::specterToggleDetailEnabled(M, inside)) {
+    if (aircraftMesh::nocturneToggleDetailEnabled(M, inside)) {
       for (size_t q = 0; q < cand.size(); q++) {
         if (moving[q] || fabsf(dRest[q]) >= band
-            || !aircraftMesh::specterToggleDetailCell(candP[q], M + 22*4, .5f*kS2)) continue;
+            || !aircraftMesh::nocturneToggleDetailCell(candP[q], M + 22*4, .5f*kS2)) continue;
         toggleDetail[q] = 1; toggleSet.insert(cand[q]);
         if (!thin[q]) { thin[q] = 1; nThin++; }
       }
@@ -476,7 +476,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
       phase("  eval");
       if (iso != 0.f) for (float& x : cv) x -= iso;
       std::vector<int> cubeV(cells.size() * nOwn, -1);   // each slot's cubes -> vertex (local)
-      const bool reportToggle = sub == aircraftMesh::kSpecterToggleSub && getenv("HULLDBG");
+      const bool reportToggle = sub == aircraftMesh::kNocturneToggleSub && getenv("HULLDBG");
       const size_t toggleLatticeBytes = reportToggle ? cpts.capacity()*sizeof(vec3) + cv.capacity()*sizeof(float) + cubeV.capacity()*sizeof(int)
           + (slotOf.keys.capacity()+rim.keys.capacity())*sizeof(int64_t)
           + (slotOf.vals.capacity()+rim.vals.capacity()+cc.capacity())*sizeof(int) : 0;
@@ -574,7 +574,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
       mode(2, 0); hullEval4(vpos, d4, &vn);
       if (reportToggle) {
         togglePeakBytes = std::max(togglePeakBytes, toggleWorkingBytes() + (vn.capacity()+d4.capacity())*sizeof(float));
-        printf("mesh Specter toggle buffers: %zu lattice bytes, %zu peak tracked CPU working bytes (samples, indices, hashes, crossings, normals, QEF; excludes output mesh and GPU staging)\n",
+        printf("mesh Nocturne toggle buffers: %zu lattice bytes, %zu peak tracked CPU working bytes (samples, indices, hashes, crossings, normals, QEF; excludes output mesh and GPU staging)\n",
             toggleLatticeBytes, togglePeakBytes);
       }
       phase("  pull");
@@ -632,12 +632,12 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     phase("nets");
     fineStart = (uint32_t)ib.size();
     const size_t fineV = vb.size() / 8;   // (the fine patch's vertices are its own, after the coarse mesh's)
-    if (!fineCells.empty()) nets(fineCells, 8, aircraftMesh::kSpecterToggleRingSink, 0.f);
+    if (!fineCells.empty()) nets(fineCells, 8, aircraftMesh::kNocturneToggleRingSink, 0.f);
     phase("fine nets");
     if (!toggleCells.empty()) {
       const size_t samplesBefore = nLattice, verticesBefore = vb.size()/8, indicesBefore = ib.size();
-      nets(toggleCells, aircraftMesh::kSpecterToggleSub, 0.f, 0.f);
-      if (getenv("HULLDBG")) printf("mesh Specter toggles: %zu core cells, %zu overlap cells, %zu samples, %zu raw vertices, %zu raw triangles; lattice 3.90625 mm\n",
+      nets(toggleCells, aircraftMesh::kNocturneToggleSub, 0.f, 0.f);
+      if (getenv("HULLDBG")) printf("mesh Nocturne toggles: %zu core cells, %zu overlap cells, %zu samples, %zu raw vertices, %zu raw triangles; lattice 3.90625 mm\n",
           toggleSet.size(), toggleCells.size()-toggleSet.size(), nLattice-samplesBefore, vb.size()/8-verticesBefore, (ib.size()-indicesBefore)/3);
       phase("toggle detail nets");
     }
@@ -873,9 +873,9 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
         PartOut* po = partOut.back().get(); po->raw = po->ib.size() / 3;
         // Bound concurrent simplifiers (static/fine plus at most two part workers).
         if (partSimp.size() >= 2) { const auto tj = std::chrono::steady_clock::now(); partSimp.front().join(); partSimp.erase(partSimp.begin()); partJoinS += std::chrono::duration<double>(std::chrono::steady_clock::now() - tj).count(); }
-        // The Atlas main doors are broad, 24 mm slabs. Long coplanar triangles
+        // The Galleon main doors are broad, 24 mm slabs. Long coplanar triangles
         // can reverse their near/far faces under vertex-interpolated log depth.
-        const float partMaxEdge = pv.model == kAtlas && po->type == 36 ? aircraftMesh::kAtlasDoorMaxEdge : 0.f;
+        const float partMaxEdge = pv.model == kGalleon && po->type == 36 ? aircraftMesh::kGalleonDoorMaxEdge : 0.f;
         partSimp.emplace_back([po, inside, partMaxEdge] { size_t pe = po->ib.size(); simplifyMesh(po->vb, po->ib, pe, inside ? 0.0003f : 0.0008f, 0.04f, partMaxEdge); });
       }
       hullBakePart = -1;
@@ -890,11 +890,11 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     }
     fineStart = (uint32_t)ib.size();
     { const uint32_t off = (uint32_t)(vb.size() / 8); vb.insert(vb.end(), vbF.begin(), vbF.end()); for (uint32_t i : ibF) ib.push_back(i + off); }
-    // Nightjar's near-eye overhead plate: keep the simplified triangles local so the
+    // Vigil's near-eye overhead plate: keep the simplified triangles local so the
     // existing vertex-log depth cannot place the roof beyond it in front. No shader/depth change.
-    if (inside && pv.model == kNightjar && int(M[21*4+2] + .5f) == 2) {
+    if (inside && pv.model == kVigil && int(M[21*4+2] + .5f) == 2) {
       const size_t added = aircraftMesh::boundOverheadEdges(vb, ib, fineStart, M + 22*4);
-      if (getenv("HULLDBG")) printf("mesh Nightjar overhead: added %zu local triangles\n", added);
+      if (getenv("HULLDBG")) printf("mesh Vigil overhead: added %zu local triangles\n", added);
     }
     // A small set of conventional cabin triangles survived extraction with a
     // winding opposite all three agreeing field normals. Keep intentional
@@ -994,16 +994,16 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
         nCr++;
       }
       if (getenv("HULLDBG")) printf("mesh part %d: %d corners on creases\n", po->type, nCr);
-      if (int(pv.M[2]+.5f)==6 && !wraithLoadout::roundSurfaces(po->type).empty()) {
+      if (int(pv.M[2]+.5f)==6 && !somnusLoadout::roundSurfaces(po->type).empty()) {
         aircraftMesh::PlanarRepairStats flatStats;
         if (!aircraftMesh::repairVerifiedPlanarNormals(po->vb,po->ib,cn,flatStats)) {
-          fprintf(stderr,"Rejected invalid Wraith planar-part input; using SDF fallback\n"); return;
+          fprintf(stderr,"Rejected invalid Somnus planar-part input; using SDF fallback\n"); return;
         }
-        if(getenv("HULLDBG"))printf("Wraith part %d: %zu verified planar faces repaired\n",po->type,flatStats.repaired);
-        const auto repaired=wraithLoadout::repairRoundNormals(po->type,po->vb,po->ib);
-        if(getenv("HULLDBG"))printf("Wraith part %d: %zu verified round faces repaired\n",po->type,repaired);
+        if(getenv("HULLDBG"))printf("Somnus part %d: %zu verified planar faces repaired\n",po->type,flatStats.repaired);
+        const auto repaired=somnusLoadout::repairRoundNormals(po->type,po->vb,po->ib);
+        if(getenv("HULLDBG"))printf("Somnus part %d: %zu verified round faces repaired\n",po->type,repaired);
       }
-      // Islander's thin control surfaces have proven planar faces whose edge
+      // Skerry's thin control surfaces have proven planar faces whose edge
       // corner normals smeared across long triangles. Reuse the existing inset
       // samples; curved edges retain their smooth normals and geometry is fixed.
       if (pv.model == 3 && po->type >= 11 && po->type <= 13) {
@@ -1151,7 +1151,7 @@ void Renderer::computePartPoses(const FrameParams& fp, const PlaneMesh* player, 
   std::vector<float> revision;
   auto addRevision = [&](const float* p, size_t n) { revision.insert(revision.end(), p, p + n); };
   if (player) {
-    if(int(fp.plane.M[79]+.5f)/2==kAtlas){
+    if(int(fp.plane.M[79]+.5f)/2==kGalleon){
       addRevision(fp.plane.Pr,4);addRevision(fp.plane.engineHealth,4);
     }
     addRevision(fp.plane.M, 96); addRevision(fp.plane.PS, 4); addRevision(fp.plane.Ctl, 4);
@@ -1178,7 +1178,7 @@ void Renderer::computePartPoses(const FrameParams& fp, const PlaneMesh* player, 
     for (int i = 0; i < np && (int)poseType.size() < kMaxPoseInst; i++) {
       const int forward=owner==0?int(fp.plane.wr[6][3]+.5f):0;
       const int bomb=owner==0?fp.plane.wrBombSet:0;
-      if(!wraithLoadout::selected(pl[i].type,forward,bomb,owner!=0 || fp.plane.wr[6][0]>0.f))continue;
+      if(!somnusLoadout::selected(pl[i].type,forward,bomb,owner!=0 || fp.plane.wr[6][0]>0.f))continue;
       bool have = false; for (auto& P : pm->parts) have = have || P.type == pl[i].type;
       if (!have) continue;
       poseType.push_back(pl[i].type); O.n++;

@@ -34,7 +34,7 @@ print('PASS native enemies draw after world clear with bound G-buffer/depth; fee
 store=read('src/enemy_mesh.cpp')
 assert 'planeMeshes.find(hullKey(fp,0))' in store, 'released stores need exterior parts even from cockpit'
 assert 'glBindVertexArray(mesh->vao);glDrawElements(GL_TRIANGLES,mesh->idx' in store, 'reuse actual cached store mesh'
-assert 'warmWraithStores' in store
+assert 'warmSomnusStores' in store
 assert 'pixelDiameter(camera.pos' in store, 'near bomb camera preserves shadow quality'
 assert 'smoothstepf(.45f,2.f,pixels)' in store
 shadow=read('src/shaders/enemy_shadow.glsl')
@@ -68,6 +68,6 @@ assert w0+(w1-w0)*t>5 # old shader spuriously clipped meters of visible foregrou
 print("PASS showroom eye-crossing quads use conventional clipping and fragment logarithmic depth")
 
 effects=read("src/raster_renderer.cpp").split("void Renderer::rasterEffects",1)[1].split("bool Renderer::rasterCloak",1)[0]
-assert "const bool wraith = (p.on || weapons)" in effects
-assert "wraith ? afModelOf(p.M, p.model)" in effects
-print("PASS live Wraith ordnance keeps its specialized effects shader when the hull is hidden")
+assert "const bool somnus = (p.on || weapons)" in effects
+assert "somnus ? afModelOf(p.M, p.model)" in effects
+print("PASS live Somnus ordnance keeps its specialized effects shader when the hull is hidden")

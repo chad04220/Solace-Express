@@ -64,15 +64,15 @@ int main() {
       "#version 330 core\n"
       "#define AF_MODEL 7\n"
       "#define LEVEL (AF_MODEL*2 + 1)\n"
-      "float swift(){ return 7.0; }\n"
-      "float kestrel(){ return 0.0; }\n"
+      "float cutwater(){ return 7.0; }\n"
+      "float dawnlark(){ return 0.0; }\n"
       "float bake(){ return 3.0; }\n"
       "out vec4 o;\n"
       "void main(){ o = vec4(0.0);\n"
       "#if AF_MODEL == 7\n"
-      "  o.x += swift();\n"
+      "  o.x += cutwater();\n"
       "#elif AF_MODEL == 0\n"
-      "  o.x += kestrel();\n"
+      "  o.x += dawnlark();\n"
       "#endif\n"
       "  #  ifdef PART_BAKE\n"
       "  o.y += bake();\n"
@@ -83,12 +83,12 @@ int main() {
       "  o.z = 2.0;\n"
       "#endif\n"
       "#ifndef AF_MODEL\n"
-      "  o.w = kestrel();\n"
+      "  o.w = dawnlark();\n"
       "#endif\n"
       "}\n";
     const std::string o = shaderPrune::prune(src);
-    check(has(o, "o.x+=swift();") && has(o, "float swift()"), "the live branch kept", o);
-    check(!has(o, "kestrel") && !has(o, "bake"), "dead branches and the functions only they called removed", o);
+    check(has(o, "o.x+=cutwater();") && has(o, "float cutwater()"), "the live branch kept", o);
+    check(!has(o, "dawnlark") && !has(o, "bake"), "dead branches and the functions only they called removed", o);
     check(has(o, "o.z=1.0;") && !has(o, "o.z=2.0;"), "arithmetic, defined() and nested macros evaluated", o);
     check(!has(o, "#if") && !has(o, "#elif") && !has(o, "#else") && !has(o, "#endif"), "settled directives removed", o);
     check(has(o, "#define AF_MODEL 7"), "#defines kept", o);
@@ -233,19 +233,21 @@ int main() {
     if (want != got) printf("aircraft bake hash %s, fixture %s\n", got, want.c_str());
     check(want == got, "the aircraft bodies' bake is unchanged (tests/fixtures/aircraft_bake.fnv: update it only with an aircraft edit)", "");
   }
-  // Family identities change only for intentional geometry edits. The XR-30 mounting relief
-  // changes AF_JET; the conventional AF_LIGHT family must retain its original bake.
-  for (const auto& family : {std::pair<const char*,uint64_t>{"AF_LIGHT",0xc9df3f37c31b4da2ull}, {"AF_JET",0x2d09ade2de45070aull}}) {
+  // Family identities change only for intentional geometry edits, or a rename in the shaders' sources (the craft
+  // renames changed both). The XR-30 mounting relief changes AF_JET; the conventional AF_LIGHT family must retain its
+  // original bake.
+  for (const auto& family : {std::pair<const char*,uint64_t>{"AF_LIGHT",0x9ddd1de9b7bb880eull}, {"AF_JET",0x0fcfcbaea70cde56ull}}) {
     uint64_t h=1469598103934665603ull;
     for(const char* n:{"","#define HULL_BAKE_NORMALS\n"})
       for(unsigned char c:shaderPrune::prune(hullBakeFSAssembly(std::string("#define ")+family.first+"\n"+n)))h=(h^c)*1099511628211ull;
+    if(h!=family.second) printf("%s bake identity 0x%016llxull\n",family.first,(unsigned long long)h);
     check(h==family.second,"aircraft family bake identity matches its geometry fixture",family.first);
   }
   for(int kind=0;kind<3;kind++) {
     const std::string s=shaderPrune::prune(releasedStoreFSAssembly(kind));
-    check(s.size()<14000 && !has(s,"mapWraith(") && !has(s,"wrKineticCartridge(") && !has(s,"wrChargedCartridge("),
+    check(s.size()<14000 && !has(s,"mapSomnus(") && !has(s,"wrKineticCartridge(") && !has(s,"wrChargedCartridge("),
       "released hardware program contains one payload, no aircraft or gun fields",s.substr(0,100));
-    check(has(s,"shadeWraithStore(") && has(s,"releasedStoreField("),"released store shares detailed field and exact bay materials","");
+    check(has(s,"shadeSomnusStore(") && has(s,"releasedStoreField("),"released store shares detailed field and exact bay materials","");
   }
   return fails ? 1 : 0;
 }

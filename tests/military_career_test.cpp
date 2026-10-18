@@ -80,17 +80,17 @@ int main() {
     if (m) { seen[id] = true; xrSeen[m->aircraft] = true;
       check(m->id == id && military::missionForContract(m->contractType) == m && isMilitaryContract(m->contractType), "catalogue mission and persisted contract types agree");
       check(m->title[0] && m->role[0] && m->brief[0] && m->loadout[0] && m->reward > 0, "all board missions have complete shared UI metadata");
-      check(m->aircraft == kWraith || m->objective == hive::MissionKind::Recon, "non-weapon XR aircraft receive sensor missions only");
+      check(m->aircraft == kSomnus || m->objective == hive::MissionKind::Recon, "non-weapon XR aircraft receive sensor missions only");
     }
   }
   for (int aircraft : kResearchAircraft) check(xrSeen[aircraft], "board offers each XR aircraft");
   check(!seen[military::LegacyRecon], "legacy trainer ID remains reserved outside XR board");
   const auto& high = *military::mission(military::HighAltitudeIntel);
   check(military::sensorEnvelope(high, 4500, 200) && !military::sensorEnvelope(high, 3499, 200) &&
-        !military::sensorEnvelope(high, 6501, 200) && !military::sensorEnvelope(high, 4500, 179), "Specter sensor enforces live altitude and speed envelope");
+        !military::sensorEnvelope(high, 6501, 200) && !military::sensorEnvelope(high, 4500, 179), "Nocturne sensor enforces live altitude and speed envelope");
   const auto& hover = *military::mission(military::HoverScan);
   check(military::sensorEnvelope(hover, 1060, 5, 1000) && !military::sensorEnvelope(hover, 1029, 5, 1000) &&
-        !military::sensorEnvelope(hover, 1121, 5, 1000) && !military::sensorEnvelope(hover, 1060, 13, 1000), "Wraith hover sensor enforces roof-relative altitude and low speed");
+        !military::sensorEnvelope(hover, 1121, 5, 1000) && !military::sensorEnvelope(hover, 1060, 13, 1000), "Somnus hover sensor enforces roof-relative altitude and low speed");
   Career base = populated(); const std::string civil = civilianState(base);
   { // New careers reveal exactly one mission at a time in display order, not MissionId order.
     const int expectedOrder[] = {3, 4, 5, 6, 7, 1, 8, 9, 2};
@@ -175,7 +175,7 @@ int main() {
     check(m.type == CT_MIL_RECON + kind && m.forceAircraft == craft, "mission selects authoritative catalogue loaner");
     c.license = LIC_STUDENT; c.money = -10000; c.fleet.clear(); c.airline.routes.clear();
     check(c.canFly(m, craft) == Career::SRC_MILITARY, "loaner needs no license, money or owned craft");
-    check(c.canFly(m, craft == 0 ? kWraith : 0) == Career::SRC_NONE, "wrong craft is rejected");
+    check(c.canFly(m, craft == 0 ? kSomnus : 0) == Career::SRC_NONE, "wrong craft is rejected");
     check(c.canFly(m, -1) == Career::SRC_NONE && c.canFly(m, kAircraftCount) == Career::SRC_NONE, "out-of-range craft is rejected");
     Contract bad = m; bad.forceAircraft = 1; check(c.canFly(bad, craft) == Career::SRC_NONE, "tampered forced craft is rejected");
     bad = m; bad.id = "MIL_FORGED"; check(!c.beginMilitary(bad), "forged mission identity rejected");
@@ -190,7 +190,7 @@ int main() {
     check(token == ready.attempt + 1 && c.attemptOpen && !c.beginMilitary(m), "one live attempt with monotonic token");
     int stars = -1; FlightResult r = success();
     const std::string active = serialized(c);
-    c.settle(m, craft == 0 ? kWraith : 0, Career::SRC_MILITARY, r, &stars);
+    c.settle(m, craft == 0 ? kSomnus : 0, Career::SRC_MILITARY, r, &stars);
     check(stars == 0 && serialized(c) == active, "wrong craft cannot consume attempt or reward");
     c.settle(m, craft, Career::SRC_OWNED, r, &stars);
     check(serialized(c) == active, "wrong source cannot consume attempt or change civilian state");

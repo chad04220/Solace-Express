@@ -160,7 +160,7 @@ int main(int argc, char** argv) {
           for (int fl = 0; fl < 2; fl++) {
             Career t; t.newGame(); t.license = lic; t.location = ap; t.money = m;
             t.storyIndex = lic == LIC_STUDENT ? 0 : 4;   // (a student always has a lesson next)
-            if (fl) t.fleet.push_back({1, (ap + 5) % (int)g_world.airports.size(), 10.f, 0.f});   // one owned Wren, far away
+            if (fl) t.fleet.push_back({1, (ap + 5) % (int)g_world.airports.size(), 10.f, 0.f});   // one owned Ambler, far away
             t.refreshBoard();
             checked++;
             if (!t.earningPath() || (lic >= LIC_PPL && t.board.empty())) { bad++; if (bad < 6) printf("  !! no earning path at %s lic %d money %d fleet %d (board %zu)\n", g_world.airports[ap].code, lic, m, fl, t.board.size()); }

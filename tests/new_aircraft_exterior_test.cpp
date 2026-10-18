@@ -17,31 +17,31 @@ int main(){
     for(float v:M)assert(std::isfinite(v));
     const int flags=int(M[79]+.5f);
     assert(flags%2==kModels[i].deice);
-    assert(flags/2==(i>=kLarkspur?i:0)); // old cache/traffic packed values stay byte-compatible
+    assert(flags/2==(i>=kThistledown?i:0)); // old cache/traffic packed values stay byte-compatible
     const auto&m=kModels[i];
     for(int j=1;j<8;j++)assert(m.st[j][0]>m.st[j-1][0]);
   }
-  const auto&l=kModels[kLarkspur];const auto&a=kModels[kAtlas];
+  const auto&l=kModels[kThistledown];const auto&a=kModels[kGalleon];
   assert(near(l.st[7][0]-l.st[0][0],8.8f)&&near(l.wing[0]*2,11.6f));
   assert(near(a.st[7][0]-a.st[0][0],42.6f)&&near(a.wing[0]*2,39.8f));
-  for(int i=0;i<kAircraftCount;i++)if(i!=kAtlas){
-    assert(kAircraft[kAtlas].fusLen>kAircraft[i].fusLen);
-    assert(kAircraft[kAtlas].span>kAircraft[i].span);
+  for(int i=0;i<kAircraftCount;i++)if(i!=kGalleon){
+    assert(kAircraft[kGalleon].fusLen>kAircraft[i].fusLen);
+    assert(kAircraft[kGalleon].span>kAircraft[i].span);
   }
-  float props[2][4];assert(modelProps(l,props)==1&&kAircraft[kLarkspur].blades==3);
-  Plane lp;lp.spec=&kAircraft[kLarkspur];
+  float props[2][4];assert(modelProps(l,props)==1&&kAircraft[kThistledown].blades==3);
+  Plane lp;lp.spec=&kAircraft[kThistledown];
   assert(props[0][1]-props[0][3]+lp.gearHeight()>.2f);
-  assert(modelProps(a,props)==0&&kAircraft[kAtlas].engines==2&&!hasReheat(kAircraft[kAtlas]));
-  Plane ap;ap.spec=&kAircraft[kAtlas];const float gh=ap.gearHeight();
+  assert(modelProps(a,props)==0&&kAircraft[kGalleon].engines==2&&!hasReheat(kAircraft[kGalleon]));
+  Plane ap;ap.spec=&kAircraft[kGalleon];const float gh=ap.gearHeight();
   const auto gs=gearStations(*ap.spec);
   assert(near(gs.track,3.45f));
   assert(a.nacY-a.nacR+gh>.45f); // ingestion/ground-strike margin at the real physics gear height
   assert(a.nacX-a.nacR>gs.track+.34f+.145f+.7f);
   assert(a.nacY+a.nacR<a.wing[4]+a.nacX*tanf(a.wing[6]*DEG)+.1f);
-  assert(near(kAircraft[kAtlas].wingY*kAircraft[kAtlas].fusRad,a.wing[4]));
-  assert(near(kAircraft[kAtlas].wingZ,a.wing[5]));
+  assert(near(kAircraft[kGalleon].wingY*kAircraft[kGalleon].fusRad,a.wing[4]));
+  assert(near(kAircraft[kGalleon].wingZ,a.wing[5]));
 
-  // The dedicated source-bound atlas_gear_geometry test covers the complete
+  // The dedicated source-bound galleon_gear_geometry test covers the complete
   // cavity/door/skin sweep. Keep the fleet scale test on the production CPU
   // pose rather than retaining a second, obsolete copy of the fold equations.
   const auto deployed=gearBreakup::mainPose(*ap.spec,a,gs,gh,1.f);

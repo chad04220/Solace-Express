@@ -8,7 +8,7 @@
 #include <set>
 #include <string>
 #include "../src/shaders.h"
-#include "../src/shaders_wraith_cockpit.h"
+#include "../src/shaders_somnus_cockpit.h"
 #include "../src/entity_shaders.h"
 
 static const std::set<std::string> kReserved = {

@@ -8,7 +8,7 @@ static_assert(sizeof(kCockpitLayouts)/sizeof(kCockpitLayouts[0])==kAircraftCount
 
 // clang-format off
 const ModelDef kModels[] = {
-  // ---------------------------------------------------------------- Kestrel T2 (high-wing two-seat trainer)
+  // ---------------------------------------------------------------- Dawnlark T2 (high-wing two-seat trainer)
   { {{-3.65f,0.100f,0.090f,-0.020f},{-3.45f,0.350f,0.340f,-0.040f},{-2.55f,0.480f,0.425f,-0.025f},{-1.70f,0.550f,0.615f,0.115f},{-0.45f,0.550f,0.610f,0.130f},{1.00f,0.380f,0.410f,0.190f},{2.90f,0.150f,0.180f,0.320f},{3.65f,0.060f,0.080f,0.380f}}, 0.62f,
     {5.05f,1.62f,1.10f,.25f,.74f,-1.72f,1.5f,.13f}, 1,2.4f,0,.55f, 0,0,
     {1.65f,.95f,.70f,.15f,.30f,2.60f,0}, 0,
@@ -17,7 +17,7 @@ const ModelDef kModels[] = {
     0, .24f, 0,
     0, 0,0,0,0,0,
     vec3(-.20f,.46f,-1.15f), 0, -2.35f,-1.55f,.34f,-0.40f },
-  // ---------------------------------------------------------------- Wren 180 (four-seat tourer)
+  // ---------------------------------------------------------------- Ambler 180 (four-seat tourer)
   // Cantilever touring wing, fuller rear cabin and taller tapered fin distinguish it from the strut-braced trainer.
   { {{-4.15f,0.100f,0.090f,-0.020f},{-3.92f,0.380f,0.350f,-0.050f},{-2.80f,0.520f,0.445f,-0.035f},{-1.80f,0.600f,0.645f,0.095f},{-0.20f,0.620f,0.645f,0.115f},{1.60f,0.450f,0.420f,0.160f},{3.40f,0.150f,0.190f,0.290f},{4.15f,0.060f,0.090f,0.350f}}, 0.86f,
     {5.50f,1.62f,1.00f,.55f,.80f,-1.85f,1.7f,.13f}, 0,0,0,.55f, 0,0,
@@ -27,7 +27,7 @@ const ModelDef kModels[] = {
     1, .26f, 0,
     1, .50f,1.72f,.22f,.27f,.20f,
     vec3(-.20f,.50f,-1.30f), 0, -2.60f,-1.75f,.36f,0.45f },
-  // ---------------------------------------------------------------- Bushmaster STOL (taildragger, tundra tyres, slats)
+  // ---------------------------------------------------------------- Scrubrunner STOL (taildragger, tundra tyres, slats)
   { {{-4.00f,0.110f,0.100f,-0.020f},{-3.75f,0.400f,0.390f,-0.030f},{-2.75f,0.500f,0.490f,-0.010f},{-1.80f,0.560f,0.680f,0.100f},{-0.40f,0.560f,0.665f,0.115f},{1.00f,0.380f,0.440f,0.180f},{3.30f,0.130f,0.170f,0.330f},{4.00f,0.060f,0.085f,0.385f}}, 0.50f,
     {6.20f,1.80f,1.70f,.05f,.82f,-1.95f,1.0f,.15f}, 1,2.9f,0,.60f, 1,0,
     {1.95f,1.10f,.80f,.15f,.35f,2.85f,0}, 0,
@@ -36,7 +36,7 @@ const ModelDef kModels[] = {
     2, .38f, 0,
     0, 0,0,0,0,0,
     vec3(-.25f,.53f,-1.25f), 0, -2.70f,-1.80f,.38f,0.30f },
-  // ---------------------------------------------------------------- Islander Twin (boxy high-wing twin)
+  // ---------------------------------------------------------------- Skerry Twin (boxy high-wing twin)
   { {{-5.48f,.03f,.03f,-.07f},{-5.20f,.40f,.40f,-.08f},{-4.40f,.60f,.60f,-.02f},{-3.50f,.72f,.82f,.04f},{-0.50f,.72f,.82f,.04f},{1.80f,.50f,.62f,.12f},{4.60f,.15f,.30f,.40f},{5.45f,.06f,.14f,.45f}}, .35f,
     {7.45f,2.05f,2.05f,0,.95f,-2.40f,1.0f,.14f}, 0,0,0,.60f, 0,0,
     {2.30f,1.30f,1.05f,.10f,.45f,3.90f,0}, 0,
@@ -45,7 +45,7 @@ const ModelDef kModels[] = {
     1, .32f, 0,
     4, -2.4f,1.2f,.22f,.20f,.17f,
     vec3(-.35f,.59f,-3.10f), 1, -4.60f,-3.40f,.32f,-2.60f },
-  // ---------------------------------------------------------------- Pelican Caravan (single turboprop, cargo pod)
+  // ---------------------------------------------------------------- Longshore Hauler (single turboprop, cargo pod)
   { {{-5.75f,.14f,.14f,-.10f},{-5.50f,.36f,.36f,-.10f},{-4.30f,.52f,.55f,-.05f},{-3.20f,.78f,.85f,.08f},{-0.50f,.80f,.88f,.10f},{2.0f,.55f,.62f,.20f},{4.90f,.16f,.30f,.45f},{5.75f,.06f,.14f,.50f}}, .45f,
     {7.95f,2.00f,1.45f,.20f,1.00f,-2.75f,2.0f,.14f}, 1,3.3f,0,.65f, 0,0,
     {2.60f,1.35f,.95f,.20f,.55f,4.25f,0}, 0,
@@ -54,7 +54,7 @@ const ModelDef kModels[] = {
     1, .36f, 1,
     5, -2.0f,2.2f,.30f,.21f,.18f,
     vec3(-.38f,.66f,-2.45f), 1, -4.00f,-2.90f,.40f,-2.10f },
-  // ---------------------------------------------------------------- Meridian Q400 (T-tail regional turboprop airliner)
+  // ---------------------------------------------------------------- Archipel 400 (T-tail regional turboprop airliner)
   { {{-13.05f,.03f,.03f,-.32f},{-12.6f,.60f,.62f,-.20f},{-11.5f,1.05f,1.05f,-.05f},{-9.8f,1.32f,1.38f,0},{8.0f,1.32f,1.38f,0},{10.5f,1.0f,1.10f,.25f},{12.4f,.45f,.60f,.70f},{13.0f,.20f,.30f,.85f}}, 1.0f,
     {13.70f,2.90f,1.45f,.40f,1.20f,-1.50f,2.0f,.15f}, 0,0,0,.55f, 0,1,
     {3.90f,2.10f,1.30f,.90f,0,0,0}, 1,
@@ -63,7 +63,7 @@ const ModelDef kModels[] = {
     3, .45f, 0,
     18, -8.5f,7.5f,.25f,.12f,.17f,
     vec3(-.55f,.90f,-10.30f), 2, -11.90f,-10.90f,.35f,-10.2f },
-  // ---------------------------------------------------------------- Starling 500 (low-wing T-tail business jet)
+  // ---------------------------------------------------------------- Emissary 500 (low-wing T-tail business jet)
   { {{-7.00f,.05f,.05f,-.15f},{-6.60f,.32f,.30f,-.15f},{-5.60f,.65f,.60f,-.05f},{-4.60f,.92f,.95f,.05f},{2.0f,.92f,.95f,.05f},{4.50f,.80f,.85f,.15f},{6.40f,.38f,.48f,.40f},{7.00f,.12f,.22f,.50f}}, 1.0f,
     {7.95f,2.50f,1.00f,1.40f,-.55f,-0.90f,4.0f,.12f}, 0,0,.80f,.55f, 0,0,
     {2.90f,1.50f,.80f,.90f,0,0,0}, 1,
@@ -72,7 +72,7 @@ const ModelDef kModels[] = {
     4, .33f, 0,
     6, -3.8f,1.2f,.20f,.17f,.21f,
     vec3(-.42f,.40f,-4.75f), 2, -5.95f,-4.95f,.22f,-4.4f },
-  // ---------------------------------------------------------------- Swift S6 (low-wing retractable tourer)
+  // ---------------------------------------------------------------- Cutwater S6 (low-wing retractable tourer)
   { // Eight closed nose-to-tail fuselage stations: z, half width, half height, centre y.
   {{-4.35f,.10f,.09f,-.055f},{-4.10f,.35f,.31f,-.060f},
   {-2.95f,.49f,.41f,-.035f},{-1.90f,.62f,.66f,.075f},
@@ -86,7 +86,7 @@ const ModelDef kModels[] = {
   4,.28f,0,                                         // wing/body retracts; no cargo pod
   1,.35f,1.45f,.24f,.28f,.205f,                       // one passenger window per side
   vec3(-.250f,.470f,-1.400f),0,-2.80f,-2.14f,.31f,.50f }, // left-seat analog; windshield ahead of panel
-  // ---------------------------------------------------------------- Osprey C6 (six-seat piston twin)
+  // ---------------------------------------------------------------- Wavecrest C6 (six-seat piston twin)
   { // Fuselage stations: pointed luggage nose, six-seat cabin, tapered tailcone.
   {{-4.90f,0.06f,0.06f,-0.06f},{-4.45f,0.37f,0.35f,-0.04f},{-3.10f,0.63f,0.67f,0.03f},{-2.10f,0.72f,0.90f,0.09f},
   {0.55f,0.72f,0.90f,0.09f},{2.15f,0.49f,0.58f,0.16f},{4.25f,0.16f,0.24f,0.30f},{4.90f,0.06f,0.08f,0.34f}}, 0.72f,
@@ -99,7 +99,7 @@ const ModelDef kModels[] = {
   2,-0.55f,1.45f,0.25f,0.27f,0.22f, // two large cabin windows per side
   vec3(-0.34f,0.66f,-1.90f),1, // left pilot eye; analog twin cockpit
   -3.40f,-2.62f,0.40f,-0.65f }, // windshield and pilot side windows
-  // ---------------------------------------------------------------- XR-10 Nightjar (civil twin-jet research demonstrator; generic field)
+  // ---------------------------------------------------------------- XR-10 Vigil (civil twin-jet research demonstrator; generic field)
   { // Eight closed stations; enough roof height for the offset glass-cockpit eye.
   {{-8.30f,.035f,.035f,-.035f},{-6.65f,.28f,.22f,-.030f},
   {-5.05f,.56f,.49f,-.010f},{-3.55f,.77f,.79f,.045f},
@@ -113,7 +113,7 @@ const ModelDef kModels[] = {
   4,.35f,0,                                        // wing/body retracts; no cargo pod
   0,0.0f,0.0f,0.0f,0.0f,0.0f,                       // no passenger windows
   vec3(-.38f,.53f,-3.30f),2,-5.45f,-4.23f,.30f,-2.20f }, // glass cockpit; avoid centre-display overlap using data
-  // ---------------------------------------------------------------- XR-30 Specter (research jet; custom SDF in the shader, engine code 5)
+  // ---------------------------------------------------------------- XR-30 Nocturne (research jet; custom SDF in the shader, engine code 5)
   { {{-9.00f,.04f,.03f,-.05f},{-7.60f,.40f,.22f,-.02f},{-5.60f,.82f,.48f,.06f},{-3.60f,1.05f,.62f,.08f},{0.0f,1.15f,.60f,.05f},{3.50f,1.25f,.55f,0},{6.60f,1.15f,.45f,-.02f},{8.20f,.95f,.40f,-.02f}}, .45f,
     {5.60f,7.20f,1.20f,5.60f,-.20f,-1.60f,-2.0f,.045f}, 0,0,0,.82f, 0,0,
     {1.90f,1.60f,.55f,1.10f,.05f,-6.60f,0}, 0,
@@ -122,7 +122,7 @@ const ModelDef kModels[] = {
     4, .38f, 0,
     0, 0,0,0,0,0,
     vec3(0,.62f,-4.70f), 3, -6.0f,-4.9f,.5f,-4.0f },
-  // ---------------------------------------------------------------- XR-20 Mantis (single-seat forward-swept systems demonstrator)
+  // ---------------------------------------------------------------- XR-20 Reverie (single-seat forward-swept systems demonstrator)
   { // a low shoulder / chine body, a raised single-seat canopy and a tapered instrument nose
     {{-8.0f,.035f,.035f,-.04f},{-6.25f,.30f,.22f,-.03f},{-4.95f,.64f,.57f,.10f},{-3.65f,.78f,.85f,.10f},
      {-.3f,1.05f,.61f,-.02f},{2.65f,1.10f,.53f,-.03f},{6.1f,.48f,.30f,.03f},{8.0f,.06f,.07f,.10f}}, .28f,
@@ -135,7 +135,7 @@ const ModelDef kModels[] = {
     0,0.0f,0.0f,0.0f,0.0f,0.0f,
     vec3(0.0f,.67f,-3.75f),2,                         // a centreline eye; the live glass instruments
     -5.45f,-4.48f,.28f,-2.70f },
-  // ---------------------------------------------------------------- XR-40 Wraith (stealth research craft; faceted SDF in the shader, engine code 6)
+  // ---------------------------------------------------------------- XR-40 Somnus (stealth research craft; faceted SDF in the shader, engine code 6)
   { {{-8.40f,.04f,.03f,-.05f},{-7.00f,.45f,.24f,-.02f},{-5.20f,.85f,.48f,.05f},{-3.20f,1.10f,.58f,.06f},{0.0f,1.25f,.58f,.04f},{3.20f,1.30f,.52f,0},{6.00f,1.05f,.42f,-.02f},{7.80f,.80f,.32f,-.02f}}, .25f,
     {6.20f,7.60f,1.40f,5.40f,-.15f,-2.30f,0.0f,.04f}, 0,0,0,.82f, 0,0,
     {0,0,0,0,0,0,0}, 0,
@@ -144,7 +144,7 @@ const ModelDef kModels[] = {
     4, .40f, 0,
     0, 0,0,0,0,0,
     vec3(0,.58f,-4.30f), 3, -5.6f,-4.5f,.5f,-3.6f },
-  // ---------------------------------------------------------------- Larkspur L4 (cantilever shoulder-wing grand tourer)
+  // ---------------------------------------------------------------- Thistledown L4 (cantilever shoulder-wing grand tourer)
   // A low cowling, panoramic four-seat cabin, swept dorsal fin and slim tapering panels; authored at full scale.
   { {{-4.40f,.085f,.080f,-.060f},{-4.04f,.37f,.33f,-.055f},{-2.82f,.54f,.46f,-.030f},{-1.80f,.68f,.79f,.080f},
      {.40f,.70f,.78f,.100f},{1.85f,.46f,.47f,.180f},{3.68f,.15f,.20f,.310f},{4.40f,.055f,.080f,.360f}}, .90f,
@@ -155,7 +155,7 @@ const ModelDef kModels[] = {
     0,.285f,0,
     1,.65f,1.70f,.28f,.32f,.235f,
     vec3(-.29f,.60f,-1.48f),0,-2.72f,-1.96f,.38f,.40f },
-  // ---------------------------------------------------------------- Atlas A180 (180-seat twin-underwing transport)
+  // ---------------------------------------------------------------- Galleon 180 (180-seat twin-underwing transport)
   // The largest fleet aircraft: broad pressurised barrel, sculpted flight deck, swept low wing, tall swept tail.
   { {{-21.30f,.045f,.040f,-.30f},{-20.95f,.50f,.40f,-.33f},{-19.20f,1.32f,.92f,-.24f},{-15.00f,2.05f,2.10f,0},
      {12.0f,2.05f,2.10f,0},{16.8f,1.45f,1.58f,.30f},{20.15f,.47f,.64f,.83f},{21.30f,.13f,.22f,1.05f}},1.0f,
@@ -212,7 +212,7 @@ void modelWheelRadii(int idx, float& mainRadius, float& noseRadius) {
   const ModelDef& m = kModels[idx];
   mainRadius = s.special ? .38f : m.wheelR;
   noseRadius = s.special ? .33f : s.taildragger ? .10f :
-               idx == kAtlas ? mainRadius*.74f : m.gear == 3 ? mainRadius*.75f : mainRadius*.85f;
+               idx == kGalleon ? mainRadius*.74f : m.gear == 3 ? mainRadius*.75f : mainRadius*.85f;
 }
 
 void packModel(const AircraftSpec& s, int idx, float gh, float o[24 * 4]) {
@@ -239,7 +239,7 @@ void packModel(const AircraftSpec& s, int idx, float gh, float o[24 * 4]) {
   put(18, gst.track, m.wheelR, gst.mainZ, gst.noseZ);
   // Low bit: de-ice; new authored variants carry their explicit roster ID above it.
   // Legacy packed data remains byte-identical. Traffic has no separate model uniform.
-  put(19, gh, gst.tailZ, s.taildragger ? 1.f : 0.f, (float)(m.deice + (idx >= kLarkspur ? 2 * idx : 0)));
+  put(19, gh, gst.tailZ, s.taildragger ? 1.f : 0.f, (float)(m.deice + (idx >= kThistledown ? 2 * idx : 0)));
   put(20, (float)m.winCount, m.winZ0, m.winZ1, m.winY);
   float panelZ = m.eye.z - (m.cockpit == 2 ? 0.85f : 0.68f);
   put(21, m.winW, m.winH, (float)m.cockpit, panelZ);
@@ -250,20 +250,20 @@ void packModel(const AircraftSpec& s, int idx, float gh, float o[24 * 4]) {
 void packModelOf(int idx, float o[24 * 4]) { Plane p; p.spec = &kAircraft[idx]; packModel(kAircraft[idx], idx, p.gearHeight(), o); }
 
 vec3 modelWingTip(const ModelDef& m) { return vec3(m.wing[0] + 0.02f, m.wing[4] + m.wing[0] * tanf(m.wing[6] * DEG), m.wing[5] + m.wing[3] + m.wing[2] * 0.25f); }
-vec3 modelFinTop(const ModelDef& m) {   // (the XR-20's right fin, canted 0.48 rad from its shoulder root: plane_common.glsl mantisFinTop)
-  if (&m == &kModels[kMantis]) return vec3(1.05f + sinf(0.48f) * m.vt[0], m.vt[4] + cosf(0.48f) * m.vt[0] + 0.04f, m.vt[5] + m.vt[3] + m.vt[2] * 0.4f);
+vec3 modelFinTop(const ModelDef& m) {   // (the XR-20's right fin, canted 0.48 rad from its shoulder root: plane_common.glsl reverieFinTop)
+  if (&m == &kModels[kReverie]) return vec3(1.05f + sinf(0.48f) * m.vt[0], m.vt[4] + cosf(0.48f) * m.vt[0] + 0.04f, m.vt[5] + m.vt[3] + m.vt[2] * 0.4f);
   return vec3(0, m.vt[4] + m.vt[0] + 0.04f, m.vt[5] + m.vt[3] + m.vt[2] * 0.4f);
 }
 vec3 modelTailTip(const ModelDef& m) {   // (the XR-20's: on its nozzle's upper rim)
-  if (&m == &kModels[kMantis]) return vec3(0, m.nacY + m.nacR * 0.88f + 0.02f, m.nacZ0 + m.nacLen - 0.04f);
+  if (&m == &kModels[kReverie]) return vec3(0, m.nacY + m.nacR * 0.88f + 0.02f, m.nacZ0 + m.nacLen - 0.04f);
   return vec3(0, m.st[7][3], m.st[7][0] + 0.03f);
 }
 
 
 void modelCabinFit(int model, float panelZ, float foot[4], float seat[2]) {
   model=std::clamp(model,0,kAircraftCount-1); const ModelDef& m=kModels[model]; const vec3 E=m.eye;
-  const bool compact=model==0||model==1||model==2||model==6||model==7||model==9||model==kLarkspur;
-  const bool fleet=model<10||model==kLarkspur||model==kAtlas;
+  const bool compact=model==0||model==1||model==2||model==6||model==7||model==9||model==kThistledown;
+  const bool fleet=model<10||model==kThistledown||model==kGalleon;
   const float drop=fleet?(compact?.64f:.73f):.80f;
   auto floorAt=[&](float x,float z) {
     float hw,hh,cy;stationAt(m,z,hw,hh,cy);float lo=cy-hh,hi=cy,mn=std::min(hw,hh),rr=mn*(.3f+.7f*m.roundness);
@@ -275,23 +275,23 @@ void modelCabinFit(int model, float panelZ, float foot[4], float seat[2]) {
     }
     return hi;
   };
-  float footZ=panelZ+.035f+(model==6?.180f:0.f),centre=fabsf(E.x)*(model==6?.72f:.90f),spacing=model==kMantis?.10f:((model==0||model==1)?.070f:.080f);
-  if(model==2)centre=.252f; // Bushmaster: preserve verified pedal spread after seat/eye moves inward.
+  float footZ=panelZ+.035f+(model==6?.180f:0.f),centre=fabsf(E.x)*(model==6?.72f:.90f),spacing=model==kReverie?.10f:((model==0||model==1)?.070f:.080f);
+  if(model==2)centre=.252f; // Scrubrunner: preserve verified pedal spread after seat/eye moves inward.
   float width=m.cockpit==0?.036f:.045f;
   // A rotated full-size metal rim extends 77.365 mm below its pivot. Keep 5.6 mm above
   // the flat floor; curved-floor fitting is unchanged on the compact aircraft.
   foot[0]=std::max(E.y-1.06f+(fleet?.083f:.072f),floorAt(centre+spacing+width,footZ-.055f)+.072f);
   if(model==9)foot[0]+=.004f; // 4 mm inner-shell margin for the moving pedal extraction.
   foot[1]=footZ;foot[2]=centre;foot[3]=spacing;
-  // Swift: retain verified world pedal mounts when the supported seats move inboard/down.
+  // Cutwater: retain verified world pedal mounts when the supported seats move inboard/down.
   if(model==7){foot[0]=-.259707659f;foot[1]=-2.04499984f;foot[2]=.287999988f;foot[3]=.0799999982f;}
   float hw,hh,cy;stationAt(m,E.z+.05f,hw,hh,cy);
   float k=(E.y-drop-cy)/std::max(hh-.035f,.01f);
   float cabinW=(hw-.035f)*sqrtf(std::max(1.f-k*k,0.f));
   float sw=std::clamp(cabinW-fabsf(E.x)-.015f,.145f,.21f);
   if(model==0||model==1)sw=std::min(sw,.165f); // matched compact trainer pan/support width
-  if(model==2)sw=std::min(sw,.180f); // matched supported Bushmaster pan/rails
-  if(model==7)sw=std::min(sw,.180f); // matched supported Swift pan/rails
+  if(model==2)sw=std::min(sw,.180f); // matched supported Scrubrunner pan/rails
+  if(model==7)sw=std::min(sw,.180f); // matched supported Cutwater pan/rails
   seat[0]=std::max(E.y-1.06f,floorAt(fabsf(E.x)+std::min(.15f,sw*.7f),E.z-.20f));seat[1]=drop;
 }
 
@@ -314,13 +314,13 @@ int modelCockpitFocusTargets(int model,CockpitFocusTarget* out,int capacity){
   if(!out || capacity<=0 || model<0 || model>=kAircraftCount)return 0;
   const ModelDef& m=kModels[model];const vec3 E=m.eye;const float panelZ=E.z-(m.cockpit==2?.85f:.68f);int count=0;
   auto add=[&](vec3 c,vec3 n,vec2 h){ if(count<capacity)out[count++]={c,normalize(n),h}; };
-  if(model<10||model==kLarkspur||model==kAtlas){
+  if(model<10||model==kThistledown||model==kGalleon){
     const auto& L=kCockpitLayouts[model].value;const bool glass=m.cockpit==2,twin=model==3||model==8;
     auto mount=[&](int i){return vec3(L[i][0],E.y-L[i][1],panelZ+L[i][2]+.050f);};
     for(int tile=0;tile<2;tile++){
       const float scale=L[tile][3];vec3 c=mount(tile);
       if(glass){
-        const float yaw=model==kAtlas?(tile==0?-.16f:.16f):0.f;
+        const float yaw=model==kGalleon?(tile==0?-.16f:.16f):0.f;
         const vec3 n(-sinf(yaw),0,cosf(yaw)),right(cosf(yaw),0,sinf(yaw));
         c=vec3(L[tile][0],E.y-L[tile][1],panelZ+L[tile][2])+n*.050f;
         add(c+right*(-.09f*scale),n,vec2(.085f*scale,.075f*scale));
@@ -337,19 +337,19 @@ int modelCockpitFocusTargets(int model,CockpitFocusTarget* out,int capacity){
     }
     const vec3 n(0,sinf(.35f),cosf(.35f));
     add(vec3(L[3][0],E.y-L[3][1],panelZ+L[3][2])+n*.05f,n,vec2(L[3][3],L[3][3]*.70f));
-    if(model==kAtlas){
+    if(model==kGalleon){
       const vec3 navN(0,sinf(1.15f),cosf(1.15f));
       add(vec3(0,E.y-.590f,panelZ+.335f)+navN*.022f,navN,vec2(.165f,.115f));
       add(vec3(0,E.y+.458f,E.z-.260f),vec3(0,-1,0),vec2(.150f,.108f));
     }
-  }else if(model==kMantis){
+  }else if(model==kReverie){
     add(vec3(0,E.y-.325f,panelZ+.068f),vec3(0,0,1),vec2(.395f,.19f));
     for(int side:{-1,1})add(vec3(side*.235f,E.y-.695f,panelZ+.228f),vec3(0,0,1),vec2(.185f,.117f));
   }else if(model==kResearchJet){
-    for(int i=0;i<5;i++){auto p=cockpitResearch::specterPanel(i);add(E+p.c,p.n,p.h);}
+    for(int i=0;i<5;i++){auto p=cockpitResearch::nocturnePanel(i);add(E+p.c,p.n,p.h);}
     for(int side:{-1,1})add(E+vec3(side*.54f,-.39f,-.12f),vec3(0,1,0),vec2(.075f,.06f));
   }else{
-    for(int i=0;i<3;i++){auto p=cockpitResearch::wraithPanel(i);add(E+p.c,p.n,p.h);}
+    for(int i=0;i<3;i++){auto p=cockpitResearch::somnusPanel(i);add(E+p.c,p.n,p.h);}
     for(int side:{-1,1})add(E+vec3(side*.575f,-.395f,-.36f),vec3(0,cosf(.55f),sinf(.55f)),vec2(.09f,.055f));
   }
   return count;

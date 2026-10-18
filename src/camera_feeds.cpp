@@ -68,7 +68,7 @@ void Renderer::renderFeeds(const FrameParams& fp, const std::function<void(GLuin
     if (feedRigNow) { for (bool& v : feedValid) v = false; feedRigNow = 0; }
     return;
   }
-  // Direct-window Specter never needs an offscreen camera. Wraith retains a prewarmed
+  // Direct-window Nocturne never needs an offscreen camera. Somnus retains a prewarmed
   // bomb target even before release, so activating it does not allocate at the input edge.
   if (screenWindows && fp.feedRig != 2) return;
   // (the bomb camera flies free: with the displays as windows nothing needs the mounts)

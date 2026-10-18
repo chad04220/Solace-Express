@@ -622,12 +622,12 @@ void Renderer::rasterEffects(const FrameParams& fp) {
   // and its blasts burning - else the light aircraft's build, which has no airframe in it: the propellers, the vapour and
   // the flames; with no aircraft, or weapons in the air with no XR-40 flying, every aircraft's)
   const bool weapons = fp.fx.beams + fp.fx.bombs + fp.fx.blasts > 0;
-  // A hidden/destroyed Wraith retains its packed identity while its ordnance lives.
+  // A hidden/destroyed Somnus retains its packed identity while its ordnance lives.
   // Do not compile every aircraft's cloak/field just because its hull is not drawn.
-  const bool wraith = (p.on || weapons) && (int)(p.M[2] + 0.5f) == 6;
-  const GLuint progEffects = afPassProgram(kAfEffects, wraith ? afModelOf(p.M, p.model) : -1, wraith || weapons || !p.on);
+  const bool somnus = (p.on || weapons) && (int)(p.M[2] + 0.5f) == 6;
+  const GLuint progEffects = afPassProgram(kAfEffects, somnus ? afModelOf(p.M, p.model) : -1, somnus || weapons || !p.on);
   if (!progEffects) { rasterTrafficProps(fp); return; }
-  const bool cloakTex = wraith && rasterCloak(fp);   // (the cloaked part's surface from the mesh: no march in the effects)
+  const bool cloakTex = somnus && rasterCloak(fp);   // (the cloaked part's surface from the mesh: no march in the effects)
   const int cur = histIdx ^ 1;
   glBindFramebuffer(GL_FRAMEBUFFER, fboTAA[cur]);
   GLenum c0 = GL_COLOR_ATTACHMENT0; glDrawBuffers(1, &c0);

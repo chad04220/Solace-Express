@@ -323,7 +323,7 @@ void flightTests() {
   expect(authored.nearPoint(-49000, 49000) == 51000 && g_world.nearPoint(-49000, 49000) == -49000,
     "procedural navigation never chooses a repeated nearby copy");
   Weather wx; wx.windSpeed = wx.gust = wx.turbulence = wx.cloudCover = 0; wx.timeOfDay = 0;
-  // (the Starling, at a jet's speed: the Wren flew this at 180 m/s, nearly three times its cruise, until its structure
+  // (the Emissary, at a jet's speed: the Ambler flew this at 180 m/s, nearly three times its cruise, until its structure
   // became a normal-category +3.8 g one and failed there at once)
   const AircraftSpec& spec = kAircraft[6];
   const float dt = 1.f / 60.f;

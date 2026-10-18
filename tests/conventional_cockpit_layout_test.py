@@ -36,7 +36,7 @@ def point(E,m,tile,p):
         a=-.16 if tile==0 else .16;x,z=math.cos(a)*x-math.sin(a)*z,math.sin(a)*x+math.cos(a)*z
     return [m[0]+x,E[1]-m[1]+y,E[2]-(.85 if E[3] else .68)+m[2]+z]
 
-# Bushmaster's raised primary panel intentionally fails the generic eye-drop
+# Scrubrunner's raised primary panel intentionally fails the generic eye-drop
 # proxy. Test the actual forward path instead, without relaxing face/skin fit.
 # Source-shape assertions fail closed when these mirrored GLSL fields change.
 # (MODEL_IS(n), plane_common.glsl, is gModelId==n in every build that carries the code: the contracts read it so)
@@ -44,7 +44,7 @@ def compact(s): return re.sub(r'MODEL_IS\((\d+)\)', r'gModelId==\1', re.sub(r'\s
 def rb(p,h,r=0):
     q=[abs(p[k])-h[k]+r for k in range(3)]
     return math.sqrt(sum(max(v,0)**2 for v in q))+min(max(q),0)-r
-def bushmaster_forward_contract(md,L):
+def scrubrunner_forward_contract(md,L):
     shader_paths=list((root/'src/shaders').glob('*.glsl'))
     shader_text={p:compact(p.read_text()) for p in shader_paths}
     fittings=shader_text[root/'src/shaders/cockpit_fittings.glsl']
@@ -57,7 +57,7 @@ def bushmaster_forward_contract(md,L):
     # Parse dimensions from the actual helper, not the historical result JSON.
     definitions=[]
     for path,s in shader_text.items():
-        definitions += [(path,b) for b in re.findall(r'floatbushShellFittedPilotBrow\(vec3p,floatfuselage\)\{([^{}]+)\}',s)]
+        definitions += [(path,b) for b in re.findall(r'floatscrubrunnerShellFittedPilotBrow\(vec3p,floatfuselage\)\{([^{}]+)\}',s)]
     assert len(definitions)==1, 'exactly one integrated low-brow helper required'
     brow_path,body=definitions[0]
     n='('+number+')'
@@ -68,14 +68,14 @@ def bushmaster_forward_contract(md,L):
     assert match, 'unsupported low-brow formula: reconcile CPU mirror'
     by,bz,bx,hy,hz,br,inset=map(float,match.groups())
     assert inset>=.066, 'pilot brow must retain its 6 mm inner-shell separation'
-    # Generic brows are now named before dispatch so the Kestrel-only return
-    # can be expressed once. Both Bushmaster compilation branches must still
+    # Generic brows are now named before dispatch so the Dawnlark-only return
+    # can be expressed once. Both Scrubrunner compilation branches must still
     # select its own parsed low-brow helper, never that generic fallback.
     assert 'floatbrow=sdRoundBox(lip,vec3(h.x+.027,.014,.083),.012);' in fittings
     assert 'if(gModelId==0&&i==0)brow=max(sdRoundBox(lip+vec3(.025,0,0),vec3(h.x+.052,.014,.083),.012),fuselage+.040);' in fittings
     dispatches=[
-        'if(fleetIndividualBrow(i))outv=opU(outv,vec2(gModelId==2?bushShellFittedPilotBrow(p,fuselage):brow,14.0));',
-        'if(fleetIndividualBrow(i))outv=opU(outv,vec2(gModelId==2?bushShellFittedPilotBrow(p,fuselage):gModelId==7?swiftShellFittedPilotBrow(p,fuselage):brow,14.0));'
+        'if(fleetIndividualBrow(i))outv=opU(outv,vec2(gModelId==2?scrubrunnerShellFittedPilotBrow(p,fuselage):brow,14.0));',
+        'if(fleetIndividualBrow(i))outv=opU(outv,vec2(gModelId==2?scrubrunnerShellFittedPilotBrow(p,fuselage):gModelId==7?cutwaterShellFittedPilotBrow(p,fuselage):brow,14.0));'
     ]
     assert all(v in fittings for v in dispatches), 'model2 low brow not dispatched in both panel-renderer compilation branches'
     assert 'if(gModelId==2||gModelId==4||gModelId==7)returntile==0;' in fittings, 'individual brow selection changed'
@@ -145,7 +145,7 @@ for L in layout:
     rows.append({'model':i,'name':L['name'],'minimum_glass_to_skin_m':-worst[0],'worst_tile':worst[1][0]})
 forward=[];brow_path=None
 try:
-    forward,brow_path=bushmaster_forward_contract(models[2],layout[2])
+    forward,brow_path=scrubrunner_forward_contract(models[2],layout[2])
     for row in forward:
         if row['required']:
             checks+=1

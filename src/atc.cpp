@@ -103,7 +103,7 @@ bool AtcVoice::resolveRecorded(const std::string& msg, const std::string& missio
   out = Tx(); out.text = msg;
   auto finish = [&](const std::string& sp, int prio) {
     for (auto& id : out.ids) if (id.empty() || !clips.count(id)) { out.ids.clear(); return false; }   // (a fragment the pack lacks)
-    out.prio = prio; out.radio = sp == "tower" || sp == "spectre" || sp.rfind("tower_",0)==0;
+    out.prio = prio; out.radio = sp == "tower" || sp == "nocturne" || sp.rfind("tower_",0)==0;
     return !out.ids.empty();
   };
   auto line = [&](const std::string& id) {

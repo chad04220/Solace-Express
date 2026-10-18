@@ -37,7 +37,7 @@ struct GameTest {
     g.initHeadless(); g.diskless = true; g.set.traffic = false;
     g.screen = SCR_HUB; g.hubTab = TAB_HANGAR; g.uiDt = 1.f/60.f;
     g.researchView.yaw = .57f; g.researchView.pitch = .31f; g.researchView.zoom = 1.23f;
-    g.resCraft = kWraith; g.militarySelection = 1;
+    g.resCraft = kSomnus; g.militarySelection = 1;
     const auto originalGun = g.practiceForward;
     const auto originalBomb = g.practiceBomb;
     const int originalWave = g.practiceWave;
@@ -156,7 +156,7 @@ struct GameTest {
     check(near(g.hangarView.yaw,.7f) && near(g.hangarView.zoom,1) && free.plane.model==0 && !free.hangarClassified,"Free Flight resets career view and selects its own unlocked craft");
     g.hangarView.yaw=1;g.hangarView.zoom=.75f;g.screen=SCR_HUB;g.hangarPreviewCamera(free);
     check(near(g.hangarView.yaw,.7f) && near(g.hangarView.zoom,1),"return to career resets Free Flight view");
-    check(near(g.researchView.yaw,.57f) && near(g.researchView.pitch,.31f) && near(g.researchView.zoom,1.23f) && g.resCraft==kWraith && g.militarySelection==1,
+    check(near(g.researchView.yaw,.57f) && near(g.researchView.pitch,.31f) && near(g.researchView.zoom,1.23f) && g.resCraft==kSomnus && g.militarySelection==1,
       "preview controls preserve research and military selection/camera");
     check(g.practiceForward==originalGun && g.practiceBomb==originalBomb && g.practiceWave==originalWave,"preview controls preserve practice equipment");
 
@@ -285,7 +285,7 @@ struct GameTest {
       check(privateShape,"classified geometry retains privacy"+context);
       check(clearRoom,"full elevated orbit has clear room sightlines"+context);
       view.reset();view.rotate(.5f);view.magnify(.2f);
-      if(mode==1)g.resCraft=kNightjar;else if(mode==2)g.militarySelection=military::RouteRecon;else if(mode==3)g.freeCraft=1;else g.selHangar=1;
+      if(mode==1)g.resCraft=kVigil;else if(mode==2)g.militarySelection=military::RouteRecon;else if(mode==3)g.freeCraft=1;else g.selHangar=1;
       camera();check(near(view.yaw,.7f)&&near(view.pitch,.15f)&&near(view.zoom,1)&&!view.drag,"new selection resets the common view"+context);
       // A page transition while held must not transfer a gesture to another view.
       view.held=0;view.heldSource=2;view.drag=true;g.focusScreen=-1;g.focusNavigate();

@@ -189,7 +189,7 @@ const PerfModel& Plane::perf(const AircraftSpec* sp) {
       p.sceneryHits = false;
       for (int i = 0; i < 60; i++) p.step(1 / 60.f, calm, 0.f);   // (settled on its wheels)
       // (the roll starts at touchdown, 1.1 Vs0 - a taildragger's three-point at the stall: at 1.1 Vs0 in that attitude the
-      // Bushmaster's full-flap wing flew again - and the approach at 1.3 Vs0 is the air segment below)
+      // Scrubrunner's full-flap wing flew again - and the approach at 1.3 Vs0 is the air segment below)
       p.vel = p.forward() * (vs0 * (s.taildragger ? 1.f : 1.1f)); p.ctl.flaps = 1; p.flaps = 1; p.ctl.throttle = 0; p.engineRunning = true;
       vec3 p0 = p.pos; P.ldgRoll = -1;
       for (float t = 0; t < 120.f && !p.ev.crashed; t += 1 / 60.f) {

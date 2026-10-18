@@ -100,14 +100,14 @@ vec3 plumeOne(vec3 lo, vec3 ld, float tmax, vec3 o, vec3 ax, vec2 radius, vec4 p
   acc *= (0.9 + 0.1*sin(uTime*63.0))*0.35*intensity/scale;
   return acc/(1.0 + max(acc.r, max(acc.g, acc.b))*mix(0.45, 0.12, ab));   // gentle hue-preserving roll-off keeps the orange orange
 }
-void shadeWraith(inout Mat m, int mid, vec3 lp, vec3 ln, float t);
+void shadeSomnus(inout Mat m, int mid, vec3 lp, vec3 ln, float t);
 vec3 vaporCone(vec3 col, vec3 ro, vec3 rd, float tmax, float jit);
 vec3 cloakSkin(vec3 world, vec3 n, vec3 rd, vec3 lp, float front);
 vec3 weaponsFx(vec3 col, vec3 ro, vec3 rd, float t);
-void shadeWraithCockpit(inout Mat m, int mid, vec3 lp, vec3 ln, vec3 E);
-vec3 wraithPodLight(vec3 p, vec3 n, vec3 v, Mat m, vec3 E);
+void shadeSomnusCockpit(inout Mat m, int mid, vec3 lp, vec3 ln, vec3 E);
+vec3 somnusPodLight(vec3 p, vec3 n, vec3 v, Mat m, vec3 E);
 vec3 wrHolo(vec3 ro, vec3 rd, float tmax);
-vec3 wraithScreen(vec3 col, vec3 rd, int id, vec3 sl);
+vec3 somnusScreen(vec3 col, vec3 rd, int id, vec3 sl);
 vec3 feedScreen(int id, vec3 sl, out vec3 rdc, out bool bomb);
 vec3 wrFeedOverlay(vec3 col, vec3 sl);
 float wrClip(vec3 lp, int mid);

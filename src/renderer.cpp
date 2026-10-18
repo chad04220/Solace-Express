@@ -19,7 +19,7 @@
 #if defined(_MSC_VER)
 #pragma warning(pop)
 #endif
-#include "shaders_wraith_cockpit.h"
+#include "shaders_somnus_cockpit.h"
 #include "entity_shaders.h"
 #include "hangar_preview.h"
 #include "font_data.h"
@@ -282,7 +282,7 @@ static GLuint program(const std::string& vs, const std::string& fs, std::string&
 // shader cache with it, so it knows without compiling anything whether the cache holds this build's programs
 std::string shaderCacheStamp() {
   uint64_t h = 1469598103934665603ull;
-  for (const char* src : {hangarPreview::kVS, hangarPreview::kFS, hangarPreview::kClassifiedFS, kFullscreenVS, kCommonGLSL, kRtIO, kSceneUniforms, kRoads, kPlaneCommon, kCockpitLayout, kCockpitFittings, kResearchCockpitLayout, kPlaneParts, kPlaneSDF, kPlaneTrace, kTerrainTrace, kMaterialCommon, kLightCommon, kClouds, kTerrainMaterial, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRtPrims, kPlaneScreens, kFeeds, kPlaneFx, kWraithWeaponSDF, kWraithSDF, kWraithStoreMaterial, kWraithMaterial, kWraithFx, kWraithCockpitCommon, kCabinWindows, kWraithCockpitSDF, kWraithCockpitMaterial, kCockpitMaterial, kPlaneMaterial, kWater, kViewUniforms, kNoiseTex, kGBuffer, kGBWrite, kTerrainVS, kTerrainFS, kFarRegionVS, kFarRegionFS, kWaterVS, kWaterFS, kLightFS, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kPropellerGLSL, kPropDiscVS, kPropDiscFS, kDownFS, kUpFS, kRayMaskFS, kRayFS, kFeedRaysFS, kTaaFS, kPostFS, kGLens, kUIVS, kUIFS, kEntCommon, kEntVS, kEntFS1, kEntFS2, kEntShadowFS, kCloudMain, kCloudCompFS, kCloudAccFS, kHullBakeMain, kTShBakeMain, kAfShMap, kEnemyCommon, kEnemyNeedle, kEnemyBastion, kEnemyHeavyCommon, kEnemyCantor, kEnemyArchon, kEnemyMaterial, kEnemyMeshVS, kEnemyMeshFS, kEnemyShadow, kReleasedStoreVS, kReleasedStoreFS, kPlanet}) h = fnv1a(src, h);
+  for (const char* src : {hangarPreview::kVS, hangarPreview::kFS, hangarPreview::kClassifiedFS, kFullscreenVS, kCommonGLSL, kRtIO, kSceneUniforms, kRoads, kPlaneCommon, kCockpitLayout, kCockpitFittings, kResearchCockpitLayout, kPlaneParts, kPlaneSDF, kPlaneTrace, kTerrainTrace, kMaterialCommon, kLightCommon, kClouds, kTerrainMaterial, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRtPrims, kPlaneScreens, kFeeds, kPlaneFx, kSomnusWeaponSDF, kSomnusSDF, kSomnusStoreMaterial, kSomnusMaterial, kSomnusFx, kSomnusCockpitCommon, kCabinWindows, kSomnusCockpitSDF, kSomnusCockpitMaterial, kCockpitMaterial, kPlaneMaterial, kWater, kViewUniforms, kNoiseTex, kGBuffer, kGBWrite, kTerrainVS, kTerrainFS, kFarRegionVS, kFarRegionFS, kWaterVS, kWaterFS, kLightFS, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kPropellerGLSL, kPropDiscVS, kPropDiscFS, kDownFS, kUpFS, kRayMaskFS, kRayFS, kFeedRaysFS, kTaaFS, kPostFS, kGLens, kUIVS, kUIFS, kEntCommon, kEntVS, kEntFS1, kEntFS2, kEntShadowFS, kCloudMain, kCloudCompFS, kCloudAccFS, kHullBakeMain, kTShBakeMain, kAfShMap, kEnemyCommon, kEnemyNeedle, kEnemyBastion, kEnemyHeavyCommon, kEnemyCantor, kEnemyArchon, kEnemyMaterial, kEnemyMeshVS, kEnemyMeshFS, kEnemyShadow, kReleasedStoreVS, kReleasedStoreFS, kPlanet}) h = fnv1a(src, h);
   auto str = [](GLenum e) { const GLubyte* s = glGetString(e); return std::string(s ? (const char*)s : "?"); };
   h = fnv1a(str(GL_VENDOR) + "|" + str(GL_RENDERER) + "|" + str(GL_VERSION), h);
   char b[24]; snprintf(b, sizeof b, "%016llx", (unsigned long long)h);
@@ -309,7 +309,7 @@ std::string meshGeometryStamp(const std::string& defines) {
 // aircraft's bodies alone - Renderer::meshStamp)
 std::string meshCacheStamp(const std::string& defines) {
   uint64_t h = fnv1a(aircraftMesh::kAlgorithmManifest, 1469598103934665603ull);
-  if(defines.empty() || defines.find("#define AF_WRAITH") != std::string::npos) h=fnv1a(aircraftMesh::kWraithLoadoutManifest,h);
+  if(defines.empty() || defines.find("#define AF_SOMNUS") != std::string::npos) h=fnv1a(aircraftMesh::kSomnusLoadoutManifest,h);
   // (the bake programs as the driver gets them, cut to what they run: an edit to a material, a light or a comment
   // leaves every aircraft body as it was; one to a shape the bake evaluates builds them again)
   h = fnv1a(shaderPrune::prune(hullBakeFSAssembly(defines)), h);
@@ -842,7 +842,7 @@ void Renderer::renderDisplays(const FrameParams& fp, bool panel, int half) {
   if (panel) glDrawArrays(GL_TRIANGLES, 0, 3);
   else {
     // only the pages this cockpit shows (the rest of the atlas is never read): the XR-40's dash and consoles 0-3 and 6
-    // (wraith_cockpit_material.glsl), the XR-30's 0-6 (plane_material.glsl), a glass cockpit's 0 and 2
+    // (somnus_cockpit_material.glsl), the XR-30's 0-6 (plane_material.glsl), a glass cockpit's 0 and 2
     // (cockpit_material.glsl, plane_material.glsl) - the XR-40's 8 pages cost 5. Half of them a frame (half: which),
     // alternately, so each page still changes at 30 Hz and every frame costs the same
     const int sp = validAircraft(pv.model) ? kAircraft[pv.model].special : 0;
