@@ -47,7 +47,7 @@ struct GameTest {
   static int somnusHitch(Game& game) {
     for (int i : kCareerAircraft) Plane::perf(&kAircraft[i]);   // (as Game::init learns them: the traffic reads them)
     game.headless = false; g_ren.entSync = false;   // (the launch as the game runs it: its loading screen, and its warm-ups)
-    game.resCraft = kSomnus; game.resCard = getenv("HITCHCARD") ? atoi(getenv("HITCHCARD")) : -1; game.resAirborne = true; game.resAirport = 0; game.realTime = 20;
+    game.resCraft = getenv("HITCHCRAFT") ? atoi(getenv("HITCHCRAFT")) : kSomnus; game.resCard = getenv("HITCHCARD") ? atoi(getenv("HITCHCARD")) : -1;   // (HITCHCRAFT: another research craft) game.resAirborne = true; game.resAirport = 0; game.realTime = 20;
     game.launchResearch();
     int lf = 0; const int b0 = g_ren.bakeCount, m0 = g_shaderCacheMisses;
     for (; lf < 4000 && (game.screen == SCR_LOADING || lf < 3); lf++) { game.update(1.f / 30.f); game.render(); game.framePresented(); }
@@ -69,6 +69,9 @@ struct GameTest {
       printf("frame %3d %-14s update %7.1f ms  render %8.1f ms  programs compiled %d (%.0f ms)  bodies %d  feeds %d  bombs %d  scenery built now %d (%.0f ms)\n",
              i, what, u, r, (int)g_shaderCacheMisses - miss0, (g_shaderCompileUs - us0) / 1000.0, g_ren.bakeCount - bake0,
              g_feedMounts[2].ok ? 1 : 0, (int)game.somnus.bombs.size(), g_scenery.syncBuilt - gen0, g_scenery.syncBuildMs - genMs0);
+      if (const char* sh = getenv("HITCHSHOTS")) {   // (HITCHSHOTS=<name>: the view switches' settled frames as pictures)
+        if (i == 2 || i == 5) { char b[160]; snprintf(b, sizeof b, "/tmp/claude-0/sp/shot_%s_%s.ppm", sh, i == 2 ? "out" : "in"); g_ren.screenshot(b); printf("wrote %s\n", b); }
+      }
       if (g_ren.profileRegionRender) {   // (HITCHPASSES: the render's passes, each timed to its end)
         const auto& a = g_ren.regionAuxRenderMs;
         printf("          world %.0f  ground shadow %.0f  lighting %.0f  aircraft shadow %.0f  traffic shadow %.0f  stores %.0f  displays %.0f  feeds %.0f  objects %.0f  shadow proxy %.0f  post %.0f ms\n",
