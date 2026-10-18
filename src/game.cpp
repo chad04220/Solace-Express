@@ -98,7 +98,7 @@ unsigned Game::actionCtxMask(int a) {
   }
 }
 Game::InputCtx Game::inputContext() const {
-  if (bindCapture >= 0) return CTX_BIND;
+  if (bindCapture >= 0 || axisCapture >= 0) return CTX_BIND;
   if (confirmNew) return CTX_DIALOG;
   if (screen != SCR_FLIGHT) return CTX_SCREEN;
   if (paused) return CTX_PAUSE;
@@ -113,6 +113,8 @@ void Game::armInputs() {
   if (ctx != lastCtx) {
     for (int k = 0; k < 256; k++) if (in.down[k]) keyUnarmed[k] = true;
     padUnarmed |= in.buttons;
+    joyUnarmed.resize(in.joys.size());
+    for (size_t j = 0; j < in.joys.size(); j++) for (int b = 0; b < kJoyButtons; b++) joyUnarmed[j][b] |= in.joys[j].button[b];
     // Hover power is momentary, so triggers held across a pause / overlay must be released before powering up
     // again, just like a held key or button. Keep this separate from the conventional throttle's input path.
     if (plane.spec && plane.spec->special == 2 && plane.ctl.flaps > 0.99f) {
@@ -126,11 +128,92 @@ void Game::armInputs() {
   for (int k = 0; k < 256; k++) { if (!in.down[k]) keyUnarmed[k] = false; if (keyUnarmed[k]) in.down[k] = in.pressed[k] = false; }
   padUnarmed &= in.buttons;
   in.buttons &= ~padUnarmed; in.buttonsPressed &= ~padUnarmed;
+  joyUnarmed.resize(in.joys.size());   // (a device that came or went: its held buttons count from here)
+  for (size_t j = 0; j < in.joys.size(); j++) for (int b = 0; b < kJoyButtons; b++) {
+    if (!in.joys[j].button[b]) joyUnarmed[j][b] = false;
+    if (joyUnarmed[j][b]) in.joys[j].button[b] = in.joys[j].pressed[b] = false;
+  }
+  updateJoysticks();
   // the device the prompts name: the gamepad from when it connects or is used, the keyboard from a key press
   if (in.pad && (!padWas || in.buttonsPressed || fabsf(in.lx) + fabsf(in.ly) + fabsf(in.rx) + fabsf(in.ry) > 0.6f || in.lt + in.rt > 0.3f)) padActive = true;
   for (int k = 1; k < 256 && padActive; k++) if (in.pressed[k]) padActive = false;
   if (padWas && !in.pad && screen == SCR_FLIGHT && !paused) { paused = true; settingsFromPause = false; toast("Controller disconnected - paused. Reconnect it, or carry on with the keyboard", vec3(1, 0.85f, 0.5f)); }
   padWas = in.pad;
+}
+
+float Game::joyAxis(int axis, bool* bound) const {
+  const AxisBind& b = set.axisBind[axis];
+  const int d = b.bound() ? joyFind(in.joys, b.dev, b.devName) : -1;
+  if (bound) *bound = d >= 0;
+  return d >= 0 && actOk(ACT_PITCH_UP) ? shapeAxis(in.joys[d].axis[b.axis], b, kFlightAxes[axis].unipolar) : 0.f;   // (flight input only where the flight's keys work)
+}
+
+// The joysticks' housekeeping, every frame: the first one ever seen has its stick bound to pitch and roll, so it flies
+// as soon as it is plugged in; a bound flight axis's device lost in flight pauses it, as a lost gamepad does
+void Game::updateJoysticks() {
+  if (!set.joyAutoDone && !in.joys.empty()) {
+    for (const JoyState& j : in.joys) if (j.hasAxis[0] && j.hasAxis[1]) {
+      bool any = false; for (const AxisBind& a : set.axisBind) any |= a.bound();
+      if (!any) {
+        AxisBind roll; roll.dev = j.id; roll.devName = j.name; roll.axis = 0;
+        AxisBind pitch = roll; pitch.axis = 1;   // (DirectInput's Y grows toward the pilot: pulling back is nose up)
+        set.axisBind[AX_ROLL] = roll; set.axisBind[AX_PITCH] = pitch;
+        toast(j.name + " found: its stick flies pitch and roll. Set up its other axes in Settings -> Joystick", vec3(.6f, .9f, 1.f), false);
+      }
+      set.joyAutoDone = true; saveSettings();
+      break;
+    }
+  }
+  bool bound = false, present = true;
+  for (const AxisBind& a : set.axisBind) if (a.bound()) { bound = true; present &= joyFind(in.joys, a.dev, a.devName) >= 0; }
+  const bool here = bound && present;
+  if (joyFlightBound && !here && bound && screen == SCR_FLIGHT && !paused) {
+    paused = true; settingsFromPause = false;
+    toast("Joystick disconnected - paused. Reconnect it, or carry on with the keyboard", vec3(1, 0.85f, 0.5f));
+  }
+  joyFlightBound = here;
+}
+
+void Game::soakFlyOn() { if (screen == SCR_FLIGHT && plane.spec && !plane.onGround && !plane.apOn) plane.apEngage(Plane::AP_HOLD, -1, wx); }
+
+// Report a problem (the pause menu): what was happening when the player pressed it - the build, the screen, the
+// aircraft and where it was, the flight, the weather, the settings that matter and the last messages - in
+// report_<time>.txt beside the logs, with room for what went wrong; the platform opens it to be filled in. Nothing is
+// sent: the player sends it (with startup.log and any crash report) to the playtest
+std::string Game::writeProblemReport() {
+  const time_t now = time(nullptr); char stamp[32]; strftime(stamp, sizeof stamp, "%Y%m%d-%H%M%S", localtime(&now));
+  const std::string name = std::string("report_") + stamp + ".txt", path = saveDir.empty() ? name : saveDir + "/" + name;
+  FILE* f = diskless ? nullptr : fopen(path.c_str(), "w");
+  if (!f) return std::string();
+  static const char* screens[] = {"menu", "hub", "flight", "debrief", "research", "loading", "free flight", "region loading"};
+  fprintf(f, "Somnium Volandi problem report\nBuild: %s (%s)\nTime: %s\nScreen: %s%s\n", version.c_str(), buildStamp.c_str(), stamp,
+          screens[std::clamp((int)screen, 0, 7)], paused ? " (paused)" : "");
+  if (plane.spec) {
+    fprintf(f, "Aircraft: %s (%s)%s\n", plane.spec->name, plane.spec->id, plane.onGround ? ", on the ground" : "");
+    fprintf(f, "Position: x %.0f m, z %.0f m, altitude %.0f m (%.0f m above the ground), %.0f kt, heading %.0f, pitch %.1f\n",
+            plane.pos.x, plane.pos.z, plane.pos.y, plane.agl(), length(plane.vel) * MS_TO_KT, plane.heading(), plane.pitchDeg());
+    fprintf(f, "Controls: throttle %.2f, flaps %.2f, gear %s, autopilot %s, camera %d\n", plane.ctl.throttle, plane.ctl.flaps, plane.ctl.gearDown ? "down" : "up",
+            plane.apOn ? plane.apStatus.c_str() : "off", camMode);
+  }
+  if (screen == SCR_FLIGHT || screen == SCR_DEBRIEF)
+    fprintf(f, "Flight: %s \"%s\" %s -> %s%s%s%s\n", contract.id.c_str(), contract.title.c_str(),
+            contract.from >= 0 && contract.from < (int)g_world.airports.size() ? g_world.airports[contract.from].code : "?",
+            contract.to >= 0 && contract.to < (int)g_world.airports.size() ? g_world.airports[contract.to].code : "?",
+            freeFlight ? " (free flight)" : "", researchFlight ? " (research)" : "", militaryFlight ? " (military)" : "");
+  fprintf(f, "Weather: wind %.0f kt from %.0f, gusts %.0f kt, cloud %.0f%% at %.0f m, visibility %.0f m, precipitation %d%s, %.2f h\n",
+          wx.windSpeed * MS_TO_KT, wx.windFrom, wx.gust * MS_TO_KT, wx.cloudCover * 100.f, wx.cloudBase, wx.visibility, wx.precip, wx.storm ? ", storm" : "", wx.timeOfDay);
+  fprintf(f, "Settings: quality %d, resolution mode %d, frame-rate target %d, UI scale %.2f, traffic %d, fullscreen %d\n",
+          set.quality, set.resMode, set.fpsTarget, set.uiScale, set.traffic, set.fullscreen);
+  fprintf(f, "Input: gamepad %s, joysticks %d", in.pad ? "connected" : "none", (int)in.joys.size());
+  for (const JoyState& j : in.joys) fprintf(f, ", %s", j.name.c_str());
+  fprintf(f, "\n\nLast messages:\n");
+  for (const auto& t : toasts) fprintf(f, "  %s\n", t.text.c_str());
+  const size_t n = atc.history.size();
+  for (size_t i = n > 12 ? n - 12 : 0; i < n; i++) fprintf(f, "  radio: %s\n", atc.history[i].c_str());
+  fprintf(f, "\nWhat happened? What did you expect instead? (Write below, save, and send this file with startup.log and any\n"
+             "crash report from the crash folder.)\n\n");
+  fclose(f);
+  return path;
 }
 
 // The pad's names follow its bindings; the stick and trigger actions a pad drives without a button binding are named
@@ -184,6 +267,25 @@ std::string padName(unsigned bit) {
 // Settings / pause menu "press a key" capture. Runs before anything else reads the frame's input and swallows it,
 // so the press that sets a binding never also flies the aircraft or closes the menu.
 void Game::updateBindCapture(float dt) {
+  if (axisCapture >= 0) {   // a flight axis: the joystick axis moved furthest from where it was, once past half its travel;
+                            // the way it moved (the capture asks for nose up, right, full) sets its direction
+    bindCaptureT += dt;
+    axisCaptureRest.resize(in.joys.size());
+    int bestDev = -1, bestAx = -1; float best = .5f;
+    for (size_t d = 0; d < in.joys.size(); d++) for (int a = 0; a < kJoyAxes; a++)
+      if (in.joys[d].hasAxis[a] && fabsf(in.joys[d].axis[a] - axisCaptureRest[d][a]) > best) { best = fabsf(in.joys[d].axis[a] - axisCaptureRest[d][a]); bestDev = (int)d; bestAx = a; }
+    const bool cancel = in.pressed[K_ESC] || (in.buttonsPressed & PAD_START) || bindCaptureT > 8.f;
+    if (bestDev >= 0 && !cancel) {
+      AxisBind& b = set.axisBind[axisCapture];
+      b.dev = in.joys[bestDev].id; b.devName = in.joys[bestDev].name; b.axis = bestAx;
+      b.invert = in.joys[bestDev].axis[bestAx] < axisCaptureRest[bestDev][bestAx];
+    }
+    if (bestDev >= 0 || cancel) { axisCapture = -1; saveSettings(); g_audio.trigger(SFX_CLICK); }
+    memset(in.pressed, 0, sizeof(in.pressed)); in.buttonsPressed = 0;
+    for (JoyState& j : in.joys) memset(j.pressed, 0, sizeof(j.pressed));
+    for (int i = 0; i < 3; i++) in.mPressed[i] = false;
+    return;
+  }
   if (bindCapture < 0) return;
   bindCaptureT += dt;
   int a = bindCapture;
@@ -196,6 +298,14 @@ void Game::updateBindCapture(float dt) {
         if (b != a && set.keyBind[b] == k && kActions[b].group == kActions[a].group) set.keyBind[b] = set.keyBind[a];
       set.keyBind[a] = k; done = true;
     }
+  } else if (bindCaptureDev == 2) {   // a joystick button: the first pressed, on any device
+    for (size_t d = 0; d < in.joys.size() && !done; d++) for (int bt = 0; bt < kJoyButtons && !done; bt++) {
+      if (!in.joys[d].pressed[bt]) continue;
+      const JoyButtonBind nb{in.joys[d].id, in.joys[d].name, bt};
+      for (int b = 0; b < ACT_COUNT; b++)   // (one already used in the same group swaps over)
+        if (b != a && kActions[b].group == kActions[a].group && joyDev(b) == (int)d && set.joyBind[b].button == bt) set.joyBind[b] = set.joyBind[a];
+      set.joyBind[a] = nb; done = true;
+    }
   } else if (in.buttonsPressed) {
     unsigned bit = in.buttonsPressed & ~(unsigned)PAD_START;
     if (bit) {
@@ -207,6 +317,7 @@ void Game::updateBindCapture(float dt) {
   }
   if (done) { bindCapture = -1; saveSettings(); g_audio.trigger(SFX_CLICK); }
   memset(in.pressed, 0, sizeof(in.pressed)); in.buttonsPressed = 0;
+  for (JoyState& j : in.joys) memset(j.pressed, 0, sizeof(j.pressed));
   for (int i = 0; i < 3; i++) in.mPressed[i] = false;
 }
 
@@ -216,7 +327,7 @@ static std::string joinPath(const std::string& d, const char* f) { return d.empt
 
 void Game::loadSettings() {
   FILE* f = fopen(joinPath(saveDir, "settings.cfg").c_str(), "r");
-  if (!f) return;
+  if (!f) { loadJoystickConfig(); return; }
   resDone.clear(); trialBest.clear();   // (read twice at startup: the lists are the file's, not appended to)
   char k[64]; float v;
   while (fscanf(f, "%63s %f", k, &v) == 2) {
@@ -248,6 +359,7 @@ void Game::loadSettings() {
     else if (s == "menuMotion") set.menuMotion = v != 0;
     else if (s == "cbHud") set.cbHud = v != 0;
     else if (s == "uiScale") set.uiScale = clampf(v, 0.8f, 1.4f);
+    else if (s == "joyAuto") set.joyAutoDone = v != 0;
     else if (s.rfind("hudCam", 0) == 0 && s.size() == 7 && s[6] >= '0' && s[6] <= '3') set.hudCam[s[6] - '0'] = v != 0;
     else if (s.rfind("key.", 0) == 0 || s.rfind("pad.", 0) == 0)
       for (int i = 0; i < ACT_COUNT; i++)
@@ -256,6 +368,26 @@ void Game::loadSettings() {
         }
   }
   fclose(f);
+  loadJoystickConfig();
+}
+
+// joystick.cfg: the flight axes and the actions' joystick buttons (joystick.h)
+static const char* const* actionIds() {
+  static const char* ids[ACT_COUNT];
+  for (int i = 0; i < ACT_COUNT; i++) ids[i] = kActions[i].id;
+  return ids;
+}
+void Game::loadJoystickConfig() {
+  std::string text;
+  if (FILE* f = fopen(joinPath(saveDir, "joystick.cfg").c_str(), "r")) {
+    char b[512]; size_t n;
+    while ((n = fread(b, 1, sizeof b, f)) > 0) text.append(b, n);
+    fclose(f);
+  }
+  for (auto& a : set.axisBind) a = AxisBind();
+  for (auto& b : set.joyBind) b = JoyButtonBind();
+  joyConfigParse(text, set.axisBind, set.joyBind, actionIds(), ACT_COUNT);
+  joyWritten = joyConfigText(set.axisBind, set.joyBind, actionIds(), ACT_COUNT);
 }
 
 // Written only when something changed (the settings page calls this every frame), through a temp file so an
@@ -266,7 +398,19 @@ bool Game::saveSettings() {
   std::string t = fmt("quality %d\nmaster %f\nengineVol %f\nsfxVol %f\nradioVol %f\ninvertPitch %d\nshowHints %d\nmetric %d\nfullscreen %d\nradioStation %d\nmouseSens %f\ntraffic %d\natcVol %f\n",
           set.quality, set.master, set.engineVol, set.sfxVol, set.radioVol, set.invertPitch, set.showHints, set.metric, set.fullscreen, set.radioStation, set.mouseSens, set.traffic, set.atcVol);
   t += fmt("renderRes %d\nfpsTarget %d\nfov %f\nheadLook %d\ncbHud %d\nuiScale %f\nhudCam0 %d\nhudCam1 %d\nhudCam2 %d\nhudCam3 %d\n", set.resMode, set.fpsTarget, set.fov, set.headLook, set.cbHud, set.uiScale, set.hudCam[0], set.hudCam[1], set.hudCam[2], set.hudCam[3]);
-  t += fmt("cockpitFocusZoom %d\nfoveate %d\nmenuMotion %d\n", set.cockpitFocusZoom, set.foveate, set.menuMotion);
+  t += fmt("cockpitFocusZoom %d\nfoveate %d\nmenuMotion %d\njoyAuto %d\n", set.cockpitFocusZoom, set.foveate, set.menuMotion, set.joyAutoDone);
+  {   // the joystick bindings: their own file (device names don't fit this one's "name number" lines)
+    static const std::string none = [] { AxisBind a[AX_COUNT]; std::vector<JoyButtonBind> b(ACT_COUNT); return joyConfigText(a, b.data(), actionIds(), ACT_COUNT); }();
+    const std::string j = joyConfigText(set.axisBind, set.joyBind, actionIds(), ACT_COUNT);
+    if (j != joyWritten && !(joyWritten.empty() && j == none)) {   // (nothing bound, nothing read: no file to write)
+      const std::string path = joinPath(saveDir, "joystick.cfg"), tmp = path + ".tmp";
+      if (FILE* f = fopen(tmp.c_str(), "w")) {
+        bool ok = fwrite(j.data(), 1, j.size(), f) == j.size();
+        ok = fclose(f) == 0 && ok;
+        if (ok && replaceFile(tmp, path)) joyWritten = j; else remove(tmp.c_str());
+      }
+    }
+  }
   for (int i = 0; i < ACT_COUNT; i++) t += fmt("key.%s %d\npad.%s %u\n", kActions[i].id, set.keyBind[i], kActions[i].id, set.padBind[i]);
   for (const std::string& id : resDone) t += "rescard." + id + " 1\n";
   for (auto& tb : trialBest) for (size_t i = 0; i < tb.second.size(); i++) t += fmt("trial.%s.%d %f\n", tb.first.c_str(), (int)i, tb.second[i]);
@@ -282,53 +426,19 @@ bool Game::saveSettings() {
   return ok;
 }
 
-// Built-in presets. Bump kStationsVersion when adding presets: older station files get the new ones appended.
-static const int kStationsVersion = 2;
-static const std::pair<const char*, const char*> kDefaultStations[] = {
-  {"SomaFM Groove Salad (ambient)", "https://ice1.somafm.com/groovesalad-128-mp3"},
-  {"SomaFM Drone Zone", "https://ice1.somafm.com/dronezone-128-mp3"},
-  {"SomaFM Secret Agent", "https://ice1.somafm.com/secretagent-128-mp3"},
-  {"SomaFM Lush", "https://ice1.somafm.com/lush-128-mp3"},
-  {"SomaFM Indie Pop Rocks", "https://ice1.somafm.com/indiepop-128-mp3"},
-  {"Radio Paradise (eclectic)", "https://stream.radioparadise.com/mp3-128"},
-  {"Radio Paradise Mellow", "https://stream.radioparadise.com/mellow-128"},
-  {"KEXP Seattle", "https://kexp-mp3-128.streamguys1.com/kexp128.mp3"},
-  // US East Coast public and college stations (free, listener-supported)
-  {"WNYC 93.9 New York - NPR news", "https://fm939.wnyc.org/wnycfm"},
-  {"WQXR 105.9 New York - classical", "https://stream.wqxr.org/wqxr"},
-  {"WFMU 91.1 Jersey City - freeform", "https://stream0.wfmu.org/freeform-128k"},
-  {"WBGO 88.3 Newark - jazz", "https://wbgo.streamguys1.com/wbgo128"},
-  {"WFUV 90.7 New York - indie & folk", "https://onair.wfuv.org/onair-hi"},
-  {"WXPN 88.5 Philadelphia - AAA", "https://wxpnhi.xpn.org/xpnhi"},
-  {"WBUR 90.9 Boston - NPR news", "https://icecast-stream.wbur.org/wbur"},
-  {"GBH 89.7 Boston - NPR news", "https://wgbh-live.streamguys1.com/wgbh"},
-  {"CRB 99.5 Boston - classical", "https://wgbh-live.streamguys1.com/classical-hi"},
-  {"WMBR 88.1 MIT Cambridge - college", "https://wmbr.org:8002/hi"},
-  {"WUNC 91.5 Chapel Hill - NPR news", "https://wunc-ice.streamguys1.com/wunc-128-mp3"},
-  {"WCPE 89.7 Raleigh - classical", "https://audio-mp3.ibiblio.org/wcpe.mp3"},
-};
-
-static void writeStations(const std::string& path, const std::vector<std::pair<std::string, std::string>>& st) {
-  FILE* f = fopen(path.c_str(), "w");
-  if (!f) return;
-  fprintf(f, "# Somnium Volandi internet radio stations\n# stations-version %d\n# One per line:  Name|URL   (MP3 or AAC HTTP/HTTPS streams). Add your own below.\n", kStationsVersion);
-  for (auto& s : st) fprintf(f, "%s|%s\n", s.first.c_str(), s.second.c_str());
-  fclose(f);
-}
-
+// The internet radio's stations are the player's own: none ship with the game. The first run writes the save folder's
+// radio_stations.txt with how to add them; a list an earlier version filled with presets is kept as it is.
 void Game::loadStations() {
   stations.clear();
   std::string path = joinPath(saveDir, "radio_stations.txt");
   FILE* f = fopen(path.c_str(), "r");
   bool userFile = f != nullptr;
   if (!f) f = fopen("radio_stations.txt", "r");
-  int version = 1;
   if (f) {
     char line[1024];
     while (fgets(line, sizeof(line), f)) {
       std::string s = line;
       while (!s.empty() && (s.back() == '\n' || s.back() == '\r' || s.back() == ' ')) s.pop_back();
-      if (s.compare(0, 19, "# stations-version ") == 0) version = atoi(s.c_str() + 19);
       if (s.empty() || s[0] == '#') continue;
       size_t bar = s.find('|');
       if (bar == std::string::npos) stations.push_back({s, s});
@@ -336,16 +446,16 @@ void Game::loadStations() {
     }
     fclose(f);
   }
-  if (stations.empty() || version < kStationsVersion || (!userFile && !saveDir.empty())) {
-    // add presets the list doesn't have yet (keeps the player's own stations and order)
-    for (auto& d : kDefaultStations) {
-      bool have = false;
-      for (auto& s : stations) if (s.second == d.second) have = true;
-      if (!have) stations.push_back({d.first, d.second});
+  if (!userFile && !saveDir.empty() && !diskless)
+    if (FILE* w = fopen(path.c_str(), "w")) {
+      fprintf(w, "# Somnium Volandi internet radio stations\n"
+                 "# One per line:  Name|URL   (an MP3 or AAC stream over HTTP or HTTPS), for example:\n"
+                 "#   My Station|https://example.com/stream.mp3\n"
+                 "# Lines starting with # are ignored. After editing, press Reload in the game's radio panel.\n");
+      for (auto& s : stations) fprintf(w, "%s|%s\n", s.first.c_str(), s.second.c_str());
+      fclose(w);
     }
-    if ((!saveDir.empty() || userFile) && !diskless) writeStations(path, stations);
-  }
-  set.radioStation = std::clamp(set.radioStation, 0, (int)stations.size() - 1);
+  set.radioStation = stations.empty() ? 0 : std::clamp(set.radioStation, 0, (int)stations.size() - 1);
 }
 
 void Game::saveGame() {
@@ -1607,6 +1717,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
   cockpitFocus = CockpitFocusZoom(); ckZoom = 1.f; // a new flight never inherits a previous display lock
   camQ = plane.q; camPos = plane.pos + plane.q.rotate(vec3(0, 3, 15));
   flapNotch = 0; phase = 0; lastHintPhase = -1; hint.clear();
+  joyThrTaken = false; joyThrLast = -1;   // (the throttle lever takes over when it moves, not at the start)
   takeoffAnnounced = c.startAirborne; touchedDown = false; touchdownFpm = 0; stillTimer = 0; tdRunway = -2;   // (an airborne start has no takeoff to announce)
   engineAutoStarted = false; startDelay = 1.2f;
   parkingBrake = !c.startAirborne;   // a start on the ground is parked: the brake is released to roll
@@ -1816,6 +1927,14 @@ void Game::flightControls(float dt) {
     padR += (actPad(ACT_ROLL_R) ? 1.f : 0.f) - (actPad(ACT_ROLL_L) ? 1.f : 0.f);
     padP = padP * fabsf(padP) * 0.4f + padP * 0.6f; padR = padR * fabsf(padR) * 0.4f + padR * 0.6f;
   }
+  // joystick, pedals and throttle lever (joystick.h): positions, each through its binding's dead zone and curve. The
+  // lever has the throttle once it moves, and gives it up to a key, trigger or number key until it moves again
+  bool jP = false, jR = false, jY = false, jT = false;
+  padP += joyAxis(AX_PITCH, &jP); padR += joyAxis(AX_ROLL, &jR); padY += joyAxis(AX_YAW, &jY);
+  const float lever = joyAxis(AX_THROTTLE, &jT);
+  if (!jT) { joyThrTaken = false; joyThrLast = -1; }
+  else if (joyThrLast < 0) joyThrLast = lever;   // (bound, back, or a new flight: it takes over when it moves, not before)
+  const bool leverMoved = jT && fabsf(lever - joyThrLast) > (joyThrTaken ? 0.f : 0.02f);
   bool manual = fabsf(pitchIn) + fabsf(rollIn) > 0 || fabsf(padP) + fabsf(padR) > 0.3f;
   // (a refused autoland's hold too: the pilot asked for a landing, not a hold, and was told the stick takes over - the
   // review of v3.31.0, F3)
@@ -1824,7 +1943,7 @@ void Game::flightControls(float dt) {
   // a key or button for anything the aircraft does - hands it straight back, wherever the figure has got to; the view,
   // the HUD, the map, the radio and the pause don't (the stunt key itself: below)
   if (plane.apOn && plane.apMode == Plane::AP_STUNT) {
-    bool touched = fabsf(pitchIn) + fabsf(rollIn) + fabsf(yawIn) + fabsf(padP) + fabsf(padR) + fabsf(padY) > 0.f || (in.pad && (in.lt > 0.1f || in.rt > 0.1f));
+    bool touched = fabsf(pitchIn) + fabsf(rollIn) + fabsf(yawIn) + fabsf(padP) + fabsf(padR) + fabsf(padY) > 0.f || (in.pad && (in.lt > 0.1f || in.rt > 0.1f)) || (leverMoved && (!joyThrTaken || fabsf(lever - joyThrLast) > 0.01f));
     for (int a = 0; a < ACT_COUNT && !touched; a++) if (a != ACT_STUNT && a != ACT_AP && (a < ACT_CAMERA || a > ACT_ZOOM)) touched = actDown(a);   // (the autopilot key turns it all off: below)
     for (int k : {K_PGUP, K_PGDN, K_PLUS, K_MINUS, K_HOME, K_END}) touched = touched || in.down[k];
     for (int k = '0'; k <= '9'; k++) touched = touched || in.down[k];
@@ -1850,14 +1969,14 @@ void Game::flightControls(float dt) {
   }
   if (!plane.apOn) {
     float tp = clampf(pitchIn + padP, -1, 1), tr = clampf(rollIn + padR, -1, 1);
-    float rate = manual ? 2.8f : 5.f;
+    float rate = jP || jR ? 14.f : manual ? 2.8f : 5.f;   // (a joystick's position is the control's, near enough at once)
     c.pitch = approach(c.pitch, tp, rate, dt);
     c.roll = approach(c.roll, tr, rate, dt);
   }
   (void)manual;
   // XR-40 weapons hot: the bumpers fire and bomb, so the rudder is frozen until weapons are safe again
   if (plane.spec->special == 2 && somnus.armed && !plane.onGround) { yawIn = 0; padY = 0; }
-  c.yaw = approach(c.yaw, clampf(yawIn + padY, -1, 1), 4.f, dt);
+  c.yaw = approach(c.yaw, clampf(yawIn + padY, -1, 1), jY ? 14.f : 4.f, dt);
   // throttle
   float thr = 0;
   if (actDown(ACT_THR_UP) || key(K_PGUP) || key(K_PLUS)) thr += 0.55f;
@@ -1865,13 +1984,19 @@ void Game::flightControls(float dt) {
   if (in.pad) thr += (in.rt - in.lt) * 0.6f;
   bool numKey = in.pressed['0'];
   for (int k = 1; k <= 9; k++) numKey |= in.pressed['0' + k] && !actKey(ACT_THR_DN);
-  if (plane.apOn && plane.apMode == Plane::AP_HOLD && plane.apSpeed > 0 && numKey) { plane.apSpeed = 0; toast("Autothrottle off - manual throttle", vec3(1, 0.85f, 0.5f)); }
+  const bool leverTakes = leverMoved && !joyThrTaken;
+  if (leverMoved) { joyThrTaken = true; joyThrLast = lever; }
+  if (thr != 0 || numKey) { joyThrTaken = false; joyThrLast = jT ? lever : -1.f; }   // (the last throttle input wins)
+  if (plane.apOn && plane.apMode == Plane::AP_HOLD && plane.apSpeed > 0 && (numKey || leverTakes)) { plane.apSpeed = 0; toast("Autothrottle off - manual throttle", vec3(1, 0.85f, 0.5f)); }
+  // (while the autopilot has the throttle the lever waits where it is: handed back, the power stays until it moves)
+  if (apNav || (plane.apOn && plane.apSpeed > 0)) { joyThrTaken = false; joyThrLast = jT ? lever : -1.f; }
   if (apNav) {}   // the autopilot has the throttle
   else if (plane.apOn && plane.apSpeed > 0) {   // autothrottle: throttle inputs move the speed target
     const AircraftSpec& sp = *plane.spec;
     plane.apSpeed = clampf(plane.apSpeed + thr * 30.f * dt, sp.vref * 1.2f, sp.cruise * (sp.special ? 1.6f : 1.15f));
   } else {
     c.throttle = clampf(c.throttle + thr * dt, 0, 1);
+    if (joyThrTaken) c.throttle = lever;
     for (int k = 1; k <= 9; k++) if (in.pressed['0' + k] && !actKey(ACT_THR_DN)) c.throttle = k / 9.f;
     if (in.pressed['0']) c.throttle = 0;
   }
@@ -1895,7 +2020,7 @@ void Game::flightControls(float dt) {
   // gear
   bool wrAir = plane.spec->special == 2 && !plane.onGround;   // XR-40 in the air: gamepad Y is weapons hot / safe instead of the gear
   bool gearPad = actPadP(ACT_GEAR) && !(wrAir && set.padBind[ACT_GEAR] == set.padBind[ACT_WEAPONS]);
-  if ((actKeyP(ACT_GEAR) || gearPad || (!showMap && (in.buttonsPressed & PAD_RIGHT))) && plane.spec->retract) {
+  if ((actKeyP(ACT_GEAR) || gearPad || actJoyP(ACT_GEAR) || (!showMap && (in.buttonsPressed & PAD_RIGHT))) && plane.spec->retract) {
     if (plane.onGround && c.gearDown) toast("Gear lever is locked on the ground", vec3(1, 0.6f, 0.4f));
     else { c.gearDown = !c.gearDown; toast(c.gearDown ? "Gear down" : "Gear up", vec3(0.8f, 1, 0.8f)); }
     if (plane.fail.gearStuck) toast(plane.fail.gearStuck == 1 ? "Gear won't come down - it's stuck up" : "Gear won't retract - it's stuck down", vec3(1, 0.45f, 0.35f));
@@ -1919,8 +2044,8 @@ void Game::flightControls(float dt) {
     else toast("Autopilot ON: the stick trims heading and altitude, throttle sets speed", vec3(0.6f, 1, 0.6f));
   }
   if (plane.spec->special == 2) somnusControls(dt);
-  if (actKeyP(ACT_PARK) || (!showMap && actPadP(ACT_PARK))) { parking = !parking; toast(parking ? "Parking brake SET" : "Parking brake released", vec3(1, 0.85f, 0.5f)); }
-  float wb = actDown(ACT_BRAKE) ? 1.f : 0.f;
+  if (actKeyP(ACT_PARK) || actJoyP(ACT_PARK) || (!showMap && actPadP(ACT_PARK))) { parking = !parking; toast(parking ? "Parking brake SET" : "Parking brake released", vec3(1, 0.85f, 0.5f)); }
+  float wb = std::max(actDown(ACT_BRAKE) ? 1.f : 0.f, joyAxis(AX_BRAKE));   // (toe brakes: as far as they are pressed)
   if (wb > 0 && parking && plane.onGround && length(plane.vel) > 2.f) parking = false;
   c.brake = parking ? 1.f : wb;
   // autopilot: Z / right stick click. With an autoland airport picked on the GPS it flies there and lands;
@@ -1961,6 +2086,7 @@ void Game::flightControls(float dt) {
     if (actOk(ACT_THR_UP)) {
       if (actDown(ACT_THR_UP) || key(K_PGUP) || key(K_PLUS)) power = 1.f;
       for (int k = 1; k <= 9; k++) if (key('0' + k)) power = std::max(power, k / 9.f);
+      if (joyThrTaken) power = std::max(power, lever);
       const float rt = in.pad && !vtolRtUnarmed && in.rt > 0.05f ? in.rt : 0.f;
       const float lt = in.pad && !vtolLtUnarmed && in.lt > 0.05f ? in.lt : 0.f;
       power = clampf(std::max(power, rt) - lt, 0.f, 1.f);
@@ -4602,7 +4728,7 @@ void Game::feedAudio() {
     if (rv != radioSentVol) { radio.setVolume(rv); radioSentVol = rv; }
   }
   static bool muffled = false;
-  if (actKeyP(ACT_ANR) || (screen == SCR_FLIGHT && !paused && actPadP(ACT_ANR))) { muffled = !muffled; toast(muffled ? "Engine noise muffled (headset ANR on)" : "Headset ANR off"); }
+  if (actKeyP(ACT_ANR) || actJoyP(ACT_ANR) || (screen == SCR_FLIGHT && !paused && actPadP(ACT_ANR))) { muffled = !muffled; toast(muffled ? "Engine noise muffled (headset ANR on)" : "Headset ANR off"); }
   ap.muffled = muffled;
   if (screen == SCR_FLIGHT && plane.spec && !crashed) {
     const AircraftSpec& s = *plane.spec;
@@ -4756,7 +4882,7 @@ void Game::update(float dt) {
     resWork = std::max(resWork, 0.25f * views + 0.65f * chunks + 0.10f * (lit ? 1.f : 0.f));
     if (resWarmFrames > 2 * resCraftCount() + 3 && !baked && g_ren.entPending == 0 && !loadingShadowPending()) { resWarm = false; resWarmCraft = -1; resWarmCk = false; g_ren.entBudgetMs = 2.5f; resWork = 1.f; }
   }
-  if (screen == SCR_FLIGHT && (actKeyP(ACT_RADIO) || (!paused && actPadP(ACT_RADIO)))) showRadio = !showRadio;
+  if (screen == SCR_FLIGHT && (actKeyP(ACT_RADIO) || actJoyP(ACT_RADIO) || (!paused && actPadP(ACT_RADIO)))) showRadio = !showRadio;
   radio.poll();
   if (screen == SCR_FLIGHT) {
     if (in.pressed[K_ESC] || (in.buttonsPressed & PAD_START)) {

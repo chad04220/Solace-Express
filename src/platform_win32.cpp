@@ -10,12 +10,15 @@
 #include <mmdeviceapi.h>
 #include <audioclient.h>
 #include <shellapi.h>
+#include <psapi.h>
 #include <objbase.h>
 #include <thread>
 #include <atomic>
 #include <memory>
 #include <mutex>
+#include "crash.h"
 #include "game.h"
+#include "joystick.h"
 #include "load_pacer.h"
 #include "world_load_progress.h"
 
@@ -96,6 +99,7 @@ static LRESULT CALLBACK wndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
   switch (msg) {
     case WM_CLOSE: if (g_game) g_game->quit = true; return 0;
     case WM_DISPLAYCHANGE: case WM_EXITSIZEMOVE: setupPacing(h); break;   // refresh rate / monitor may have changed
+    case WM_DEVICECHANGE: joyDevicesChanged(); break;   // (a joystick, throttle or pedals plugged in or out)
     case WM_SIZE: if (g_ren.ok) g_ren.resize(LOWORD(lp), HIWORD(lp)); return 0;
     case WM_GETMINMAXINFO: {   // (a window no smaller than 800 x 600 inside: the menus and settings are laid out for it - the review of v3.44.0, UI-4)
       RECT r = {0, 0, 800, 600}; AdjustWindowRect(&r, (DWORD)GetWindowLongPtr(h, GWL_STYLE), FALSE);
@@ -449,6 +453,20 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   game.saveDir = userDir();
   { char exe[MAX_PATH] = {}; DWORD n = GetModuleFileNameA(nullptr, exe, MAX_PATH);   // pictures etc. live next to the exe
     std::string d(exe, n); size_t sl = d.find_last_of("\\/"); game.assetDir = sl == std::string::npos ? std::string(".") : d.substr(0, sl); }
+  {   // crash reports (crash.h): the handlers first, then what the last session left
+    char version[96] = "development build";
+    if (FILE* f = fopen((game.assetDir + "\\VERSION.txt").c_str(), "r")) {
+      if (fgets(version, sizeof version, f)) version[strcspn(version, "\r\n")] = 0;
+      fclose(f);
+    }
+    game.version = version;
+    const std::string crashDir = game.saveDir + "\\crash";
+    crashInstall(crashDir, game.saveDir + "\\startup.log", version);
+    game.crashReport = crashTakePending(crashDir);
+    crashPrune(crashDir);
+    game.platformOpen = [](const std::string& path) { ShellExecuteA(nullptr, "open", path.c_str(), nullptr, nullptr, SW_SHOWNORMAL); };
+    if (strstr(GetCommandLineA(), "--test-crash")) { volatile int* none = nullptr; *none = 1; }   // (checks the reports end to end)
+  }
 
   WNDCLASSEXW wc = {sizeof(wc)};
   wc.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
@@ -481,12 +499,14 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   g_opengl32 = LoadLibraryA("opengl32.dll");
   const char* missing = nullptr;
   if (!glLoad(wglProc, &missing)) { MessageBoxA(g_hwnd, (std::string("Missing OpenGL function: ") + missing).c_str(), "Somnium Volandi", MB_ICONERROR); return 1; }
+  crashInstall(game.saveDir + "\\crash", game.saveDir + "\\startup.log", nullptr);   // (ours again, over any the driver set)
   s_swapInterval = (PFNWGLSWAPINTERVALEXTPROC)wglGetProcAddress("wglSwapIntervalEXT");
   if (auto ext = (PFNWGLGETEXTENSIONSSTRINGEXTPROC)wglGetProcAddress("wglGetExtensionsStringEXT")) { const char* e = ext(); s_tear = e && strstr(e, "WGL_EXT_swap_control_tear"); }
   timeBeginPeriod(1);   // 1 ms Sleep granularity for the frame limiter
   setupPacing(g_hwnd);
   const char* xdlls[] = {"xinput1_4.dll", "xinput9_1_0.dll", "xinput1_3.dll"};
   for (auto d : xdlls) { HMODULE m = LoadLibraryA(d); if (m) { s_xinput = (PFNXINPUTGETSTATE)GetProcAddress(m, "XInputGetState"); if (s_xinput) break; } }
+  joyInit(g_hwnd);   // joysticks, throttles and pedals (joystick_win.cpp); none: the game runs without them
 
   ShowWindow(g_hwnd, SW_SHOW);
   game.loadSettings();   // early, for fullscreen during the intro (Game::init loads them again)
@@ -585,7 +605,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   // aircraft's meshes
   const std::string cmdLine = GetCommandLineA();
   // (--raster, from older scripts, is accepted and ignored: there is one renderer)
-  const bool tool = cmdLine.find("--bench ") != std::string::npos || cmdLine.find("--shots ") != std::string::npos || cmdLine.find("--profile ") != std::string::npos || cmdLine.find("--analyze") != std::string::npos || cmdLine.find("--loadshots") != std::string::npos;
+  const bool tool = cmdLine.find("--bench ") != std::string::npos || cmdLine.find("--soak ") != std::string::npos || cmdLine.find("--shots ") != std::string::npos || cmdLine.find("--profile ") != std::string::npos || cmdLine.find("--analyze") != std::string::npos || cmdLine.find("--loadshots") != std::string::npos;
   auto exists = [](const std::string& p) { return !p.empty() && GetFileAttributesA(p.c_str()) != INVALID_FILE_ATTRIBUTES; };
   g_ren.prebuiltAircraftDir = game.assetDir + "\\aircraft"; // immutable full-quality geometry bundled beside the exe
   g_ren.checkMeshCache();
@@ -1163,6 +1183,77 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       return 0;
     }
   }
+  // Soak: SomniumVolandi.exe --soak MINUTES [--out soak.txt] flies one long session on this PC: one game throughout, a new
+  // scene every two minutes (the benchmark's: the islands, the forest, a storm, the night, the cockpits, the research
+  // craft), and every 10 s a line of the frame rate, the 1% low, the process's memory, handles and GDI objects. The end
+  // says whether the memory or the handles grew (more than 20 MB or 50 handles an hour, after the first quarter) and
+  // the exit code is 1 if they did (diagnostics.bat soak)
+  {
+    std::string cl = GetCommandLineA();
+    size_t k = cl.find("--soak ");
+    if (k != std::string::npos) {
+      const int minutes = std::clamp(atoi(cl.c_str() + k + 7), 1, 24 * 60);
+      char exe[MAX_PATH] = {}; DWORD n = GetModuleFileNameA(nullptr, exe, MAX_PATH);
+      std::string dir(exe, n); dir = dir.substr(0, dir.find_last_of("\\/"));
+      std::string outName = "soak.txt"; size_t ko = cl.find("--out ");
+      if (ko != std::string::npos) { outName = cl.substr(ko + 6); outName = outName.substr(0, outName.find(' ')); }
+      const bool absoluteOut = (outName.size() > 1 && outName[1] == ':') || outName.rfind("\\\\", 0) == 0;
+      FILE* sf = fopen((absoluteOut ? outName : dir + "\\" + outName).c_str(), "w");
+      if (!sf) { MessageBoxA(g_hwnd, "Cannot open the soak output file.", "Soak", MB_ICONERROR); return 2; }
+      fprintf(sf, "Somnium Volandi soak, %d minutes; build %s\nGPU: %s\n\n", minutes, game.version.c_str(), gpu.c_str());
+      static const char* cycle[] = {"air", "forest", "storm", "night", "cockpit", "hud", "rjet", "rjetc", "sunset", "mountain", "snow", "jet"};
+      Game* g = new Game();
+      g->saveDir = game.saveDir; g->diskless = true; g->initHeadless(); g->iconTex = iconTex;
+      LARGE_INTEGER f0, t0, last; QueryPerformanceFrequency(&f0); QueryPerformanceCounter(&t0); last = t0;
+      std::vector<float> window;   // this 10 s's frame times (ms)
+      std::vector<std::array<double, 3>> marks;   // (minutes, private MB, handles)
+      double nextLog = 10, nextScene = 0; int sceneIx = -1;
+      auto secs = [&](LARGE_INTEGER t) { return (double)(t.QuadPart - t0.QuadPart) / f0.QuadPart; };
+      while (!game.quit) {
+        LARGE_INTEGER now; QueryPerformanceCounter(&now);
+        const double t = secs(now);
+        if (t >= minutes * 60.0) break;
+        if (t >= nextScene) {
+          sceneIx = (sceneIx + 1) % (int)(sizeof cycle / sizeof cycle[0]);
+          g->debugScene(cycle[sceneIx]);
+          g->soakFlyOn();   // (it flies on)
+          SetWindowTextA(g_hwnd, fmt("Somnium Volandi - soak %.0f / %d min - %s", t / 60.0, minutes, cycle[sceneIx]).c_str());
+          nextScene = t + 120;
+        }
+        g->update(1.f / 60.f); g->render(); SwapBuffers(g_hdc); pumpB();
+        QueryPerformanceCounter(&now);
+        window.push_back((float)((now.QuadPart - last.QuadPart) * 1000.0 / f0.QuadPart)); last = now;
+        if (secs(now) >= nextLog) {
+          nextLog += 10;
+          std::vector<float> w = window; std::sort(w.begin(), w.end()); window.clear();
+          double mean = 0; for (float x : w) mean += x; mean /= std::max<size_t>(1, w.size());
+          const size_t worst = std::max<size_t>(1, (w.size() + 99) / 100); double slow = 0; for (size_t i = w.size() - std::min(worst, w.size()); i < w.size(); i++) slow += w[i];
+          PROCESS_MEMORY_COUNTERS_EX pm = {}; pm.cb = sizeof pm; GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pm, sizeof pm);
+          DWORD handles = 0; GetProcessHandleCount(GetCurrentProcess(), &handles);
+          const DWORD gdi = GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS);
+          const double priv = pm.PrivateUsage / 1048576.0, mins = secs(now) / 60.0;
+          marks.push_back({mins, priv, (double)handles});
+          fprintf(sf, "%7.2f min  %-10s %6.1f fps  1%% low %6.1f fps  private %7.0f MB  working set %7.0f MB  handles %5lu  GDI %4lu\n",
+                  mins, cycle[std::max(0, sceneIx)], mean > 0 ? 1000.0 / mean : 0.0, slow > 0 ? 1000.0 * std::min(worst, w.size()) / slow : 0.0,
+                  priv, pm.WorkingSetSize / 1048576.0, (unsigned long)handles, (unsigned long)gdi);
+          fflush(sf);
+        }
+      }
+      delete g;
+      // the trend after the first quarter (the first use of every scene's bodies, programs and scenery is not a leak)
+      auto slope = [&](int col) {
+        double sx = 0, sy = 0, sxx = 0, sxy = 0; int m = 0;
+        for (const auto& r : marks) if (r[0] >= minutes * 0.25) { sx += r[0]; sy += r[col]; sxx += r[0] * r[0]; sxy += r[0] * r[col]; m++; }
+        const double d = m * sxx - sx * sx;
+        return m >= 3 && d > 0 ? (m * sxy - sx * sy) / d * 60.0 : 0.0;   // per hour
+      };
+      const double memRate = slope(1), handleRate = slope(2);
+      const bool steady = memRate < 20.0 && handleRate < 50.0;
+      fprintf(sf, "\nTrend after the first quarter: memory %+.1f MB/hour, handles %+.1f/hour: %s\n", memRate, handleRate, steady ? "steady" : "GROWING");
+      fclose(sf);
+      return steady ? 0 : 1;
+    }
+  }
   // Benchmark: SomniumVolandi.exe --bench scene1,scene2,... [--size WxH] times each scene (wall clock with the GPU flushed,
   // plus the GPU time of every pass) and writes bench.txt next to the exe. Optional --bench-frames N
   // and --bench-csv add long runs and raw CPU/app-present/fresh delayed GPU samples; no per-frame waits.
@@ -1453,6 +1544,12 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   // (the menus render their scenes live: a menu.mp4 left from an older version is not played)
   startAudio();
   if (FILE* f = fopen((game.saveDir + "\\startup.log").c_str(), "a")) { fprintf(f, "Audio: %s\n", audioBackendName()); fclose(f); }
+  joyPoll(game.in.joys);   // (the joysticks found: a support aid, like the GPU)
+  if (FILE* f = fopen((game.saveDir + "\\startup.log").c_str(), "a")) {
+    fprintf(f, "Joysticks: %d\n", (int)game.in.joys.size());
+    for (const JoyState& j : game.in.joys) fprintf(f, "  %s (%d axes, %d buttons, %d hats)\n", j.name.c_str(), j.axes, j.buttons, j.hats);
+    fclose(f);
+  }
 
   QueryPerformanceCounter(&prev);
   while (!game.quit) {
@@ -1462,6 +1559,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     float dt = (float)(now.QuadPart - prev.QuadPart) / freq.QuadPart;
     prev = now;
     pollPad(game.in);
+    joyPoll(game.in.joys);
     game.filterControllerFocus();
     RECT rc; GetClientRect(g_hwnd, &rc);
     if (rc.right > 0 && rc.bottom > 0) {

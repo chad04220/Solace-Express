@@ -53,22 +53,22 @@ void Game::somnusControls(float dt) {
   }
   // Y (keyboard or gamepad, in the air on the pad): weapons hot - the laser turrets drop out and the bomb bay opens.
   // Y again: weapons safe - bay closed, turrets stowed. While hot the gamepad bumpers are the triggers, not the rudder.
-  if (actKeyP(ACT_WEAPONS) || (air && actPadP(ACT_WEAPONS))) {
+  if (actKeyP(ACT_WEAPONS) || actJoyP(ACT_WEAPONS) || (air && actPadP(ACT_WEAPONS))) {
     W.armed = !W.armed;
     toast(W.armed ? "WEAPONS HOT - lasers out, bomb bay open" : "WEAPONS SAFE - bay closed, lasers stowed", vec3(1.f, 0.35f, 0.4f));
     g_audio.triggerLocal(SFX_GEAR_CLUNK, kBayBomb, 0.6f);
   }
-  // fire: left mouse or Enter held, or the right bumper while weapons are hot
+  // fire: left mouse or Enter held, a joystick button bound to it, or the right bumper while weapons are hot
   bool padHot = air && in.pad && W.armed;
   // (an open map or radio takes the mouse and the keyboard: a click on a station armed the weapons and fired - review
   // UI-1; the pad's bumpers aren't the radio's)
   const bool overlay = showMap || showRadio;
-  bool fire = (in.mDown[0] && !overlay) || (actKey(ACT_FIRE) && !overlay) || (padHot && actPad(ACT_FIRE));
-  if (W.fireLatch) { if (!in.mDown[0] && !actKey(ACT_FIRE)) W.fireLatch = false; fire = false; }
+  bool fire = (in.mDown[0] && !overlay) || (actKey(ACT_FIRE) && !overlay) || (air && actJoy(ACT_FIRE)) || (padHot && actPad(ACT_FIRE));
+  if (W.fireLatch) { if (!in.mDown[0] && !actKey(ACT_FIRE) && !actJoy(ACT_FIRE)) W.fireLatch = false; fire = false; }
   if (fire && !W.armed) { W.armed = true; g_audio.triggerLocal(SFX_GEAR_CLUNK, kBayBomb, 0.6f); }
   W.wantFire = fire;   // the bolt leaves the lens after this frame's physics step (updateSomnus)
   // bombs: Backspace, middle mouse, or the left bumper while weapons are hot - each press queues a drop
-  if ((!overlay && (actKeyP(ACT_BOMB) || in.mPressed[2])) || (padHot && actPadP(ACT_BOMB))) {
+  if ((!overlay && (actKeyP(ACT_BOMB) || in.mPressed[2])) || (air && actJoyP(ACT_BOMB)) || (padHot && actPadP(ACT_BOMB))) {
     if (W.bombQueue < 3) W.bombQueue++;
   }
 }

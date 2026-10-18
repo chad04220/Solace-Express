@@ -141,6 +141,15 @@ jobs:
     needs: [aircraft-meshes]
     if: github.event_name != 'schedule' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository)
     runs-on: windows-latest
+    permissions:
+      contents: read
+      actions: read
+      id-token: write   # (code signing signs in to Azure with OpenID Connect: no stored password)
+    env:
+      # Code signing (docs/CODE_SIGNING.md): a release is signed when these repository secrets are set, else it ships
+      # unsigned with a warning. Only releases are signed: a branch build's exe never leaves the run's artifacts
+      SIGN_ACCOUNT: ${{ secrets.ARTIFACT_SIGNING_ACCOUNT }}
+      RELEASING: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -186,6 +195,44 @@ jobs:
           if [ "$MODE" = some ]; then pick=(-R "$PICKED"); else pick=(); fi
           ctest --test-dir build -C Release --output-on-failure -j4 "${pick[@]}"
 
+      - name: Stage the executable   # (on its own: the signing signs everything in the folder, and the tests share build/Release)
+        shell: bash
+        run: mkdir -p build/sign && cp build/Release/SomniumVolandi.exe build/sign/
+
+      - name: Sign in to Azure (code signing)
+        if: env.SIGN_ACCOUNT != '' && env.RELEASING == 'true'
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Sign the executable (Azure Artifact Signing)
+        if: env.SIGN_ACCOUNT != '' && env.RELEASING == 'true'
+        uses: azure/artifact-signing-action@v2.0.0
+        with:
+          endpoint: ${{ secrets.ARTIFACT_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ secrets.ARTIFACT_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.ARTIFACT_SIGNING_PROFILE }}
+          files-folder: ${{ github.workspace }}\build\sign
+          files-folder-filter: exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Check the signature
+        if: env.SIGN_ACCOUNT != '' && env.RELEASING == 'true'
+        shell: pwsh
+        run: |
+          $s = Get-AuthenticodeSignature build/sign/SomniumVolandi.exe
+          "Signature: $($s.Status), $($s.SignerCertificate.Subject), timestamped $($null -ne $s.TimeStamperCertificate)" | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          if ($s.Status -ne 'Valid' -or $null -eq $s.TimeStamperCertificate) { exit 1 }
+
+      - name: Unsigned release
+        if: env.SIGN_ACCOUNT == '' && env.RELEASING == 'true'
+        shell: bash
+        run: echo "::warning::This release's executable is unsigned - the code-signing secrets aren't set (docs/CODE_SIGNING.md)"
+
       - uses: actions/download-artifact@v4
         with:
           name: SomniumVolandi-aircraft
@@ -203,8 +250,8 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist/SomniumVolandi | Out-Null
-          Copy-Item build/Release/SomniumVolandi.exe dist/SomniumVolandi/
-          Copy-Item README.md, LICENSE, radio_stations.txt, THIRD_PARTY_NOTICES.md, diagnostics.bat dist/SomniumVolandi/
+          Copy-Item build/sign/SomniumVolandi.exe dist/SomniumVolandi/   # (signed, for a release with the signing secrets)
+          Copy-Item README.md, LICENSE, EULA.md, PRIVACY.md, radio_stations.txt, THIRD_PARTY_NOTICES.md, diagnostics.bat dist/SomniumVolandi/
           Set-Content -Path dist/SomniumVolandi/VERSION.txt -Value "${{ inputs.release_tag || github.ref_name }}"
           New-Item -ItemType Directory -Force -Path dist/SomniumVolandi/loading | Out-Null
           Copy-Item assets/loading/*.jpg dist/SomniumVolandi/loading/
@@ -223,6 +270,14 @@ jobs:
         with:
           name: SomniumVolandi-windows-x64-zip
           path: dist/SomniumVolandi-windows-x64.zip
+
+      # the symbols for this exact build: crash dumps from players open against them. An artifact, not a release
+      # download (the symbols name the code); archive them with each release (docs/PLAYTEST_KIT.md)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SomniumVolandi-symbols
+          path: build/Release/SomniumVolandi.pdb
+          retention-days: 90
 
   release:   # only once the same source has passed on Windows and under the Linux sanitizers
     if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''

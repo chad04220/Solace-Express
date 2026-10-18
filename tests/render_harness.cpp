@@ -123,6 +123,25 @@ struct GameTest {
     if (getenv("UISCALE")) g.set.uiScale = (float)atof(getenv("UISCALE"));   // (the review's 140% checks)
     if (what == "controls") { g.hubTab = TAB_SETTINGS; g.settingsPage = 1; if (getenv("CAPTURE")) { g.bindCapture = ACT_GEAR; g.bindCaptureDev = 0; g.bindCaptureT = 3; } g.drawHub(); }
     else if (what == "settings") { g.hubTab = TAB_SETTINGS; g.settingsPage = 0; g.drawHub(); }
+    else if (what == "joystick") {   // Settings -> Joystick with a stick and pedals connected, three axes bound, one capturing
+      JoyState stick; stick.id = "{A1}"; stick.name = "T.16000M FCS"; stick.axes = 4; stick.buttons = 16;
+      for (int a : {0, 1, 5, 6}) stick.hasAxis[a] = true;
+      stick.axis[0] = .35f; stick.axis[1] = -.6f; stick.axis[5] = .05f; stick.axis[6] = .4f;
+      JoyState pedals; pedals.id = "{B2}"; pedals.name = "TFRP Rudder"; pedals.axes = 3; pedals.buttons = 0;
+      for (int a : {0, 1, 5}) pedals.hasAxis[a] = true;
+      pedals.axis[0] = -1.f; pedals.axis[1] = -.2f; pedals.axis[5] = -.3f;
+      g.in.joys = {stick, pedals};
+      auto bind = [&](int ax, const JoyState& j, int a, bool inv, float dead, float curve) { AxisBind& b = g.set.axisBind[ax]; b.dev = j.id; b.devName = j.name; b.axis = a; b.invert = inv; b.dead = dead; b.curve = curve; };
+      bind(AX_PITCH, stick, 1, false, .05f, .3f); bind(AX_ROLL, stick, 0, false, .05f, .3f); bind(AX_THROTTLE, stick, 6, true, .03f, 0.f); bind(AX_YAW, pedals, 5, false, .08f, .5f);
+      if (getenv("CAPTURE")) { g.axisCapture = AX_BRAKE; g.bindCaptureT = 3; }
+      g.hubTab = TAB_SETTINGS; g.settingsPage = 2; g.drawHub();
+    }
+    else if (what == "menucrash") {   // the main menu after a crash: where its report is
+      g.crashReport = "C:\\Users\\Pilot\\AppData\\Roaming\\SomniumVolandi\\crash\\crash-20261018-101500.txt";
+      g.platformOpen = [](const std::string&) {};
+      g.drawMenu();
+    }
+    else if (what == "radioempty") { g.stations.clear(); g.saveDir = "C:\\Users\\Pilot\\AppData\\Roaming\\SomniumVolandi"; g.platformOpen = [](const std::string&) {}; g.screen = SCR_HUB; g.showRadio = true; g.hubTab = TAB_CONTRACTS; g.drawRadioPanel(60 * g.S(), 90 * g.S()); }
     else if (what == "pause") { g.drawPause(); }
     else if (what == "menu") { g.drawMenu(); }
     else if (what == "debrief") {   // a story delivery's settlement with eleven lines and a new licence (the review of v3.24.0, R9)

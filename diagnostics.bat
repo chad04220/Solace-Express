@@ -8,6 +8,8 @@ rem   diagnostics.bat           the full run (below)
 rem   diagnostics.bat quick     the benchmarks and the system report only (about 3 minutes)
 rem   diagnostics.bat shots     the screenshots only
 rem   diagnostics.bat loading   renders the loading-screen pictures (the "loading" folder) on your GPU
+rem   diagnostics.bat soak [min] one long session (120 minutes unless given): a new scene every two minutes, the frame
+rem                             rate, memory and handles every 10 s, and whether anything grew (soak.txt), then the logs
 rem
 rem The full run:
 rem   1. system report: GPU and driver, CPU, memory, Windows, monitors with their refresh rates
@@ -52,6 +54,7 @@ mkdir "%OUT%"
 rem (an error.log already there is an earlier launch's: kept apart, so the one collected at the end is these runs')
 if exist "%APPDATA%\SomniumVolandi\error.log" move /y "%APPDATA%\SomniumVolandi\error.log" "%OUT%\error_before.log" >nul
 if /i "%MODE%"=="shots" goto shots
+if /i "%MODE%"=="soak" goto soak
 
 echo [1/6] System report ...
 set INFO=%OUT%\system.txt
@@ -124,11 +127,25 @@ if exist shots (
 )
 if /i "%MODE%"=="shots" goto finish
 
+goto logs
+
+:soak
+set MIN=%~2
+if "%MIN%"=="" set MIN=120
+echo Soak: %MIN% minutes on this PC, one scene after another. Leave it running; close the game's window to stop early ...
+start "" /wait SomniumVolandi.exe --soak %MIN% --out %OUT%\soak.txt
+if exist "%OUT%\soak.txt" type "%OUT%\soak.txt" | findstr /c:"Trend"
+
 :logs
 echo [6/6] Logs and settings ...
 if exist "%APPDATA%\SomniumVolandi\startup.log" copy /y "%APPDATA%\SomniumVolandi\startup.log" "%OUT%\startup.log" >nul
 if exist "%APPDATA%\SomniumVolandi\settings.cfg" copy /y "%APPDATA%\SomniumVolandi\settings.cfg" "%OUT%\settings.cfg" >nul
 if exist "%APPDATA%\SomniumVolandi\error.log" copy /y "%APPDATA%\SomniumVolandi\error.log" "%OUT%\error.log" >nul
+rem the crash reports' summaries (what failed and where; the dumps themselves stay on this PC unless sent)
+if exist "%APPDATA%\SomniumVolandi\crash\crash-*.txt" (
+  if not exist "%OUT%\crash" mkdir "%OUT%\crash"
+  copy /y "%APPDATA%\SomniumVolandi\crash\crash-*.txt" "%OUT%\crash\" >nul
+)
 call :findcache
 if defined CACHE (
   if exist "%CACHE%\compile.log" copy /y "%CACHE%\compile.log" "%OUT%\compile.log" >nul

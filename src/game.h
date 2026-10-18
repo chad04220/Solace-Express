@@ -1,6 +1,7 @@
 // Somnium Volandi - game state, flight session, cameras, effects, UI
 #pragma once
 #include "quality_governor.h"
+#include <array>
 #include <functional>
 #include <optional>
 #include <set>
@@ -26,16 +27,21 @@
 #include "radio.h"
 #include "atc.h"
 #include "keys.h"
+#include "joystick.h"
 
 struct Input {
   bool down[256] = {}, pressed[256] = {};
   float mx = 0, my = 0, mdx = 0, mdy = 0, wheel = 0;
   bool mDown[3] = {}, mPressed[3] = {}, mReleased[3] = {};
   bool pad = false; float lx = 0, ly = 0, rx = 0, ry = 0, lt = 0, rt = 0; unsigned buttons = 0, buttonsPressed = 0;
-  void endFrame() { memset(pressed, 0, sizeof(pressed)); for (int i = 0; i < 3; i++) mPressed[i] = mReleased[i] = false; wheel = 0; mdx = mdy = 0; buttonsPressed = 0; }
+  std::vector<JoyState> joys;   // joysticks, throttles and pedals (the platform's: joystick.h)
+  void endFrame() {
+    memset(pressed, 0, sizeof(pressed)); for (int i = 0; i < 3; i++) mPressed[i] = mReleased[i] = false; wheel = 0; mdx = mdy = 0; buttonsPressed = 0;
+    for (JoyState& j : joys) memset(j.pressed, 0, sizeof(j.pressed));
+  }
 };
 
-// Rebindable flight actions. Each has one keyboard key and one gamepad button; the sticks and triggers stay fixed
+// Rebindable flight actions. Each has one keyboard key, one gamepad button and one joystick button; the sticks and triggers stay fixed
 // (left stick pitch/roll, triggers throttle) and the arrow keys / PgUp / PgDn / Home / End stay as fixed alternates.
 enum Action {
   ACT_PITCH_DN = 0, ACT_PITCH_UP, ACT_ROLL_L, ACT_ROLL_R, ACT_YAW_L, ACT_YAW_R, ACT_THR_UP, ACT_THR_DN, ACT_TRIM_UP, ACT_TRIM_DN,
@@ -66,8 +72,11 @@ struct Settings {
   float uiScale = 1.f;    // on top of the window-height scale
   bool hudCam[4] = {true, true, true, true};   // the HUD on or off, remembered per camera
   int keyBind[ACT_COUNT]; unsigned padBind[ACT_COUNT];
+  JoyButtonBind joyBind[ACT_COUNT];   // (none by default: joysticks differ)
+  AxisBind axisBind[AX_COUNT];        // the flight axes on joysticks, throttles and pedals (Settings -> Joystick)
+  bool joyAutoDone = false;           // the first joystick seen had its stick bound to pitch and roll (once, ever)
   Settings() { resetBindings(); }
-  void resetBindings() { for (int i = 0; i < ACT_COUNT; i++) { keyBind[i] = kActions[i].key; padBind[i] = kActions[i].pad; } }
+  void resetBindings() { for (int i = 0; i < ACT_COUNT; i++) { keyBind[i] = kActions[i].key; padBind[i] = kActions[i].pad; joyBind[i] = JoyButtonBind(); } }
 };
 
 struct TipPt { vec3 p; float age, a; int seg; AirSwirl sw; bool caught = false; };   // wingtip vapour ribbon point (in the air mass; caught: turning round its tip's vortex)
@@ -79,6 +88,7 @@ enum HubTab { TAB_CONTRACTS = 0, TAB_HANGAR, TAB_AIRLINE, TAB_LOGBOOK, TAB_SETTI
 
 class Game {
   friend struct GameTest;
+  friend struct SoakTest;
 public:
   ~Game();
   bool botControl = false;  // tests drive plane.ctl directly
@@ -97,6 +107,11 @@ public:
   int prewarmCraft = -1; bool prewarmInside = false;   // the menu tour shows this aircraft instead (prewarm only)
   bool wantFullscreenToggle = false;
   std::function<void()> platformPresent;   // swaps the window's buffers and answers its messages (platform_win32 sets it): a frame shown from inside a long bake
+  std::function<void(const std::string&)> platformOpen;   // opens a folder in Explorer, or a file in its app (platform_win32 sets it)
+  std::string crashReport;   // the report the last session's crash left (crash.h); the main menu says so until dismissed
+  std::string version = "development build";   // the release's name (VERSION.txt beside the exe: the platform layer reads it)
+  void soakFlyOn();   // --soak (platform_win32): an aircraft in the air flies on, on the autopilot's hold
+  std::string writeProblemReport();   // the pause menu's Report a problem: what was happening, written beside the logs (its path)
   int monitorHz = 60;            // the display's refresh rate (the platform layer sets it)
   bool wantPacing = false;       // the frame-rate target changed: the platform layer re-applies its pacing
   // sceneOnly: the scene without the menu on top (captures of the menu's scenery)
@@ -511,8 +526,17 @@ private:
   int atcStation(int airport) const { return (airport * 7 + 2) % AtcVoice::kVoices; }   // each airport keeps one voice
   std::vector<std::pair<std::string, std::string>> stations;
   bool settingsFromPause = false;
-  int settingsPage = 0;                    // 0 general, 1 controls
-  int bindCapture = -1, bindCaptureDev = 0; // action waiting for a key (dev 0) or gamepad button (dev 1)
+  int settingsPage = 0;                    // 0 general, 1 controls, 2 joystick
+  int bindCapture = -1, bindCaptureDev = 0; // action waiting for a key (dev 0), gamepad button (dev 1) or joystick button (dev 2)
+  int axisCapture = -1;                     // flight axis waiting for a joystick axis to be moved (Settings -> Joystick)
+  std::vector<std::array<float, kJoyAxes>> axisCaptureRest;   // each device's axes when the capture began
+  std::string joyWritten;                   // joystick.cfg's last written contents
+  bool joyThrTaken = false; float joyThrLast = -1;   // the throttle lever has the throttle (it moved since a key or trigger did)
+  bool joyFlightBound = false;              // a bound flight axis's device was there last frame (one lost in flight pauses)
+  std::vector<std::array<bool, kJoyButtons>> joyUnarmed;   // joystick buttons held across a change of input context
+  int joyDev(int a) const { const JoyButtonBind& b = set.joyBind[a]; return b.bound() ? joyFind(in.joys, b.dev, b.devName) : -1; }
+  float joyAxis(int axis, bool* bound = nullptr) const;   // a flight axis's shaped value (0 unbound or its device absent)
+  void updateJoysticks();                   // first-joystick binding, a lost device's pause (armInputs)
   float bindCaptureT = 0;
   std::vector<TipPt> tipTrail[2]; int tipSeg = 0; bool tipOn = false;
   int ctlScroll = 0; float ctlScrollAcc = 0;
@@ -543,12 +567,15 @@ private:
   bool actKeyP(int a) const { int k = set.keyBind[a]; return actOk(a) && k > 0 && k < 256 && in.pressed[k]; }
   bool actPad(int a) const { return actOk(a) && in.pad && (in.buttons & set.padBind[a]); }
   bool actPadP(int a) const { return actOk(a) && in.pad && (in.buttonsPressed & set.padBind[a]); }
-  bool actDown(int a) const { return actKey(a) || actPad(a); }
-  bool actPressed(int a) const { return actKeyP(a) || actPadP(a); }
+  bool actJoy(int a) const { const int d = joyDev(a); return d >= 0 && actOk(a) && in.joys[d].button[set.joyBind[a].button]; }
+  bool actJoyP(int a) const { const int d = joyDev(a); return d >= 0 && actOk(a) && in.joys[d].pressed[set.joyBind[a].button]; }
+  bool actDown(int a) const { return actKey(a) || actPad(a) || actJoy(a); }
+  bool actPressed(int a) const { return actKeyP(a) || actPadP(a) || actJoyP(a); }
   bool confirmNew = false;
 
   // ---------------------------------------------------------------- helpers
   bool saveSettings();
+  void loadJoystickConfig();
   void loadStations();
   int radioScroll = 0;
   void saveGame();
@@ -605,6 +632,8 @@ private:
   void panel(float x, float y, float w, float h, float a = 0.78f);
   void hudPanel(float x, float y, float w, float h, float a = 1.f);
   void header(float x, float y, float w, const std::string& label);
+  std::string joyButtonLabel(const JoyButtonBind& b) const;
+  void drawJoystick(float x, float y, float w, float h);   // Settings -> Joystick: the devices and the flight axes
   void card(float x, float y, float w, float h, bool sel, bool hov, vec3 accent);
   bool uiGlass = false;   // the career hub's style: translucent glass panels and cards over the live scene
   float anim(uint32_t id, float target, float rate);

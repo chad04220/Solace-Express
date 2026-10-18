@@ -581,6 +581,53 @@ struct GameTest {
                  Plane::stuntName(0), once, taken, resumed, once && taken && resumed ? "ok" : "FAIL");
           fails += !(once && taken && resumed);
         }
+        // joysticks (joystick.h): the first one seen flies pitch and roll at once; the stick's position is the controls';
+        // a throttle lever takes the throttle when it moves and gives it to a key until it moves again; a bound joystick
+        // button works its action; a device lost in flight pauses it
+        {
+          const Settings keepSet = g.set; const bool keepDisk = g.diskless; g.diskless = true;   // (no settings files written)
+          for (auto& a : g.set.axisBind) a = AxisBind();
+          for (auto& b : g.set.joyBind) b = JoyButtonBind();
+          g.set.joyAutoDone = false; g.in = Input();
+          const int cap = g_world.findAirport("CAP");
+          g.startFlight(fc, 1, Career::SRC_RENT); g.parkingBrake = false;
+          g.plane.reset(&kAircraft[1], g_world.airports[cap].pos() + vec3(0, 1800, 0), 90, 60, 85, true, kAircraft[1].cruise * 0.9f);
+          g.takeoffAnnounced = true; g.engineAutoStarted = true; g.plane.ctl.throttle = 0.7f;
+          JoyState j; j.id = "{TEST-HOTAS}"; j.name = "Test HOTAS"; j.axes = 4; j.buttons = 12;
+          for (int a : {0, 1, 2, 5}) j.hasAxis[a] = true;
+          j.axis[2] = -1.f;   // (the lever at idle)
+          auto step = [&](int n) { for (int i = 0; i < n; i++) { g.in.joys = {j}; g.update(dt); g.in.endFrame(); std::fill(std::begin(j.pressed), std::end(j.pressed), false); } };
+          step(1);
+          const bool autoBound = g.set.joyAutoDone && g.set.axisBind[AX_ROLL].axis == 0 && g.set.axisBind[AX_PITCH].axis == 1 && g.set.axisBind[AX_PITCH].devName == "Test HOTAS";
+          AxisBind lever; lever.dev = j.id; lever.devName = j.name; lever.axis = 2; g.set.axisBind[AX_THROTTLE] = lever;
+          AxisBind rudder = lever; rudder.axis = 5; g.set.axisBind[AX_YAW] = rudder;
+          g.set.joyBind[ACT_LIGHTS] = {j.id, j.name, 3};
+          j.axis[1] = 1.f; j.axis[0] = -.5f; j.axis[5] = .3f; step(30);
+          const float wantRoll = shapeAxis(-.5f, g.set.axisBind[AX_ROLL], false), wantYaw = shapeAxis(.3f, rudder, false);
+          const bool stick = g.plane.ctl.pitch > .95f && fabsf(g.plane.ctl.roll - wantRoll) < .02f && fabsf(g.plane.ctl.yaw - wantYaw) < .02f;
+          j.axis[1] = j.axis[0] = j.axis[5] = 0.f; step(30);
+          const bool centred = fabsf(g.plane.ctl.pitch) < .02f && fabsf(g.plane.ctl.roll) < .02f;
+          const bool leverWaits = fabsf(g.plane.ctl.throttle - .7f) < 1e-4f;   // (bound at idle, never moved: the throttle as it was)
+          j.axis[2] = .6f; step(2);
+          const bool leverTakes = fabsf(g.plane.ctl.throttle - shapeAxis(.6f, lever, true)) < 1e-4f;
+          const int k = g.set.keyBind[ACT_THR_DN];
+          for (int i = 0; i < 20; i++) { g.in.down[k] = true; step(1); }
+          g.in.down[k] = false; step(10);
+          const float byKey = g.plane.ctl.throttle;
+          const bool keyWins = byKey < shapeAxis(.6f, lever, true) - .1f;   // (the lever unmoved: the key's throttle stays)
+          j.axis[2] = .7f; step(2);
+          const bool leverBack = fabsf(g.plane.ctl.throttle - shapeAxis(.7f, lever, true)) < 1e-4f;
+          const bool light0 = g.landingLight;
+          j.button[3] = j.pressed[3] = true; step(1); j.button[3] = false; step(1);
+          const bool button = g.landingLight != light0;
+          g.in.joys.clear(); g.update(dt); g.in.endFrame();
+          const bool lost = g.paused;
+          g.paused = false; g.set = keepSet; g.diskless = keepDisk; g.in = Input(); g.joyFlightBound = false; g.update(dt);
+          const bool ok = autoBound && stick && centred && leverWaits && leverTakes && keyWins && leverBack && button && lost;
+          printf("Joystick: first one bound %d, stick and rudder positions %d, centred %d, lever waits %d / takes over %d / a key wins %d (%.2f) / back %d, button %d, lost pauses %d: %s\n",
+                 autoBound, stick, centred, leverWaits, leverTakes, keyWins, byKey, leverBack, button, lost, ok ? "ok" : "FAIL");
+          fails += !ok;
+        }
         // the XR-40 armed: both bumpers held 1.5 s
         g.resCraft = kSomnus; g.resAirborne = true; g.launchResearch(); g.somnus.armed = true;
         bool hid0 = g.uiHidden;
@@ -1131,7 +1178,8 @@ struct GameTest {
         g.somnusControls(dt);
         const bool safe = !g.somnus.armed && !g.somnus.wantFire;
         g.in.mDown[0] = g.in.mPressed[0] = false; g.showRadio = false; g.somnus = Game::SomnusState();
-        remove("./settings.cfg"); g.saveDir = sd; g.settingsWritten.clear(); g.stations = st0; g_ren.W = W0; g_ren.H = H0; g_ren.uiBegin();
+        remove("./settings.cfg"); remove("./radio_stations.txt");   // (a click on Reload writes the station file's first copy)
+        g.saveDir = sd; g.settingsWritten.clear(); g.stations = st0; g_ren.W = W0; g_ren.H = H0; g_ren.uiBegin();
         bool ok = moved == 0 && clicks == 600 && safe;
         printf("Radio panel owns its clicks: %d of %d clicks over it moved the hub beneath, XR-40 weapons stay safe %d: %s\n", moved, clicks, safe, ok ? "ok" : "FAIL"); fails += !ok;
       }
@@ -1140,7 +1188,7 @@ struct GameTest {
         const int W0 = g_ren.W, H0 = g_ren.H; const float ui0 = g.set.uiScale, page0 = (float)g.settingsPage;
         g_ren.W = 800; g_ren.H = 600; g.set.uiScale = 1.4f; g.screen = SCR_HUB; g.hubTab = TAB_SETTINGS; g.showRadio = false; g.focusNav = false;
         int outside = 0, seen = 0;
-        for (int page = 0; page < 2; page++) {
+        for (int page = 0; page < 3; page++) {
           g.settingsPage = page; g.focusList.clear(); g.in.mx = g.in.my = -1; g_ren.uiBegin(); g.drawHub();
           for (auto& f : g.focusList) { seen++; if (f.x < 0.f || f.x + f.w > (float)g_ren.W + 0.5f) outside++; }
         }
@@ -1159,7 +1207,7 @@ struct GameTest {
         const bool tab = g.hubTab == 3;
         g.hubTab = TAB_SETTINGS; g.settingsPage = 1; frame();
         const int act = ACT_COUNT - 1;   // (the last row: below the list's first screen)
-        g.focusId = 0xB1D00000u + (uint32_t)act * 2u; frame();
+        g.focusId = 0xB1D00000u + (uint32_t)act * 3u; frame();
         bool listed = false; for (auto& f : g.focusList) listed |= f.id == g.focusId;
         g.in.pressed[K_ENTER] = true; frame(); g.in.pressed[K_ENTER] = false;
         const bool cell = listed && g.bindCapture == act && g.bindCaptureDev == 0;

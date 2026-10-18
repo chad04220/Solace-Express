@@ -79,7 +79,9 @@ Cruise, take-off roll and landing distance are what each aircraft actually does 
 
 ## Controls
 
-The game shows no key prompts during flight. Open **Controls** from the main menu, the pause menu or the Settings tab to see every binding. To remap one, click its keyboard or controller cell and press the new key or button (Esc / Menu cancels, right-click clears the binding). A key that's already used in the same group swaps over, and **Reset to defaults** restores the table below. Bindings are saved in `settings.cfg`. The arrow keys, PgUp / PgDn, the number keys, the sticks and the triggers are fixed.
+The game shows no key prompts during flight. Open **Controls** from the main menu, the pause menu or the Settings tab to see every binding. To remap one, click its keyboard, controller or joystick cell and press the new key or button (Esc / Menu cancels, right-click clears the binding). A key that's already used in the same group swaps over, and **Reset to defaults** restores the table below. Bindings are saved in `settings.cfg`. The arrow keys, PgUp / PgDn, the number keys, the sticks and the triggers are fixed.
+
+**Joysticks, throttles and pedals.** Any DirectInput flight stick, throttle quadrant, HOTAS or rudder pedals works next to the keyboard and gamepad. The first joystick you plug in flies pitch and roll straight away. **Settings → Joystick** lists the connected devices and binds the five flight axes: pitch, roll, yaw (rudder), throttle and wheel brakes (toe brakes). Click an axis's binding and move the control as it asks (pull the stick back, push the lever to full): that binds it and sets its direction. Each axis can also be reversed by hand, and has its own dead zone (a stick's centre, or each end of a lever) and response curve, with a live meter of what the aircraft gets. A throttle lever takes the throttle once it moves; a throttle key, trigger or number key takes it back until the lever moves again, so the two never fight. Any action in the Controls table can also have a joystick button or hat direction. Joystick bindings are saved in `joystick.cfg`, and a device moved to another USB port is found again by name. A bound joystick unplugged in flight pauses the game, as a gamepad does. Xbox-style gamepads stay on the gamepad column.
 
 **XR-40 manual VTOL (90-degree pod notch):** hold throttle-up (default **Shift**, **PgUp** or **+**) for full power, or hold **1–9** for a partial-power target. **RT** commands power proportionally; **LT** reduces it, and throttle-down or **0** commands idle. Releasing the power control commands idle and the engines wind down at their normal spool rate. Held controls must be released after pausing or changing input context before they can apply power again. Forward flight, the intermediate pod notches, and engaged autopilot retain their existing throttle controls.
 
@@ -163,20 +165,29 @@ Two more airframes round out the register. The **XR-10 Vigil** is the programme'
 
 ## Internet radio
 
-Press **R** in flight, or use the **Radio** button in the hub. Stations come from `%APPDATA%\SomniumVolandi\radio_stations.txt`, which is created on first run. Add one line per station:
+Press **R** in flight, or use the **Radio** button in the hub. No stations come with the game: add your own to `%APPDATA%\SomniumVolandi\radio_stations.txt`, which is created on first run (the radio panel's **Edit station list** opens it). Add one line per station:
 
 ```
 My Station|https://example.com/stream.mp3
 ```
 
-Any MP3 or AAC stream over HTTP or HTTPS that Windows Media Foundation can play will work.
+Any MP3 or AAC stream over HTTP or HTTPS that Windows Media Foundation can play will work. Press **Reload** in the radio panel after editing; there's no need to restart. A list an earlier version filled with its presets is kept as your own. The list scrolls with the mouse wheel.
 
-The presets include SomaFM, Radio Paradise and KEXP, plus free US East Coast public and college stations: WNYC and WQXR (New York), WFMU (Jersey City), WBGO (Newark), WFUV (New York), WXPN (Philadelphia), WBUR, GBH and CRB (Boston), WMBR (MIT), WUNC (Chapel Hill) and WCPE (Raleigh). When an update adds presets, they're appended to your existing station file, and your own stations are kept. The list scrolls with the mouse wheel.
+## Crash reports
+
+If the game crashes, it writes a crash report to `%APPDATA%\SomniumVolandi\crash`: a minidump, a short summary of what failed and where, and a copy of `startup.log`. The next launch says so on the main menu, with a button that opens the folder. Nothing is uploaded; send the report with a note of what you were doing if you'd like the crash fixed. The newest 10 reports are kept. `SomniumVolandi.exe --test-crash` crashes on purpose, to check that reports are written.
 
 ## System requirements
 
-- Windows 10 or 11, 64-bit
-- A GPU with OpenGL 3.3 (anything from roughly 2012 on). A mid-range GPU from the last 5–6 years is recommended for 1080p.
+What the game checks, and what has been measured. A verified minimum and recommended PC will follow from the playtest's hardware matrix (`docs/HARDWARE_MATRIX.md`); until then there are no claims beyond these:
+
+- **Checked at start:** Windows 10 or 11, 64-bit, and a graphics driver with OpenGL 3.3 (core profile) and at least 22 texture units per shader. If the driver falls short, the game says so and names the fix: update the driver, or run on the dedicated GPU.
+- **Disk use:** about 0.5 GB unpacked, estimated from this build's files. Of that, the voices take 44 MB, the material textures 74 MB, the loading pictures 4 MB, and the ready-built aircraft bodies most of the rest. The first launch also builds a cache of compiled shaders and the islands in `%LOCALAPPDATA%\SomniumVolandi`; `diagnostics.bat` reports its size.
+- **Measured memory:** a long headless session (the `soak` test: twelve legs over every career type and the XR-40) holds at about 170 MB with no growth. The rendered game uses more, and its figure for your PC is in `diagnostics.bat soak`.
+- **Not yet measured:** frame rates on a range of GPUs. The benchmark (`diagnostics.bat`) measures them on your PC, every scene at 1920x1080.
+
+### How it runs
+
 - **Frame rate.** By default the game paces to your display's refresh rate (vsync; adaptive where the driver supports it, so a late frame tears once instead of stuttering). Settings → *Frame rate* can instead cap it at 30 / 60 / 90 / 120 / 144 / 240 fps with a precise limiter. The automatic resolution scaler aims for whichever rate is in effect.
 - **Scenery streaming.** Scenery is generated deterministically in 256 m chunks as you fly (about half a millisecond per chunk, nearest first). Chunks within 700 m are built immediately; the rest are built on background worker threads (one per spare CPU core) and handed to the renderer when ready, so streaming costs the frame almost nothing. Each object has three levels of detail picked by distance. Chunks are frustum-culled, trees thin out towards the draw distance where the ground's canopy texture takes over, and the shadow cascades only re-render when the camera has moved far enough or new scenery appears where their shadows show. In cockpit views, the area the cabin covered last frame is masked out before the scenery is drawn, so trees and buildings behind the cabin walls are never shaded, and the terrain's shadow on the aircraft is computed once per frame on the CPU rather than for every pixel of the cabin. The Low/Medium/High quality setting scales the tree, rock and building draw distances (trees out to 2.9 / 5 / 7.8 km, buildings to 9 / 13 / 18 km, scenery shadows reach about 2 / 3.2 / 4.4 km ahead) and the shadow-map size. Trees retain their closest mesh to 210 / 290 / 400 m and their middle mesh to 1 / 1.45 / 2 km; bushes have proportionally shorter detail ranges and reach 0.9 / 1.45 / 2 km. Auxiliary camera feeds and shadow detail retain their original budgets. See [foliage ranges and validation limits](docs/FOLIAGE_DRAW_RANGES.md).
 - **Resolution.** By default (*Auto 60*) the render resolution drops automatically, down to 50%, only while the GPU can't hold the target frame rate, and climbs back in 5% steps when it can. Settings → *Render resolution* can instead fix it at 100 / 85 / 75 / 67%. Changing the resolution, by hand or automatically, never reallocates anything, so it causes no hitch. The temporal AA upscales back to the display either way. Temporal anti-aliasing smooths edges, and a light contrast-adaptive sharpening pass keeps the image crisp. Press **F3** for a frame-rate / GPU-time / resolution readout with the GPU time of every rendering pass. An FPS counter is always shown at the top right. `diagnostics.bat` (next to the exe) writes a system report, times the first-run shader compile, benchmarks the scenes full screen at 1920x1080 with the GPU time of every pass, runs the pass-by-pass analysis and takes screenshots, all into a `diagnostics` folder. The pre-flight loading screen shows a picture of the airport (or of your aircraft in flight) from the set that ships in the `loading` folder, and the main menu renders its aircraft flybys and island scenery live in the game engine. Its cinematic flight paths and camera moves are scripted; no prerecorded menu video is played, and old `menu.mp4` files are ignored. Low/Medium/High quality is in Settings.
@@ -261,3 +272,5 @@ tools/gen_font.py  regenerates the embedded SDF font atlas
 ## Copyright
 
 Copyright (c) 2026 CDAIII. All rights reserved. See `LICENSE`; third-party components are listed in `THIRD_PARTY_NOTICES.md`.
+
+Playing the game is covered by the end user licence agreement in `EULA.md`. How the game handles data (in short: it keeps everything on your computer and sends nothing to us) is in `PRIVACY.md`. Both ship in the release zip.

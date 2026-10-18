@@ -576,6 +576,20 @@ void Game::drawMenu() {
     g_ren.text(fx, H - 90 * s, 11 * s, "THE DREAM OF FLIGHT", C_ACCENT, 1, 0, false);
     g_ren.text(fx, H - 67 * s, 23 * s, "Find your next horizon.", C_TEXT, 1);
   }
+  if (!crashReport.empty()) {   // the last session crashed: where its report is, until dismissed
+    const float nx = W - fx > 300 * s ? fx : x, nw = std::min(520 * s, W - nx - 32 * s), ny = W - fx > 300 * s ? 42 * s : H - 200 * s;
+    const std::string dir = crashReport.substr(0, crashReport.find_last_of("\\/"));
+    const auto lines = wrap("A crash report was saved to " + dir + ". Please send it with a note of what you were doing when "
+                            "it happened. Nothing is sent automatically.", nw - 48 * s, 13 * s);
+    const float nh = (86 + 18 * lines.size()) * s;
+    panel(nx, ny, nw, nh);
+    g_ren.text(nx + 24 * s, ny + 16 * s, 11 * s, "THE LAST SESSION CLOSED UNEXPECTEDLY", C_WARN, 1, 0, false);
+    float ly = ny + 36 * s;
+    for (const std::string& l : lines) { g_ren.text(nx + 24 * s, ly, 13 * s, l, C_TEXT, 1); ly += 18 * s; }
+    const float bw2 = (nw - 58 * s) * 0.5f;
+    if (platformOpen && button(nx + 24 * s, ly + 6 * s, bw2, 32 * s, "Open folder")) platformOpen(dir);
+    if (button(nx + nw - 24 * s - bw2, ly + 6 * s, bw2, 32 * s, "Dismiss")) crashReport.clear();
+  }
 }
 
 // ------------------------------------------------------------------ hub
@@ -657,7 +671,7 @@ void Game::drawHub() {
     case TAB_HANGAR: drawHubHangar(cx, cy, cw, ch); break;
     case TAB_AIRLINE: drawHubAirline(cx, cy, cw, ch); break;
     case TAB_LOGBOOK: drawHubLogbook(cx, cy, cw, ch); break;
-    default: { float pw = std::min(cw, (settingsPage == 1 ? 940 : 760) * s), sx = cx + (cw - pw) * 0.5f; panel(sx, cy, pw, ch); drawSettings(sx + 24 * s, cy + 20 * s, pw - 48 * s, ch - 40 * s); break; }
+    default: { float pw = std::min(cw, (settingsPage >= 1 ? 940 : 760) * s), sx = cx + (cw - pw) * 0.5f; panel(sx, cy, pw, ch); drawSettings(sx + 24 * s, cy + 20 * s, pw - 48 * s, ch - 40 * s); break; }
   }
   if (showRadio) drawRadioPanel(W - 460 * s, 126 * s);
   uiGlass = false;
@@ -1694,16 +1708,16 @@ void Game::drawSettings(float x, float y, float w, float h) {
   float py = y;
   g_ren.text(x, py, 24 * s, "Settings", C_TEXT, 1);
   {  // page tabs: general settings / controls, with a sliding underline
-    const char* pages[] = {"GENERAL", "CONTROLS"};
-    float tx = x + 150 * s, tw = 140 * s;
-    for (int i = 0; i < 2; i++) {
+    const char* pages[] = {"GENERAL", "CONTROLS", "JOYSTICK"};
+    float tx = x + 150 * s, tw = std::min(140 * s, (w - 150 * s - 16 * s) / 3.f);
+    for (int i = 0; i < 3; i++) {
       bool take = false;
       const bool foc = focusHere(0x5E7700u + (uint32_t)i, tx + i * (tw + 8 * s), py - 2 * s, tw, 32 * s, &take);
       bool hov = hovered(tx + i * (tw + 8 * s), py - 2 * s, tw, 32 * s) || foc;
       float hk = anim(uid(tx + i * tw, py, "stab"), hov ? 1.f : 0.f, 14);
       if (hk > 0.01f) g_ren.rectGrad(tx + i * (tw + 8 * s), py - 2 * s, tw, 32 * s, vec3(0.05f, 0.16f, 0.24f), vec3(0.02f, 0.06f, 0.1f), 0.8f * hk, 3 * s);
       g_ren.text(tx + i * (tw + 8 * s) + tw * 0.5f, py + 6 * s, 15 * s, pages[i], settingsPage == i ? C_TEXT : mixc(C_DIM, C_TEXT, hk), 1, 1, false);
-      if (((hov && in.mPressed[0]) || take) && settingsPage != i) { settingsPage = i; bindCapture = -1; g_audio.trigger(SFX_CLICK); }
+      if (((hov && in.mPressed[0]) || take) && settingsPage != i) { settingsPage = i; bindCapture = -1; axisCapture = -1; g_audio.trigger(SFX_CLICK); }
     }
     float ux = anim(0x5e77u, tx + settingsPage * (tw + 8 * s), 14);
     g_ren.glow(ux + 10 * s, py + 28 * s, tw - 20 * s, 2.5f * s, C_ACCENT, 0.5f, 1.2f * s, 7 * s);
@@ -1711,6 +1725,7 @@ void Game::drawSettings(float x, float y, float w, float h) {
   }
   py += 44 * s;
   if (settingsPage == 1) { drawControls(x, py, w, y + h - py); return; }
+  if (settingsPage == 2) { drawJoystick(x, py, w, y + h - py); return; }
   header(x, py, std::min(w, 620 * S()), "DISPLAY / AUDIO / CONTROLS"); py += 28 * s;
   // the controls scroll in a clipped region of their own (mouse wheel, the right stick; keyboard or D-pad focus scrolls
   // its control into view): every one stays reachable at any resolution and UI scale (the review of v3.31.0, U3: five
@@ -1828,12 +1843,22 @@ void Game::drawSettings(float x, float y, float w, float h) {
   (void)w;
 }
 
-// Controls page: every rebindable action with its keyboard key and gamepad button. Click a cell and press the new
-// key / button (Esc or Menu cancels, right-click clears); a key already used in the same group swaps over.
+// A joystick button binding's name: its number (a hat's direction), and its device when that isn't the only one there
+std::string Game::joyButtonLabel(const JoyButtonBind& b) const {
+  if (!b.bound()) return "--";
+  static const char* hat[] = {"UP", "RIGHT", "DOWN", "LEFT"};
+  std::string l = b.button >= 120 ? fmt("HAT%d %s", (b.button - 120) / 4 + 1, hat[(b.button - 120) % 4]) : fmt("B%d", b.button + 1);
+  const int d = joyFind(in.joys, b.dev, b.devName);
+  if (d < 0) return l + " (absent)";
+  return in.joys.size() > 1 ? l + "  " + b.devName : l;
+}
+
+// Controls page: every rebindable action with its keyboard key, gamepad button and joystick button. Click a cell and
+// press the new key / button (Esc or Menu cancels, right-click clears); one already used in the same group swaps over.
 void Game::drawControls(float x, float y, float w, float h) {
   float s = S(), rowH = 32 * s;
-  float nameW = std::min(330 * s, w * 0.42f), cellW = std::min(170 * s, (w - nameW - 40 * s) * 0.5f);
-  float kx = x + nameW, px = kx + cellW + 12 * s;
+  float nameW = std::min(290 * s, w * 0.34f), cellW = std::min(170 * s, (w - nameW - 52 * s) / 3.f);
+  float kx = x + nameW, px = kx + cellW + 12 * s, jx = px + cellW + 12 * s;
   // column titles with device glyphs
   g_ren.text(x, y, 12 * s, "ACTION", C_DIM, 1, 0, false);
   g_ren.rect(kx + 2 * s, y + 1 * s, 16 * s, 10 * s, C_ACCENT, 0.0f); g_ren.rectOutline(kx, y, 18 * s, 12 * s, C_ACCENT, 0.7f, 2 * s, 1 * s);
@@ -1843,7 +1868,10 @@ void Game::drawControls(float x, float y, float w, float h) {
   g_ren.rect(px, y + 1 * s, 20 * s, 11 * s, C_ACCENT, 0.0f); g_ren.rectOutline(px, y + 1 * s, 20 * s, 11 * s, C_ACCENT, 0.7f, 5 * s, 1 * s);
   g_ren.rect(px + 4 * s, y + 5.5f * s, 5 * s, 1.5f * s, C_ACCENT, 0.8f); g_ren.rect(px + 5.75f * s, y + 3.75f * s, 1.5f * s, 5 * s, C_ACCENT, 0.8f);
   g_ren.rect(px + 13 * s, y + 4 * s, 2.5f * s, 2.5f * s, C_ACCENT, 0.8f, 1.25f * s); g_ren.rect(px + 15.5f * s, y + 6.5f * s, 2.5f * s, 2.5f * s, C_ACCENT, 0.8f, 1.25f * s);
-  g_ren.text(px + 28 * s, y, 12 * s, in.pad ? "CONTROLLER  (CONNECTED)" : "CONTROLLER", in.pad ? C_GOOD : C_ACCENT, 1, 0, false);
+  g_ren.text(px + 28 * s, y, 12 * s, in.pad ? "CONTROLLER  (ON)" : "CONTROLLER", in.pad ? C_GOOD : C_ACCENT, 1, 0, false);
+  g_ren.rect(jx + 7 * s, y + 3 * s, 4 * s, 9 * s, C_ACCENT, 0.8f, 1 * s); g_ren.rect(jx + 3 * s, y + 9 * s, 12 * s, 3 * s, C_ACCENT, 0.8f, 1 * s);   // (a stick on its base)
+  g_ren.rect(jx + 6 * s, y, 6 * s, 4 * s, C_ACCENT, 0.8f, 2 * s);
+  g_ren.text(jx + 22 * s, y, 12 * s, in.joys.empty() ? "JOYSTICK" : fmt("JOYSTICK  (%d ON)", (int)in.joys.size()), in.joys.empty() ? C_ACCENT : C_GOOD, 1, 0, false);
   y += 22 * s;
   // flattened list: group headers + action rows, scrolled a row at a time
   struct Row { int group, act; };
@@ -1860,10 +1888,10 @@ void Game::drawControls(float x, float y, float w, float h) {
   const bool ctlWheeled = ctlScroll != ctlBefore;
   // (each cell is in the keyboard / D-pad walk, the rows scrolled out of view too: the walk moves into them and the list
   // follows the focus)
-  auto cellId = [](int act, int dev) { return 0xB1D00000u + (uint32_t)act * 2u + (uint32_t)dev; };
+  auto cellId = [](int act, int dev) { return 0xB1D00000u + (uint32_t)act * 3u + (uint32_t)dev; };
   ctlScroll = std::clamp(ctlScroll, 0, maxScroll);
   if (focusNav && focusId >= cellId(0, 0) && focusId < cellId(ACT_COUNT, 0)) {
-    const int act = (int)((focusId - cellId(0, 0)) / 2u), dev = (int)((focusId - cellId(0, 0)) % 2u);
+    const int act = (int)((focusId - cellId(0, 0)) / 3u), dev = (int)((focusId - cellId(0, 0)) % 3u);
     for (int i = 0; i < (int)rows.size(); i++) if (rows[i].act == act && (i < ctlScroll || i >= ctlScroll + visible)) {
       if (!ctlWheeled) { if (i < ctlScroll) ctlScroll = i; else ctlScroll = i - visible + 1; break; }
       // (the list scrolled away from the focus by the stick: it goes along, to the nearest action still shown)
@@ -1880,9 +1908,9 @@ void Game::drawControls(float x, float y, float w, float h) {
     const Row& r = rows[i];
     const bool shown = !(ry < listTop - 0.5f * s || ry > listTop + (visible - 1) * rowH + 0.5f * s);
     if (!shown) {   // (registered where it would be; the list is scrolling to it - Enter takes it already)
-      if (r.act >= 0) for (int dev = 0; dev < 2; dev++) {
+      if (r.act >= 0) for (int dev = 0; dev < 3; dev++) {
         const uint32_t id = cellId(r.act, dev);
-        focusList.push_back({id, dev ? px : kx, ry + 2 * s, cellW, rowH - 8 * s});
+        focusList.push_back({id, dev == 2 ? jx : dev ? px : kx, ry + 2 * s, cellW, rowH - 8 * s});
         if (focusNav && focusId == id && bindCapture < 0 && (in.pressed[K_ENTER] || in.pressed[' '])) {
           in.pressed[K_ENTER] = in.pressed[' '] = false; bindCapture = r.act; bindCaptureDev = dev; bindCaptureT = 0; g_audio.trigger(SFX_CLICK);
         }
@@ -1895,17 +1923,19 @@ void Game::drawControls(float x, float y, float w, float h) {
     float rh = anim(uid(x, (float)r.act, "crow"), rowHov ? 1.f : 0.f, 14);
     if (rh > 0.01f) g_ren.rectGrad(x - 6 * s, ry, w - 24 * s, rowH - 4 * s, vec3(0.04f, 0.12f, 0.18f), vec3(0.02f, 0.06f, 0.1f), 0.6f * rh, 3 * s);
     g_ren.text(x + 6 * s, ry + 6 * s, 15 * s, ai.name, mixc(C_DIM, C_TEXT, 0.6f + 0.4f * rh), 1);
-    for (int dev = 0; dev < 2; dev++) {
-      float cx = dev ? px : kx, cy = ry + 2 * s, cw = cellW, ch = rowH - 8 * s;
+    for (int dev = 0; dev < 3; dev++) {
+      float cx = dev == 2 ? jx : dev ? px : kx, cy = ry + 2 * s, cw = cellW, ch = rowH - 8 * s;
       bool cap = bindCapture == r.act && bindCaptureDev == dev;
       bool take = false;
       const bool foc = focusHere(cellId(r.act, dev), cx, cy, cw, ch, bindCapture < 0 ? &take : nullptr);
       bool hov = hovered(cx, cy, cw, ch) || foc;
       int k = set.keyBind[r.act]; unsigned b = set.padBind[r.act];
+      const JoyButtonBind& jb = set.joyBind[r.act];
       bool clash = false;
       for (int o = 0; o < ACT_COUNT; o++)
-        if (o != r.act && kActions[o].group == ai.group && (dev ? (b && set.padBind[o] == b) : (k && set.keyBind[o] == k))) clash = true;
-      bool isDef = dev ? b == ai.pad : k == ai.key;
+        if (o != r.act && kActions[o].group == ai.group &&
+            (dev == 2 ? (jb.bound() && set.joyBind[o].button == jb.button && set.joyBind[o].dev == jb.dev) : dev ? (b && set.padBind[o] == b) : (k && set.keyBind[o] == k))) clash = true;
+      bool isDef = dev == 2 ? !jb.bound() : dev ? b == ai.pad : k == ai.key;
       float hk = anim(uid(cx, (float)r.act, "cell"), hov || cap ? 1.f : 0.f, 16);
       vec3 ac = clash ? C_WARN : C_ACCENT;
       if (cap) {
@@ -1918,19 +1948,19 @@ void Game::drawControls(float x, float y, float w, float h) {
       } else {
         g_ren.rectGrad(cx, cy, cw, ch, mixc(C_BTN * 1.3f, C_BTN_HI * 1.3f, hk), mixc(C_BTN, C_BTN_HI, hk), 0.9f, 3 * s);
         g_ren.rectOutline(cx, cy, cw, ch, ac, 0.22f + 0.5f * hk + (clash ? 0.3f : 0.f), 3 * s, 1 * s);
-        std::string lbl = dev ? padName(b) : keyName(k);
-        bool none = dev ? !b : !k;
+        std::string lbl = dev == 2 ? ellipsize(joyButtonLabel(jb), cw - 24 * s, 13 * s) : dev ? padName(b) : keyName(k);
+        bool none = dev == 2 ? !jb.bound() : dev ? !b : !k;
         // keycap / button chip
         float tw = g_ren.textWidth(lbl, 13 * s) + 16 * s;
         float chx = cx + cw * 0.5f - tw * 0.5f;
         if (!none) {
-          g_ren.rect(chx, cy + 3 * s, tw, ch - 6 * s, ac, 0.12f + 0.1f * hk, dev ? (ch - 6 * s) * 0.5f : 2.5f * s);
+          g_ren.rect(chx, cy + 3 * s, std::min(tw, cw - 8 * s), ch - 6 * s, ac, 0.12f + 0.1f * hk, dev ? (ch - 6 * s) * 0.5f : 2.5f * s);
           g_ren.rect(chx, cy + ch - 4 * s, tw, 1 * s, ac, 0.5f);
         }
         g_ren.text(cx + cw * 0.5f, cy + ch * 0.5f - 7 * s, 13 * s, lbl, none ? C_DIM * 0.6f : clash ? C_WARN : C_TEXT, 1, 1, false);
         if (!isDef) g_ren.rect(cx + cw - 7 * s, cy + 4 * s, 3.5f * s, 3.5f * s, C_ACCENT, 0.9f, 1.75f * s);   // customised marker
         if ((hov && in.mPressed[0]) || take) { bindCapture = r.act; bindCaptureDev = dev; bindCaptureT = 0; g_audio.trigger(SFX_CLICK); }
-        if (hov && in.mPressed[1]) { if (dev) set.padBind[r.act] = 0; else set.keyBind[r.act] = 0; saveSettings(); g_audio.trigger(SFX_CLICK); }
+        if (hov && in.mPressed[1]) { if (dev == 2) set.joyBind[r.act] = JoyButtonBind(); else if (dev) set.padBind[r.act] = 0; else set.keyBind[r.act] = 0; saveSettings(); g_audio.trigger(SFX_CLICK); }
       }
     }
   }
@@ -1943,20 +1973,90 @@ void Game::drawControls(float x, float y, float w, float h) {
   g_ren.rect(x, fy, w - 30 * s, 1 * s, C_ACCENT, 0.2f);
   g_ren.text(x, fy + 10 * s, 12.5f * s, "FIXED   Arrows pitch/roll   PgUp/PgDn throttle   1-9, 0 set throttle   Right-drag look   Esc pause   F11 fullscreen", C_DIM, 0.85f, 0, false);
   g_ren.text(x, fy + 28 * s, 12.5f * s, "              Left stick pitch/roll   RT/LT throttle   Right stick look   Menu pause", C_DIM, 0.85f, 0, false);
-  g_ren.text(x, fy + 52 * s, 12.5f * s, bindCapture >= 0 ? "Esc / Menu cancels" : "Click a cell to rebind  //  right-click to clear", C_ACCENT, 0.9f, 0, false);
+  g_ren.text(x, fy + 52 * s, 12.5f * s, bindCapture >= 0 ? "Esc / Menu cancels" : "Click a cell to rebind  //  right-click to clear  //  joystick axes: the Joystick tab", C_ACCENT, 0.9f, 0, false);
   if (button(x + w - 30 * s - 190 * s, fy + 46 * s, 190 * s, 32 * s, "Reset to defaults")) { set.resetBindings(); bindCapture = -1; saveSettings(); }
+}
+
+// Settings -> Joystick: the joysticks, throttles and pedals connected, and the five flight axes - each bound by moving
+// the control, with its direction, dead zone and curve, and a live meter of what the aircraft gets
+void Game::drawJoystick(float x, float y, float w, float h) {
+  const float s = S();
+  float py = y;
+  header(x, py, w - 16 * s, "DEVICES"); py += 28 * s;
+  if (in.joys.empty()) {
+    g_ren.text(x + 6 * s, py, 14 * s, "No joystick, throttle or pedals connected. Plug one in: it is found at once.", C_DIM, 1); py += 22 * s;
+  } else for (size_t d = 0; d < in.joys.size() && d < 4; d++) {
+    const JoyState& j = in.joys[d];
+    g_ren.text(x + 6 * s, py, 14 * s, ellipsize(j.name, w * 0.55f, 14 * s), C_TEXT, 1);
+    g_ren.text(x + w * 0.6f, py, 13 * s, j.hats ? fmt("%d axes, %d buttons, %d hat%s", j.axes, j.buttons, j.hats, j.hats > 1 ? "s" : "") : fmt("%d axes, %d buttons", j.axes, j.buttons), C_DIM, 1);
+    py += 20 * s;
+  }
+  py += 8 * s;
+  header(x, py, w - 16 * s, "FLIGHT AXES"); py += 30 * s;
+  const float rowH = std::min(62 * s, std::max(48 * s, (y + h - py - 40 * s) / AX_COUNT));
+  const float bx = x + std::min(210 * s, w * 0.27f), bw = std::min(270 * s, w * 0.36f), mx = bx + bw + 16 * s, mw = std::max(40 * s, x + w - 16 * s - mx);
+  const float u = std::min(1.f, (w - 32 * s) / (600 * s));   // (the second line's controls, narrower in a small window)
+  for (int i = 0; i < AX_COUNT; i++) {
+    AxisBind& b = set.axisBind[i];
+    const bool lever = kFlightAxes[i].unipolar;
+    const int d = b.bound() ? joyFind(in.joys, b.dev, b.devName) : -1;
+    g_ren.text(x + 6 * s, py + 5 * s, 15 * s, kFlightAxes[i].name, C_TEXT, 1);
+    // the binding: click and move the control; right-click clears
+    const bool cap = axisCapture == i;
+    std::string lbl = !b.bound() ? std::string("Not set - click, then move it") : std::string(joyAxisName(b.axis)) + "  -  " + b.devName + (d < 0 ? "  (absent)" : "");
+    if (cap) {
+      const float pulse = 0.5f + 0.5f * sinf(realTime * 7.f);
+      g_ren.glow(bx, py, bw, 28 * s, C_ACCENT, 0.25f + 0.25f * pulse, 3 * s, 10 * s);
+      g_ren.rectGrad(bx, py, bw, 28 * s, C_ACCENT * 0.5f, C_ACCENT * 0.25f, 0.95f, 3 * s);
+      static const char* ask[AX_COUNT] = {"PULL THE STICK RIGHT BACK", "STICK FULLY RIGHT", "FULL RIGHT RUDDER", "PUSH THE LEVER TO FULL", "PRESS THE BRAKES FULLY"};
+      g_ren.text(bx + bw * 0.5f, py + 7 * s, 12 * s, ask[i], C_TEXT, 0.7f + 0.3f * pulse, 1, false);   // (the way it moves sets its direction)
+      g_ren.rect(bx, py + 26 * s, bw * clampf(1.f - bindCaptureT / 8.f, 0, 1), 2 * s, C_TEXT, 0.8f);
+    } else if (button(bx, py, bw, 28 * s, ellipsize(lbl, bw - 20 * s, 13 * s) + "##axis-bind-" + std::to_string(i), true, false) && axisCapture < 0) {
+      axisCapture = i; bindCaptureT = 0;
+      axisCaptureRest.assign(in.joys.size(), {});
+      for (size_t k = 0; k < in.joys.size(); k++) for (int a = 0; a < kJoyAxes; a++) axisCaptureRest[k][a] = in.joys[k].axis[a];
+    }
+    if (hovered(bx, py, bw, 28 * s) && in.mPressed[1]) { b = AxisBind(); saveSettings(); g_audio.trigger(SFX_CLICK); }
+    // the live meter: what the aircraft gets (the bar) and where the control is (the tick)
+    g_ren.rect(mx, py + 10 * s, mw, 8 * s, C_ACCENT, 0.14f, 4 * s);
+    if (d >= 0) {
+      const float raw = in.joys[d].axis[b.axis] * (b.invert ? -1.f : 1.f), v = shapeAxis(in.joys[d].axis[b.axis], b, lever);
+      if (lever) g_ren.rect(mx, py + 10 * s, mw * v, 8 * s, C_ACCENT, 0.85f, 4 * s);
+      else { const float c = mx + mw * 0.5f, e = c + mw * 0.5f * v; g_ren.rect(std::min(c, e), py + 10 * s, fabsf(e - c), 8 * s, C_ACCENT, 0.85f, 2 * s); g_ren.rect(c - 0.5f * s, py + 6 * s, 1 * s, 16 * s, C_DIM, 0.8f); }
+      g_ren.rect(mx + mw * (raw + 1.f) * 0.5f - 1 * s, py + 5 * s, 2 * s, 18 * s, C_TEXT, 0.9f);
+      g_ren.text(mx + mw, py - 9 * s, 11 * s, lever ? fmt("%.0f%%", v * 100.f) : fmt("%+.0f%%", v * 100.f), C_DIM, 1, 2, false);
+    }
+    // the second line: direction, dead zone, curve, clear
+    float lx = x + 16 * s, ly = py + 32 * s, lh = std::min(24 * s, rowH - 36 * s), sw = 26 * s * u, vw = 128 * s * u;
+    const std::string sfx = "##axis-" + std::to_string(i);
+    if (button(lx, ly, 120 * s * u, lh, std::string(b.invert ? "Reversed" : "Normal") + sfx + "-inv")) { b.invert = !b.invert; saveSettings(); }
+    lx += 120 * s * u + 14 * s * u;
+    auto stepper = [&](const char* what, float& v, float step, float lo, float hi) {
+      if (button(lx, ly, sw, lh, "-" + sfx + what + "-")) { v = clampf(roundf((v - step) / step) * step, lo, hi); saveSettings(); }
+      g_ren.text(lx + sw + vw * 0.5f, ly + lh * 0.5f - 6.5f * s, 12.5f * s, fmt("%s %.0f%%", what, v * 100.f), C_TEXT, 1, 1, false);
+      if (button(lx + sw + vw, ly, sw, lh, "+" + sfx + what + "+")) { v = clampf(roundf((v + step) / step) * step, lo, hi); saveSettings(); }
+      lx += 2 * sw + vw + 14 * s * u;
+    };
+    stepper(lever ? "Ends" : "Dead zone", b.dead, 0.01f, 0.f, 0.45f);
+    stepper("Curve", b.curve, 0.1f, 0.f, 1.f);
+    if (b.bound() && button(lx, ly, 80 * s * u, lh, "Clear" + sfx + "-clear")) { b = AxisBind(); saveSettings(); }
+    py += rowH;
+  }
+  g_ren.text(x, std::min(py + 4 * s, y + h - 16 * s), 12 * s, "Keys and the gamepad keep working alongside. A throttle lever takes over when it moves; a key or trigger takes it back.", C_DIM, 0.85f, 0, false);
 }
 
 void Game::drawRadioPanel(float x, float y) {
   float s = S();
   const int rows = std::min((int)stations.size(), std::max(4, (int)((g_ren.H - y - 140 * s) / (34 * s))));
-  const int visible = std::min(rows, 12);
+  const bool none = stations.empty();
+  const int visible = none ? 3 : std::min(rows, 12);   // (an empty list: the room says how to add stations)
   float w = 440 * s, h = (118 + 34 * visible) * s;
   radioRect[0] = x; radioRect[1] = y; radioRect[2] = w; radioRect[3] = h;   // (next frame's widgets beneath it keep off)
   radioDrawing = true;
   struct Done { bool& f; ~Done() { f = false; } } done{radioDrawing};
   panel(x, y, w, h, 0.92f);
   g_ren.text(x + 18 * s, y + 14 * s, 20 * s, "Internet Radio", C_TEXT, 1);
+  if (button(x + 196 * s, y + 12 * s, 90 * s, 26 * s, "Reload")) { loadStations(); radioScroll = 0; }   // (the list as the file now has it)
   if (radio.state() == Radio::PLAYING)  // live equaliser bars
     for (int i = 0; i < 12; i++) { float bh = (0.3f + 0.7f * fabsf(sinf(realTime * (3.1f + i * 0.7f) + i * 1.3f))) * 16 * s; g_ren.rect(x + w - 120 * s + i * 8 * s, y + 34 * s - bh, 5 * s, bh, C_ACCENT, 0.8f, 1 * s); }
   vec3 sc = radio.state() == Radio::PLAYING ? C_GOOD : radio.state() == Radio::FAILED ? C_BAD : C_DIM;
@@ -1977,6 +2077,15 @@ void Game::drawRadioPanel(float x, float y) {
       set.radioStation = i; radio.setVolume(radioLevel()); radio.play(stations[i].second); saveSettings();
     }
     py += 34 * s;
+  }
+  if (none) {   // no stations: none ship with the game, so the player adds their own
+    const std::string file = saveDir.empty() ? std::string("radio_stations.txt in the game folder")
+                           : saveDir + (saveDir.find('\\') != std::string::npos ? "\\" : "/") + "radio_stations.txt";   // (Windows' own separator for Explorer)
+    g_ren.text(x + 18 * s, listY + 2 * s, 15 * s, "No stations yet.", C_TEXT, 1);
+    g_ren.text(x + 18 * s, listY + 24 * s, 13 * s, "Add one per line, as  Name|URL , to", C_DIM, 1);
+    g_ren.text(x + 18 * s, listY + 44 * s, 12 * s, ellipsize(file, w - 36 * s, 12 * s), C_ACCENT, 1, 0, false);
+    if (platformOpen && !saveDir.empty() && button(x + 14 * s, listY + 68 * s, 160 * s, 30 * s, "Edit station list")) { loadStations(); platformOpen(file); }
+    py = listY + listH;
   }
   if (maxScroll > 0) {  // scrollbar
     float sx = x + w - 28 * s;
@@ -2607,7 +2716,7 @@ void Game::drawHud(const FrameParams& fp) {
   }
   // (the radio: under the tower recall on the left)
   if (showRadio) drawRadioPanel(cockpit ? 16 * s : rail + 12 * s, msgTop + 110 * s);
-  else if (radio.state() == Radio::PLAYING) g_ren.text(cockpit ? 16 * s : rail + 12 * s, msgTop + 110 * s, 11 * s, "RADIO  " + stations[std::clamp(set.radioStation, 0, (int)stations.size() - 1)].first, C_DIM, 0.8f, 0, false);
+  else if (radio.state() == Radio::PLAYING && !stations.empty()) g_ren.text(cockpit ? 16 * s : rail + 12 * s, msgTop + 110 * s, 11 * s, "RADIO  " + stations[std::clamp(set.radioStation, 0, (int)stations.size() - 1)].first, C_DIM, 0.8f, 0, false);
 }
 
 // Liang-Barsky clip of a segment to a rectangle; false when fully outside
@@ -2883,11 +2992,11 @@ void Game::drawPause() {
   float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
   g_ren.rect(0, 0, W, H, vec3(0, 0, 0), 0.55f);
   if (settingsFromPause) {
-    float pw = std::min((settingsPage == 1 ? 940 : 760) * s, W - 40 * s);
+    float pw = std::min((settingsPage >= 1 ? 940 : 760) * s, W - 40 * s);
     panel(W * 0.5f - pw * 0.5f, 60 * s, pw, H - 120 * s, 0.95f);
-    drawSettings(W * 0.5f - pw * 0.5f + 24 * s, 80 * s, pw - 48 * s, H - 160 * s - (settingsPage == 1 ? 0 : 50 * s));
+    drawSettings(W * 0.5f - pw * 0.5f + 24 * s, 80 * s, pw - 48 * s, H - 160 * s - (settingsPage >= 1 ? 0 : 50 * s));
     if (settingsPage == 0 && button(W * 0.5f + pw * 0.5f - 180 * s, H - 120 * s - 58 * s, 150 * s, 42 * s, "Back", true, true)) settingsFromPause = false;
-    if (settingsPage == 1 && button(W * 0.5f - pw * 0.5f + 24 * s, H - 120 * s - 4 * s - 48 * s, 150 * s, 36 * s, "Back", true, true)) { settingsFromPause = false; bindCapture = -1; }
+    if (settingsPage >= 1 && button(W * 0.5f - pw * 0.5f + 24 * s, H - 120 * s - 4 * s - 48 * s, 150 * s, 36 * s, "Back", true, true)) { settingsFromPause = false; bindCapture = -1; axisCapture = -1; }
     return;
   }
   const bool combatPractice=researchFlight && resCard<0 && specIdx==kSomnus;
@@ -2899,7 +3008,12 @@ void Game::drawPause() {
   float by = y + 112 * s, bw = 350 * s, bh = 46 * s;
   if (button(x + 30 * s, by, bw, bh, "Resume", true, true)) paused = false;
   by += bh + 12 * s;
-  if (button(x + 30 * s, by, bw, bh, "Restart flight")) restartFlight();
+  if (button(x + 30 * s, by, bw * 0.48f, bh, "Restart flight")) restartFlight();
+  if (button(x + 30 * s + bw * 0.52f, by, bw * 0.48f, bh, "Report a problem")) {   // (what was happening, beside the logs: the playtest kit)
+    const std::string r = writeProblemReport();
+    if (r.empty()) toast("Couldn't write the report (the save folder isn't writable)", vec3(1.f, 0.45f, 0.35f), false);
+    else { toast("Report written beside the logs: describe what happened, then send it", vec3(0.6f, 1.f, 0.7f), false); if (platformOpen) platformOpen(r); }
+  }
   by += bh + 12 * s;
   if (button(x + 30 * s, by, bw * 0.48f, bh, "Settings")) { settingsFromPause = true; settingsPage = 0; }
   if (button(x + 30 * s + bw * 0.52f, by, bw * 0.48f, bh, "Controls")) { settingsFromPause = true; settingsPage = 1; }

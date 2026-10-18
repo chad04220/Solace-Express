@@ -16,7 +16,7 @@ THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
 
 ## Internet radio
 
-Stations listed in `radio_stations.txt` are third-party services streamed live at the player's request. Somnium Volandi does not host, cache or redistribute any audio. Check each station's terms before featuring them in marketing material.
+No stations ship with the game. Stations the player adds to `radio_stations.txt` are third-party services streamed live at the player's request; Somnium Volandi does not host, cache or redistribute any audio.
 
 ## Voices (`voice/`)
 

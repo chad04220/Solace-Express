@@ -83,6 +83,8 @@ One batch file, `diagnostics.bat`, next to `SomniumVolandi.exe`:
 | `diagnostics.bat shots` | the screenshots only |
 | `diagnostics.bat menu [kbps]` | `menu.mp4`: the main-menu montage pre-rendered, played on the menu instead of rendering it live |
 | `diagnostics.bat loading` | the loading-screen pictures in `loading\` |
+| `diagnostics.bat soak [min]` | `soak.txt`: one long session (120 minutes by default), the frame rate, memory and handles every 10 s, and whether anything grew |
 
-Logs: `%APPDATA%\SomniumVolandi\startup.log` (GPU, shader cache, shader errors). Saves and settings are in the same
-folder (`career.sav` with its `.bak`, `settings.cfg`, `radio_stations.txt`).
+Logs: `%APPDATA%\SomniumVolandi\startup.log` (GPU, joysticks, shader cache, shader errors). Saves and settings are in
+the same folder (`career.sav` with its `.bak`, `settings.cfg`, `joystick.cfg`, `radio_stations.txt`), with crash
+reports in its `crash` folder and the pause menu's problem reports (`report_<time>.txt`).

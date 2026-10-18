@@ -1,3 +1,55 @@
+## What's new in v3.50.0
+
+### Every aircraft has a new name
+All fifteen aircraft now have names of their own. This changes everywhere: the hangar, the job board, the cockpit voices, the radio calls and the research terminal. Nyx and the display pair say the new names, in the same voices as before.
+
+| Was | Now |
+|---|---|
+| Kestrel T2 | Dawnlark T2 |
+| Wren 180 | Ambler 180 |
+| Bushmaster STOL | Scrubrunner STOL |
+| Islander Twin | Skerry Twin |
+| Pelican Caravan | Longshore Hauler |
+| Meridian Q400 | Archipel 400 |
+| Starling 500 Jet | Emissary 500 |
+| Swift S6 | Cutwater S6 |
+| Osprey C6 | Wavecrest C6 |
+| Larkspur L4 | Thistledown L4 |
+| Atlas A180 | Galleon 180 |
+| XR-10 Nightjar | XR-10 Vigil |
+| XR-20 Mantis | XR-20 Reverie |
+| XR-30 Specter | XR-30 Nocturne |
+| XR-40 Wraith | XR-40 Somnus |
+
+The O + P display pair is now the **Nocturne display pair**.
+
+### Joysticks, throttles and pedals
+- **Any flight stick, throttle, HOTAS or rudder pedals now works**, alongside the keyboard and gamepad. The first joystick you plug in flies pitch and roll straight away.
+- **Settings → Joystick** binds pitch, roll, yaw (rudder), throttle and the wheel brakes (toe brakes): click one and move the control. Each axis has its own direction, dead zone and curve, with a live meter.
+- **Any action can have a joystick button** or hat direction, in a new column on the Controls page.
+- **A throttle lever takes over when you move it**, and a throttle key or trigger takes it back until you move it again.
+- A bound joystick unplugged in flight pauses the game, as a gamepad does.
+
+### When something goes wrong
+- **Crash reports:** if the game crashes, it saves a crash report (a dump, a summary and the log) in `%APPDATA%\SomniumVolandi\crash`. The next start tells you, with a button to open the folder. Nothing is uploaded.
+- **Report a problem**, in the pause menu, writes down what was happening (the aircraft, where it was, the weather, the last messages) and opens it for you to add what went wrong.
+- **`diagnostics.bat soak`** runs a two-hour session and checks that nothing slows down or grows.
+
+### The XR-40 no longer freezes
+- **The first bomb drop and the first switch to the cockpit no longer freeze the game.** The loading screen now draws the flight's views once (inside, outside, the XR-40's stores and a blast) before the flight opens, so the graphics driver finishes preparing them first.
+
+### Realistic g limits
+- **Civil aircraft now break at their certification category's limits**: the tourers +3.8 g, the Scrubrunner and Cutwater +4.4 g, the aerobatic Dawnlark +6 g, the Emissary +3.0 g and the airliners +2.5 g. Aerobatics declines a figure the airframe isn't built for.
+- **The research craft take far more**: the XR-10 +45 g, the XR-20 ±34 g, the XR-30 ±180 g and the XR-40 ±300 g.
+
+### Other changes
+- **No radio stations come with the game.** Add your own: the radio panel's **Edit station list** opens the file, and **Reload** picks up your changes. A list you already have is kept.
+- **The release now includes an end user licence agreement (`EULA.md`) and a privacy notice (`PRIVACY.md`).** In short, the game keeps everything on your computer and sends nothing.
+
+### Good to know
+- **Careers from earlier versions don't load.** The saved aircraft use their old names. The game keeps the old save as `career.sav.damaged` and starts a new career.
+- **Joysticks have been tested only with simulated devices**, not with real hardware on Windows. Please try yours: bind each axis, check the directions and the throttle lever, and tell me what your device is called and anything that doesn't respond.
+
 ## What's new in v3.49.8
 
 ### Spatial audio (prepared by Codex)
