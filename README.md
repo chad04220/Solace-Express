@@ -183,7 +183,7 @@ What the game checks, and what has been measured. A verified minimum and recomme
 
 - **Checked at start:** Windows 10 or 11, 64-bit, and a graphics driver with OpenGL 3.3 (core profile) and at least 22 texture units per shader. If the driver falls short, the game says so and names the fix: update the driver, or run on the dedicated GPU.
 - **Disk use:** about 0.5 GB unpacked, estimated from this build's files. Of that, the voices take 44 MB, the material textures 74 MB, the loading pictures 4 MB, and the ready-built aircraft bodies most of the rest. The first launch also builds a cache of compiled shaders and the islands in `%LOCALAPPDATA%\SomniumVolandi`; `diagnostics.bat` reports its size.
-- **Measured memory:** a long headless session (the `soak` test: twelve legs over every career type and the XR-40) holds at about 170 MB with no growth. The rendered game uses more, and its figure for your PC is in `diagnostics.bat soak`.
+- **Measured memory:** a long headless session (the `soak` test: every career type and the XR-40, with the tower voices; 200 legs before a release) settles at about 225 MB. It rises over the first 30 or so legs, as each tower voice line is kept once it has been played, then holds. The rendered game uses more, and its figure for your PC is in `diagnostics.bat soak`.
 - **Not yet measured:** frame rates on a range of GPUs. The benchmark (`diagnostics.bat`) measures them on your PC, every scene at 1920x1080.
 
 ### How it runs

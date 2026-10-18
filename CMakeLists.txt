@@ -406,6 +406,7 @@ add_test(NAME entity_raycast COMMAND entity_raycast_test)
 add_test(NAME world_cache COMMAND world_cache_test WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 target_compile_definitions(gameplay_test PRIVATE SOMNIUM_ASSETS="${CMAKE_SOURCE_DIR}/assets")
 target_compile_definitions(military_gameplay_test PRIVATE SOMNIUM_ASSETS="${CMAKE_SOURCE_DIR}/assets")
+target_compile_definitions(soak_test PRIVATE SOMNIUM_ASSETS="${CMAKE_SOURCE_DIR}/assets")
 # the game loop end to end in four parts run side by side (tests/gameplay_test.cpp --part: under the sanitizers the
 # whole of it took 16 minutes on its own), each in a folder of its own - they save careers and settings where they run
 foreach(part 1 2 3 4)
