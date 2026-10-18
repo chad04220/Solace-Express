@@ -6,13 +6,21 @@
 // released version have to keep working.
 #include "../src/career.h"
 #include "test_world.h"
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
 static int fails = 0;
 static void check(bool c, const char* what) { if (!c) { printf("  !! %s\n", what); fails++; } }
-static std::string readFile(const std::string& p) { std::string s; FILE* f = fopen(p.c_str(), "rb"); if (!f) return s; char b[4096]; size_t n; while ((n = fread(b, 1, sizeof b, f)) > 0) s.append(b, n); fclose(f); return s; }
+// the file's text with its line ends as \n: Windows writes a save in text mode (\r\n), and the fixture is checked out with
+// either (the loader reads both: the format is its lines)
+static std::string readFile(const std::string& p) {
+  std::string s; FILE* f = fopen(p.c_str(), "rb"); if (!f) return s;
+  char b[4096]; size_t n; while ((n = fread(b, 1, sizeof b, f)) > 0) s.append(b, n); fclose(f);
+  s.erase(std::remove(s.begin(), s.end(), '\r'), s.end());
+  return s;
+}
 
 // equal, or where they part: the first line that differs
 static bool same(const std::string& got, const std::string& want) {
