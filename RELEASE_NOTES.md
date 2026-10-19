@@ -1,5 +1,9 @@
 ## What's new in v3.50.3
 
+### Checkpoints
+- **The checkpoint marker no longer draws over your aircraft or the HUD.** The magenta diamond, its distance label and the dashed line down to the ground now go behind the aircraft wherever the airframe is in front of them. In the cockpit, the windscreen frame and the instrument panel hide them too, so you only see the marker through the glass. Every HUD panel, the map and the menus now draw over it. When the checkpoint is off-screen, the arrow at the screen's edge also stays under the HUD panels.
+- **A new route from checkpoint to checkpoint.** The sparse dotted trail is gone. A smooth neon lane now curves from each gate to the next: it leaves each gate the way the gate faces, and it climbs or descends between gates in a gentle S. Chevrons flow along it toward the next gate, and a slow wave of light runs the same way. Its edges stay sharp at any distance and any resolution. It keeps its colour against a bright sky and hides behind terrain and aircraft. The leg you're flying now is shown too, from the gate you just passed, so you can follow it into the next gate; the legs after that are fainter.
+
 ### The first start after an update, measured
 - **v3.50.2's side-by-side compiling was faster, but not by as much as expected.** On the RTX 3070 laptop the aircraft's shader programs took 105 seconds, down from 156 seconds one after another, instead of the estimated 35. Each helper compiled every program two to three times slower than the game itself does, even the last one when it was compiling alone.
 - **The helpers now ask Windows to run them at full speed.** Windows can run a process that has no window of its own in a power-saving mode, at lower clock speeds. That may be what slowed them down.

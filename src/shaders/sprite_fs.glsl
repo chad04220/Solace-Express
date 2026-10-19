@@ -59,6 +59,26 @@ void main(){
     vec3 n = normalize(vec3(0.0, c.y, sqrt(max(1.0 - c.y*c.y, 0.0))));
     float l = 0.6 + 0.4*max(dot(n, normalize(uSunDir + vec3(0,0.3,0))), 0.0);
     o = vec4(vCol.rgb*(uSunCol*l*1.2*max(uSunDir.y+0.1,0.0) + uAmb), vCol.a*a*wisp);
+  } else if (kind == 11) { // checkpoint route (alpha-blended, so it keeps its colour over a bright sky): a ribbon from
+    // gate to gate (u: along it, in chevron spacings; v across). A dark translucent body, a soft core and a fine neon
+    // rail at each edge, chevrons flowing on toward the next gate between them - a sharp bright front, a fading tail -
+    // and a slow wave of light running the same way; far off, a few pixels across, one soft line. Every edge is
+    // anti-aliased by its own pixel size, and the chevrons fade as they crowd into a pixel. Layered front to back
+    // (premultiplied), then divided out for the blend
+    float y = abs(c.y), px = max(fwidth(c.y), 1e-4);   // (px: a pixel, in half-widths)
+    float detail = 1.0 - smoothstep(0.18, 0.45, px);
+    float wave = 0.8 + 0.2*sin(vUV.x*0.4 - uTime*2.2);
+    float th = max(0.04, 0.6*px), rail = (1.0 - smoothstep(th - 0.5*px, th + 0.5*px, abs(y - 0.86)))*min(1.0, 0.07/th);
+    float ph = vUV.x + 0.55*y - uTime*1.4, pw = max(fwidth(ph), 1e-4), band = fract(ph);
+    float chev = smoothstep(0.42, 0.9, band)*(1.0 - smoothstep(0.92 - pw, 0.92 + pw, band))*(1.0 - smoothstep(0.64, 0.74, y));
+    chev *= (1.0 - smoothstep(0.18, 0.4, pw))*detail;
+    vec3 hue = vCol.rgb;
+    vec4 P = vec4(hue*0.06, 1.0)*0.24*(1.0 - smoothstep(0.84, 0.9, y))*detail;                        // body
+    float ac = exp(-y*y*9.0)*mix(0.85, 0.3, detail); P = vec4(hue*1.5*wave, 1.0)*ac + P*(1.0 - ac);   // core (the far line)
+    float ar = rail*0.95*detail; P = vec4(hue*2.2*wave, 1.0)*ar + P*(1.0 - ar);                       // rails
+    float ah = chev*0.95; P = vec4(mix(hue, vec3(1.0), 0.3)*2.6*wave, 1.0)*ah + P*(1.0 - ah);          // chevrons
+    P *= 1.0 - smoothstep(0.93, 1.0, y);
+    o = vec4(P.rgb/max(P.a, 1e-4), P.a*vCol.a);
   } else if (kind == 3) { // rain streak (a colour past 1 is light on it: a landing light's beam, lightning)
     float a = smoothstep(1.0, 0.0, abs(c.x)) * smoothstep(1.0, 0.6, abs(c.y));
     // (by daylight; at night hardly seen but where a light catches them)

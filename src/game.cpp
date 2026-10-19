@@ -4248,7 +4248,49 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
     if (landingLight && plane.engineRunning && camMode != 1)
       bill(add, plane.pos + plane.q.rotate(vec3(s.engLayout == 0 ? -s.span * 0.25f : 0, s.engLayout == 0 ? s.wingY * s.fusRad : -s.fusRad * 0.6f, s.engLayout == 0 ? s.wingZ - s.chord * 0.5f : -0.35f * s.fusLen)), ls * 1.8f,
            vec3(1.f, 0.95f, 0.85f) * (1.f + 4.f * night) * glint, 1, SPR_GLOW, 0.3f);
-    // checkpoint gates: the active one spins, breathes and shows a moving breadcrumb trail to the next gate
+    // the route from gate to gate (SPR_ROUTE): a curve leaving each gate the way it faces and arriving at the next the
+    // same way (cubic Hermite, level at both ends: a climb or a descent between them is an S), drawn as a ribbon of
+    // light turned to the camera - 8 m wide, never thinner than a few pixels - with chevrons flowing along it toward
+    // the next gate (sprite_fs.glsl); it grows out of each gate's centre and fades as the camera nears it
+    const float focal = 0.5f * g_ren.H / tanf(0.5f * std::max(fp.fovY, 0.05f));   // (pixels per metre at a metre)
+    std::vector<vec3> rp; std::vector<float> rs;
+    auto route = [&](vec3 p0, vec3 ax0, vec3 p1, vec3 ax1, vec3 col, float a) {
+      const vec3 up(0, 1, 0);
+      const float lh = length(vec3(p1.x - p0.x, 0, p1.z - p0.z));
+      if (lh < 1.f) return;
+      const vec3 t0 = normalize(cross(up, ax0)) * (lh * 0.9f), t1 = normalize(cross(up, ax1)) * (lh * 0.9f);
+      const int n = std::min(420, std::max(32, (int)(lh / 9.f)));
+      rp.resize(n + 1); rs.resize(n + 1);
+      for (int k = 0; k <= n; k++) {
+        const float u = (float)k / n, u2 = u * u, u3 = u2 * u;
+        rp[k] = p0 * (2 * u3 - 3 * u2 + 1) + t0 * (u3 - 2 * u2 + u) + p1 * (3 * u2 - 2 * u3) + t1 * (u3 - u2);
+        rs[k] = k ? rs[k - 1] + length(rp[k] - rp[k - 1]) : 0.f;
+      }
+      const float total = rs[n];
+      vec3 side = normalize(cross(rp[1] - rp[0], up)), pl, pr; float pa = 0, pu = 0;
+      for (int k = 0; k <= n; k++) {
+        const vec3 d = rp[std::min(k + 1, n)] - rp[std::max(k - 1, 0)], view = rp[k] - fp.camPos;
+        const float dist = length(view);
+        vec3 sd = cross(d, view); const float sl = length(sd);
+        if (sl > 1e-3f * length(d) * dist) side = sd * (1.f / sl);   // (seen end-on: the last side kept)
+        const float hw = std::max(4.f, 2.5f * dist / focal);
+        const vec3 l = rp[k] - side * hw, r = rp[k] + side * hw;
+        const float fa = a * smoothstepf(0.f, 70.f, rs[k]) * smoothstepf(0.f, 70.f, total - rs[k]) * smoothstepf(20.f, 140.f, dist);
+        const float uu = rs[k] / 30.f;   // (one chevron every 30 m)
+        if (k && (fa > 0.f || pa > 0.f)) {
+          SpriteVert q[4] = {{pl.x, pl.y, pl.z, pu, 0, col.x, col.y, col.z, pa, (float)SPR_ROUTE, 2.f}, {pr.x, pr.y, pr.z, pu, 1, col.x, col.y, col.z, pa, (float)SPR_ROUTE, 2.f},
+                             {r.x, r.y, r.z, uu, 1, col.x, col.y, col.z, fa, (float)SPR_ROUTE, 2.f}, {l.x, l.y, l.z, uu, 0, col.x, col.y, col.z, fa, (float)SPR_ROUTE, 2.f}};
+          alpha.push_back(q[0]); alpha.push_back(q[1]); alpha.push_back(q[2]); alpha.push_back(q[0]); alpha.push_back(q[2]); alpha.push_back(q[3]);
+        }
+        pl = l; pr = r; pa = fa; pu = uu;
+      }
+    };
+    // the route: the leg being flown (from the gate just passed), brightest, then on through the next two gates
+    for (int i = std::max(wpIndex, 1) - 1; i < wpIndex + 2; i++) {
+      vec3 c0, ax0, ay0, c1, ax1, ay1;
+      if (ringGeom(i, c0, ax0, ay0) && ringGeom(i + 1, c1, ax1, ay1)) route(c0, ax0, c1, ax1, vec3(0.9f, 0.32f, 1.f), i < wpIndex ? 1.f : i == wpIndex ? 0.75f : 0.4f);
+    }
+    // checkpoint gates: the active one spins and breathes
     for (int i = wpIndex; i < (int)contract.wps.size() && i < wpIndex + 3; i++) {
       vec3 c, ax, ay;
       ringGeom(i, c, ax, ay);
@@ -4257,16 +4299,6 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
       vec3 col = act ? vec3(0.2f, 1.f, 0.5f) * 2.2f : vec3(0.85f, 0.4f, 1.f) * 1.1f;
       quadAx(add, c, ax * br, ay * br, col, act ? 1.f : 0.55f, SPR_RING, 5.f);
       if (act) quadAx(add, c, ax * 1.25f, ay * 1.25f, col * 0.35f, 0.2f, SPR_SHOCK, 5.f);   // faint outer halo
-      vec3 c2, ax2, ay2;
-      if (act && ringGeom(i + 1, c2, ax2, ay2)) {
-        float len = length(c2 - c);
-        int n = std::min(14, std::max(3, (int)(len / 180.f)));
-        for (int k = 0; k < n; k++) {
-          float f = (k + fmodf(t * 0.8f, 1.f)) / n;
-          float fade = sinf(f * 3.14159f);
-          bill(add, c + (c2 - c) * f, std::max(9.f, length(c + (c2 - c) * f - fp.camPos) * 0.012f), vec3(0.85f, 0.4f, 1.f) * 3.f * fade, 1.f, SPR_SPARK, 5.f);
-        }
-      }
     }
     for (const RingBurst& b : bursts) {
       float k = b.t / 0.9f, s = 1.f + 2.2f * (1.f - (1.f - k) * (1.f - k));
@@ -5513,12 +5545,16 @@ void Game::debugScene(const std::string& name) {
     }
   }
   if (name == "rings" || name == "ringburst") {
-    vec3 c, ax, ay; ringGeom(0, c, ax, ay);
+    // (RINGWP: the gates already flown through; RINGDIST, RINGUP: the start that far before the next, that high above its centre)
+    if (getenv("RINGWP")) wpIndex = std::min(std::max(atoi(getenv("RINGWP")), 0), std::max((int)contract.wps.size() - 1, 0));
+    vec3 c, ax, ay; ringGeom(wpIndex, c, ax, ay);
     vec3 nd = normalize(cross(vec3(0, 1, 0), ax));
     float dist = name == "rings" ? 420.f : 160.f;
+    if (getenv("RINGDIST")) dist = (float)atof(getenv("RINGDIST"));
     float hdg = atan2f(nd.x, -nd.z) / DEG;
-    plane.reset(&kAircraft[0], c - nd * dist - vec3(0, 12, 0), hdg, kAircraft[0].maxFuel, 100, true, kAircraft[0].cruise);
+    plane.reset(&kAircraft[0], c - nd * dist - vec3(0, getenv("RINGUP") ? -(float)atof(getenv("RINGUP")) : 12.f, 0), hdg, kAircraft[0].maxFuel, 100, true, kAircraft[0].cruise);
     takeoffAnnounced = true; camQ = plane.q; hint.clear(); toasts.clear(); botControl = true;
+    if (getenv("RINGCOCKPIT")) camMode = 1;
     plane.ctl = Controls(); plane.ctl.throttle = 0.7f;
     for (int i = 0; i < 30; i++) updateCamera(0.1f);
     for (int i = 0; i < (name == "rings" ? 60 : 42); i++) { realTime += 1 / 30.f; update(1 / 30.f); }

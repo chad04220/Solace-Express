@@ -32,7 +32,7 @@ static const float kLogDepthFar = 2.0e7f;
 inline float logDepthC() { return 2.f / log2f(kLogDepthFar + 1.f); }
 
 struct SpriteVert { float x, y, z, u, v, r, g, b, a, kind, soft, bill = 0; };   // bill > 0: x,y,z is the centre of a camera-facing square of that half size
-enum SpriteKind { SPR_SMOKE = 0, SPR_GLOW = 1, SPR_RING = 2, SPR_RAIN = 3, SPR_FIRE = 4, SPR_SNOW = 5, SPR_SHOCK = 6, SPR_SPARK = 7, SPR_RIBBON = 8, SPR_FLAME = 9 };
+enum SpriteKind { SPR_SMOKE = 0, SPR_GLOW = 1, SPR_RING = 2, SPR_RAIN = 3, SPR_FIRE = 4, SPR_SNOW = 5, SPR_SHOCK = 6, SPR_SPARK = 7, SPR_RIBBON = 8, SPR_FLAME = 9, SPR_ROUTE = 11 };
 
 struct PlaneVisual {
   int wrBombSet = 0; // Somnus carried payload: plasma / penetrator / EMP
@@ -352,6 +352,10 @@ public:
   // UI clipping (screen pixels, y down): what is drawn until uiClipOff() shows only inside the box
   void uiClip(float x0, float y0, float x1, float y1) { flushUI(); uiClipOn = true; uiClipBox[0] = x0; uiClipBox[1] = y0; uiClipBox[2] = x1; uiClipBox[3] = y1; }
   void uiClipOff() { flushUI(); uiClipOn = false; }
+  // What is drawn between uiBehindAircraft(true) and (false) lies behind the aircraft: left out wherever this frame's
+  // scene has an airframe (the own aircraft, its cockpit, the traffic: ui_fs.glsl aircraftCover). Drawn before the
+  // rest of the UI, it is under that too (the HUD's target marker)
+  void uiBehindAircraft(bool on);
   bool screenshot(const char* path);
   bool screenshotPNG(const char* path);
   // the program being compiled or loaded now (compilePrograms, on its worker thread), for the loading screen
@@ -433,6 +437,8 @@ private:
   std::vector<UIVert> ui;
   GLuint curImg = 0;
   bool uiClipOn = false; float uiClipBox[4] = {0, 0, 0, 0};
+  bool uiBehindOn = false; size_t uiBehindFrom = 0;   // (since uiBehindAircraft(true): ui from this vertex on)
+  void markBehind();
   void flushUI();
   void createTargets();
   void createRenderTargets();

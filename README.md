@@ -156,7 +156,7 @@ Two more airframes round out the register. The **XR-10 Vigil** is the programme'
 
 ## Flying tips
 
-- Fly the green rings in the lessons. The navigation card at the top shows distance, bearing, how far to climb or descend and time en route; the heading tape below it has a magenta caret on your target's bearing with a turn cue. The magenta diamond sits on the objective itself in 3D, with a dashed stalk down to the ground so you can read its height, and turns into an arrow at the screen edge when the target is out of view.
+- Fly the green rings in the lessons. The navigation card at the top shows distance, bearing, how far to climb or descend and time en route; the heading tape below it has a magenta caret on your target's bearing with a turn cue. The magenta diamond sits on the objective itself in 3D, with a dashed stalk down to the ground so you can read its height. It goes behind your aircraft and the cockpit like anything else in the world, sits under every HUD panel, and turns into an arrow at the screen edge when the target is out of view. A neon lane with flowing chevrons runs from gate to gate, from the one you just passed through the next two.
 - The wind dial (left) shows the wind at your aircraft relative to your nose, its direction, speed and gusts, and the headwind / crosswind components (amber when the crosswind is strong).
 - On approach the HUD shows a glidepath (G/S) and localiser guide. The PAPI lights by the runway show **two white and two red** when you're on a 3° glidepath.
 - A touchdown under 150 fpm earns a "butter" bonus. Over 600 fpm costs you, and over about 900 fpm collapses the gear.

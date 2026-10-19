@@ -2382,7 +2382,13 @@ void Renderer::clearScreen() {
   glBindFramebuffer(GL_FRAMEBUFFER, 0); glViewport(0, 0, W, H);
   glDisable(GL_DEPTH_TEST); glClearColor(0, 0, 0, 1); glClear(GL_COLOR_BUFFER_BIT);
 }
-void Renderer::uiBegin() { ui.clear(); curImg = 0; uiClipOn = false; }
+void Renderer::uiBegin() { ui.clear(); curImg = 0; uiClipOn = false; uiBehindOn = false; uiBehindFrom = 0; }
+// (a mode past 16 tells the UI shader the vertex is behind the aircraft: ui_vs.glsl)
+void Renderer::markBehind() { for (size_t i = uiBehindFrom; i < ui.size(); i++) ui[i].mode += 16.f; uiBehindFrom = ui.size(); }
+void Renderer::uiBehindAircraft(bool on) {
+  if (uiBehindOn) markBehind();
+  uiBehindOn = on; uiBehindFrom = ui.size();
+}
 
 static void quad(std::vector<UIVert>& v, float x0, float y0, float x1, float y1, float u0, float v0, float u1, float v1, vec3 c, float a, float mode, float hx = 0, float hy = 0, float p = 0, const vec3* c2 = nullptr) {
   vec3 b = c2 ? *c2 : c;
@@ -2468,7 +2474,8 @@ void Renderer::image(GLuint tex, float x, float y, float w, float h, float u0, f
 
 void Renderer::flushUI() {
   if (ui.empty()) return;
-  if (!progUI) { ui.clear(); return; }   // (no renderer: a headless test drawing the hub - nothing to draw it with)
+  if (uiBehindOn) markBehind();
+  if (!progUI) { ui.clear(); uiBehindFrom = 0; return; }   // (no renderer: a headless test drawing the hub - nothing to draw it with)
   glBindFramebuffer(GL_FRAMEBUFFER, screenFbo);
   glViewport(0, 0, W, H);
   glEnable(GL_BLEND); glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
@@ -2477,6 +2484,11 @@ void Renderer::flushUI() {
   glUniform1f(U(progUI, "uGLoad"), uiGLoad); glUniform1f(U(progUI, "uTime"), uiTime);
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texFont); glUniform1i(U(progUI, "uFont"), 0);
   glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D, curImg ? curImg : texFont); glUniform1i(U(progUI, "uImg"), 1);
+  {   // the scene's G-buffer, for what is drawn behind the aircraft (its lower-left rw x rh: the render resolution)
+    const bool gb = texGB[0] && rw > 0 && rh > 0;
+    glActiveTexture(GL_TEXTURE0 + 2); glBindTexture(GL_TEXTURE_2D, texGB[0]); glUniform1i(U(progUI, "uGB0"), 2);
+    glUniform4f(U(progUI, "uGBMap"), gb ? (float)rw / W : 0.f, gb ? (float)rh / H : 0.f, gb ? (float)rw : 0.f, gb ? (float)rh : 0.f);
+  }
   glBindVertexArray(vaoUI); glBindBuffer(GL_ARRAY_BUFFER, vboUI);
   glBufferData(GL_ARRAY_BUFFER, ui.size() * sizeof(UIVert), ui.data(), GL_STREAM_DRAW);
   if (uiClipOn) {
@@ -2486,7 +2498,7 @@ void Renderer::flushUI() {
   glDrawArrays(GL_TRIANGLES, 0, (GLsizei)ui.size());
   glDisable(GL_SCISSOR_TEST);
   glActiveTexture(GL_TEXTURE0);
-  ui.clear();
+  ui.clear(); uiBehindFrom = 0;
 }
 
 void Renderer::uiEnd() { flushUI(); glDisable(GL_BLEND); curImg = 0; }

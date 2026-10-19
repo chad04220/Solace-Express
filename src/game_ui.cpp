@@ -2272,6 +2272,60 @@ void Game::drawHud(const FrameParams& fp) {
   vec3 mag(1.f, 0.35f, 1.f);
   const vec3 APC(0.3f, 0.95f, 1.f);
   float hdg = plane.heading();
+  // the bottom rows' layout (the systems tiles over the bottom strip), which the target marker keeps clear of too
+  const float stripH = cockpit ? 0.f : 46 * s, pfd = 148 * s;
+  const float tileW = 80 * s, tileH = 38 * s, tileGap = 5 * s; const int tileCols = 4;
+  int tileRows = spc.special == 2 ? 3 : 2;
+  const float tilesTop = H - stripH - 10 * s - tileRows * tileH - (tileRows - 1) * tileGap;
+  // ================================================================ the target in the world (first: under the rest of
+  // the HUD, and behind the aircraft - its diamond a point in the world, hidden where the airframe or the cockpit is in
+  // front of it; the pointer at the screen's edge is the HUD's own, over the cockpit but under every panel)
+  if (!crashed) {
+    auto label = [&](float x, float y, const std::string& t) {
+      float tw2 = g_ren.textWidth(t, 13 * s);
+      g_ren.rect(x - tw2 * 0.5f - 6 * s, y - 2 * s, tw2 + 12 * s, 19 * s, vec3(0.01f, 0.02f, 0.04f), 0.7f, 4 * s);
+      g_ren.text(x, y, 13 * s, t, mag, 1, 1);
+    };
+    vec3 tgt3 = target; if (!toWp && combatTarget.empty()) tgt3.y = d.elev + 3.f;
+    float sx, sy;
+    vec3 rel3 = tgt3 - fp.camPos;
+    float zc = dot(rel3, -fp.camBack);
+    const float bandT = band + 100 * s, bandB = cockpit ? H - 70 * s : tilesTop - 40 * s, bandC = 0.5f * (bandT + bandB), bandH = std::max(40 * s, 0.5f * (bandB - bandT));
+    bool onS = zc > 1.f && g_ren.project(fp, tgt3, sx, sy) && sx > rail + 20 * s && sx < W - rail - 20 * s && sy > bandT && sy < bandB;
+    std::string lab = dist < 1000.f ? fmt("%.0f m", length(rel3)) : fmt("%.1f km", dist / 1000.f);
+    if(!combatTarget.empty()) lab=combatTarget+" / "+lab;
+    if ((toWp || !combatTarget.empty()) && fabsf(target.y - plane.pos.y) > 45.f) lab += fmt("  %s%s", target.y > plane.pos.y ? "+" : "-", fmtAlt(fabsf(target.y - plane.pos.y)).c_str());
+    if (onS) {
+      g_ren.uiBehindAircraft(true);
+      float gx, gy; vec3 gpt(tgt3.x, g_world.height(tgt3.x, tgt3.z), tgt3.z);
+      if (toWp && g_ren.project(fp, gpt, gx, gy) && gy > sy + 8 * s) {
+        float len = gy - sy;
+        for (float u = 0; u < len; u += 9 * s) g_ren.line(sx, sy + u, sx, sy + std::min(u + 5 * s, len), 1.5f * s, mag, 0.6f);
+        g_ren.line(gx - 6 * s, gy, gx + 6 * s, gy, 1.5f * s, mag, 0.6f);
+      }
+      float r = 11 * s + 4 * s * (0.5f + 0.5f * sinf(realTime * 4.f));
+      g_ren.line(sx - r, sy, sx, sy - r, 2.5f * s, mag, 0.95f); g_ren.line(sx, sy - r, sx + r, sy, 2.5f * s, mag, 0.95f);
+      g_ren.line(sx + r, sy, sx, sy + r, 2.5f * s, mag, 0.95f); g_ren.line(sx, sy + r, sx - r, sy, 2.5f * s, mag, 0.95f);
+      g_ren.rect(sx - 2.5f * s, sy - 2.5f * s, 5 * s, 5 * s, mag, 1, 2.5f * s);
+      label(sx, sy + r + 4 * s, lab);
+      g_ren.uiBehindAircraft(false);
+    } else {
+      vec2 dir(dot(rel3, fp.camRight), -dot(rel3, fp.camUp));
+      if (zc < 0) dir = vec2(dir.x >= 0 ? 1.f : -1.f, clampf(dir.y / (fabsf(dir.x) + fabsf(dir.y) + 1e-3f), -0.4f, 0.4f));
+      { float dl = length(dir); dir = vec2(dir.x / dl, dir.y / dl); }
+      float t2 = std::min(fabsf((W * 0.5f - rail - 50 * s) / std::max(fabsf(dir.x), 1e-3f)), fabsf(bandH / std::max(fabsf(dir.y), 1e-3f)));
+      float ex2 = W * 0.5f + dir.x * t2, ey2 = bandC + dir.y * t2;
+      if (showMinimap && !cockpit) {   // the pointer keeps off the minimap: lifted above it when they would meet
+        float mm = 168 * s, mx0 = W - rail - 16 * s - mm - 30 * s, my0 = tilesTop - mm - 34 * s - 30 * s;
+        if (ex2 > mx0 && ey2 > my0) ey2 = my0;
+      }
+      g_ren.rect(ex2 - 20 * s, ey2 - 20 * s, 40 * s, 40 * s, vec3(0.01f, 0.03f, 0.05f), 0.5f, 20 * s);
+      hudRing(ex2, ey2, 19 * s, 1.2f * s, mag, 0.5f, 32);
+      float pulse2 = 1.f + 0.12f * sinf(realTime * 5.f);
+      hudDart(ex2 + dir.x * 11 * s * pulse2, ey2 + dir.y * 11 * s * pulse2, dir.x, dir.y, 22 * s * pulse2, 9 * s, mag, 1.f);
+      label(ex2 - dir.x * 48 * s, ey2 - dir.y * 48 * s - 8 * s, lab);
+    }
+  }
   // ================================================================ the top band
   {
     hudStrip(0, 0, W, band, 1.f);
@@ -2380,10 +2434,6 @@ void Game::drawHud(const FrameParams& fp) {
     if (engOff && n) g_ren.text(W * 0.5f, iy + isz + 22 * s, 11 * s, "press " + actLabel(ACT_ENGINE, padPrompts()) + " to restart", C_DIM, 0.9f, 1, false);
   }
   // ================================================================ the rails
-  const float stripH = cockpit ? 0.f : 46 * s, pfd = 148 * s;
-  const float tileW = 80 * s, tileH = 38 * s, tileGap = 5 * s; const int tileCols = 4;
-  int tileRows = spc.special == 2 ? 3 : 2;
-  const float tilesTop = H - stripH - 10 * s - tileRows * tileH - (tileRows - 1) * tileGap;
   float railTop = band + 10 * s, railBot = cockpit ? H - 60 * s : std::min(H - stripH - pfd - 18 * s, tilesTop - 30 * s), railH = railBot - railTop;
   if (!cockpit && railH > 160 * s) {
     // ---- left: the speed tape
@@ -2650,51 +2700,6 @@ void Game::drawHud(const FrameParams& fp) {
   // minimap: inboard of the altitude tape, above the systems tiles
   if (showMinimap && !cockpit) { float mm = 168 * s, range = clampf(dist * 1.3f, 3000.f, 20000.f); drawMinimap(W - rail - 16 * s - mm, tilesTop - mm - 34 * s, mm, range); }
   else if (showMinimap) { float mm = 168 * s, range = clampf(dist * 1.3f, 3000.f, 20000.f); drawMinimap(W - 24 * s - mm, H - 60 * s - mm, mm, range); }
-  // ================================================================ the target in the world (last, over the panels)
-  {
-    auto label = [&](float x, float y, const std::string& t) {
-      float tw2 = g_ren.textWidth(t, 13 * s);
-      g_ren.rect(x - tw2 * 0.5f - 6 * s, y - 2 * s, tw2 + 12 * s, 19 * s, vec3(0.01f, 0.02f, 0.04f), 0.7f, 4 * s);
-      g_ren.text(x, y, 13 * s, t, mag, 1, 1);
-    };
-    vec3 tgt3 = target; if (!toWp && combatTarget.empty()) tgt3.y = d.elev + 3.f;
-    float sx, sy;
-    vec3 rel3 = tgt3 - fp.camPos;
-    float zc = dot(rel3, -fp.camBack);
-    const float bandT = band + 100 * s, bandB = cockpit ? H - 70 * s : tilesTop - 40 * s, bandC = 0.5f * (bandT + bandB), bandH = std::max(40 * s, 0.5f * (bandB - bandT));
-    bool onS = zc > 1.f && g_ren.project(fp, tgt3, sx, sy) && sx > rail + 20 * s && sx < W - rail - 20 * s && sy > bandT && sy < bandB;
-    std::string lab = dist < 1000.f ? fmt("%.0f m", length(rel3)) : fmt("%.1f km", dist / 1000.f);
-    if(!combatTarget.empty()) lab=combatTarget+" / "+lab;
-    if ((toWp || !combatTarget.empty()) && fabsf(target.y - plane.pos.y) > 45.f) lab += fmt("  %s%s", target.y > plane.pos.y ? "+" : "-", fmtAlt(fabsf(target.y - plane.pos.y)).c_str());
-    if (onS) {
-      float gx, gy; vec3 gpt(tgt3.x, g_world.height(tgt3.x, tgt3.z), tgt3.z);
-      if (toWp && g_ren.project(fp, gpt, gx, gy) && gy > sy + 8 * s) {
-        float len = gy - sy;
-        for (float u = 0; u < len; u += 9 * s) g_ren.line(sx, sy + u, sx, sy + std::min(u + 5 * s, len), 1.5f * s, mag, 0.6f);
-        g_ren.line(gx - 6 * s, gy, gx + 6 * s, gy, 1.5f * s, mag, 0.6f);
-      }
-      float r = 11 * s + 4 * s * (0.5f + 0.5f * sinf(realTime * 4.f));
-      g_ren.line(sx - r, sy, sx, sy - r, 2.5f * s, mag, 0.95f); g_ren.line(sx, sy - r, sx + r, sy, 2.5f * s, mag, 0.95f);
-      g_ren.line(sx + r, sy, sx, sy + r, 2.5f * s, mag, 0.95f); g_ren.line(sx, sy + r, sx - r, sy, 2.5f * s, mag, 0.95f);
-      g_ren.rect(sx - 2.5f * s, sy - 2.5f * s, 5 * s, 5 * s, mag, 1, 2.5f * s);
-      label(sx, sy + r + 4 * s, lab);
-    } else {
-      vec2 dir(dot(rel3, fp.camRight), -dot(rel3, fp.camUp));
-      if (zc < 0) dir = vec2(dir.x >= 0 ? 1.f : -1.f, clampf(dir.y / (fabsf(dir.x) + fabsf(dir.y) + 1e-3f), -0.4f, 0.4f));
-      { float dl = length(dir); dir = vec2(dir.x / dl, dir.y / dl); }
-      float t2 = std::min(fabsf((W * 0.5f - rail - 50 * s) / std::max(fabsf(dir.x), 1e-3f)), fabsf(bandH / std::max(fabsf(dir.y), 1e-3f)));
-      float ex2 = W * 0.5f + dir.x * t2, ey2 = bandC + dir.y * t2;
-      if (showMinimap && !cockpit) {   // the pointer keeps off the minimap: lifted above it when they would meet
-        float mm = 168 * s, mx0 = W - rail - 16 * s - mm - 30 * s, my0 = tilesTop - mm - 34 * s - 30 * s;
-        if (ex2 > mx0 && ey2 > my0) ey2 = my0;
-      }
-      g_ren.rect(ex2 - 20 * s, ey2 - 20 * s, 40 * s, 40 * s, vec3(0.01f, 0.03f, 0.05f), 0.5f, 20 * s);
-      hudRing(ex2, ey2, 19 * s, 1.2f * s, mag, 0.5f, 32);
-      float pulse2 = 1.f + 0.12f * sinf(realTime * 5.f);
-      hudDart(ex2 + dir.x * 11 * s * pulse2, ey2 + dir.y * 11 * s * pulse2, dir.x, dir.y, 22 * s * pulse2, 9 * s, mag, 1.f);
-      label(ex2 - dir.x * 48 * s, ey2 - dir.y * 48 * s - 8 * s, lab);
-    }
-  }
   if(militaryFlight || (researchFlight && specIdx==kSomnus)) {
     if(specIdx==kSomnus) {
       const auto& gun=hive::forwardSpec(combatLoadout.forward);

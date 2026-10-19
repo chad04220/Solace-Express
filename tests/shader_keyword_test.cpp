@@ -155,6 +155,14 @@ int main() {
   int divs = scanMatDiv("objects.frag", objectsFSAssembly("")) + scanMatDiv("shadow_proxy.frag", shadowProxyFSAssembly("")) + scanMatDiv("effects.frag", effectsFSAssembly(""))
            + scanMatDiv("plane_mesh.frag", planeMeshFSAssembly("")) + scanMatDiv("scene_lib.frag", lib) + scanMatDiv("part_pose.frag", partPoseFSAssembly());
   if (divs) { printf("FAIL: %d matrix division(s): NVIDIA's compiler refuses them\n", divs); return 1; }
+  // the UI's cut around the aircraft (ui_fs.glsl aircraftCover) names the airframe classes by number: they must still
+  // be GB_PLANE (5) to GB_ENEMY (13), every class between them an airframe and none after them
+  const std::string gb = kGBuffer, ui = uiFSAssembly();
+  if (gb.find("GB_PLANE = 5, GB_CABIN = 6, GB_POD = 7, GB_DISPLAY = 8,") == std::string::npos ||
+      gb.find("GB_DEBRIS = 9, GB_UFO = 10, GB_WRECK = 11, GB_TRAFFIC = 12, GB_ENEMY = 13;") == std::string::npos ||
+      ui.find("cls >= 5 && cls <= 13") == std::string::npos) {
+    printf("FAIL: the G-buffer's airframe classes and the UI shader's aircraft cut (5 to 13) disagree\n"); return 1;
+  }
   printf("PASS: no reserved GLSL words in the shaders\n");
   return 0;
 }
