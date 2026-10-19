@@ -99,7 +99,7 @@ The game shows no key prompts during flight. Open **Controls** from the main men
 | Z | Autopilot: hold, or autoland at the airport picked on the GPS | Right-stick click |
 | ; | Aerobatics: the autopilot flies the next figure (loop, aileron roll, barrel roll, Immelmann, split-S, Cuban eight, wingover); press again to stop and level off | (bind one in Controls) |
 | T | Time Warp ×2 / ×4 / ×8 / ×16 / off, by hand or on the autopilot (above ×4 slower PCs may stutter) | |
-| C | Camera: chase, cockpit, orbit, flyby (chase and orbit stay where you swing them) | Back |
+| C | Camera: chase, cockpit, orbit, flyby (orbit stays where you swing it; chase eases back behind the aircraft after 4 s, unless Settings → Flying → Chase view says otherwise) | Back |
 | Right mouse drag, wheel | Look around, zoom | Right stick |
 | L | Landing lights | |
 | I | Engine start; hold for a second, stopped on the ground, to shut down | |

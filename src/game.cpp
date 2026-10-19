@@ -382,6 +382,7 @@ void Game::loadSettings() {
     else if (s == "speedFov") set.speedFov = v != 0;
     else if (s == "musicVol") set.musicVol = clampf(v, 0.f, 1.f);
     else if (s == "musicFlight") set.musicFlight = v != 0;
+    else if (s == "camRecentre") set.camRecentre = v != 0;
     else if (s == "failures") set.failures = v != 0;
     else if (s == "air") set.air = std::clamp((int)v, 0, 1);
     else if (s == "hudEssential") set.hudEssential = v != 0;
@@ -424,7 +425,7 @@ bool Game::saveSettings() {
           set.quality, set.master, set.engineVol, set.sfxVol, set.radioVol, set.invertPitch, set.showHints, set.metric, set.fullscreen, set.radioStation, set.mouseSens, set.traffic, set.atcVol);
   t += fmt("renderRes %d\nfpsTarget %d\nfov %f\nheadLook %d\ncbHud %d\nuiScale %f\nhudCam0 %d\nhudCam1 %d\nhudCam2 %d\nhudCam3 %d\n", set.resMode, set.fpsTarget, set.fov, set.headLook, set.cbHud, set.uiScale, set.hudCam[0], set.hudCam[1], set.hudCam[2], set.hudCam[3]);
   t += fmt("cockpitFocusZoom %d\nfoveate %d\nmenuMotion %d\njoyAuto %d\n", set.cockpitFocusZoom, set.foveate, set.menuMotion, set.joyAutoDone);
-  t += fmt("assist %d\ncamShake %f\nrumble %d\nspeedFov %d\nmusicVol %f\nmusicFlight %d\nfailures %d\nair %d\nhudEssential %d\n", set.assist, set.camShake, set.rumble, set.speedFov, set.musicVol, set.musicFlight, set.failures, set.air, set.hudEssential);
+  t += fmt("assist %d\ncamShake %f\nrumble %d\nspeedFov %d\nmusicVol %f\nmusicFlight %d\ncamRecentre %d\nfailures %d\nair %d\nhudEssential %d\n", set.assist, set.camShake, set.rumble, set.speedFov, set.musicVol, set.musicFlight, set.camRecentre, set.failures, set.air, set.hudEssential);
   {   // the joystick bindings: their own file (device names don't fit this one's "name number" lines)
     static const std::string none = [] { AxisBind a[AX_COUNT]; std::vector<JoyButtonBind> b(ACT_COUNT); return joyConfigText(a, b.data(), actionIds(), ACT_COUNT); }();
     const std::string j = joyConfigText(set.axisBind, set.joyBind, actionIds(), ACT_COUNT);
@@ -1829,7 +1830,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
   flapNotch = 0; phase = 0; lastHintPhase = -1; hint.clear();
   joyThrTaken = false; joyThrLast = -1;   // (the throttle lever takes over when it moves, not at the start)
   arrivalAt = -1; arrivalTold = false; engineShutDown = false; engineHold = 0; engineHeld = false; tdStampT = -1.f;
-  flightAch.clear(); flightKm = 0; profileT = 0; pbOld = -1.f; pbNew = false; lastMark = LandingMark();
+  flightAch.clear(); flightKm = 0; profileT = 0; pbOld = -1.f; pbNew = false; lastMark = LandingMark(); touchdownApplauded = false;
   trialSplits.clear(); ghostRec.clear(); ghostBest.clear();   // (a trial loads its ghost after: startTrial)
   sightReq = -1; sightAsked = sightDone = false; photoFlashT = -10.f;
   if ((c.type == CT_PAX || c.type == CT_VIP) && !c.story && !g_world.procedural && c.from != c.to) {   // a landmark near the way: the passengers may ask
@@ -2667,7 +2668,7 @@ void Game::updateFlight(float dt) {
           } else toast(fmt("Gate %d  %s", wpIndex, trialScore(TR_GATES, sp).c_str()), vec3(0.6f, 0.9f, 1.f), false);
         }
       }
-      g_audio.trigger(SFX_CHIME);
+      if (contract.type == CT_TRIAL && g_music.owns()) g_music.note(wpIndex - 1); else g_audio.trigger(SFX_CHIME);   // (a gate run climbs a scale, gate by gate)
       toast(wpIndex < (int)contract.wps.size() ? fmt("Checkpoint %d of %d", wpIndex, (int)contract.wps.size()) : "All checkpoints passed!", vec3(0.5f, 1, 0.7f));
       if (contract.wps.size() && wpIndex >= (int)contract.wps.size() && contract.id == "L1") { endTimer = 2.f; }
     }
@@ -2875,10 +2876,16 @@ void Game::updateCamera(float dt) {
   float lookK = camMode == 1 ? 1.f / ckZoom : 1.f;   // zoomed in: finer look control
   if (drag) { camYaw -= in.mdx * 0.005f * set.mouseSens * lookK; camPitch = clampf(camPitch + pitchDir * in.mdy * 0.004f * set.mouseSens * lookK, -1.3f, 1.4f); }
   if (in.pad) { float rx = fabsf(in.rx) > 0.2f ? in.rx : 0, ry = fabsf(in.ry) > 0.2f ? in.ry : 0; camYaw -= rx * 2.f * dt; camPitch = clampf(camPitch + pitchDir * ry * 1.5f * dt, -1.3f, 1.4f); }
+  camIdle = drag || (in.pad && (fabsf(in.rx) > 0.2f || fabsf(in.ry) > 0.2f)) ? 0.f : camIdle + dt;
   const AircraftSpec& s = *plane.spec;
   float size = std::max(s.fusLen, s.span);
   if (camMode == 0) {
-    // no auto-recentre: the camera stays where it was swung until the view is changed (C)
+    // the camera stays where it was swung until the view is changed (C) - or, with Settings' recentre, it eases back
+    // behind the aircraft once left alone for 4 s (a brushed right stick lost the heading: the review of v3.50.3)
+    if (set.camRecentre && camIdle > 4.f) {
+      const float k = 1.f - expf(-dt * 1.6f);
+      camYaw = wrapAngle(camYaw) * (1.f - k); camPitch += (0.12f - camPitch) * k;
+    }
     // follow orientation with lag; reduce roll so the horizon isn't nauseating
     vec3 f = plane.forward();
     if (length(plane.vel) > 15.f && !plane.onGround) f = normalize(lerp(f, normalize(plane.vel), 0.5f));
@@ -5855,6 +5862,7 @@ void Game::debugScene(const std::string& name) {
     takeoffAnnounced = true; camQ = plane.q; hint.clear(); toasts.clear(); botControl = true;
     if (getenv("RINGCOCKPIT")) camMode = 1;
     plane.ctl = Controls(); plane.ctl.throttle = 0.7f;
+    if (getenv("SIGHT")) { sightReq = atoi(getenv("SIGHT")); sightAsked = true; sightDone = false; }   // (SIGHT=<site>: the passengers' request on the HUD)
     if (getenv("GHOST")) {   // (a gate run's ghost alongside: the best run 80 m ahead and 30 m to the right)
       contract.type = CT_TRIAL; trialT0 = flightClock; trialT1 = -1.f; ghostBest.clear();
       const vec3 rt = normalize(cross(nd, vec3(0, 1, 0)));

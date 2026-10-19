@@ -105,6 +105,9 @@
 - **Camera shake:** touchdowns, turbulence, gusts, the stall buffet, high g, sonic booms, bombs and crashes now shake the view. The shake is lighter in the cockpit. **Settings → Flying → Camera shake** sets its strength from off to 150%.
 - **Gamepad rumble** on Xbox-compatible controllers, for the same moments. Turn it off in **Settings → Flying → Gamepad rumble**.
 - **Speed sensation:** the chase view widens by up to 5° as you speed up. Turn it off in **Settings → Flying → Speed sensation**.
+- **The chase view recentres:** 4 seconds after you last swung it, it eases back behind the aircraft, so a brushed right stick no longer loses your heading. The orbit view still stays where you put it. **Settings → Flying → Chase view** turns this off.
+- **Passengers applaud** a butter landing, and on a gate run each gate's chime climbs a note higher.
+- **The debrief rises in** over the scene, instead of cutting in.
 
 ### More settings
 - **Random failures:** On, for worn and rented aircraft as before, or Off.

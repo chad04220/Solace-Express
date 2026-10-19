@@ -82,6 +82,7 @@ struct Settings {
   bool speedFov = true;    // the outside views widen a little with speed
   float musicVol = 0.5f;   // the game's own music (the radio has its volume)
   bool musicFlight = false;   // its quiet ambience in the cruise too (the menus and the hub always have it)
+  bool camRecentre = true;    // the chase view swings back behind the aircraft a few seconds after it was swung (orbit stays)
   bool failures = true;    // random failures on worn or rented aircraft (lessons never fail)
   int air = 1;             // the air: 0 calm (a fraction of the gusts and turbulence), 1 as forecast
   bool hudEssential = false;   // the flight HUD's essentials only: no systems tiles; the wind's components and the g meter only when they matter
@@ -333,6 +334,7 @@ private:
   std::string warpBlocker() const;
   bool warpWarned = false;   // the x8 / x16 performance note shown this session
   int camMode = 0; float camYaw = 0, camPitch = 0.12f, camDist = 0, camZoom = 1;
+  float camIdle = 0;   // seconds since the view was last swung (the chase view's recentre: Settings)
   float camArm = 0, camArmV = 0, camSpd = 0;   // chase camera spring arm: length (m), its rate, smoothed airspeed
   float lookYaw = 0, lookPitch = 0;
   quat camQ; vec3 camPos; vec3 camVel;
@@ -369,6 +371,7 @@ private:
   std::vector<AchShow> achShow;         // the banners still to show (top centre, one at a time)
   float profileT = 0, flightKm = 0;     // (the once-a-second checks; this flight's track over the ground, km)
   float pbOld = -1.f; bool pbNew = false;   // this flight's touchdown against the type's softest before it
+  bool touchdownApplauded = false;      // (the cabin's applause, once a flight)
   int logPage = 0;                     // the logbook's right-hand page: progress, achievements, passport
   int licenceShown = -1;                // the licence card in the hub: the licence it celebrates (-1 none)
   bool finaleShown = false;             // the campaign's end card (once, on the hub)

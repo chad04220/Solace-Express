@@ -8,8 +8,8 @@
 MusicPlayer g_music;
 
 namespace {
-enum Inst { I_PAD = 0, I_BELL, I_PLUCK, I_BASS, I_CHIME, I_BRASS, I_SHAKER };
-const float kInstLevel[] = {0.055f, 0.11f, 0.10f, 0.16f, 0.09f, 0.045f, 0.035f};
+enum Inst { I_PAD = 0, I_BELL, I_PLUCK, I_BASS, I_CHIME, I_BRASS, I_SHAKER, I_CLAP };
+const float kInstLevel[] = {0.055f, 0.11f, 0.10f, 0.16f, 0.09f, 0.045f, 0.035f, 0.07f};
 
 const int kTable = 4096;
 float s_sine[kTable + 1];
@@ -101,11 +101,21 @@ void MusicGen::sting(int kind) {
     case STING_ACHIEVEMENT:
       { const int up[5] = {7, 9, 12, 16, 19}; for (int i = 0; i < 5; i++) at(i * 0.065f, I_CHIME, key + 24 + up[i], 0.55f, 1.f); }
       break;
+    case STING_APPLAUSE:   // a cabin's applause: claps scattered over three seconds, thick at first, thinning out
+      for (int i = 0; i < 90; i++) { const float u = urand(); at(0.8f + u * u * 3.f, I_CLAP, 0, 0.5f + 0.5f * urand(), 0.05f); }   // (as the wheels settle)
+      break;
     case STING_MEDAL:
       { const int up[6] = {0, 7, 12, 16, 19, 24}; for (int i = 0; i < 6; i++) at(i * 0.07f, I_CHIME, key + 24 + up[i], 0.6f, 1.2f); }
       for (int n : {12, 16, 19}) at(0.42f, I_BRASS, key + n, 0.6f, 1.f);
       break;
   }
+}
+
+void MusicGen::note(int step) {
+  const int key = moodNow != MOOD_NONE ? kMoods[moodNow].key : 50;
+  step = std::clamp(step, 0, 14);
+  schedule(now + 0.01 * sr, I_CHIME, key + 24 + kPenta[step % 5] + 12 * (step / 5), 0.65f, 1.2f, 2.5f);
+  schedule(now + 0.01 * sr, I_BELL, key + 12 + kPenta[step % 5] + 12 * (step / 5), 0.35f, 1.f, 2.5f);
 }
 
 void MusicGen::onBeat() {
@@ -149,7 +159,7 @@ void MusicGen::render(float* out, int frames) {
       for (size_t e = 0; e < events.size();) {
         if (events[e].at <= now) {
           const Event ev = events[e]; events[e] = events.back(); events.pop_back();
-          if (ev.inst == I_SHAKER) { Voice v; v.inst = I_SHAKER; v.vel = ev.vel; v.dur = ev.dur; v.pan = ev.pan; v.ph3 = 0; if (voices.size() < 64) voices.push_back(v); }
+          if (ev.inst == I_SHAKER || ev.inst == I_CLAP) { Voice v; v.inst = ev.inst; v.vel = ev.vel; v.dur = ev.dur; v.pan = ev.pan; v.ph3 = 0; if (voices.size() < 64) voices.push_back(v); }
           else play(ev.inst, ev.midi, ev.vel, ev.dur, ev.pan);
         } else e++;
       }
@@ -159,7 +169,7 @@ void MusicGen::render(float* out, int frames) {
     for (Voice& v : voices) {
       float s = 0, env = 0, s2 = 0;
       const float t = v.t;
-      if (v.rel < 0 && t >= v.dur && v.inst != I_BELL && v.inst != I_CHIME && v.inst != I_PLUCK && v.inst != I_SHAKER) v.rel = t;
+      if (v.rel < 0 && t >= v.dur && v.inst != I_BELL && v.inst != I_CHIME && v.inst != I_PLUCK && v.inst != I_SHAKER && v.inst != I_CLAP) v.rel = t;
       const float relEnv = v.rel >= 0 ? expf(-(t - v.rel) / (v.inst == I_PAD ? 0.9f : v.inst == I_BRASS ? 0.18f : 0.12f)) : 1.f;
       switch (v.inst) {
         case I_PAD: {
@@ -199,6 +209,11 @@ void MusicGen::render(float* out, int frames) {
           const float n = urand() * 2.f - 1.f; s = n - v.ph3; v.ph3 = n; s2 = s;
           break;
         }
+        case I_CLAP: {   // a hand clap: a burst of noise, a little body under its hiss (ph2: a low-passed copy)
+          env = std::min(t / 0.002f, 1.f) * expf(-t * 32.f);
+          const float n = urand() * 2.f - 1.f; v.ph2 += (n - v.ph2) * 0.35f; s = (n - v.ph3) * 0.6f + v.ph2 * 0.8f; v.ph3 = n; s2 = s;
+          break;
+        }
       }
       v.t += inv;
       const bool stingV = v.pan >= 2.f;
@@ -206,7 +221,7 @@ void MusicGen::render(float* out, int frames) {
       const float a = env * v.vel * kInstLevel[v.inst];
       const float l = a * (0.5f - 0.5f * pan) * 2.f, r = a * (0.5f + 0.5f * pan) * 2.f;
       if (stingV) { sL += s * l; sR += s2 * r; } else { L += s * l; R += s2 * r; }
-      if (env < 1e-4f && t > 0.05f && (v.rel >= 0 || v.inst == I_BELL || v.inst == I_CHIME || v.inst == I_PLUCK || v.inst == I_SHAKER)) v.inst = -1 - v.inst;   // (spent)
+      if (env < 1e-4f && t > 0.05f && (v.rel >= 0 || v.inst == I_BELL || v.inst == I_CHIME || v.inst == I_PLUCK || v.inst == I_SHAKER || v.inst == I_CLAP)) v.inst = -1 - v.inst;   // (spent)
     }
     voices.erase(std::remove_if(voices.begin(), voices.end(), [](const Voice& v) { return v.inst < 0; }), voices.end());
     L = L * gain + sL * 0.85f; R = R * gain + sR * 0.85f;
@@ -262,6 +277,7 @@ void MusicPlayer::own(bool on) {
 
 void MusicPlayer::setMood(int m) { wantMood = m; }
 void MusicPlayer::sting(int k) { std::lock_guard<std::mutex> g(m); if (stings.size() < 8) stings.push_back(k); }
+void MusicPlayer::note(int step) { std::lock_guard<std::mutex> g(m); if (stings.size() < 8) stings.push_back(1000 + std::clamp(step, 0, 14)); }   // (a note: 1000 + its step)
 
 void MusicPlayer::run() {
   MusicGen gen(rate, (uint32_t)std::chrono::steady_clock::now().time_since_epoch().count());
@@ -272,7 +288,7 @@ void MusicPlayer::run() {
     if (t && have < 0) { uint32_t was = t; token.compare_exchange_strong(was, 0u); }   // (the radio took the ring)
     if (have < 0 || have > 9000) { std::this_thread::sleep_for(std::chrono::milliseconds(have < 0 ? 20 : 4)); continue; }
     gen.setMood(wantMood.load());
-    { std::lock_guard<std::mutex> g(m); for (int k : stings) gen.sting(k); stings.clear(); }
+    { std::lock_guard<std::mutex> g(m); for (int k : stings) { if (k >= 1000) gen.note(k - 1000); else gen.sting(k); } stings.clear(); }
     gen.render(buf.data(), 1024);
     g_audio.musicPush(t, buf.data(), 1024);
   }

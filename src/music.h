@@ -11,7 +11,7 @@
 #include <vector>
 
 enum MusicMood { MOOD_NONE = 0, MOOD_MENU, MOOD_HUB, MOOD_CRUISE, MOOD_FINALE, MOOD_COUNT };
-enum MusicSting { STING_SUCCESS = 0, STING_FAIL, STING_LICENCE, STING_ACHIEVEMENT, STING_MEDAL, STING_COUNT };
+enum MusicSting { STING_SUCCESS = 0, STING_FAIL, STING_LICENCE, STING_ACHIEVEMENT, STING_MEDAL, STING_APPLAUSE, STING_COUNT };
 
 // The generator: the same notes for the same seed, rendered a block at a time (the player's thread, or a test)
 class MusicGen {
@@ -20,6 +20,7 @@ public:
   void setMood(int mood);   // the old mood's notes ring out, the new one starts at once (its pads swell in)
   int mood() const { return moodNow; }
   void sting(int kind);     // a short phrase over whatever plays, in its key
+  void note(int step);      // one chime, step notes up the key's major pentatonic (a gate run climbs through them)
   void render(float* stereo, int frames);   // interleaved, about -6 dBFS at its loudest
 
   struct Voice { int inst = -1; float f = 0, t = 0, vel = 0, dur = 0, pan = 0, ph1 = 0, ph2 = 0, ph3 = 0, rel = -1; };
@@ -56,6 +57,7 @@ public:
   bool owns() const { return token.load() != 0; }
   void setMood(int mood);
   void sting(int kind);
+  void note(int step);
   int mood() const { return wantMood.load(); }
 private:
   std::thread th;

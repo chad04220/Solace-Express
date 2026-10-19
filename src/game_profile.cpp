@@ -36,6 +36,7 @@ void Game::profileTouchdown(float fpm, int ap) {
   }
   const int grade = touchdownGrade(fpm);
   if (grade == TD_BUTTER) { award("butter"); if (profile.add("butters") >= 25.f) award("butter25"); }
+  if (grade == TD_BUTTER && contract.pax >= 4 && contract.type != CT_LESSON && g_music.owns() && !touchdownApplauded) { touchdownApplauded = true; g_music.sting(STING_APPLAUSE); }   // (the cabin applauds a butter landing)
   if (fpm < 60.f) award("greaser");
   {   // the type's softest touchdown
     auto it = profile.best.find(plane.spec->id);

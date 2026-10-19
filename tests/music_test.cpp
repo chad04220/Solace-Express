@@ -46,7 +46,7 @@ int main() {
     printf("Mood change: largest step %.3f (menu alone %.3f); fades to %.4f rms after a stop: %s\n", switchStep, maxStep, sqrt(tail / sr), ok ? "ok" : "FAIL");
     fails += !ok;
   }
-  const char* sn[] = {"success", "fail", "licence", "achievement", "medal"};
+  const char* sn[STING_COUNT] = {"success", "fail", "licence", "achievement", "medal", "applause"};
   for (int k = 0; k < STING_COUNT; k++) {
     MusicGen quiet(sr, 3); quiet.sting(k);
     std::vector<float> b((size_t)sr * 2 * 3); quiet.render(b.data(), (int)sr * 3);

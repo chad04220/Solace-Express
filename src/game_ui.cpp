@@ -538,7 +538,7 @@ void Game::drawLoading() {
 void Game::enterCareerHub() { screen = SCR_HUB; hubTab = TAB_CONTRACTS; hubList = 0; selContract = 0; selAircraft = -1; }
 void Game::drawMenu() {
   // the first start: the welcome over the menu, the menu under it without the clicks, the keys or the pad
-  const bool welcome = !profile.welcomed && !headless;
+  const bool welcome = !profile.welcomed && !headless && !diskless;   // (never in a tool's session: its pictures show the menu)
   Input held;
   if (welcome) { held = in; memset(in.pressed, 0, sizeof(in.pressed)); for (bool& m : in.mPressed) m = false; in.buttonsPressed = 0; in.wheel = 0; in.text.clear(); }
   struct WelcomeAfter { Game* g; bool on; Input& held; ~WelcomeAfter() { if (!on) return; g->in = held; g_ren.flushUIPublic(); g->drawWelcome(); } } after{this, welcome, held};
@@ -554,7 +554,7 @@ void Game::drawMenu() {
   g_ren.text(x, 220 * s, 16 * s, "The dream of flight.", C_DIM, 1);
   float y = 270 * s;
   panel(x, y, cw, (hasSave ? 114 : 86) * s);
-  g_ren.text(x + 24 * s, y + 16 * s, 11 * s, hasSave ? "CAREER READY" : "WELCOME ABOARD", C_ACCENT, 1, 0, false);
+  g_ren.text(x + 24 * s, y + 16 * s, 11 * s, hasSave ? (profile.name.empty() ? std::string("CAREER READY") : ellipsize("WELCOME BACK, CAPTAIN " + [&] { std::string u; for (char ch : profile.name) u += (char)toupper((unsigned char)ch); return u; }(), bw, 11 * s)) : std::string("WELCOME ABOARD"), C_ACCENT, 1, 0, false);
   if (hasSave) {
     const Airport& ap = g_world.airports[career.location];
     g_ren.text(x + 24 * s, y + 36 * s, 15 * s, ellipsize(std::string(licenseName(career.license)) + " / " + ap.code, bw, 15 * s), C_TEXT, 1);
@@ -1943,6 +1943,7 @@ void Game::drawSettings(float x, float y, float w, float h) {
     note(set.assist == 0 ? "Every input moves the controls directly, as in the real aircraft" :
          "The inputs roll and pitch the aircraft; let go and it holds its bank and its climb, the rudder coordinating. Near the stall the nose comes down. Time warp always flies assisted");
   }
+  toggle("Chase view", set.camRecentre, "Recentres after 4 s", "Stays where swung");
   slider("Camera shake", set.camShake, 0.f, 1.5f, 0.1f, set.camShake <= 0.f ? std::string("Off") : fmt("%.0f%%", set.camShake * 100));
   py -= 6 * s; note("touchdowns, turbulence, the stall buffet, high g");
   toggle("Gamepad rumble", set.rumble, "On", "Off");
@@ -2480,9 +2481,9 @@ void Game::drawHud(const FrameParams& fp) {
       hudRing(gx, gy, r, 1.6f * s, gc, 0.9f, 32);
       const float ahead = dot(gp - plane.pos, normalize(plane.vel + vec3(0, 0, 1e-3f)));
       const std::string t = fmt("BEST  %s%.0f m", ahead >= 0 ? "+" : "-", fabsf(ahead));
-      const float tw = g_ren.textWidth(t, 12 * s);
-      g_ren.rect(gx - tw * 0.5f - 5 * s, gy + r + 3 * s, tw + 10 * s, 17 * s, vec3(0.01f, 0.02f, 0.04f), 0.65f, 4 * s);
-      g_ren.text(gx, gy + r + 4 * s, 12 * s, t, gc, 1, 1);
+      const float tw = g_ren.textWidth(t, 12 * s), lx = clampf(gx, rail + tw * 0.5f + 10 * s, W - rail - tw * 0.5f - 10 * s);
+      g_ren.rect(lx - tw * 0.5f - 5 * s, gy + r + 3 * s, tw + 10 * s, 17 * s, vec3(0.01f, 0.02f, 0.04f), 0.65f, 4 * s);
+      g_ren.text(lx, gy + r + 4 * s, 12 * s, t, gc, 1, 1);
       g_ren.uiBehindAircraft(false);
     }
   }
@@ -2498,9 +2499,9 @@ void Game::drawHud(const FrameParams& fp) {
       g_ren.uiBehindAircraft(true);
       g_ren.line(gx - r, gy, gx, gy - r, 2 * s, gold, 0.9f); g_ren.line(gx, gy - r, gx + r, gy, 2 * s, gold, 0.9f);
       g_ren.line(gx + r, gy, gx, gy + r, 2 * s, gold, 0.9f); g_ren.line(gx, gy + r, gx - r, gy, 2 * s, gold, 0.9f);
-      const float tw = g_ren.textWidth(t, 12 * s);
-      g_ren.rect(gx - tw * 0.5f - 5 * s, gy + r + 3 * s, tw + 10 * s, 17 * s, vec3(0.01f, 0.02f, 0.04f), 0.65f, 4 * s);
-      g_ren.text(gx, gy + r + 4 * s, 12 * s, t, gold, 1, 1);
+      const float tw = g_ren.textWidth(t, 12 * s), lx = clampf(gx, rail + tw * 0.5f + 10 * s, W - rail - tw * 0.5f - 10 * s);   // (the label kept off the tapes)
+      g_ren.rect(lx - tw * 0.5f - 5 * s, gy + r + 3 * s, tw + 10 * s, 17 * s, vec3(0.01f, 0.02f, 0.04f), 0.65f, 4 * s);
+      g_ren.text(lx, gy + r + 4 * s, 12 * s, t, gold, 1, 1);
       g_ren.uiBehindAircraft(false);
     } else {   // its bearing, along the top of the view
       vec2 d(dot(rel, fp.camRight), -dot(rel, fp.camUp));
@@ -3442,6 +3443,8 @@ void Game::drawWelcome() {
     g_ren.text(cx, py + 26 * s, 12 * s, road[i], i == 0 ? C_TEXT : C_DIM, 1, 1);
   }
   if (button(x + pw * 0.5f - 120 * s, y + ph - 66 * s, 240 * s, 46 * s, "Let's fly", true, true) || in.pressed[K_ENTER]) {
+    // (a new pilot gets the style shown; a career already under way keeps its settings unless one was picked)
+    if (welcomeStyle < 0 && !hasSave) { if (cur == 0) { set.assist = std::max(set.assist, 1); set.air = 0; } else { set.assist = 0; set.air = 1; } }
     profile.welcomed = true; saveProfile(); saveSettings(); g_audio.trigger(SFX_CLICK);
   }
 }
@@ -3518,8 +3521,9 @@ void Game::drawDebrief() {
   // (it comes in: the title, then the lines one after another, the total counting up to what was earned)
   const float e = realTime - debriefT0;
   auto fadeIn = [&](float at) { const float k = clampf((e - at) / 0.22f, 0.f, 1.f); return k * k * (3 - 2 * k); };
-  g_ren.rect(0, 0, W, H, vec3(0, 0, 0), 0.35f);
-  float pw = std::min(720 * s, W - 40 * s), ph = std::min(760 * s, H - 40 * s), x = W * 0.5f - pw * 0.5f, y = H * 0.5f - ph * 0.5f;
+  const float inK = clampf(e / 0.3f, 0.f, 1.f), inEase = 1.f - (1.f - inK) * (1.f - inK);   // (the panel rises in over the scene)
+  g_ren.rect(0, 0, W, H, vec3(0, 0, 0), 0.35f * inEase);
+  float pw = std::min(720 * s, W - 40 * s), ph = std::min(760 * s, H - 40 * s), x = W * 0.5f - pw * 0.5f, y = H * 0.5f - ph * 0.5f + (1.f - inEase) * 28 * s;
   panel(x, y, pw, ph, 0.95f);
   float px = x + 30 * s, py = y + 24 * s;
   for (auto& l : wrap(debriefTitle, pw - 60 * s, 28 * s)) { g_ren.text(px, py, 28 * s, l, lastSuccess ? C_GOOD : C_BAD, 1); py += 34 * s; }
