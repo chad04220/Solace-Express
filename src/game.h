@@ -28,6 +28,8 @@
 #include "atc.h"
 #include "keys.h"
 #include "joystick.h"
+#include "profile.h"
+#include "music.h"
 
 struct Input {
   bool down[256] = {}, pressed[256] = {};
@@ -78,6 +80,7 @@ struct Settings {
   bool rumble = true;      // the gamepad's motors (the same events)
   bool speedFov = true;    // the outside views widen a little with speed
   float musicVol = 0.5f;   // the game's own music (the radio has its volume)
+  bool musicFlight = false;   // its quiet ambience in the cruise too (the menus and the hub always have it)
   bool failures = true;    // random failures on worn or rented aircraft (lessons never fail)
   int air = 1;             // the air: 0 calm (a fraction of the gusts and turbulence), 1 as forecast
   bool hudEssential = false;   // the flight HUD's essentials only: no systems tiles; the wind's components and the g meter only when they matter
@@ -338,6 +341,31 @@ private:
   // the HUD's touchdown stamp: the grade and rate of the last touchdown (realTime it was made; < 0 none)
   float tdStampT = -1.f, tdStampFpm = 0.f;
   void drawLandingStamp();
+  // ---- the pilot's profile (profile.h): achievements, the airports landed at, the landmarks found, each type's
+  // softest touchdown. One record across careers, in profile.cfg; a tool's or a test's session never writes it
+  Profile profile;
+  std::vector<std::string> flightAch;   // achievements earned since this flight began (the debrief lists them)
+  struct AchShow { std::string id; float t = 0; bool played = false; };
+  std::vector<AchShow> achShow;         // the banners still to show (top centre, one at a time)
+  float profileT = 0, flightKm = 0;     // (the once-a-second checks; this flight's track over the ground, km)
+  float pbOld = -1.f; bool pbNew = false;   // this flight's touchdown against the type's softest before it
+  int logPage = 0;                     // the logbook's right-hand page: progress, achievements, passport
+  int licenceShown = -1;                // the licence card in the hub: the licence it celebrates (-1 none)
+  bool finaleShown = false;             // the campaign's end card (once, on the hub)
+  float debriefT0 = 0;                  // when the debrief opened (its lines come in, the total counts up)
+  LandingMark lastMark;                 // the debrief's landing mark
+  void award(const std::string& id);
+  void loadProfile();
+  void saveProfile();
+  void profileTouchdown(float fpm, int airport);
+  void profileTick(float dt);           // in flight: landmarks, sightings, the warp's distance
+  void profileFlightEnd(bool success);
+  void profileCareerCheck();            // licences, the fleet, the airline, the bank
+  void drawAchievementBanner();
+  void drawLicenceCard();
+  void drawFinaleCard();
+  int musicMood() const;                // the score's mood for what is on screen
+  void updateMusic();
   void callout(const std::string& s);   // a line for the voices only: shown elsewhere (the stamp) or not at all
   bool engineAutoStarted = false;
   float startDelay = 0;
@@ -547,6 +575,7 @@ private:
   bool warnWas[4] = {}; float warnLastT[4] = {-99, -99, -99, -99};   // stall, pull up, gear, engine off: rising edges
   static const int kWarnKey = 1000;   // (a hazard call's Tx key: kWarnKey + its index, valid while warnWas holds)
   float radioSentVol = -1.f;          // the radio's volume as last set (feedAudio)
+  float musicSentVol = -1.f;          // the score's, while it has the music ring (updateMusic)
   float radioLevel() const { return set.master * set.radioVol * (1.f - 0.65f * voiceDuck); }   // the music: master x radio, ducked under speech
   // a failure annunciator (C7): the HUD draws text, comms speak it when its state (slot -> key) comes on or changes
   // severity, never for the numbers alone (battery and ice percentages move every frame)

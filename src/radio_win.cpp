@@ -147,7 +147,7 @@ void Radio::play(const std::string& url) {
   {std::lock_guard<std::mutex> guard(i->state->mutex);i->state->url=url;i->state->audioToken=g_audio.musicBegin();i->state->request=true;i->state->status.store(CONNECTING);}
   g_audio.musicVolume(vol);i->state->wake.notify_all();st=CONNECTING;msg="Connecting... "+url;
 }
-void Radio::setVolume(float v){vol=std::clamp(v,0.f,1.f);g_audio.musicVolume(vol);}
+void Radio::setVolume(float v){vol=std::clamp(v,0.f,1.f);if(st!=IDLE)g_audio.musicVolume(vol);}   // (off, the music ring is the game's own score's: music.h)
 void Radio::poll() {
   auto i=static_cast<Impl*>(impl);if(!i)return;
   auto next=static_cast<Radio::State>(i->state->status.load());

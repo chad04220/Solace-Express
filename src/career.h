@@ -99,6 +99,14 @@ inline int touchdownGrade(float fpm) {
 // the cockpit's call (Aster's recorded ratings: atc.cpp) and the HUD stamp's word
 inline const char* touchdownGradeCall(int g) { static const char* n[] = {"BUTTER!", "Smooth landing", "Good landing", "Firm landing", "HARD landing!"}; return n[std::clamp(g, 0, 4)]; }
 inline const char* touchdownGradeWord(int g) { static const char* n[] = {"BUTTER", "SMOOTH", "GOOD", "FIRM", "HARD"}; return n[std::clamp(g, 0, 4)]; }
+struct AircraftSpec;
+// The landing's mark out of 100, for the debrief: the touchdown's rate (40: butter 40, smooth 33, good 25, firm 12),
+// where on the runway it came down (25: the first third, 12 short of the middle), the centreline (15: inside 2 m, 9
+// inside 5 m, 4 inside 10 m) and the approach over the threshold (20: the speed and the height the settlement's
+// "Stable approach" asks for, half for near them). S from 92, A from 80, B from 65, C from 45, else D. No mark
+// (score -1) without a touchdown on the destination's runway
+struct LandingMark { int score = -1, rate = 0, zone = 0, line = 0, approach = 0; char letter = 0; };
+LandingMark landingMark(const FlightResult& r, const AircraftSpec& s);
 
 class Career {
 public:

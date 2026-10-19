@@ -42,7 +42,7 @@ set(CORE_ONLY_SOURCES
 set(CORE_SOURCES ${ENVIRONMENT_SOURCES} ${CORE_ONLY_SOURCES})
 set(GAME_ONLY_SOURCES
   src/aircraft_mesh_asset.cpp
-  src/joystick.cpp src/traffic.cpp src/game.cpp src/game_ui.cpp src/game_research_ui.cpp src/game_military_ui.cpp src/game_somnus.cpp src/renderer.cpp src/materials.cpp src/texture_compress.cpp src/raster_renderer.cpp src/prop_disc.cpp src/terrain_mesh.cpp src/aircraft_mesh.cpp src/entity_render.cpp src/aircraft_hull.cpp src/camera_feeds.cpp src/atc.cpp src/gl.cpp src/audio.cpp src/sky.cpp src/enemy_fleet.cpp src/enemy_mesh.cpp)
+  src/joystick.cpp src/traffic.cpp src/game.cpp src/game_ui.cpp src/game_profile.cpp src/profile.cpp src/music.cpp src/game_research_ui.cpp src/game_military_ui.cpp src/game_somnus.cpp src/renderer.cpp src/materials.cpp src/texture_compress.cpp src/raster_renderer.cpp src/prop_disc.cpp src/terrain_mesh.cpp src/aircraft_mesh.cpp src/entity_render.cpp src/aircraft_hull.cpp src/camera_feeds.cpp src/atc.cpp src/gl.cpp src/audio.cpp src/sky.cpp src/enemy_fleet.cpp src/enemy_mesh.cpp)
 set(GAME_SOURCES ${CORE_SOURCES} src/entity_mesh.cpp src/bridge_mesh.cpp ${GAME_ONLY_SOURCES})
 add_library(env_objs OBJECT ${ENVIRONMENT_SOURCES})
 add_library(core_objs OBJECT ${CORE_ONLY_SOURCES})
@@ -273,6 +273,18 @@ if(MSVC)
   target_compile_definitions(assist_test PRIVATE _CRT_SECURE_NO_WARNINGS)
 endif()
 add_dependencies(assist_test shaders_gen)
+# The pilot's profile and the debrief's landing mark: the mark's scale, the profile kept, the stamps, the landmarks.
+if(WIN32)
+  add_executable(profile_test tests/profile_test.cpp ${GAME_OBJS} src/radio_win.cpp)
+  target_link_libraries(profile_test PRIVATE opengl32 gdi32 winmm mfreadwrite mfplat mfuuid ole32 uuid)
+else()
+  add_executable(profile_test tests/profile_test.cpp ${GAME_OBJS} src/radio_stub.cpp)
+  target_link_libraries(profile_test PRIVATE ${CMAKE_DL_LIBS} pthread)
+endif()
+if(MSVC)
+  target_compile_definitions(profile_test PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
+add_dependencies(profile_test shaders_gen)
 add_dependencies(gameplay_test military_gameplay_test)
 # Showroom controls and safe turntable/lens bounds against the real Game and room geometry.
 if(WIN32)
@@ -363,6 +375,7 @@ add_test(NAME joystick COMMAND joystick_test)
 add_test(NAME military_career COMMAND military_career_test)
 add_test(NAME military_gameplay COMMAND military_gameplay_test)
 add_test(NAME assist_and_warp COMMAND assist_test)
+add_test(NAME pilot_profile COMMAND profile_test)
 set_tests_properties(assist_and_warp PROPERTIES COST 40)
 add_test(NAME hangar_preview_controls COMMAND hangar_preview_controls_test)
 add_test(NAME hive_combat COMMAND hive_combat_test)
@@ -748,7 +761,7 @@ add_test(NAME test_world COMMAND test_world ${CMAKE_BINARY_DIR}/test_world.bin)
 set_tests_properties(test_world PROPERTIES FIXTURES_SETUP world COST 1000)
 foreach(t airport_environment airport_layouts cockpit_camera community_layout ufo_encounter entity_raycast terrain_envelope
           environment_scale_audit earth_rebase_flight flight_model_1 flight_model_2 flight_model_3 gameplay_loop_1 gameplay_loop_2 gameplay_loop_3
-          gameplay_loop_4 assist_and_warp campaign_progression_1 campaign_progression_2 campaign_progression_3 career_saves save_format soak military_career military_career_fastmath military_gameplay hangar_preview_controls hive_world_collision hive_world_collision_fastmath terrain_shadow_bake
+          gameplay_loop_4 assist_and_warp pilot_profile campaign_progression_1 campaign_progression_2 campaign_progression_3 career_saves save_format soak military_career military_career_fastmath military_gameplay hangar_preview_controls hive_world_collision hive_world_collision_fastmath terrain_shadow_bake
           volcano_effects new_aircraft_performance new_aircraft_autoland_thistledown new_aircraft_autoland_galleon new_aircraft_go_around
           vtol_throttle wreck_pose bridges roads landmarks road_traffic road_grade_gpu menu_plan_cache)
   if(TEST ${t})
@@ -757,7 +770,7 @@ foreach(t airport_environment airport_layouts cockpit_camera community_layout uf
   endif()
 endforeach()
 foreach(t airport_environment_test airport_layout_test cockpit_camera_test community_layout_test encounter_timing_test
-          entity_raycast_test envelope_test environment_scale_audit geo_flight_test flight_test gameplay_test assist_test progression_test save_test save_format_test soak_test
+          entity_raycast_test envelope_test environment_scale_audit geo_flight_test flight_test gameplay_test assist_test profile_test progression_test save_test save_format_test soak_test
           military_career_test military_career_fastmath_test military_gameplay_test hangar_preview_controls_test hive_world_collision_test hive_world_collision_fastmath_test
           terrain_shadow_test volcano_effects_test new_aircraft_performance_test new_aircraft_autoland_test vtol_throttle_test
           bridges_test roads_test landmarks_test road_traffic_test road_grade_gpu_test menu_plan_cache_test)
@@ -854,6 +867,12 @@ set_tests_properties(jet_fuel PROPERTIES FIXTURES_REQUIRED world
 add_executable(audio_spatial_test tests/audio_spatial_test.cpp src/audio.cpp)
 add_executable(audio_voice_test tests/audio_voice_test.cpp src/audio.cpp src/atc.cpp)
 add_test(NAME audio_spatial COMMAND audio_spatial_test)
+# The game's own score (music.h): every mood and stinger rendered offline - levels, no silence, no clipping, the cost
+add_executable(music_test tests/music_test.cpp src/music.cpp src/audio.cpp)
+if(NOT WIN32)
+  target_link_libraries(music_test PRIVATE pthread)
+endif()
+add_test(NAME music COMMAND music_test)
 add_test(NAME audio_voice COMMAND audio_voice_test ${CMAKE_SOURCE_DIR}/assets/voice)
 if(Python3_Interpreter_FOUND)
   add_test(NAME audio_assets COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/audio_asset_audit.py)

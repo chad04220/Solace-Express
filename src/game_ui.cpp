@@ -5,6 +5,7 @@
 #include "hangar_catalog.h"
 #include "ui_identity.h"
 #include "load_pacer.h"
+#include <ctime>
 
 // High-tech glass UI: deep navy panels, cyan accents, amber for warnings
 static const vec3 C_PANEL = svui::ink, C_PANEL2 = svui::panel, C_ACCENT = svui::brass, C_WARN = svui::amber;
@@ -594,6 +595,12 @@ void Game::drawMenu() {
 
 // ------------------------------------------------------------------ hub
 void Game::drawHub() {
+  // a card over the hub (a new licence, the campaign's end) takes the clicks, the keys and the pad: the hub under it
+  // is drawn without them
+  const bool card = licenceShown >= 0 || finaleShown;
+  Input held;
+  if (card) { held = in; memset(in.pressed, 0, sizeof(in.pressed)); for (bool& m : in.mPressed) m = false; in.buttonsPressed = 0; in.wheel = 0; }
+  struct CardAfter { Game* g; bool on; Input& held; ~CardAfter() { if (!on) return; g->in = held; g->uiGlass = false; g_ren.flushUIPublic(); if (g->licenceShown >= 0) g->drawLicenceCard(); else if (g->finaleShown) g->drawFinaleCard(); } } after{this, card, held};
   if (hubTab == TAB_CONTRACTS && hubList == 2) { FrameParams fp{}; drawMilitary(fp); return; }
   float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
   uiGlass = true;   // (panels and cards in the hub's glass style; reset at the end)
@@ -1643,9 +1650,17 @@ void Game::drawHubAirline(float x, float y, float w, float h) {
 void Game::drawHubLogbook(float x, float y, float w, float h) {
   const float s = S(), lw = std::min(w * 0.36f, 430 * s), dx = x + lw + 16 * s, dw = w - lw - 16 * s;
   panel(x, y, lw, h); panel(dx, y, dw, h);
-  g_ren.text(x + 24 * s, y + 20 * s, 24 * s, "Pilot logbook", C_TEXT, 1);
-  g_ren.text(dx + 24 * s, y + 20 * s, 24 * s, "Career progression", C_TEXT, 1);
+  fitText(x + 24 * s, y + 20 * s, lw - 48 * s, 24 * s, 15 * s, profile.name.empty() ? std::string("Pilot logbook") : "Captain " + profile.name, C_TEXT);
+  // the right column's pages: the campaign, the achievements, the passport (airports, landmarks, sightings)
+  {
+    const char* pages[] = {"PROGRESS", "ACHIEVEMENTS", "PASSPORT"};
+    const float bw = std::min(150 * s, (dw - 48 * s - 16 * s) / 3.f);
+    for (int i = 0; i < 3; i++)
+      if (button(dx + 24 * s + i * (bw + 8 * s), y + 18 * s, bw, 30 * s, pages[i], true, logPage == i) && logPage != i) { logPage = i; g_audio.trigger(SFX_CLICK); }
+  }
   static float scroll[2] = {0, 0}, total[2] = {0, 0};
+  static int pageWas = -1;
+  if (pageWas != logPage) { pageWas = logPage; scroll[1] = 0; }
   const float top = y + 72 * s, bottom = y + h - 20 * s;
   for (int column = 0; column < 2; ++column) {
     float bx = column ? dx : x, bw = column ? dw : lw, px = bx + 24 * s, iw = bw - 48 * s;
@@ -1668,6 +1683,17 @@ void Game::drawHubLogbook(float x, float y, float w, float h) {
       py += 244 * s;
       g_ren.text(px, py, 12 * s, "SOFTEST LANDING", C_DIM, 1, 0, false);
       g_ren.text(px + iw, py, 15 * s, career.bestLandingFpm < 9000 ? fmt("%.0f fpm", career.bestLandingFpm) : "No landings yet", C_TEXT, 1, 2); py += 40 * s;
+      if (!profile.best.empty()) {   // each type's softest, from the profile (every career, every flight)
+        header(px, py, iw, "SOFTEST BY TYPE"); py += 30 * s;
+        for (int i = 0; i < kAircraftCount; i++) {
+          auto it = profile.best.find(kAircraft[i].id);
+          if (it == profile.best.end()) continue;
+          g_ren.text(px, py, 14 * s, ellipsize(kAircraft[i].name, iw - 110 * s, 14 * s), C_TEXT, 1);
+          g_ren.text(px + iw, py, 14 * s, fmt("%.0f fpm", it->second), touchdownGrade(it->second) == TD_BUTTER ? vec3(1.f, 0.85f, 0.45f) : C_TEXT, 1, 2);
+          py += 22 * s;
+        }
+        py += 18 * s;
+      }
       header(px, py, iw, "LICENCES"); py += 30 * s;
       const char* unlocks[] = {"Dawnlark trainer / flight school", "Dawnlark and Ambler rentals / cargo work", "Scrubrunner, Skerry and Longshore / passengers / ownership", "Archipel and Emissary / airline operations"};
       for (int i = 0; i < 4; ++i) {
@@ -1676,6 +1702,66 @@ void Game::drawHubLogbook(float x, float y, float w, float h) {
         g_ren.text(px + 18 * s, py, 15 * s, licenseName(i), got ? C_TEXT : C_DIM, 1); py += 23 * s;
         for (auto& line : wrap(unlocks[i], iw - 18 * s, 12 * s)) { g_ren.text(px + 18 * s, py, 12 * s, line, C_DIM, 0.9f); py += 17 * s; }
         py += 20 * s;
+      }
+    } else if (logPage == 1) {   // the achievements: earned ones lit, with the day; the rest with how far along
+      g_ren.text(px, py, 12 * s, fmt("%02d / %02d ACHIEVEMENTS", (int)profile.ach.size(), kAchievementCount), C_ACCENT, 1, 0, false); py += 26 * s;
+      g_ren.rect(px, py, iw, 4 * s, C_DIM, 0.2f, 2 * s);
+      g_ren.rect(px, py, std::max(2 * s, iw * profile.ach.size() / (float)kAchievementCount), 4 * s, C_ACCENT, 1, 2 * s); py += 22 * s;
+      const int nAp = (int)profile.airports.size(), nSites = (int)profile.sites.size(), allSites = (int)profileSites().size();
+      auto progress = [&](const std::string& id) -> std::string {
+        if (id == "butter25") return fmt("%d / 25", (int)profile.count("butters"));
+        if (id == "airports10") return fmt("%d / 10", std::min(nAp, 10));
+        if (id == "airports_all") return fmt("%d / %d", nAp, (int)g_world.airports.size());
+        if (id == "sites5") return fmt("%d / 5", std::min(nSites, 5));
+        if (id == "sites_all") return fmt("%d / %d", nSites, allSites);
+        if (id == "warp") return fmt("%.0f / 500 km", std::min(profile.count("warpKm"), 500.f));
+        if (id == "fleet3") return fmt("%d / 3", std::min((int)career.fleet.size(), 3));
+        return "";
+      };
+      for (int i = 0; i < kAchievementCount; i++) {
+        const Achievement& ac = kAchievements[i];
+        auto it = profile.ach.find(ac.id);
+        const bool got = it != profile.ach.end();
+        const vec3 gold(1.f, 0.82f, 0.35f);
+        g_ren.rect(px, py, iw, 50 * s, got ? gold * 0.12f : C_PANEL2, got ? 0.8f : 0.45f, 4 * s);
+        g_ren.rect(px + 10 * s, py + 13 * s, 24 * s, 24 * s, got ? gold : C_DIM * 0.5f, got ? 1.f : 0.5f, 12 * s);
+        g_ren.rect(px + 15 * s, py + 18 * s, 14 * s, 14 * s, vec3(0.05f, 0.06f, 0.07f), 1, 7 * s);
+        std::string right;
+        if (got) { time_t t = (time_t)it->second; char buf[32] = ""; if (t > 0) { struct tm* lt = localtime(&t); if (lt) strftime(buf, sizeof buf, "%d %b %Y", lt); } right = buf; }
+        else right = progress(ac.id);
+        const float rw = right.empty() ? 0.f : g_ren.textWidth(right, 12 * s) + 12 * s;
+        g_ren.text(px + 46 * s, py + 8 * s, 15 * s, ellipsize(ac.title, iw - 56 * s - rw, 15 * s), got ? C_TEXT : C_DIM, 1);
+        g_ren.text(px + 46 * s, py + 28 * s, 12 * s, ellipsize(!got && ac.secret ? "A secret: keep flying" : ac.desc, iw - 56 * s - rw, 12 * s), C_DIM, got ? 1.f : 0.7f);
+        if (!right.empty()) g_ren.text(px + iw - 10 * s, py + 18 * s, 12 * s, right, got ? gold : C_DIM, 1, 2);
+        py += 56 * s;
+      }
+    } else if (logPage == 2) {   // the passport: every airport landed at, every landmark found, the sightings
+      header(px, py, iw, fmt("AIRPORTS  %d / %d", (int)profile.airports.size(), (int)g_world.airports.size())); py += 30 * s;
+      for (const Airport& a : g_world.airports) {
+        const bool got = profile.airports.count(a.code) > 0;
+        g_ren.rect(px, py + 3 * s, 10 * s, 10 * s, got ? vec3(1.f, 0.82f, 0.35f) : C_DIM * 0.4f, got ? 1.f : 0.5f, 5 * s);
+        g_ren.text(px + 20 * s, py, 14 * s, a.code, got ? vec3(1.f, 0.85f, 0.45f) : C_DIM, 1);
+        g_ren.text(px + 74 * s, py, 14 * s, ellipsize(a.name, iw - 170 * s, 14 * s), got ? C_TEXT : C_DIM, got ? 1.f : 0.7f);
+        g_ren.text(px + iw, py, 12 * s, got ? "STAMPED" : "", vec3(1.f, 0.82f, 0.35f), 1, 2, false);
+        py += 22 * s;
+      }
+      py += 14 * s;
+      const auto& sites = profileSites();
+      header(px, py, iw, fmt("LANDMARKS  %d / %d", (int)profile.sites.size(), (int)sites.size())); py += 30 * s;
+      for (const Site& st : sites) {
+        const bool got = profile.sites.count(st.id) > 0;
+        g_ren.rect(px, py + 3 * s, 10 * s, 10 * s, got ? C_GOOD : C_DIM * 0.4f, got ? 1.f : 0.5f, 2 * s);
+        g_ren.text(px + 20 * s, py, 14 * s, ellipsize(st.name, iw - 120 * s, 14 * s), got ? C_TEXT : C_DIM, got ? 1.f : 0.7f);
+        g_ren.text(px + iw, py, 12 * s, got ? "FOUND" : "fly over it", got ? C_GOOD : C_DIM * 0.8f, 1, 2, false);
+        py += 22 * s;
+      }
+      py += 14 * s;
+      header(px, py, iw, "SIGHTINGS"); py += 30 * s;
+      const std::pair<const char*, const char*> seen[] = {{"ufo", "The visitors"}, {"display", "The Nocturne display pair"}};
+      for (auto& sg : seen) {
+        const bool got = profile.seen.count(sg.first) > 0;
+        g_ren.text(px + 20 * s, py, 14 * s, got ? sg.second : "???", got ? C_TEXT : C_DIM, got ? 1.f : 0.6f);
+        py += 22 * s;
       }
     } else {
       float fraction = g_story.empty() ? 0 : (float)career.storyIndex / g_story.size();
@@ -1812,7 +1898,8 @@ void Game::drawSettings(float x, float y, float w, float h) {
   slider("Radio volume", set.radioVol, 0, 1, 0.05f, fmt("%.0f%%", set.radioVol * 100));
   if (rv != set.radioVol) radio.setVolume(radioLevel());
   slider("Voice volume", set.atcVol, 0, 1, 0.05f, fmt("%.0f%%", set.atcVol * 100));
-  slider("Music volume", set.musicVol, 0, 1, 0.05f, fmt("%.0f%%", set.musicVol * 100));
+  slider("Music volume", set.musicVol, 0, 1, 0.05f, set.musicVol <= 0.f ? std::string("Off") : fmt("%.0f%%", set.musicVol * 100));
+  toggle("Music in the cruise", set.musicFlight, "Quiet ambience", "Off");
   slider("Mouse sensitivity", set.mouseSens, 0.2f, 3.f, 0.1f, fmt("%.1f", set.mouseSens));
   slider("Field of view", set.fov, 45.f, 75.f, 1.f, fmt("%.0f / %.0f deg", set.fov, set.fov + 19.f));   // (the long form clipped even at 1080p: the review of v3.44.0, UI-6)
   py -= 6 * s; note("outside / in the cockpit");
@@ -3098,9 +3185,120 @@ void Game::drawLandingStamp() {
   g_ren.text(W * 0.5f, y0 + bh - 28 * s, 16 * s, sub, C_TEXT, a, 1, false);
 }
 
+// An achievement as it is earned: a card sliding down at the top centre, its chime as it arrives (one at a time)
+void Game::drawAchievementBanner() {
+  if (achShow.empty()) return;
+  AchShow& a = achShow.front();
+  const Achievement* ac = findAchievement(a.id);
+  if (!ac) { achShow.erase(achShow.begin()); return; }
+  g_ren.flushUIPublic();   // (over everything drawn before it, its text too)
+  if (!a.played) { a.played = true; a.t = 0.f; if (g_music.owns()) g_music.sting(STING_ACHIEVEMENT); else g_audio.trigger(SFX_CHIME, 0.7f); }
+  const float s = S(), W = (float)g_ren.W, t = a.t;
+  const float in = clampf(t / 0.35f, 0.f, 1.f), out = clampf((4.5f - t) / 0.4f, 0.f, 1.f), k = std::min(in * in * (3 - 2 * in), out);
+  const float w = std::min(460 * s, W - 40 * s), h = 64 * s, x = W * 0.5f - w * 0.5f, y0 = screen == SCR_FLIGHT ? (float)g_ren.H * 0.17f : 130 * s, y = -h + (h + y0) * k;   // (in flight under the heading tape; elsewhere under the tabs)
+  g_ren.glow(x, y, w, h, C_ACCENT, 0.35f * k, 8 * s, 18 * s);
+  g_ren.rect(x, y, w, h, vec3(0.02f, 0.035f, 0.05f), 0.95f * k, 8 * s);
+  g_ren.rect(x, y, w, 2 * s, C_ACCENT, k);
+  // the medal: a ring with a star-ish centre, turning in
+  const float cx = x + 34 * s, cy = y + h * 0.5f, r = 20 * s;
+  g_ren.rect(cx - r, cy - r, r * 2, r * 2, C_ACCENT, 0.9f * k, r);
+  g_ren.rect(cx - r * 0.72f, cy - r * 0.72f, r * 1.44f, r * 1.44f, vec3(0.05f, 0.06f, 0.07f), k, r * 0.72f);
+  g_ren.text(cx, cy - 11 * s, 20 * s, "*", vec3(1.f, 0.88f, 0.5f), k, 1);
+  g_ren.text(x + 66 * s, y + 10 * s, 11 * s, "ACHIEVEMENT UNLOCKED", C_ACCENT, k, 0, false);
+  fitText(x + 66 * s, y + 25 * s, w - 82 * s, 18 * s, 12 * s, ac->title, C_TEXT, k);
+  fitText(x + 66 * s, y + 46 * s, w - 82 * s, 12 * s, 9 * s, ac->desc, C_DIM, k);
+}
+
+// The licence card over the hub: what the new licence opens up, the aircraft first
+void Game::drawLicenceCard() {
+  const float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
+  static float opened = -1.f; static int openedFor = -1;
+  if (openedFor != licenceShown) { openedFor = licenceShown; opened = realTime; }
+  const float e = realTime - opened, k = clampf(e / 0.4f, 0.f, 1.f), ease = 1.f - (1.f - k) * (1.f - k);
+  g_ren.rect(0, 0, W, H, vec3(0, 0, 0), 0.55f * ease);
+  const float pw = std::min(620 * s, W - 40 * s), ph = std::min(470 * s, H - 40 * s), x = W * 0.5f - pw * 0.5f, y = H * 0.5f - ph * 0.5f + (1.f - ease) * 30 * s;
+  g_ren.glow(x, y, pw, ph, vec3(1.f, 0.82f, 0.35f), 0.25f * ease, 12 * s, 30 * s);
+  panel(x, y, pw, ph, 0.97f);
+  // the wings: two bars either side of a circle
+  const float cx = x + pw * 0.5f, cy = y + 62 * s;
+  for (int sd = -1; sd <= 1; sd += 2)
+    for (int i = 0; i < 4; i++) {
+      const float len = (120 - i * 22) * s * ease, bx = sd < 0 ? cx - 34 * s - len : cx + 34 * s;
+      g_ren.rect(bx, cy - 14 * s + i * 8 * s, len, 4 * s, vec3(1.f, 0.82f, 0.35f), 0.9f - i * 0.15f, 2 * s);
+    }
+  g_ren.rect(cx - 28 * s, cy - 28 * s, 56 * s, 56 * s, vec3(1.f, 0.82f, 0.35f), ease, 28 * s);
+  g_ren.rect(cx - 22 * s, cy - 22 * s, 44 * s, 44 * s, vec3(0.06f, 0.05f, 0.03f), ease, 22 * s);
+  const char* abbr[] = {"SP", "PPL", "CPL", "ATP"};
+  g_ren.text(cx, cy - 9 * s, 16 * s, abbr[std::clamp(licenceShown, 0, 3)], vec3(1.f, 0.85f, 0.45f), ease, 1);
+  float py = y + 108 * s;
+  g_ren.text(cx, py, 12 * s, "LICENCE AWARDED", C_ACCENT, ease, 1, false); py += 22 * s;
+  std::string nm = licenseName(licenceShown); std::string up; for (char ch : nm) up += (char)toupper((unsigned char)ch);
+  { float fs = 30 * s; while (fs > 16 * s && g_ren.textWidth(up, fs) > pw - 60 * s) fs -= 1 * s; g_ren.text(cx, py, fs, up, C_TEXT, ease, 1); }
+  py += 48 * s;
+  header(x + 30 * s, py, pw - 60 * s, "NOW OPEN TO YOU"); py += 28 * s;
+  std::vector<std::string> lines;
+  for (int i = 0; i < kAircraftCount; i++) if (kAircraft[i].license == licenceShown && !kAircraft[i].special) lines.push_back(std::string(kAircraft[i].name) + "  -  " + kAircraft[i].role);
+  const char* work[] = {"", "Rentals and cargo work across the islands", "Passenger flights, and aircraft of your own to buy or finance", "Your own airline: routes, hired pilots, the biggest aircraft"};
+  if (licenceShown >= 1 && licenceShown <= 3) lines.push_back(work[licenceShown]);
+  if (licenceShown >= LIC_CPL) lines.push_back("The Military board: sorties in the XR jets");
+  int n = 0;
+  for (auto& l : lines) {
+    if (py > y + ph - 90 * s) break;
+    const float a = clampf((e - 0.35f - n++ * 0.08f) / 0.25f, 0.f, 1.f);
+    g_ren.rect(x + 34 * s, py + 6 * s, 6 * s, 6 * s, C_GOOD, a, 3 * s);
+    fitText(x + 50 * s, py, pw - 80 * s, 15 * s, 11 * s, l, C_TEXT, a);
+    py += 26 * s;
+  }
+  if (button(x + pw * 0.5f - 110 * s, y + ph - 66 * s, 220 * s, 46 * s, "Continue", true, true) || in.pressed[K_ENTER] || in.pressed[K_ESC]) { licenceShown = -1; g_audio.trigger(SFX_CLICK); }
+}
+
+// The campaign's end: the career in numbers, and what is still out there
+void Game::drawFinaleCard() {
+  const float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
+  static float opened = -1.f;
+  if (opened < 0.f || realTime - opened > 1e5f) opened = realTime;
+  const float e = realTime - opened, k = clampf(e / 0.6f, 0.f, 1.f), ease = 1.f - (1.f - k) * (1.f - k);
+  g_ren.rect(0, 0, W, H, vec3(0, 0, 0), 0.6f * ease);
+  const float pw = std::min(680 * s, W - 40 * s), ph = std::min(560 * s, H - 40 * s), x = W * 0.5f - pw * 0.5f, y = H * 0.5f - ph * 0.5f;
+  g_ren.glow(x, y, pw, ph, vec3(1.f, 0.82f, 0.35f), 0.3f * ease, 14 * s, 36 * s);
+  panel(x, y, pw, ph, 0.97f);
+  float py = y + 28 * s;
+  g_ren.text(x + pw * 0.5f, py, 12 * s, "THE SOMNIUM VOLANDI CAMPAIGN", C_ACCENT, ease, 1, false); py += 24 * s;
+  { std::string nm = "CAPTAIN"; if (!profile.name.empty()) { nm += ' '; for (char ch : profile.name) nm += (char)toupper((unsigned char)ch); }
+    g_ren.text(x + pw * 0.5f, py, 34 * s, nm, vec3(1.f, 0.85f, 0.45f), ease, 1); py += 50 * s; }
+  fitText(x + 30 * s, py, pw - 60 * s, 15 * s, 11 * s, "From your first lesson to the last flight of the night: the islands are yours.", C_TEXT, ease); py += 34 * s;
+  const std::string vals[] = {fmt("%d", career.flights), fmt("%.1f h", career.hours), fmt("%d", career.landings),
+                              career.bestLandingFpm < 9000 ? fmt("%.0f fpm", career.bestLandingFpm) : std::string("-"), fmtMoney(career.money),
+                              fmt("%d / %d", (int)profile.ach.size(), kAchievementCount)};
+  const char* labs[] = {"FLIGHTS", "FLIGHT TIME", "LANDINGS", "SOFTEST LANDING", "BANK", "ACHIEVEMENTS"};
+  const float cw = (pw - 60 * s - 24 * s) / 3.f;
+  for (int i = 0; i < 6; i++) {
+    const float a = clampf((e - 0.4f - i * 0.12f) / 0.3f, 0.f, 1.f);
+    const float bx = x + 30 * s + (i % 3) * (cw + 12 * s), by = py + (i / 3) * 74 * s;
+    g_ren.rect(bx, by, cw, 62 * s, C_PANEL2, 0.65f * a, 4 * s);
+    g_ren.text(bx + 12 * s, by + 9 * s, 10 * s, labs[i], C_DIM, a, 0, false);
+    fitText(bx + 12 * s, by + 28 * s, cw - 24 * s, 21 * s, 12 * s, vals[i], C_TEXT, a);
+  }
+  py += 160 * s;
+  header(x + 30 * s, py, pw - 60 * s, "STILL OUT THERE"); py += 28 * s;
+  const std::string more[] = {"Legendary contracts on the board: the hardest flying in the islands", "Your airline: more routes, better pilots, the Galleon 180",
+                              fmt("%d of %d airports stamped, %d of %d landmarks found", (int)profile.airports.size(), (int)g_world.airports.size(), (int)profile.sites.size(), (int)profileSites().size()),
+                              "Trials for gold, the Military board, and Free Flight anywhere on Earth"};
+  for (auto& l : more) {
+    if (py > y + ph - 90 * s) break;
+    g_ren.rect(x + 34 * s, py + 6 * s, 6 * s, 6 * s, C_ACCENT, ease, 3 * s);
+    fitText(x + 50 * s, py, pw - 80 * s, 15 * s, 11 * s, l, C_TEXT, ease);
+    py += 26 * s;
+  }
+  if (button(x + pw * 0.5f - 110 * s, y + ph - 66 * s, 220 * s, 46 * s, "Fly on", true, true) || in.pressed[K_ENTER] || in.pressed[K_ESC]) { finaleShown = false; opened = -1.f; g_audio.trigger(SFX_CLICK); }
+}
+
 void Game::drawDebrief() {
   if (isMilitaryContract(contract.type)) { drawMilitaryDebrief(); return; }
   float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
+  // (it comes in: the title, then the lines one after another, the total counting up to what was earned)
+  const float e = realTime - debriefT0;
+  auto fadeIn = [&](float at) { const float k = clampf((e - at) / 0.22f, 0.f, 1.f); return k * k * (3 - 2 * k); };
   g_ren.rect(0, 0, W, H, vec3(0, 0, 0), 0.35f);
   float pw = std::min(720 * s, W - 40 * s), ph = std::min(760 * s, H - 40 * s), x = W * 0.5f - pw * 0.5f, y = H * 0.5f - ph * 0.5f;
   panel(x, y, pw, ph, 0.95f);
@@ -3108,15 +3306,57 @@ void Game::drawDebrief() {
   for (auto& l : wrap(debriefTitle, pw - 60 * s, 28 * s)) { g_ren.text(px, py, 28 * s, l, lastSuccess ? C_GOOD : C_BAD, 1); py += 34 * s; }
   py += 8 * s;
   g_ren.text(px, py, 18 * s, ellipsize(contract.title, pw - 60 * s, 18 * s), C_TEXT, 1); py += 34 * s;
-  if (lastSuccess && contract.type != CT_FERRY) {
-    for (int i = 0; i < 3; i++) {
-      float pop = anim(uid(px + i, py, "star"), 1.f, 6.f - i * 1.5f);
-      float sz = 32 * s * (i < stars ? pop : 1.f), cx = px + i * 44 * s + 16 * s, cy = py + 16 * s;
-      if (i < stars) g_ren.glow(cx - sz * 0.5f, cy - sz * 0.5f, sz, sz, C_WARN, 0.5f * pop, sz * 0.5f, 12 * s);
-      g_ren.rect(cx - sz * 0.5f, cy - sz * 0.5f, sz, sz, i < stars ? C_WARN : vec3(0.12f, 0.16f, 0.2f), 1, sz * 0.5f);
-      g_ren.rect(cx - sz * 0.22f, cy - sz * 0.22f, sz * 0.44f, sz * 0.44f, i < stars ? vec3(1, 0.95f, 0.8f) : vec3(0.2f, 0.25f, 0.3f), 1, sz * 0.22f);
+  const bool showStars = lastSuccess && contract.type != CT_FERRY, showMark = lastSuccess && lastMark.score >= 0;
+  if (showStars || showMark) {
+    float mx = px;
+    if (showStars) {
+      for (int i = 0; i < 3; i++) {
+        float pop = anim(uid(px + i, py, "star"), 1.f, 6.f - i * 1.5f);
+        float sz = 32 * s * (i < stars ? pop : 1.f), cx = px + i * 44 * s + 16 * s, cy = py + 16 * s;
+        if (i < stars) g_ren.glow(cx - sz * 0.5f, cy - sz * 0.5f, sz, sz, C_WARN, 0.5f * pop, sz * 0.5f, 12 * s);
+        g_ren.rect(cx - sz * 0.5f, cy - sz * 0.5f, sz, sz, i < stars ? C_WARN : vec3(0.12f, 0.16f, 0.2f), 1, sz * 0.5f);
+        g_ren.rect(cx - sz * 0.22f, cy - sz * 0.22f, sz * 0.44f, sz * 0.44f, i < stars ? vec3(1, 0.95f, 0.8f) : vec3(0.2f, 0.25f, 0.3f), 1, sz * 0.22f);
+      }
+      mx = px + 150 * s;
+    }
+    if (showMark) {   // the landing's mark: a letter tile, the score out of 100 and what made it (landingMark)
+      const char L = lastMark.letter;
+      const vec3 lc = L == 'S' ? vec3(1.f, 0.82f, 0.3f) : L == 'A' ? C_GOOD : L == 'B' ? vec3(0.45f, 0.85f, 1.f) : L == 'C' ? C_WARN : C_BAD;
+      const float pop = 0.6f + 0.4f * fadeIn(0.15f), ts = 40 * s * pop, tx = mx + 20 * s - ts * 0.5f, ty = py + 16 * s - ts * 0.5f;
+      if (L == 'S') g_ren.glow(tx, ty, ts, ts, lc, 0.6f * fadeIn(0.15f), 10 * s, 16 * s);
+      g_ren.rect(tx, ty, ts, ts, lc * 0.25f, 0.95f, 8 * s);
+      g_ren.rect(tx, ty, ts, 2 * s, lc, 0.9f);
+      g_ren.text(mx + 20 * s, py + 16 * s - 14 * s * pop, 28 * s * pop, std::string(1, L), lc, fadeIn(0.15f), 1);
+      const float a = fadeIn(0.25f);
+      g_ren.text(mx + 50 * s, py - 1 * s, 12 * s, fmt("LANDING  %d / 100", lastMark.score), C_DIM, a, 0, false);
+      fitText(mx + 50 * s, py + 17 * s, x + pw - 30 * s - (mx + 50 * s), 13 * s, 10 * s,
+              fmt("touchdown %d  zone %d  centreline %d  approach %d", lastMark.rate, lastMark.zone, lastMark.line, lastMark.approach), C_TEXT * 0.8f);
     }
     py += 48 * s;
+  }
+  // a new best for the type, and the achievements earned on this flight
+  if (lastSuccess && pbNew && result.landed) {
+    const std::string t = fmt("NEW PERSONAL BEST IN THE %s: %.0f FPM (WAS %.0f)", plane.spec ? plane.spec->name : "", fabsf(touchdownFpm), pbOld);
+    std::string up; for (char ch : t) up += (char)toupper((unsigned char)ch);
+    const float tw = std::min(g_ren.textWidth(up, 12 * s) + 24 * s, pw - 60 * s), a = fadeIn(0.35f);
+    g_ren.rect(px, py, tw, 24 * s, vec3(1.f, 0.82f, 0.3f) * 0.22f, 0.9f * a, 5 * s);
+    g_ren.text(px + 12 * s, py + 6 * s, 12 * s, ellipsize(up, tw - 24 * s, 12 * s), vec3(1.f, 0.85f, 0.4f), a, 0, false);
+    py += 32 * s;
+  }
+  if (!flightAch.empty()) {
+    float cx = px; int k = 0;
+    for (const std::string& id : flightAch) {
+      const Achievement* ac = findAchievement(id);
+      if (!ac) continue;
+      const std::string t = std::string("* ") + ac->title;
+      const float tw = g_ren.textWidth(t, 13 * s) + 22 * s;
+      if (cx + tw > x + pw - 30 * s && cx > px) { cx = px; py += 30 * s; }
+      const float a = fadeIn(0.45f + 0.12f * k++);
+      g_ren.rect(cx, py, tw, 24 * s, C_ACCENT * 0.25f, 0.9f * a, 12 * s);
+      g_ren.text(cx + 11 * s, py + 5 * s, 13 * s, t, C_ACCENT, a);
+      cx += tw + 8 * s;
+    }
+    py += 34 * s;
   }
   // The foot of the panel, from the buttons up, stays put: the unsaved notice, the campaign's end, a new licence and
   // the total. What is above it - the flight data, the coaching and the settlement's lines - scrolls (mouse wheel, the
@@ -3125,7 +3365,8 @@ void Game::drawDebrief() {
   const bool campaignEnd = career.finished && lastSuccess && contract.story && contract.id == g_story.back().id;
   const auto campaignLines = campaignEnd ? wrap("You've completed the Somnium Volandi campaign. Congratulations, Captain!", pw - 60 * s, 18 * s) : std::vector<std::string>();
   const bool newLic = career.license > licenseBefore;
-  const float campY = (commitBlocked() ? y + ph - 108 * s : y + ph - 76 * s) - campaignLines.size() * 24 * s;
+  const Contract* upNext = lastSuccess && !campaignEnd && !commitBlocked() ? career.nextStory() : nullptr;
+  const float campY = (commitBlocked() ? y + ph - 108 * s : y + ph - 76 * s) - campaignLines.size() * 24 * s - (upNext ? 26 * s : 0.f);
   const float licY = campY - (newLic ? 34 * s : 0.f), totalY = licY - 34 * s;
   int total = 0;
   for (auto& l : payout) total += l.amount;
@@ -3142,10 +3383,12 @@ void Game::drawDebrief() {
   py = bodyTop - payScroll;
   // (only whole rows: one cut in half by the clip's edge ran under the total's divider)
   auto whole = [&](float h) { return py >= bodyTop - 2 * s && py + h <= bodyBot + 1 * s; };
-  auto row = [&](const std::string& k, const std::string& v) { if (whole(20 * s)) { g_ren.text(px, py, 16 * s, k, C_DIM, 1); g_ren.text(px + 230 * s, py, 16 * s, ellipsize(v, pw - 290 * s, 16 * s), C_TEXT, 1); } py += 24 * s; };
+  int rowN = 0;
+  auto rowA = [&]() { return fadeIn(0.3f + 0.05f * rowN++); };
+  auto row = [&](const std::string& k, const std::string& v) { const float a = rowA(); if (whole(20 * s)) { g_ren.text(px, py, 16 * s, k, C_DIM, a); g_ren.text(px + 230 * s, py, 16 * s, ellipsize(v, pw - 290 * s, 16 * s), C_TEXT, a); } py += 24 * s; };
   if (whole(20 * s)) header(px, py, pw - 60 * s, "FLIGHT DATA");
   py += 24 * s;
-  if (result.landed) row("Touchdown", fmt("%.0f fpm", touchdownFpm));
+  if (result.landed) row("Touchdown", fmt("%.0f fpm  (%s)", touchdownFpm, touchdownGradeWord(touchdownGrade(touchdownFpm))));
   row("Flight time", fmt("%d:%02d", (int)flightClock / 60, (int)flightClock % 60));
   row("Max G", fmt("%.2f", plane.maxG));
   row("Max bank", fmt("%.0f deg", result.maxBank));
@@ -3154,16 +3397,18 @@ void Game::drawDebrief() {
     auto cl = wrap(coaching, pw - 60 * s - 30 * s, 15 * s);
     if (cl.size() > 2) { cl.resize(2); cl[1] = ellipsize(cl[1] + " ...", pw - 90 * s, 15 * s); }
     py += 4 * s;
-    g_ren.rect(px, py, 3 * s, cl.size() * 20 * s, C_ACCENT, 0.8f);
-    for (auto& l : cl) { if (whole(18 * s)) g_ren.text(px + 12 * s, py, 15 * s, l, C_ACCENT, 0.95f); py += 20 * s; }
+    const float a = rowA();
+    g_ren.rect(px, py, 3 * s, cl.size() * 20 * s, C_ACCENT, 0.8f * a);
+    for (auto& l : cl) { if (whole(18 * s)) g_ren.text(px + 12 * s, py, 15 * s, l, C_ACCENT, 0.95f * a); py += 20 * s; }
   }
   py += 10 * s;
   if (whole(20 * s)) header(px, py, pw - 60 * s, "SETTLEMENT");
   py += 24 * s;
   for (auto& l : payout) {
+    const float a = rowA();
     if (whole(20 * s)) {
-      float vw = g_ren.text(x + pw - 30 * s, py, 16 * s, isMilitaryContract(contract.type)?fmt("%d SC",l.amount):fmtMoney(l.amount), l.amount >= 0 ? C_GOOD : C_BAD, 1, 2);
-      g_ren.text(px, py, 16 * s, ellipsize(l.label, pw - 80 * s - vw, 16 * s), C_TEXT, 1);
+      float vw = g_ren.text(x + pw - 30 * s, py, 16 * s, isMilitaryContract(contract.type)?fmt("%d SC",l.amount):fmtMoney(l.amount), l.amount >= 0 ? C_GOOD : C_BAD, a, 2);
+      g_ren.text(px, py, 16 * s, ellipsize(l.label, pw - 80 * s - vw, 16 * s), C_TEXT, a);
     }
     py += 24 * s;
   }
@@ -3175,16 +3420,26 @@ void Game::drawDebrief() {
     g_ren.rect(x + pw - 18 * s, bodyTop, 3 * s, trackH, C_ACCENT, 0.12f);
     g_ren.rect(x + pw - 18 * s, bodyTop + (trackH - barH) * payScroll / payMax, 3 * s, barH, C_ACCENT, 0.7f);
   }
-  g_ren.rect(px, totalY - 8 * s, pw - 60 * s, 1 * s, C_ACCENT, 0.5f);
-  g_ren.text(px, totalY, 18 * s, isMilitaryContract(contract.type)?"Service credits":"Total", C_TEXT, 1);
-  g_ren.text(x + pw - 30 * s, totalY, 18 * s, isMilitaryContract(contract.type)?fmt("%d SC",total):fmtMoney(total), total >= 0 ? C_GOOD : C_BAD, 1, 2);
+  {   // the total counts up once the lines are in
+    const float k = clampf((e - 0.3f - 0.05f * rowN) / 0.9f, 0.f, 1.f), ease = 1.f - (1.f - k) * (1.f - k) * (1.f - k);
+    const int shown = (int)lroundf(total * ease);
+    g_ren.rect(px, totalY - 8 * s, pw - 60 * s, 1 * s, C_ACCENT, 0.5f);
+    g_ren.text(px, totalY, 18 * s, isMilitaryContract(contract.type)?"Service credits":"Total", C_TEXT, 1);
+    if (k >= 1.f && total > 0) g_ren.glow(x + pw - 30 * s - g_ren.textWidth(fmtMoney(total), 18 * s), totalY, g_ren.textWidth(fmtMoney(total), 18 * s), 20 * s, C_GOOD, 0.25f * clampf(1.6f - (e - 0.3f - 0.05f * rowN - 0.9f), 0.f, 1.f), 6 * s, 10 * s);
+    g_ren.text(x + pw - 30 * s, totalY, 18 * s, isMilitaryContract(contract.type)?fmt("%d SC",shown):fmtMoney(shown), total >= 0 ? C_GOOD : C_BAD, 1, 2);
+  }
   if (newLic) fitText(px, licY, pw - 60 * s, 22 * s, 14 * s, std::string("NEW LICENCE: ") + licenseName(career.license), C_WARN);
-  { float cy = campY; for (auto& l : campaignLines) { g_ren.text(px, cy, 18 * s, l, C_ACCENT, 1); cy += 24 * s; } }
+  { float cy = campY; for (auto& l : campaignLines) { g_ren.text(px, cy, 18 * s, l, C_ACCENT, 1); cy += 24 * s; }
+    if (upNext) fitText(px, cy + 2 * s, pw - 60 * s, 15 * s, 11 * s, std::string("UP NEXT:  ") + upNext->title, C_ACCENT * 0.9f); }
   if (commitBlocked()) {   // the settlement above is what will be saved; until it is, the career stands as before the flight
     fitText(px, y + ph - 100 * s, pw - 60 * s, 20 * s, 13 * s, "NOT SAVED YET: " + saveWhy, C_BAD);
     if (button(x + 30 * s, y + ph - 66 * s, 200 * s, 46 * s, "Retry save")) retryCommit();
   }
-  if (button(x + pw - 230 * s, y + ph - 66 * s, 200 * s, 46 * s, "Continue", true, true) || in.pressed[K_ENTER]) { retryCommit(); screen = SCR_HUB; hubTab = TAB_CONTRACTS; selContract = 0; selAircraft = -1; }
+  if (button(x + pw - 230 * s, y + ph - 66 * s, 200 * s, 46 * s, "Continue", true, true) || in.pressed[K_ENTER]) {
+    retryCommit(); screen = SCR_HUB; hubTab = TAB_CONTRACTS; selContract = 0; selAircraft = -1;
+    if (newLic && !commitBlocked()) { licenceShown = career.license; if (g_music.owns()) g_music.sting(STING_LICENCE); }   // (the licence's card, then the campaign's)
+    if (campaignEnd && !commitBlocked()) finaleShown = true;
+  }
   const bool jobWaits = !isMilitaryContract(contract.type) && career.job && career.job->state == Career::JobState::RECOVERY;
   if (!lastSuccess && !commitBlocked() && button(x + 30 * s, y + ph - 66 * s, 200 * s, 46 * s, jobWaits ? "Continue job" : "Try again")) retryFromDebrief();
 }

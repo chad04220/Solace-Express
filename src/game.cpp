@@ -365,6 +365,7 @@ void Game::loadSettings() {
     else if (s == "rumble") set.rumble = v != 0;
     else if (s == "speedFov") set.speedFov = v != 0;
     else if (s == "musicVol") set.musicVol = clampf(v, 0.f, 1.f);
+    else if (s == "musicFlight") set.musicFlight = v != 0;
     else if (s == "failures") set.failures = v != 0;
     else if (s == "air") set.air = std::clamp((int)v, 0, 1);
     else if (s == "hudEssential") set.hudEssential = v != 0;
@@ -407,7 +408,7 @@ bool Game::saveSettings() {
           set.quality, set.master, set.engineVol, set.sfxVol, set.radioVol, set.invertPitch, set.showHints, set.metric, set.fullscreen, set.radioStation, set.mouseSens, set.traffic, set.atcVol);
   t += fmt("renderRes %d\nfpsTarget %d\nfov %f\nheadLook %d\ncbHud %d\nuiScale %f\nhudCam0 %d\nhudCam1 %d\nhudCam2 %d\nhudCam3 %d\n", set.resMode, set.fpsTarget, set.fov, set.headLook, set.cbHud, set.uiScale, set.hudCam[0], set.hudCam[1], set.hudCam[2], set.hudCam[3]);
   t += fmt("cockpitFocusZoom %d\nfoveate %d\nmenuMotion %d\njoyAuto %d\n", set.cockpitFocusZoom, set.foveate, set.menuMotion, set.joyAutoDone);
-  t += fmt("assist %d\ncamShake %f\nrumble %d\nspeedFov %d\nmusicVol %f\nfailures %d\nair %d\nhudEssential %d\n", set.assist, set.camShake, set.rumble, set.speedFov, set.musicVol, set.failures, set.air, set.hudEssential);
+  t += fmt("assist %d\ncamShake %f\nrumble %d\nspeedFov %d\nmusicVol %f\nmusicFlight %d\nfailures %d\nair %d\nhudEssential %d\n", set.assist, set.camShake, set.rumble, set.speedFov, set.musicVol, set.musicFlight, set.failures, set.air, set.hudEssential);
   {   // the joystick bindings: their own file (device names don't fit this one's "name number" lines)
     static const std::string none = [] { AxisBind a[AX_COUNT]; std::vector<JoyButtonBind> b(ACT_COUNT); return joyConfigText(a, b.data(), actionIds(), ACT_COUNT); }();
     const std::string j = joyConfigText(set.axisBind, set.joyBind, actionIds(), ACT_COUNT);
@@ -1207,9 +1208,11 @@ void Game::init(bool buildWorld, const std::function<void(float, const std::stri
     // keep an unreadable save aside rather than overwriting it with a new career
     if (FILE* f = diskless ? nullptr : fopen(sav.c_str(), "r")) { fclose(f); remove((sav + ".damaged").c_str()); rename(sav.c_str(), (sav + ".damaged").c_str()); toast("Career save couldn't be read: kept as career.sav.damaged"); }
   }
+  loadProfile();
   report(2 + kNumAircraft, "Career and recovery checks complete");
   radio.init();
   radio.setVolume(radioLevel()); radioSentVol = radioLevel();
+  if (!diskless) g_music.start((float)g_audio.sampleRate);   // (the game's own score: music.h)
   report(3 + kNumAircraft, "Radio initialized");
   atc.load(assetDir + "/voice");   // tower voices (absent: the towers stay silent)
   camQ = quat();
@@ -1597,7 +1600,7 @@ void Game::shutdown() {
   retireEarthPrefetch();
   if (earthRetireJob.valid()) { try { earthRetireJob.get(); } catch (...) {} }
   if (regionJob.valid()) { try { regionJob.get(); } catch (...) {} }
-  saveSettings(); radio.shutdown(); g_ren.releaseLoadingPreview();
+  saveSettings(); radio.shutdown(); g_music.own(false); g_music.stop(); g_ren.releaseLoadingPreview();
 }
 
 void Game::focusLost() {
@@ -1735,6 +1738,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
   flapNotch = 0; phase = 0; lastHintPhase = -1; hint.clear();
   joyThrTaken = false; joyThrLast = -1;   // (the throttle lever takes over when it moves, not at the start)
   arrivalAt = -1; arrivalTold = false; engineShutDown = false; engineHold = 0; engineHeld = false; tdStampT = -1.f;
+  flightAch.clear(); flightKm = 0; profileT = 0; pbOld = -1.f; pbNew = false; lastMark = LandingMark();
   takeoffAnnounced = c.startAirborne; touchedDown = false; touchdownFpm = 0; stillTimer = 0; tdRunway = -2;   // (an airborne start has no takeoff to announce)
   engineAutoStarted = false; startDelay = 1.2f;
   parkingBrake = !c.startAirborne;   // a start on the ground is parked: the brake is released to roll
@@ -1769,14 +1773,16 @@ void Game::endFlight(bool success, const std::string& reason, FlightOutcome outc
     result.fuelUsedKg=std::max(0.f,fuelStart-plane.fuel); result.maxG=plane.maxG; result.minG=plane.minG;
     commit([&](Career& k) { payout=k.settle(contract,specIdx,Career::SRC_MILITARY,result,&stars,&launchPlan); });
     lastSuccess=success; debriefTitle=success?"Military sortie complete":reason.empty()?"Military sortie aborted":reason;
-    coaching.clear(); screen=SCR_DEBRIEF; paused=false; showMap=false;
-    g_audio.trigger(success?SFX_SUCCESS:SFX_FAIL);
+    coaching.clear(); screen=SCR_DEBRIEF; paused=false; showMap=false; debriefT0 = realTime;
+    profileFlightEnd(success);
+    if (g_music.owns()) g_music.sting(success ? STING_SUCCESS : STING_FAIL); else g_audio.trigger(success?SFX_SUCCESS:SFX_FAIL);
     announceFlightEnd(success?"Military objectives secured":crashed?(reason=="Hull lost to Hive fire"?reason:"Flight ended after impact"):
       reason=="Military objective lost"?reason:"Flight ended");
     return;
   }
   if (freeFlight) {
     const bool impact=crashed;
+    profileFlightEnd(success || outcome == OUT_DIVERTED || outcome == OUT_OFF_AIRPORT);
     returnToFreeFlight();
     toast(success || outcome == OUT_DIVERTED || outcome == OUT_OFF_AIRPORT ? "Free flight complete" : reason.empty() || outcome == OUT_ABANDONED ? "Back in the Free Flight hangar" : reason,
           vec3(0.6f, 0.9f, 1.f), false);
@@ -1810,7 +1816,9 @@ void Game::endFlight(bool success, const std::string& reason, FlightOutcome outc
     if (!f.empty()) { success = false; result.success = false; result.outcome = OUT_CHECKRIDE_FAILED; result.failReason = "Checkride not passed: " + f; debriefTitle = result.failReason; }
   }
   coaching = landingCoaching();
+  lastMark = landingMark(result, *plane.spec);
   if (isolatedFlight) {   // a practice flight or a trial: back to the hub, nothing settled
+    profileFlightEnd(success);
     if (contract.type == CT_TRIAL) finishTrial(success);
     isolatedFlight = false; paused = false; showMap = false; screen = SCR_HUB; hubTab = TAB_CONTRACTS;
     toast(success ? "Practice flight complete" : reason.empty() ? "Practice flight over" : reason, success ? vec3(0.6f, 1, 0.7f) : vec3(1, 0.5f, 0.4f));
@@ -1847,8 +1855,17 @@ void Game::endFlight(bool success, const std::string& reason, FlightOutcome outc
   }
   lastSuccess = success;
   if (debriefTitle.empty()) debriefTitle = success ? (c.type == CT_FERRY ? "Flight complete" : "Contract complete!") : (reason.empty() ? "Flight failed" : reason);
-  g_audio.trigger(success ? SFX_SUCCESS : SFX_FAIL);
+  // the profile: the landing's mark, a flight by the book, a flawless one; then the career's milestones
+  if (success && result.landed) {
+    if (lastMark.letter == 'S') award("grade_s");
+    if (lastMark.letter == 'S' && stars == 3 && c.payout > 0) award("flawless");
+    if (result.shutDownAtStand) award("by_the_book");
+  }
+  profileFlightEnd(success);
+  profileCareerCheck();
+  if (g_music.owns()) g_music.sting(success ? STING_SUCCESS : STING_FAIL); else g_audio.trigger(success ? SFX_SUCCESS : SFX_FAIL);
   if (success && c.payout > 0) g_audio.trigger(SFX_CASH);
+  debriefT0 = realTime;
   screen = SCR_DEBRIEF;
   paused = false; showMap = false;
   announceFlightEnd(result.outcome==OUT_CHECKRIDE_FAILED?"Checkride not passed":success?"Flight complete":crashed?"Flight ended after impact":"Flight ended",coaching);
@@ -2418,6 +2435,7 @@ void Game::updateFlight(float dt) {
     // (the rating on the touchdown scale the settlement pays by: career.h touchdownGrade - spoken, and stamped on the HUD)
     callout(fmt("%s  %.0f fpm", touchdownGradeCall(touchdownGrade(fpm)), fpm));
     tdStampT = realTime; tdStampFpm = fpm; arrivalTold = false;
+    profileTouchdown(fpm, tdRunway);   // (airport stamps, butter, the type's softest: game_profile.cpp)
     shake(clampf(fabsf(fpm) / 750.f, 0.12f, 0.8f));
     float gs = length(vec3(plane.vel.x, 0, plane.vel.z));
     for (int side = -1; side <= 1; side += 2) {
@@ -2428,6 +2446,7 @@ void Game::updateFlight(float dt) {
     }
   }
   if (!plane.onGround) result.maxBank = std::max(result.maxBank, fabsf(plane.bankDeg()));
+  profileTick(dt);   // (landmarks found, sightings, the distance flown)
   // rolling dust / spray
   float gs = length(vec3(plane.vel.x, 0, plane.vel.z));
   updateJobMeters(simDt, gs);   // (simulated time: at 4x the patient rides four seconds of turbulence a frame)
@@ -4897,8 +4916,10 @@ void Game::feedAudio() {
   }
   ap.master = set.master; ap.engineVol = set.engineVol * (1.f - 0.35f * voiceDuck); ap.sfxVol = set.sfxVol; ap.voiceVol = set.atcVol;
   {   // the radio music, at the master volume (the review of v3.44.0, AUD-1), lowered under speech
+    // (only while the radio plays: idle, the music ring is the score's, at its own volume - updateMusic)
     const float rv = radioLevel();
-    if (rv != radioSentVol) { radio.setVolume(rv); radioSentVol = rv; }
+    if (radio.state() == Radio::IDLE) radioSentVol = -1.f;
+    else if (rv != radioSentVol) { radio.setVolume(rv); radioSentVol = rv; }
   }
   static bool muffled = false;
   if (actKeyP(ACT_ANR) || actJoyP(ACT_ANR) || (screen == SCR_FLIGHT && !paused && actPadP(ACT_ANR))) { muffled = !muffled; toast(muffled ? "Engine noise muffled (headset ANR on)" : "Headset ANR off"); }
@@ -4980,7 +5001,7 @@ void Game::update(float dt) {
   if (screen == SCR_REGION_LOADING) {
     realTime += std::min(dt, .1f); lastDt = std::min(dt, .05f);
     if (in.pressed[K_F11]) wantFullscreenToggle = true;
-    gamepadMenus(lastDt); focusNavigate(); radio.poll();
+    gamepadMenus(lastDt); focusNavigate(); radio.poll(); updateMusic();
     updateRegionLoading(std::min(dt, .25f));
     return;
   }
@@ -5038,7 +5059,7 @@ void Game::update(float dt) {
   }
   bool padCombo = in.pad && (in.buttons & PAD_LS) && (in.buttons & PAD_RS) && (in.buttonsPressed & (PAD_LS | PAD_RS));
   if (screen == SCR_MENU && ((in.down['U'] && in.down['I'] && (in.pressed['U'] || in.pressed['I'])) || padCombo)) {
-    screen = SCR_RESEARCH; resOpened = realTime; g_audio.trigger(SFX_BEEP);
+    screen = SCR_RESEARCH; resOpened = realTime; g_audio.trigger(SFX_BEEP); award("classified");
     resWarm = true; resWarmFrames = 0; resBakeSeen = g_ren.bakeCount;   // the terminal's boot screen shows at once; the craft and its airport warm behind it
     resWork = 0.f; resPend0 = 0;
   }
@@ -5058,6 +5079,10 @@ void Game::update(float dt) {
   }
   if (screen == SCR_FLIGHT && (actKeyP(ACT_RADIO) || actJoyP(ACT_RADIO) || (!paused && actPadP(ACT_RADIO)))) showRadio = !showRadio;
   radio.poll();
+  updateMusic();
+  if (screen == SCR_HUB) { static float careerCheckT = 0; if ((careerCheckT += dt) > 1.f) { careerCheckT = 0; profileCareerCheck(); } }   // (licences, the fleet, the airline: achievements)
+  for (size_t i = 0; i < achShow.size() && i < 1; i++) achShow[i].t += dt;   // (the banner on show)
+  if (!achShow.empty() && achShow.front().t > 4.5f) achShow.erase(achShow.begin());
   if (screen == SCR_FLIGHT) {
     if (in.pressed[K_ESC] || (in.buttonsPressed & PAD_START)) {
       if (freeRegionMap) freeRegionMap = false;
@@ -5250,7 +5275,7 @@ void Game::render() {
     case SCR_RESEARCH: drawResearch(fp); break;
     case SCR_LOADING: drawLoading(); break;
   }
-  if (!(uiHidden && screen == SCR_FLIGHT && !paused)) drawToasts();
+  if (!(uiHidden && screen == SCR_FLIGHT && !paused)) { drawToasts(); drawAchievementBanner(); }
   drawPadCursor();
   if (!headless) {   // always-on frame-rate counter, top right
     float s = S(), fps = 1.f / std::max(fpsAvg, 1e-4f);

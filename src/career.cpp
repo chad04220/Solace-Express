@@ -924,6 +924,8 @@ std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, co
     }
     if (c.fragile && (r.maxG > 2.0f || r.minG < 0.0f || (r.landed && fpm > 400))) { L.push_back({"Fragile cargo damaged", -c.payout * 4 / 10}); st--; }
     *stars = std::max(1, st);
+    // three stars and an S for the landing: a flawless flight (the debrief's mark, landingMark)
+    if (c.payout > 0 && *stars == 3 && landingMark(r, s).letter == 'S') { L.push_back({"Flawless flight", c.payout * 5 / 100}); reputation++; }
     reputation += *stars;
     if (c.story) {
       storyIndex++;
@@ -1053,6 +1055,23 @@ bool Career::recallRoute(int ri, std::string* msg) {
   *msg = fmt("%s recalled: it waits at %s.", kAircraft[fleet[r.fleetIdx].spec].name, g_world.airports[fleet[r.fleetIdx].location].code);
   airline.routes.erase(airline.routes.begin() + ri);
   return true;
+}
+LandingMark landingMark(const FlightResult& r, const AircraftSpec& s) {
+  LandingMark m;
+  if (!r.landed || r.tdPastThrM < 0 || r.rwyLenM <= 0) return m;
+  const int rates[5] = {40, 33, 25, 12, 0};
+  m.rate = rates[touchdownGrade(r.touchdownFpm)];
+  m.zone = r.tdPastThrM <= r.rwyLenM / 3.f ? 25 : r.tdPastThrM <= r.rwyLenM * 0.45f ? 12 : 0;
+  m.line = r.centerlineErr < 2.f ? 15 : r.centerlineErr < 5.f ? 9 : r.centerlineErr < 10.f ? 4 : 0;
+  const float vref = s.vref * MS_TO_KT;
+  if (r.thrKt < 0) m.approach = 10;   // (nothing recorded over the threshold: half)
+  else {
+    m.approach += r.thrKt >= vref - 5.f && r.thrKt <= vref + 15.f ? 10 : r.thrKt >= vref - 8.f && r.thrKt <= vref + 25.f ? 5 : 0;
+    m.approach += r.thrAglM >= 9.f && r.thrAglM <= 24.5f ? 10 : r.thrAglM >= 5.f && r.thrAglM <= 35.f ? 5 : 0;
+  }
+  m.score = m.rate + m.zone + m.line + m.approach;
+  m.letter = m.score >= 92 ? 'S' : m.score >= 80 ? 'A' : m.score >= 65 ? 'B' : m.score >= 45 ? 'C' : 'D';
+  return m;
 }
 // The airline flies its routes once for each of your flights that got somewhere: one that took off and landed on a
 // runway, at its destination or diverted. Abandoned, crashed and off-field flights, and starts that never left the

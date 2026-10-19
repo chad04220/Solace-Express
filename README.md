@@ -154,6 +154,12 @@ Two more airframes round out the register. The **XR-10 Vigil** is the programme'
 
 </details>
 
+## Your profile, the music
+
+Every landing gets a grade from S to D in the debrief. It's scored on the touchdown, the zone, the centreline and the approach; three stars and an S together make a **Flawless flight**. Your pilot profile collects 36 achievements, an airport stamp for each airport you land at, and the twelve landmarks you can find from the air. It also keeps your softest touchdown in each aircraft. It covers all your careers and is saved in `profile.cfg` beside the settings; **Logbook → Achievements** and **Logbook → Passport** show it.
+
+The game has its own generative soundtrack: a theme on the main menu, a lighter groove in the hub, a finale theme, and stingers for jobs, licences, achievements and medals. Its volume is in **Settings**, along with an optional quiet ambience for the cruise. The score steps aside whenever the internet radio plays.
+
 ## Flying tips
 
 - Fly the green rings in the lessons. The navigation card at the top shows distance, bearing, how far to climb or descend and time en route; the heading tape below it has a magenta caret on your target's bearing with a turn cue. The magenta diamond sits on the objective itself in 3D, with a dashed stalk down to the ground so you can read its height. It goes behind your aircraft and the cockpit like anything else in the world, sits under every HUD panel, and turns into an arrow at the screen edge when the target is out of view. A neon lane with flowing chevrons runs from gate to gate, from the one you just passed through the next two.

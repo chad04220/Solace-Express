@@ -153,7 +153,27 @@ struct GameTest {
       const char* lines[] = {"Contract payment", "Reputation bonus", "On time", "Passenger comfort", "Rental fee", "Positioning", "Fuel uplift", "Landing fee", "Loan payment", "Airline: CAP - NPT route", "Pilot wages"};
       int amt[] = {24000, 2400, 1200, -900, -1800, -350, -720, -150, -2100, 8232, -1900};
       for (int i = 0; i < 11; i++) g.payout.push_back({lines[i], amt[i]});
+      g.result.tdPastThrM = 310; g.result.rwyLenM = 1500; g.result.centerlineErr = 1.2f; g.result.thrKt = 74; g.result.thrAglM = 15; g.result.touchdownFpm = 240;
+      g.lastMark = landingMark(g.result, kAircraft[1]); g.plane.spec = &kAircraft[1];
+      g.pbNew = true; g.pbOld = 312; g.flightAch = {"butter", "night", "airports10", "by_the_book"};
+      g.debriefT0 = getenv("DEBRIEFT") ? g.realTime - (float)atof(getenv("DEBRIEFT")) : 0.f;
       g.screen = SCR_DEBRIEF; g.drawDebrief();
+    }
+    else if (what == "licence" || what == "finale" || what == "logach" || what == "logpass" || what == "banner") {   // the profile's screens (profile.h)
+      g.career.license = LIC_CPL; g.career.flights = 64; g.career.hours = 41.5f; g.career.landings = 63; g.career.bestLandingFpm = 38; g.career.money = 412000;
+      g.profile.name = "Chad";
+      for (const char* id : {"first_flight", "butter", "night", "lic_ppl", "lic_cpl", "owner", "airports10", "ufo"}) g.profile.ach[id] = 1792400000;
+      for (int i = 0; i < 11; i++) g.profile.airports.insert(g_world.airports[i * 2 % (int)g_world.airports.size()].code);
+      for (const Site& st : profileSites()) { g.profile.sites.insert(st.id); if (g.profile.sites.size() >= 6) break; }
+      g.profile.seen.insert("ufo"); g.profile.num["butters"] = 17; g.profile.num["warpKm"] = 212;
+      g.profile.best["dawnlark"] = 38; g.profile.best["ambler"] = 96; g.profile.best["archipel"] = 141;
+      g.screen = SCR_HUB; g.hubTab = what == "logach" || what == "logpass" ? TAB_LOGBOOK : TAB_CONTRACTS;
+      g.logPage = what == "logach" ? 1 : what == "logpass" ? 2 : 0;
+      if (what == "licence") g.licenceShown = LIC_CPL;
+      if (what == "finale") { g.career.finished = true; g.career.storyIndex = (int)g_story.size(); g.finaleShown = true; }
+      g.drawHub();
+      if (what == "licence" || what == "finale") { g.realTime += 3.f; g_ren.uiEnd(); glClear(GL_COLOR_BUFFER_BIT); g_ren.uiBegin(); g.drawHub(); }   // (in, once its card has come in)
+      if (what == "banner") { g.achShow.push_back({"greaser", 1.2f, true}); g.drawAchievementBanner(); }
     }
     else if (what == "wavecrest_free") {   // the review of v3.31.0, U1: a CPL pilot owning only the Wavecrest, Free Flight MDB -> HFS
       g.career.license = LIC_CPL; g.career.money = 50000; g.career.storyIndex = (int)g_story.size();

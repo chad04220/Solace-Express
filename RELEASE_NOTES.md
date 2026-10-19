@@ -12,6 +12,39 @@
   Combat still runs at real time. With the autopilot cruising, it can stay on lower and nearer the field, as before.
 - **A note on performance:** above x4 the game simulates up to four times as much per frame, and the scenery streams in four times faster. On slower PCs, x8 and x16 may stutter. The game reminds you of this the first time you go above x4.
 
+### A soundtrack of its own
+- **The game now has its own music.** It's an original generative score, played live from synthesised pads, bells, plucks and bass:
+  - a slow, open theme on the main menu;
+  - a lighter groove in the hub and the debrief;
+  - a brighter theme for the campaign's finale.
+- **Short musical stingers** play when a job is done, when a flight fails, when you earn a licence or an achievement, and when you win a trial medal.
+- **Settings → Music volume** sets its level (Off at 0%). **Music in the cruise** adds a quiet ambience under the engines in level flight, high above the ground. It's off by default.
+- The score steps aside whenever the internet radio plays, and comes back when you turn the radio off.
+
+### A debrief worth landing for
+- **Every landing gets a grade, from S to D, out of 100.** It's made of four parts:
+
+  | Part | Points | Full points for |
+  |---|---|---|
+  | Touchdown | 40 | a butter landing |
+  | Zone | 25 | touching down in the first third of the runway |
+  | Centreline | 15 | staying within 2 m of the centreline |
+  | Approach | 20 | crossing the threshold at the right speed and height |
+
+  Each part's score is shown under the grade.
+- **Flawless flight:** three stars and an S together pay a 5% bonus and earn a point of reputation.
+- **The debrief now builds up:** the lines come in one after another and the total counts up. A badge marks a **new personal best** for that aircraft, and chips list the **achievements** you earned on the flight.
+- **"Up next"** names the next story job, which is already selected when you continue.
+- **A licence card** celebrates each new licence and lists what it opens up: the aircraft, the kinds of work, the Military board.
+- **A finale card** marks the end of the campaign. It shows your career in numbers and what's still out there to do.
+
+### Your pilot profile
+- **36 achievements**, from Wheels Up and Butter to Crab Walk, Deadstick, Grand Tour and Golden Wings, plus a few secret ones. Each one appears in a banner as you earn it, with a chime.
+- **Airport stamps:** your first landing at each airport stamps your passport.
+- **Landmarks to find:** fly over the wind farm, the stone circle, the wreck on the reef, the offshore platform, the observatory, the star fort, the racetrack, the Fjordhaven dam, the stadium, the container port, Lighthouse Key and the strait bridge to add them to your passport.
+- **Logbook → Achievements** shows what you've earned and when, and how far along you are on the rest. **Logbook → Passport** shows every airport, landmark and sighting. The left column now lists your softest touchdown in each aircraft type.
+- The profile covers all your careers and is saved in `profile.cfg` beside your settings.
+
 ### Flight assists
 - **Keys and gamepads now fly with assists by default.** The roll and pitch inputs turn the aircraft, and when you let go it holds its bank and its flight path. A bank under 10° rolls back to wings level. The rudder is coordinated for you, and your own rudder adds to it. Near the stall the nose comes down by itself. The bank stops at 67°.
 - **Settings → Flying → Flight assists** has three choices:
