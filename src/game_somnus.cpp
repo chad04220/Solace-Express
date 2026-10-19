@@ -279,6 +279,7 @@ void Game::buildFeedCameras(FrameParams& fp) {
 }
 
 void Game::detonate(vec3 p, bool water, hive::BombSet kind, const vec3* queryOrigin) {
+  shake(0.7f * clampf(1.f - length(p - camPos) / 3500.f, 0.f, 1.f));
   const auto& payload=hive::bombSpec(kind);
   // Keep the visual/crater exactly on the surface, but begin visibility queries just outside it.
   // Radius-aware swept impacts already leave the bomb centre clear of walls/airframes.

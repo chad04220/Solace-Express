@@ -87,6 +87,19 @@ struct FlightResult {
 
 struct PayoutLine { std::string label; int amount; };
 
+// One scale for a touchdown's rate, used by the cockpit's call, the HUD's stamp, the settlement and the checkrides:
+// butter under 150 fpm (a bonus), smooth to 250, good to 350, firm to 600 (a deduction) and hard over that (a bigger
+// one, and a failed checkride; about 900 collapses the gear)
+enum TouchdownGrade { TD_BUTTER = 0, TD_SMOOTH, TD_GOOD, TD_FIRM, TD_HARD };
+constexpr float kTdButterFpm = 150.f, kTdSmoothFpm = 250.f, kTdFirmFpm = 350.f, kTdHardFpm = 600.f;
+inline int touchdownGrade(float fpm) {
+  fpm = fabsf(fpm);
+  return fpm < kTdButterFpm ? TD_BUTTER : fpm < kTdSmoothFpm ? TD_SMOOTH : fpm <= kTdFirmFpm ? TD_GOOD : fpm <= kTdHardFpm ? TD_FIRM : TD_HARD;
+}
+// the cockpit's call (Aster's recorded ratings: atc.cpp) and the HUD stamp's word
+inline const char* touchdownGradeCall(int g) { static const char* n[] = {"BUTTER!", "Smooth landing", "Good landing", "Firm landing", "HARD landing!"}; return n[std::clamp(g, 0, 4)]; }
+inline const char* touchdownGradeWord(int g) { static const char* n[] = {"BUTTER", "SMOOTH", "GOOD", "FIRM", "HARD"}; return n[std::clamp(g, 0, 4)]; }
+
 class Career {
 public:
   int money = 600;

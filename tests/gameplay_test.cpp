@@ -1564,6 +1564,45 @@ struct GameTest {
                beside, besideTd, apron, onRwy, ok ? "ok" : "FAIL");
         fails += !ok;
       }
+      {   // a job's arrival waits for the pilot (not the tests' bots): stopped on the destination's runway it asks for the
+          // parking brake; taxied clear, the engine held off (the engine key held a second) and the brake set, it
+          // delivers with the shutdown bonus. One touchdown scale: a 620 fpm checkride landing is called hard and fails
+        Game q; q.initHeadless(); q.career.license = LIC_PPL; q.career.storyIndex = 4; q.set.traffic = false;
+        Contract c = g_story[4]; c.wx = Weather(); c.wx.windSpeed = 0; c.wx.gust = 0; c.wx.turbulence = 0; c.wps.clear();
+        q.beginCareerFlight(c, 0, Career::SRC_RENT); q.botControl = false; q.failuresArmed = false;
+        const Airport& a = g_world.airports[c.to]; const vec3 d = a.dir();
+        auto at = [&](float lateral) { vec3 l = a.pos() + vec3(-d.z, 0, d.x) * lateral; l.y = g_world.height(l.x, l.z) + q.plane.gearHeight() - 0.035f; return l; };
+        q.takeoffAnnounced = true; q.touchedDown = true; q.touchdownFpm = 100; q.engineAutoStarted = true; q.plane.sceneryHits = false;
+        q.tdRunway = c.to; q.parkingBrake = false; q.plane.engineRunning = true;
+        auto hold = [&](vec3 loc, int frames, int key = 0, bool press = false) {
+          for (int i = 0; i < frames && q.screen == SCR_FLIGHT; i++) {
+            if (key) { q.in.down[key] = true; q.in.pressed[key] = press && i == 0; }
+            q.plane.pos = loc; q.plane.vel = vec3(); q.plane.w = vec3(); q.plane.q = quat::axisAngle(vec3(0, 1, 0), -a.heading * DEG);
+            q.plane.onGround = true; q.plane.ctl.gearDown = true; q.update(0.05f);
+            q.in.endFrame();
+          }
+          if (key) q.in.down[key] = false;
+        };
+        hold(at(0.f), 80);
+        bool asked = false; for (auto& t : q.toasts) asked |= t.text.find("parking brake") != std::string::npos;
+        const bool waits = q.screen == SCR_FLIGHT && q.arrivalAt == c.to && asked;
+        hold(at(150.f), 10);
+        hold(at(150.f), 30, q.set.keyBind[ACT_ENGINE]);
+        const bool shut = q.screen == SCR_FLIGHT && !q.plane.engineRunning && q.engineShutDown;
+        hold(at(150.f), 5);
+        bool noEngineOff = true;
+        for (auto& t : q.toasts) noEngineOff &= t.text.find("ENGINE OFF") == std::string::npos;
+        hold(at(150.f), 40, q.set.keyBind[ACT_PARK], true);
+        bool bonus = false; for (auto& l : q.payout) bonus |= l.label == "Taxied clear and shut down";
+        const bool delivered = q.screen == SCR_DEBRIEF && q.lastSuccess && bonus;
+        FlightResult hr; hr.landed = true; hr.touchdownFpm = 620; Contract ck = g_story[3];
+        const bool scale = touchdownGrade(620) == TD_HARD && std::string(touchdownGradeCall(touchdownGrade(620))) == "HARD landing!" && !Career::checkrideFault(ck, hr).empty()
+                           && touchdownGrade(149) == TD_BUTTER && touchdownGrade(350) == TD_GOOD && touchdownGrade(351) == TD_FIRM && touchdownGrade(600) == TD_FIRM;
+        const bool ok = waits && shut && noEngineOff && delivered && scale;
+        printf("Pilot's arrival: waits for the parking brake %d, engine held off %d (no ENGINE OFF call %d), parked clear delivers with the shutdown bonus %d, one touchdown scale %d: %s\n",
+               waits, shut, noEngineOff, delivered, scale, ok ? "ok" : "FAIL");
+        fails += !ok;
+      }
       {   // a checkpoint job's leg ends safely at a field (the review of v3.44.0, CAR-5): stopped on a runway with checkpoints
           // left it waits to take off again, and the parking brake ends the leg there with the checkpoint flown carried; a
           // hold instruction ignored on that leg is still charged at the delivery, through a save and reload (CAR-6)

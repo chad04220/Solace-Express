@@ -875,9 +875,10 @@ std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, co
     // landing quality only counts when the flight actually ended with a touchdown
     if (r.landed) {
       bool longLdg = r.tdPastThrM >= 0 && r.rwyLenM > 0 && r.tdPastThrM > r.rwyLenM * 0.45f;   // floated half the runway
-      if (fpm < 150 && !longLdg) { L.push_back({"Butter landing bonus", c.payout / 10}); }
-      else if (fpm > 600) { L.push_back({"Hard landing", -c.payout / 5}); st--; }
-      else if (fpm > 350) { L.push_back({"Firm landing", -c.payout / 20}); }
+      const int grade = touchdownGrade(fpm);
+      if (grade == TD_BUTTER && !longLdg) { L.push_back({"Butter landing bonus", c.payout / 10}); }
+      else if (grade == TD_HARD) { L.push_back({"Hard landing", -c.payout / 5}); st--; }
+      else if (grade == TD_FIRM) { L.push_back({"Firm landing", -c.payout / 20}); }
     }
     if (r.late) { L.push_back({"Late delivery", -c.payout / 2}); st--; }
     if (c.payout > 0 && r.landed) {   // airmanship on the arrival, from what was recorded (a needed go-around costs nothing)
@@ -1062,7 +1063,7 @@ bool Career::recallRoute(int ri, std::string* msg) {
 std::string Career::checkrideFault(const Contract& c, const FlightResult& r) {
   if (c.grantLicense < 0) return "";
   if (!r.landed) return "no landing";
-  if (fabsf(r.touchdownFpm) > 600.f) return fmt("hard landing (%.0f fpm)", fabsf(r.touchdownFpm));
+  if (touchdownGrade(r.touchdownFpm) == TD_HARD) return fmt("hard landing (%.0f fpm)", fabsf(r.touchdownFpm));
   if (r.holdViolated) return "took off against a hold instruction";
   if (r.landedAgainstGoAround) return "landed against a go-around instruction";
   return "";
@@ -1156,7 +1157,7 @@ void Career::wear(std::vector<PayoutLine>& L, int si, Source src, const FlightRe
     if (oi >= 0) {
       float loss = r.flightMin / 60.f * 0.015f;   // 1.5% an hour
       float fpm = fabsf(r.touchdownFpm);
-      if (r.landed && fpm > 600) loss += 0.08f; else if (r.landed && fpm > 350) loss += 0.03f;
+      if (r.landed && touchdownGrade(fpm) == TD_HARD) loss += 0.08f; else if (r.landed && touchdownGrade(fpm) == TD_FIRM) loss += 0.03f;
       if (r.bellyLanding) loss += 0.3f;
       fleet[oi].condition = clampf(fleet[oi].condition - loss, 0.05f, 1.f);
       if (repair) {

@@ -237,7 +237,7 @@ void Plane::reset(const AircraftSpec* s, vec3 position, float headingDeg, float 
   q = quat::axisAngle(vec3(0, 1, 0), -headingDeg * DEG);
   w = vec3(); ctl = Controls(); ev = FlightEvents(); apComfort = false; sceneryHits = true; brakeHold = 0;
   flaps = 0; gear = 1; rpm = 0; n1 = 0; engineSpool = 0; maxG = minG = 1; flightTime = 0;
-  fail = Failures(); iceFeed = 0; overG = 0;
+  fail = Failures(); iceFeed = 0; overG = 0; stallWarn = 0; assistHeld = false;   // (no warning carried over from the last flight)
   apDisengage(); apDone = false; apOverrun = false; apPitchI = 0; gust = vec3(); rng = Rng(77);
   wxl = wxfield::Local(); wxAir = seamShift = vec3(); windVel = windAvg = gustRot = vec3(); gustBurst = 0; aeroMem = AeroMem(); ctlSurf = vec3();
   // drag comes from the airframe's shape (aero.cpp), evaluated every step at the speed and air density of the moment
@@ -309,6 +309,8 @@ void Plane::step(float dt, const Weather& wx, float time) {
   if (apMode == AP_APPR) apGustAdd *= clampf(1.f + dot(apLd, vec3(sinf(wx.windFrom * DEG), 0, -cosf(wx.windFrom * DEG))) * wx.windSpeed / 4.f, 0.f, 1.f);
   wxl = wxfield::local(wx, pos, agl());   // (the wind's slow parts here: they change over hundreds of metres)
   if (apOn) { apSense(); apGuidance(dt); }   // (what it can do now, then what to do about it)
+  else if (assistOn && !onGround) assistControl(dt);
+  else assistHeld = false;
   // a wind that has turned behind it since the approach was planned: down the final, while there is room to climb
   // away, the stop is checked again by the plan's own rule. Too long now, it goes around, and clear of the ground the
   // approach is planned afresh in the wind there is - the other end, or neither (then it holds, and says why). It
@@ -1749,6 +1751,47 @@ void Plane::apRates(float qT, float pT, float rollCap, float nzMin, float nzMax,
     else apYawI = clampf(apYawI + beta * qn * dt * 1.5f, -0.8f, 0.8f);
   }
   ctl.yaw = fbw ? clampf(G0 * tilt / spd / 1.4f, -1.f, 1.f) : clampf(beta * 2.f + rErr * 1.5f * qn + apYawI, -1.f, 1.f);
+}
+
+// Assisted flying: the inputs roll at up to 70% of the airframe's rate (90 deg/s at most, to 67 deg of bank) and pull
+// up to three quarters of the load factor allowed here; let go, it holds the bank it was let go at (level from under
+// 10 deg) and the flight path, the level turn's own pitch rate added so a held bank holds the height. Near
+// the stall the nose comes down whatever the input. Through apRates: this airframe's learned gains, the g limits
+// short of the structure and the stall, the rudder coordinated.
+void Plane::assistControl(float dt) {
+  apSense();
+  const AircraftSpec& s = *spec;
+  const PerfModel& P = perf(spec);
+  const ApEnvelope& E = apEnv;
+  const float V = std::max(ias, 15.f), spd = std::max(length(vel), 1.f);
+  const float vsFl = E.vs1 + (E.vs0 - E.vs1) * clampf(std::min(flaps, flapLeft()), 0.f, 1.f);
+  const float stallG = (V / vsFl) * (V / vsFl) * 0.9f, gustG = std::max(0.6f, P.gLimit * 0.05f);
+  const float nzMax = std::max(std::min(P.gLimit - gustG - P.gLimit * 0.03f, stallG), 1.05f), nzMin = std::max(P.gNeg + gustG + 0.3f, -stallG * 0.5f);
+  const float rollCap = (E.rateCmd ? fbwRollMax(0.f) : P.rollRate * clampf(V / s.cruise, 0.25f, 2.f)) * 0.9f;
+  const float bank = bankDeg(), gamma = asinf(clampf(vel.y / spd, -1.f, 1.f)), bankMax = 67.f, levelBelow = 10.f;
+  if (!assistHeld) {   // (taken over from the stick or the autopilot: bumpless, from the elevator where it is)
+    assistBank = fabsf(bank) < levelBelow ? 0.f : clampf(bank, -bankMax, bankMax); assistGamma = gamma; assistHeld = true;
+    apPitchI = ctl.pitch; apTrimEst = ctl.pitch; apRollI = 0; apYawI = 0;
+  }
+  float pT;
+  if (fabsf(assistRoll) > 0.04f) {   // (at most 90 deg/s: a research jet's 300 is not for a key)
+    pT = assistRoll * std::min(rollCap * 0.7f, 1.57f);
+    if ((bank > bankMax && pT > 0.f) || (bank < -bankMax && pT < 0.f)) pT = (copysignf(bankMax, bank) - bank) * DEG * 2.f;
+    assistBank = fabsf(bank) < levelBelow ? 0.f : clampf(bank, -bankMax, bankMax);
+  } else pT = clampf((assistBank - bank) * DEG * 2.5f, -rollCap * 0.5f, rollCap * 0.5f);
+  const float cb = cosf(clampf(bank, -80.f, 80.f) * DEG), cg = cosf(gamma);
+  float qT;
+  if (fabsf(assistPitch) > 0.04f) {
+    const float nz = assistPitch > 0.f ? 1.f + assistPitch * (nzMax - 1.f) * 0.75f : 1.f + assistPitch * (1.f - nzMin) * 0.6f;
+    qT = G0 * (nz - cg * cb) / spd;
+    assistGamma = gamma;
+  } else {
+    const float qTurn = G0 * cg * (1.f / std::max(cb, 0.17f) - cb) / spd;   // (the body's pitch rate in a level turn at this bank)
+    qT = qTurn + clampf((assistGamma - gamma) * 1.6f / std::max(apPathLag(), 0.5f), -0.15f, 0.15f);
+  }
+  if (V < vsFl * 1.25f) { qT = std::min(qT, -(vsFl * 1.25f - V) / vsFl * 0.6f); assistGamma = std::min(assistGamma, gamma); }
+  apRates(qT, pT, rollCap, nzMin, nzMax, dt);
+  ctl.yaw = clampf(ctl.yaw + assistYaw, -1.f, 1.f);
 }
 
 // The belly-up: throttle closed, wings level, the nose pulled up as hard as the structure takes to ~70 deg - the whole

@@ -54,8 +54,8 @@ const ActionInfo kActions[ACT_COUNT] = {
   {"gear", "Landing gear", 1, 'G', PAD_Y},                      {"brake", "Wheel brakes", 1, K_SPACE, PAD_A},
   {"parkingBrake", "Parking brake", 1, 'B', PAD_LEFT},          {"autopilot", "Autopilot", 1, 'Z', PAD_RS},
   {"aerobatics", "Aerobatics: fly the next figure / stop", 1, 0xBA, 0},
-  {"lights", "Landing lights", 1, 'L', 0},                      {"engine", "Engine start", 1, 'I', 0},
-  {"timeAccel", "Time acceleration", 1, 'T', 0},
+  {"lights", "Landing lights", 1, 'L', 0},                      {"engine", "Engine start (hold: shut down)", 1, 'I', 0},
+  {"timeAccel", "Time warp x1-x16 (above x4 may stutter on slower PCs)", 1, 'T', 0},
   {"camera", "Cycle camera", 2, 'C', PAD_BACK},                 {"hud", "Show / hide HUD", 2, 'H', 0},
   {"gpsMap", "GPS moving map", 2, 'N', 0},                      {"minimap", "Minimap", 2, K_TAB, 0},
   {"radio", "Internet radio", 2, 'R', 0},                       {"anr", "Headset noise cancelling", 2, 'M', PAD_LS},
@@ -360,6 +360,14 @@ void Game::loadSettings() {
     else if (s == "cbHud") set.cbHud = v != 0;
     else if (s == "uiScale") set.uiScale = clampf(v, 0.8f, 1.4f);
     else if (s == "joyAuto") set.joyAutoDone = v != 0;
+    else if (s == "assist") set.assist = std::clamp((int)v, 0, 2);
+    else if (s == "camShake") set.camShake = clampf(v, 0.f, 1.5f);
+    else if (s == "rumble") set.rumble = v != 0;
+    else if (s == "speedFov") set.speedFov = v != 0;
+    else if (s == "musicVol") set.musicVol = clampf(v, 0.f, 1.f);
+    else if (s == "failures") set.failures = v != 0;
+    else if (s == "air") set.air = std::clamp((int)v, 0, 1);
+    else if (s == "hudEssential") set.hudEssential = v != 0;
     else if (s.rfind("hudCam", 0) == 0 && s.size() == 7 && s[6] >= '0' && s[6] <= '3') set.hudCam[s[6] - '0'] = v != 0;
     else if (s.rfind("key.", 0) == 0 || s.rfind("pad.", 0) == 0)
       for (int i = 0; i < ACT_COUNT; i++)
@@ -399,6 +407,7 @@ bool Game::saveSettings() {
           set.quality, set.master, set.engineVol, set.sfxVol, set.radioVol, set.invertPitch, set.showHints, set.metric, set.fullscreen, set.radioStation, set.mouseSens, set.traffic, set.atcVol);
   t += fmt("renderRes %d\nfpsTarget %d\nfov %f\nheadLook %d\ncbHud %d\nuiScale %f\nhudCam0 %d\nhudCam1 %d\nhudCam2 %d\nhudCam3 %d\n", set.resMode, set.fpsTarget, set.fov, set.headLook, set.cbHud, set.uiScale, set.hudCam[0], set.hudCam[1], set.hudCam[2], set.hudCam[3]);
   t += fmt("cockpitFocusZoom %d\nfoveate %d\nmenuMotion %d\njoyAuto %d\n", set.cockpitFocusZoom, set.foveate, set.menuMotion, set.joyAutoDone);
+  t += fmt("assist %d\ncamShake %f\nrumble %d\nspeedFov %d\nmusicVol %f\nfailures %d\nair %d\nhudEssential %d\n", set.assist, set.camShake, set.rumble, set.speedFov, set.musicVol, set.failures, set.air, set.hudEssential);
   {   // the joystick bindings: their own file (device names don't fit this one's "name number" lines)
     static const std::string none = [] { AxisBind a[AX_COUNT]; std::vector<JoyButtonBind> b(ACT_COUNT); return joyConfigText(a, b.data(), actionIds(), ACT_COUNT); }();
     const std::string j = joyConfigText(set.axisBind, set.joyBind, actionIds(), ACT_COUNT);
@@ -1219,7 +1228,7 @@ void Game::initHeadless() {
 // ------------------------------------------------------------------ failures (C7)
 void Game::rollFailures(const Contract& c, int spec, Career::Source src) {
   failPlan = FailPlan();
-  if (!failuresArmed || c.startAirborne && c.type == CT_LESSON) return;
+  if (!failuresArmed || !set.failures || (c.startAirborne && c.type == CT_LESSON)) return;   // (Settings: random failures off)
   float chance = career.failureChance(src, spec);
   if (chance <= 0.f) return;
   // deterministic per attempt: the same flight retried after a crash gets the same roll, a new attempt a new one
@@ -1537,6 +1546,7 @@ void Game::finishTrial(bool success) {
 }
 void Game::fireFailure(int kind, int engine) {
   if (!plane.failNow(kind, engine)) return;
+  if (timeAccel > 1.f) timeAccel = 1.f;   // (a failure is flown at real time)
   const AircraftSpec& s = *plane.spec;
   std::string m = failureName(kind);
   if ((kind == FAIL_ENGINE_PARTIAL || kind == FAIL_ENGINE_TOTAL) && s.engines > 1) m += fmt(" - engine %d", engine + 1);
@@ -1634,6 +1644,7 @@ std::vector<Game::Annunciator> Game::hudAnnunciators() const {
   return ann;
 }
 
+void Game::callout(const std::string& s) { if (screen == SCR_FLIGHT || screen == SCR_LOADING) commsPending.push_back({s, contract.id}); }
 void Game::toast(const std::string& s, vec3 col, bool voiced) {
   toasts.push_back({s, 0.f, col});
   if (voiced && (screen == SCR_FLIGHT || screen == SCR_LOADING)) commsPending.push_back({s, contract.id});
@@ -1679,7 +1690,12 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
   hiveCombat.reset(1,WRAP_SPAN); combatLoadout.reset();
   combatCollisionWarm=false; combatCollisionWarmMs=0; combatPrefetchCursor=0;
   researchFlight = freeFlight = false;   // isolated launchers set their own mode after the shared reset
-  wx = c.wx; wxStart = c.wx; timeOfDay = wx.timeOfDay; apRepickT = 0;
+  wx = c.wx; timeOfDay = wx.timeOfDay; apRepickT = 0;
+  if (set.air == 0 && !botControl) {   // (Settings: calm air - a third of the gusts and the turbulence, the fronts' too)
+    wx.gust *= 0.35f; wx.turbulence *= 0.35f;
+    if (contract.wxShift) { contract.wxEnd.gust *= 0.35f; contract.wxEnd.turbulence *= 0.35f; }
+  }
+  wxStart = wx;
   wx.cloudDrift = cloudOff; wx.cloudDetail = cloudDet; wx.cloudBoil = cloudBoil;
   cloudWake.clear(); wakeGap = true; wakeOdo = 0; wispAccum = 0; rainNow = mistNow = 0;
   const AircraftSpec& s = kAircraft[spec];
@@ -1718,6 +1734,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
   camQ = plane.q; camPos = plane.pos + plane.q.rotate(vec3(0, 3, 15));
   flapNotch = 0; phase = 0; lastHintPhase = -1; hint.clear();
   joyThrTaken = false; joyThrLast = -1;   // (the throttle lever takes over when it moves, not at the start)
+  arrivalAt = -1; arrivalTold = false; engineShutDown = false; engineHold = 0; engineHeld = false; tdStampT = -1.f;
   takeoffAnnounced = c.startAirborne; touchedDown = false; touchdownFpm = 0; stillTimer = 0; tdRunway = -2;   // (an airborne start has no takeoff to announce)
   engineAutoStarted = false; startDelay = 1.2f;
   parkingBrake = !c.startAirborne;   // a start on the ground is parked: the brake is released to roll
@@ -1844,7 +1861,7 @@ std::string Game::landingCoaching() const {
                                                                : fmt("%d go-arounds: set up earlier - on the centreline, at approach speed, by 3 km out.", r.goArounds);
   if (!result.landed || r.tdPastThrM < 0) return "";
   float vref = plane.spec->vref * MS_TO_KT, fpm = touchdownFpm;
-  if (fpm > 600) return fmt("Touchdown at %.0f fpm: hold a steady 3 degree descent on power, then ease back to flare as the runway fills the windscreen.", fpm);
+  if (touchdownGrade(fpm) == TD_HARD) return fmt("Touchdown at %.0f fpm: hold a steady 3 degree descent on power, then ease back to flare as the runway fills the windscreen.", fpm);
   if (r.thrKt > vref * 1.3f) return fmt("You crossed the threshold at %.0f kt (aim for about %.0f): slow down earlier on final - extra speed floats and uses up runway.", r.thrKt, vref + 5.f);
   if (r.tdPastThrM > r.rwyLenM * 0.45f) return fmt("You touched down %.0f m past the threshold, beyond the middle of the runway: aim for the first third.", r.tdPastThrM);
   if (r.stopLeftM >= 0 && r.stopLeftM < r.rwyLenM * 0.12f) return fmt("You stopped with only %.0f m of runway to spare: brake firmly once all wheels are down.", std::max(0.f, r.stopLeftM));
@@ -1855,6 +1872,12 @@ std::string Game::landingCoaching() const {
   well += fmt(", down %.0f m in", r.tdPastThrM);
   if (r.stopLeftM >= 0) well += fmt(", %.0f m to spare", r.stopLeftM);
   return well + ".";
+}
+
+// a job's arrival waits at the field for the pilot to park (lessons and checkride lessons, trials and practice
+// flights end at the stop - their briefings and recorded lines say so - as do the tests' bots)
+bool Game::arrivalWaits() const {
+  return !botControl && !isolatedFlight && contract.type != CT_LESSON && contract.type != CT_TRIAL && !researchFlight && !militaryFlight;
 }
 
 int Game::computePhase() const {
@@ -1887,6 +1910,34 @@ void Game::cycleApDest(int dir) {
     apDest = order[((k + dir) % n + n) % n];
   }
   g_audio.trigger(SFX_CLICK);
+}
+
+// What keeps the flight at real time now ("" nothing): the ground and the approach, low or steep over the terrain, the
+// destination or a checkpoint close, a warning, a visitor, combat. The autopilot's cruise may warp lower and nearer
+// the field than the pilot's hands (its own approach turns it off)
+std::string Game::warpBlocker() const {
+  if (militaryFlight || hiveCombat.aliveCount() > 0 || hiveCombat.mission.status == hive::MissionStatus::Active) return "combat runs at real time";
+  if (crashed || plane.onGround) return "on the ground";
+  if (plane.apOn && plane.apMode == Plane::AP_APPR && plane.apStage != Plane::APS_NAV) return "the autopilot is on its approach";
+  if (plane.apOn && plane.apMode == Plane::AP_STUNT) return "aerobatics fly at real time";
+  const float dd = length(vec3(g_world.wrap(plane.pos.x - dest().x), 0, g_world.wrap(plane.pos.z - dest().z)));
+  if (!apCruising()) {
+    if (plane.agl() < 250.f) return "too low over the ground";
+    if (dd < 3500.f && !freeFlight) return "nearing the destination";
+    for (float t : {5.f, 10.f, 20.f}) {   // (where the path it is on goes in the next 20 s of flight)
+      const vec3 q = plane.pos + plane.vel * t;
+      if (q.y < std::max(g_world.height(q.x, q.z), 0.f) + 150.f) return "terrain ahead";
+    }
+  }
+  if (wpIndex < (int)contract.wps.size()) {
+    const Waypoint& w = contract.wps[wpIndex];
+    if (length(vec3(g_world.wrap(plane.pos.x - w.x), plane.pos.y - w.alt, g_world.wrap(plane.pos.z - w.z))) < 1500.f) return "checkpoint ahead";
+  }
+  if (plane.stallWarn > 0.6f) return "stall warning";
+  if (gTunnel > 0.05f) return "high g";
+  if (ufo.on) return "something is alongside";
+  if (plane.spec && plane.fuel < plane.spec->maxFuel * 0.1f && !plane.spec->special) return "low fuel";
+  return "";
 }
 
 bool Game::apCruising() const {
@@ -1967,16 +2018,28 @@ void Game::flightControls(float dt) {
       plane.apAlt = std::max(plane.apAlt + (pitchIn + padP) * 45.f * dt, g_world.height(plane.pos.x, plane.pos.z) + 60.f);
     }
   }
+  // Flight assists (Settings): the inputs command rates and the aircraft holds its attitude (Plane::assistControl) -
+  // the keyboard and the gamepad by default, every input when asked, and always in time warp; in the air only
+  const bool joyFlying = jP || jR;
+  // (the research craft's own fly-by-wire already takes rate commands: assisted only in the warp)
+  plane.assistOn = !plane.apOn && !plane.onGround && (timeAccel > 1.f || (!plane.spec->special && (set.assist == 2 || (set.assist == 1 && !joyFlying))));
   if (!plane.apOn) {
     float tp = clampf(pitchIn + padP, -1, 1), tr = clampf(rollIn + padR, -1, 1);
-    float rate = jP || jR ? 14.f : manual ? 2.8f : 5.f;   // (a joystick's position is the control's, near enough at once)
-    c.pitch = approach(c.pitch, tp, rate, dt);
-    c.roll = approach(c.roll, tr, rate, dt);
-  }
+    float rate = joyFlying ? 14.f : manual ? 2.8f : 5.f;   // (a joystick's position is the control's, near enough at once)
+    if (plane.assistOn) {   // (the commands eased in as the keys are - a tap is a small change - and out at once)
+      auto ease = [&](float cur, float tgt) { return approach(cur, tgt, joyFlying ? 14.f : fabsf(tgt) < fabsf(cur) ? 16.f : 4.f, dt); };
+      plane.assistPitch = ease(plane.assistPitch, tp); plane.assistRoll = ease(plane.assistRoll, tr);
+    } else {
+      plane.assistPitch = plane.assistRoll = 0.f;
+      c.pitch = approach(c.pitch, tp, rate, dt);
+      c.roll = approach(c.roll, tr, rate, dt);
+    }
+  } else plane.assistPitch = plane.assistRoll = 0.f;
   (void)manual;
   // XR-40 weapons hot: the bumpers fire and bomb, so the rudder is frozen until weapons are safe again
   if (plane.spec->special == 2 && somnus.armed && !plane.onGround) { yawIn = 0; padY = 0; }
   c.yaw = approach(c.yaw, clampf(yawIn + padY, -1, 1), jY ? 14.f : 4.f, dt);
+  plane.assistYaw = plane.assistOn ? c.yaw * 0.6f : 0.f;   // (assisted, the rudder pedals add to the coordination)
   // throttle
   float thr = 0;
   if (actDown(ACT_THR_UP) || key(K_PGUP) || key(K_PLUS)) thr += 0.55f;
@@ -2070,13 +2133,34 @@ void Game::flightControls(float dt) {
     }
   }
   if (actPressed(ACT_LIGHTS)) { landingLight = !landingLight; toast(landingLight ? "Landing lights ON" : "Landing lights OFF"); }
-  if (actPressed(ACT_ENGINE) && !plane.engineRunning && plane.fuel > 0) { plane.starterTime = 0.01f; toast("Engine start"); }
+  // the engine key: pressed with the engine stopped, it starts it; held a second with it running, on the ground at a
+  // walking pace or slower, it shuts it down (the arrival's shutdown at the stand: a starter press brings it back)
+  {
+    const float gsNow = length(vec3(plane.vel.x, 0, plane.vel.z));
+    if (actDown(ACT_ENGINE) && plane.engineRunning && plane.onGround && gsNow < 3.f && !engineHeld) {
+      engineHold += dt;
+      if (engineHold >= 1.f) {
+        plane.engineRunning = false; plane.starterTime = 0; engineShutDown = true; engineHeld = true;
+        toast(plane.spec->engines > 1 ? "Engines shut down" : "Engine shut down", vec3(0.85f, 0.95f, 1.f), false);
+        g_audio.trigger(SFX_CLICK);
+      }
+    } else if (!actDown(ACT_ENGINE)) { engineHold = 0; engineHeld = false; }
+    if (actPressed(ACT_ENGINE) && !plane.engineRunning && plane.fuel > 0 && !engineHeld) { plane.starterTime = 0.01f; engineShutDown = false; toast("Engine start"); }
+  }
   // time acceleration
   if (actPressed(ACT_TIME)) {
-    float dd = length(vec3(g_world.wrap(plane.pos.x - dest().x), 0, g_world.wrap(plane.pos.z - dest().z)));
-    if(militaryFlight || hiveCombat.aliveCount()>0 || hiveCombat.mission.status==hive::MissionStatus::Active) { timeAccel=1; toast("Combat runs at real time"); }
-    else if (!apCruising() && (plane.onGround || plane.agl() < 250.f || dd < 3500.f)) { timeAccel = 1; toast("Time acceleration only available in cruise", vec3(1, 0.7f, 0.4f)); }
-    else { timeAccel = timeAccel >= 4 ? 1 : timeAccel * 2; toast(fmt("Time x%.0f", timeAccel)); }
+    const std::string why = warpBlocker();
+    if (timeAccel >= 16.f) { timeAccel = 1; toast("Time warp off"); }
+    else if (!why.empty()) { timeAccel = 1; toast("Time warp unavailable - " + why, vec3(1, 0.7f, 0.4f)); }
+    else {
+      timeAccel *= 2.f;
+      toast(fmt("Time warp x%.0f", timeAccel), vec3(0.45f, 0.9f, 1.f));
+      if (timeAccel > 4.f && !warpWarned) {   // (once a session: the cost is the PC's, not the flight's)
+        warpWarned = true;
+        toast("Above x4 the world streams in much faster: slower PCs may stutter", vec3(0.85f, 0.85f, 0.85f), false);
+      }
+      if (!plane.apOn) toast("Warp flies assisted: let go and it holds its bank and its climb", vec3(0.85f, 0.95f, 1.f), false);
+    }
   }
   // Only the explicitly selected 90-degree hover notch uses momentary manual power. Resolve it after the pod
   // and autopilot switches so entry, stick takeover and AP disengagement cannot carry a stale throttle command
@@ -2112,8 +2196,31 @@ bool Game::ringGeom(int i, vec3& c, vec3& ax, vec3& ay) const {
   return true;
 }
 
+void Game::updateShake(float dt) {
+  shakeTrauma = std::max(0.f, shakeTrauma - dt * 1.6f);
+  float b = 0.f;
+  const bool live = screen == SCR_FLIGHT && !paused && !crashed && plane.spec && timeAccel <= 1.f;
+  if (live) {
+    const float hp = plane.gLoad - gLp; gLp += (plane.gLoad - gLp) * (1.f - expf(-dt * 2.5f));
+    b += clampf(fabsf(hp) * 0.55f, 0.f, 0.5f);                        // (the air's bumps, felt as g)
+    b += smoothstepf(0.45f, 1.f, plane.stallWarn) * 0.45f;            // (the stall's buffet)
+    b += gTunnel * 0.35f;                                             // (near the airframe's limit)
+    if (plane.onGround) {
+      const float gs = length(vec3(plane.vel.x, 0, plane.vel.z));
+      b += clampf(plane.groundRough, 0.f, 1.f) * smoothstepf(2.f, 30.f, gs) * 0.35f + smoothstepf(5.f, 50.f, gs) * 0.05f;
+    }
+  } else gLp = plane.spec ? plane.gLoad : 1.f;
+  shakeBuffet += (b - shakeBuffet) * (1.f - expf(-dt * 8.f));
+  if (!live) shakeBuffet = std::min(shakeBuffet, 0.f + b);
+  shakeT += dt;
+  const float on = live || (screen == SCR_FLIGHT && crashed && !paused) ? 1.f : 0.f;
+  rumbleLo = set.rumble ? on * clampf(shakeTrauma * shakeTrauma * 1.2f + shakeBuffet * 0.5f, 0.f, 1.f) : 0.f;
+  rumbleHi = set.rumble ? on * clampf(shakeBuffet * 0.9f + shakeTrauma * 0.3f, 0.f, 1.f) : 0.f;
+}
+
 void Game::updateFlight(float dt) {
-  if (paused) return;
+  updateShake(paused ? 0.f : dt);
+  if (paused) { rumbleLo = rumbleHi = 0.f; return; }
   if (!botControl) flightControls(dt);
   // automatic engine start sequence after the scene fades in
   if (!engineAutoStarted && !contract.startAirborne) {
@@ -2124,9 +2231,8 @@ void Game::updateFlight(float dt) {
   // (time acceleration is switched off before this frame's step, not after it: a 4x frame on the approach was one
   // too many)
   if (timeAccel > 1) {
-    float dd = length(vec3(g_world.wrap(plane.pos.x - dest().x), 0, g_world.wrap(plane.pos.z - dest().z)));
-    bool approach = plane.apOn && plane.apMode == Plane::AP_APPR && plane.apStage != Plane::APS_NAV;
-    if ((!apCruising() && (plane.agl() < 250.f || dd < 3500.f)) || approach || plane.onGround || crashed) { timeAccel = 1; toast("Time acceleration off"); }
+    const std::string why = warpBlocker();
+    if (!why.empty()) { timeAccel = 1; toast("Time warp off - " + why, vec3(1, 0.8f, 0.45f)); }
   }
   if(militaryFlight || hiveCombat.aliveCount()>0 || hiveCombat.mission.status==hive::MissionStatus::Active) timeAccel=1;
   float simDt = dt * timeAccel;
@@ -2134,10 +2240,15 @@ void Game::updateFlight(float dt) {
   refreshGroundPits();   // (what the wheels, the weapons and the wreckage meet this frame)
   moveClouds(simDt);
   if (!crashed) {
-    updateWeather(simDt);
-    updateFailures(simDt);
-    updateResearchCard(simDt);
-    plane.step(simDt, wx, gameTime);
+    // (time warp: the frame's flight in steps of at most x4 - the rate the autopilot's and the assists' loops, the
+    // weather and the failures were made at - ending early at a touchdown or an impact, which the frame then sees)
+    const int chunks = std::max(1, (int)ceilf(timeAccel / 4.f - 1e-3f));
+    const float h = simDt / chunks;
+    for (int k = 0; k < chunks; k++) {
+    updateWeather(h);
+    updateFailures(h);
+    updateResearchCard(h);
+    plane.step(h, wx, gameTime + h * k);
     if (plane.seamShift.x != 0.f || plane.seamShift.z != 0.f) { prevPos += plane.seamShift; followSeam(plane.seamShift); plane.seamShift = vec3(); }
     if (benchPin) { plane.pos = benchPinPos; plane.q = benchPinQ; plane.w = vec3(); }   // (a timing scene held in place: flying, going nowhere)
     if (plane.apWindEvent != apWindSaid) {   // (the autopilot went around for a wind that turned behind it on the final: Plane::step)
@@ -2152,9 +2263,11 @@ void Game::updateFlight(float dt) {
       }
       apWindSaid = plane.apWindEvent;
     }
-    flightClock += simDt;
-    timeOfDay += simDt / 3600.f;
+    flightClock += h;
+    timeOfDay += h / 3600.f;
     if (plane.ev.bellyLanding && !result.bellyLanding) { result.bellyLanding = true; toast("Belly landing - hold it straight", vec3(1, 0.6f, 0.3f)); g_audio.triggerLocal(SFX_METAL, vec3(0,-plane.gearHeight(),0), .7f); }
+    if (plane.ev.touchdown || plane.ev.crashed) { simDt = h * (k + 1); break; }
+    }
   }
   gameTime += simDt;
   if (plane.engineRunning && !wasRunning) {
@@ -2190,7 +2303,7 @@ void Game::updateFlight(float dt) {
     plane.ev.crashed = true; plane.ev.crashReason = "Mid-air collision";
   }
   for (auto& f : traffic.puffs) spawn(f.p, f.v, f.life, f.size, f.grow, f.col, f.alpha, f.kind, 1.f, 0.f);
-  for (auto& b : traffic.booms) g_audio.triggerAt(SFX_BOOM, b.first, b.second);
+  for (auto& b : traffic.booms) { g_audio.triggerAt(SFX_BOOM, b.first, b.second); shake(0.3f * clampf(b.second, 0.f, 1.f)); }
   updateSomnus(simDt);
   updateHive(simDt);
   if(screen!=SCR_FLIGHT) return;
@@ -2302,8 +2415,10 @@ void Game::updateFlight(float dt) {
     if(!result.bellyLanding) for (float side : {-1.f,1.f}) g_audio.touchdown(
       plane.pos+plane.q.rotate(vec3(side*audioGear.track,-plane.gearHeight(),audioGear.mainZ)),
       clampf(fpm/600.f,.15f,.8f),length(vec3(plane.vel.x,0,plane.vel.z)),contactSurface);
-    std::string r = fpm < 120 ? "BUTTER!" : fpm < 250 ? "Smooth landing" : fpm < 450 ? "Good landing" : fpm < 650 ? "Firm landing" : "HARD landing!";
-    toast(fmt("%s  %.0f fpm", r.c_str(), fpm), fpm < 450 ? vec3(0.6f, 1, 0.6f) : vec3(1, 0.6f, 0.3f));
+    // (the rating on the touchdown scale the settlement pays by: career.h touchdownGrade - spoken, and stamped on the HUD)
+    callout(fmt("%s  %.0f fpm", touchdownGradeCall(touchdownGrade(fpm)), fpm));
+    tdStampT = realTime; tdStampFpm = fpm; arrivalTold = false;
+    shake(clampf(fabsf(fpm) / 750.f, 0.12f, 0.8f));
     float gs = length(vec3(plane.vel.x, 0, plane.vel.z));
     for (int side = -1; side <= 1; side += 2) {
       const GearStations gst = gearStations(*plane.spec);   // (at the main wheels)
@@ -2401,7 +2516,7 @@ void Game::updateFlight(float dt) {
                 (k % 3 ? vec3(0.4f, 1.f, 0.7f) : vec3(1.f, 1.f, 0.8f)) * r.range(2.f, 5.f), 1.f, SPR_SPARK, 1.4f, -3.f);
         }
       }
-      wpIndex++; result.wpDone = wpIndex;
+      wpIndex++; result.wpDone = wpIndex; shake(0.1f);
       if (contract.type == CT_TRIAL) { if (wpIndex == 1) trialT0 = flightClock; if (wpIndex >= (int)contract.wps.size()) trialT1 = flightClock; }
       g_audio.trigger(SFX_CHIME);
       toast(wpIndex < (int)contract.wps.size() ? fmt("Checkpoint %d of %d", wpIndex, (int)contract.wps.size()) : "All checkpoints passed!", vec3(0.5f, 1, 0.7f));
@@ -2427,16 +2542,29 @@ void Game::updateFlight(float dt) {
       // or the leg ends there with the parking brake set (a safe diversion - the job carries the checkpoints flown);
       // anywhere else it is a field landing like any other (the review of v3.44.0, CAR-5: the leg could not be closed)
       const bool wpsLeft = wpIndex < (int)contract.wps.size(), onField = atField && rwy == ap;
+      // a job's arrival waits for the parking brake: the pilot taxis in and parks (lessons, trials and practice
+      // flights end at the stop, as their briefings say; arrivalWaits)
+      const bool waits = arrivalWaits() && onField && !parkingBrake;
+      arrivalAt = onField ? ap : -1;
       if (onField && wpsLeft && !parkingBrake) {
         if (stillTimer >= 1.25f && stillTimer - dt < 1.25f) {   // (the first line as recorded for the voice)
           toast("Checkpoints remaining - take off again to continue", vec3(1, 0.8f, 0.4f));
           toast(expandHint("Or set the parking brake ({parkingBrake}) to end the leg here", padPrompts()), vec3(1, 0.8f, 0.4f), false);
         }
+      } else if (waits) {
+        if (!arrivalTold) {
+          arrivalTold = true;
+          if (ap == contract.to) {
+            toast(fmt("Welcome to %s", g_world.airports[ap].name), vec3(0.6f, 1, 0.7f), false);
+            toast(expandHint("Taxi clear of the runway, then set the parking brake ({parkingBrake}) to finish", padPrompts()), vec3(0.85f, 0.95f, 1.f), false);
+            if (contract.payout > 0 && !engineShutDown) toast(expandHint("Shut down first (hold {engine}) for the airmanship bonus", padPrompts()), vec3(0.85f, 0.95f, 1.f), false);
+          } else toast(expandHint(fmt("Landed at %s: set the parking brake ({parkingBrake}) to end the flight here, or take off again", g_world.airports[ap].name), padPrompts()), vec3(1, 0.8f, 0.4f), false);
+        }
       } else if (onField && ap == contract.to && !wpsLeft) { endFlight(true, ""); return; }
       else if (onField) { result.divertedTo = ap; endFlight(false, fmt(wpsLeft ? "Leg ended at %s with checkpoints remaining" : "Diverted to %s", g_world.airports[ap].name), OUT_DIVERTED); return; }
       else if (stillTimer > 3.f) { endFlight(false, atField ? "Landed off the runway" : "Landed off-airport", OUT_OFF_AIRPORT); return; }
     }
-  } else stillTimer = 0;
+  } else { stillTimer = 0; if (gs > 4.f) arrivalAt = -1; }
   if (militaryFlight && plane.fuel<=0 && plane.onGround && gs<1.f) { endFlight(false,"Military sortie out of fuel",OUT_OUT_OF_FUEL); return; }
   if (plane.fuel <= 0 && plane.onGround && gs < 1.f && !takeoffAnnounced) { endFlight(false, "Out of fuel", OUT_OUT_OF_FUEL); return; }
   if (plane.fuel <= 0 && plane.onGround && gs < 1.f && takeoffAnnounced) {
@@ -3142,6 +3270,7 @@ void Game::partImpact(vec3 p, vec3 v, float E, float fire, bool water) {
 }
 
 void Game::breakUp(vec3 impactVel, bool water, bool air) {
+  shake(1.f);
   // Capture the ordinary production pose before the caller clears velocity.
   // In particular, speed-dependent nose steering must not snap to its taxi angle.
   FrameParams captured{};
@@ -3608,6 +3737,16 @@ FrameParams Game::buildFrame() {
     if (camMode == 0) upRef = normalize(lerp(vec3(0, 1, 0), camQ.rotate(vec3(0, 1, 0)), 0.3f));
     if (dbgCam && dbgFollow) { dbgCamPos = plane.pos + dbgFollowOff; dbgCamLook = plane.pos; }
     if (dbgCam) { camPos = dbgCamPos; fwd = normalize(dbgCamLook - dbgCamPos); upRef = vec3(0, 1, 0); }
+    if (screen == SCR_FLIGHT && !dbgCam && camMode != 3 && set.camShake > 0.f) {   // (the shake: small turns of the view, 2-5 Hz)
+      const float a = (shakeTrauma * shakeTrauma + shakeBuffet) * set.camShake * (camMode == 1 ? 0.7f : 1.f);
+      if (a > 1e-4f) {
+        const float t = shakeT;
+        auto n = [&](float f, float ph) { return sinf(t * f + ph) * 0.6f + sinf(t * f * 2.31f + ph * 1.7f) * 0.4f; };
+        const vec3 right = normalize(cross(fwd, upRef));
+        fwd = normalize(fwd + right * (n(23.f, 0.f) * a * 1.1f * DEG) + upRef * (n(29.f, 1.3f) * a * 1.4f * DEG));
+        upRef = normalize(upRef + right * (n(19.f, 2.1f) * a * 0.9f * DEG));
+      }
+    }
     fp.camPos = camPos;
     fp.camBack = -fwd;
     fp.camRight = normalize(cross(fwd, upRef));
@@ -3615,6 +3754,8 @@ FrameParams Game::buildFrame() {
     fp.fovY = (camMode == 1 ? set.fov + 19.f : set.fov) * DEG;
     if (camMode == 3) fp.fovY = clampf(2.f * atanf(std::max(plane.spec->span, plane.spec->fusLen) * (botControl ? 0.42f : 1.5f) / length(plane.pos - camPos)), 4.f * DEG, 60.f * DEG);
     if (camMode == 1) fp.fovY = 2.f * atanf(tanf((set.fov + 19.f) * 0.5f * DEG) / ckZoom);   // cockpit zoom: lean in to read the displays
+    if (camMode == 0 && set.speedFov && screen == SCR_FLIGHT && plane.spec)   // (the chase view widens a little with speed: up to 5 deg past cruise)
+      fp.fovY += smoothstepf(0.6f, 1.6f, length(plane.vel) / std::max(plane.spec->cruise, 20.f)) * 5.f * DEG;
     if (screen == SCR_LOADING && militaryFlight) militaryLoadingCamera(fp);
     g_audio.setView(fp.camPos,fp.camRight,fp.camUp,-fp.camBack);
     fp.landLight = landingLight && plane.engineRunning ? (0.3f + 0.7f * fp.night) : 0.f;
@@ -4686,7 +4827,7 @@ void Game::updateComms(float dt) {
     bool w[4] = {plane.stallWarn > 0.8f && !plane.onGround && plane.ias > 10.f,
                  !plane.onGround && plane.agl() < 120 && plane.vel.y < -7.f,
                  spc.retract && plane.gear < 0.99f && !plane.onGround && plane.agl() < 200 && length(plane.pos - d.pos()) < 4000.f && plane.ias < spc.vref * 1.5f,
-                 !plane.engineRunning && engineAutoStarted && plane.starterTime <= 0 && !plane.glideOnly()};   // (a failed engine has no restart to advise)
+                 !plane.engineRunning && engineAutoStarted && plane.starterTime <= 0 && !plane.glideOnly() && !(engineShutDown && plane.onGround)};   // (a failed engine has no restart to advise; one shut down at the stand, none needed)
     const char* say[4] = {"STALL", "PULL UP", "GEAR!", nullptr};
     for (int i = 0; i < 4; i++) {
       if (w[i] && (!warnWas[i] || realTime - warnLastT[i] > 8.f)) {
@@ -4832,6 +4973,7 @@ void Game::feedAudio() {
 // ------------------------------------------------------------------ main update / render
 void Game::update(float dt) {
   g_ren.beginRegionUploadFrame(); // one shared detail + horizon GPU budget per displayed frame
+  if (screen != SCR_FLIGHT) { rumbleLo = rumbleHi = 0.f; shakeTrauma = shakeBuffet = 0.f; }   // (the motors and the shake are the flight's)
   if (screen != SCR_REGION_LOADING && (g_world.procedural || !g_world.repeating) &&
       (screen == SCR_MENU || screen == SCR_HUB || screen == SCR_RESEARCH || screen == SCR_DEBRIEF))
     loadFreeRegion(0, screen);
@@ -5099,6 +5241,7 @@ void Game::render() {
       if (!uiHidden || paused || showMap) {   // (the HUD under the g-force lens, flushed on its own: the map and the pause menu stay clear of it)
         g_ren.flushUIPublic(); g_ren.uiGLoad = fp.gLoad; g_ren.uiTime = fp.time;
         drawHud(fp); g_ren.flushUIPublic(); g_ren.uiGLoad = 0;
+        if (!uiHidden && !showMap) drawLandingStamp();
         drawMapOverlay();
       }
       if (paused) drawPause();
@@ -5532,6 +5675,7 @@ void Game::debugScene(const std::string& name) {
     takeoffAnnounced = true;
     camQ = plane.q;
     if (name == "cockpit") camMode = 1;
+    if (name == "hud" && getenv("TDSTAMP")) { tdStampT = realTime - 0.6f; tdStampFpm = (float)atof(getenv("TDSTAMP")); }   // (TDSTAMP=fpm: the touchdown stamp)
     if (name == "hud") {   // HUDDEMO=1: every warning, a tower call, failures and messages lit, to look at the layout
       if (getenv("HUDDEMO")) {
         hudDemo = true;

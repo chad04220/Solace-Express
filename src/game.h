@@ -71,6 +71,16 @@ struct Settings {
   bool menuMotion = true; // ambient code, chart sweeps and loading-image motion; progress always remains live
   float uiScale = 1.f;    // on top of the window-height scale
   bool hudCam[4] = {true, true, true, true};   // the HUD on or off, remembered per camera
+  // Flight assists: 0 off (every input moves the controls directly), 1 the keyboard and the gamepad (the default: a
+  // joystick flies directly), 2 every input. Time warp always flies assisted (Plane::assistControl)
+  int assist = 1;
+  float camShake = 1.f;    // the camera's response to touchdowns, turbulence, the stall buffet and g (0 off .. 1.5)
+  bool rumble = true;      // the gamepad's motors (the same events)
+  bool speedFov = true;    // the outside views widen a little with speed
+  float musicVol = 0.5f;   // the game's own music (the radio has its volume)
+  bool failures = true;    // random failures on worn or rented aircraft (lessons never fail)
+  int air = 1;             // the air: 0 calm (a fraction of the gusts and turbulence), 1 as forecast
+  bool hudEssential = false;   // the flight HUD's essentials only: no systems tiles; the wind's components and the g meter only when they matter
   int keyBind[ACT_COUNT]; unsigned padBind[ACT_COUNT];
   JoyButtonBind joyBind[ACT_COUNT];   // (none by default: joysticks differ)
   AxisBind axisBind[AX_COUNT];        // the flight axes on joysticks, throttles and pedals (Settings -> Joystick)
@@ -285,7 +295,20 @@ private:
   bool landed = false, completed = false, crashed = false;
   FlightResult result;
   float fuelStart = 0;
+  // the camera's response (Settings: camera shake) and the gamepad's motors: a trauma that decays (a touchdown, an
+  // impact, a gate, a boom) and a buffet that follows the air and the airframe (the bumps felt as g, the stall, high g,
+  // a rough strip). Nothing in the time warp, the menus or a pause
+  float shakeTrauma = 0, shakeBuffet = 0, shakeT = 0, gLp = 1;
+  void shake(float amount) { shakeTrauma = std::min(1.f, shakeTrauma + amount); }
+  void updateShake(float dt);
+public:
+  float rumbleLo = 0, rumbleHi = 0;   // the gamepad's motors 0..1 (the platform layer sends them)
+private:
   float timeAccel = 1;
+  // Time warp (T): x1, x2, x4, x8, x16 in the air, under the pilot's hands (flown assisted) or the autopilot's. It
+  // drops back to x1 by itself whenever the flight needs real time: what warpBlocker names ("" none)
+  std::string warpBlocker() const;
+  bool warpWarned = false;   // the x8 / x16 performance note shown this session
   int camMode = 0; float camYaw = 0, camPitch = 0.12f, camDist = 0, camZoom = 1;
   float camArm = 0, camArmV = 0, camSpd = 0;   // chase camera spring arm: length (m), its rate, smoothed airspeed
   float lookYaw = 0, lookPitch = 0;
@@ -306,6 +329,16 @@ private:
   int tdRunway = -2;   // the airport whose runway the last touchdown was on (-1: off every runway; -2: none this flight)
   int runwayReverse = 0;
   float stillTimer = 0;
+  // the arrival: a job's flight waits, stopped at a field, for the pilot to set the parking brake (taxi in, shut down
+  // first for the airmanship bonus); lessons, trials and practice flights end at the stop. arrivalAt: the field it
+  // waits at (-1 none), told once per stop
+  int arrivalAt = -1; bool arrivalTold = false;
+  bool arrivalWaits() const;
+  bool engineShutDown = false; float engineHold = 0; bool engineHeld = false;   // the pilot shut the engine down (held the engine key a second on the ground)
+  // the HUD's touchdown stamp: the grade and rate of the last touchdown (realTime it was made; < 0 none)
+  float tdStampT = -1.f, tdStampFpm = 0.f;
+  void drawLandingStamp();
+  void callout(const std::string& s);   // a line for the voices only: shown elsewhere (the stamp) or not at all
   bool engineAutoStarted = false;
   float startDelay = 0;
   vec2 cloudOff;                 // the cloud field's drift with the wind (Weather::cloudDrift), its detail's drift and the billows' rise

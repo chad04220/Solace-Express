@@ -1,4 +1,58 @@
-## What's new in v3.50.3
+## What's new in v3.51.0
+
+### Time Warp, up to x16, in your own hands
+- **Press T to step through Time Warp: x2, x4, x8, x16, then back to real time.** It used to stop at x4, and above x2 it was hard to fly by hand. Now you can cross the islands at x16 with your own hands on the controls, not only on the autopilot.
+- **While Time Warp is on, the aircraft flies assisted.** Roll and pitch with the keys, the gamepad or the joystick. Let go and it holds the bank and the climb or descent you gave it. The physics run in steps no bigger than x4, so the aircraft is as steady at x16 as at x4. All 15 aircraft were flown at x16 in the tests.
+- **Time Warp switches itself off when it should, and tells you why:**
+  - below 250 m over the ground, or with terrain in your path in the next 20 seconds;
+  - within 3.5 km of your destination, or 1.5 km before a checkpoint;
+  - on a stall warning, at high g, below 10% fuel, or when something fails;
+  - on the autopilot's approach and during aerobatics.
+  
+  Combat still runs at real time. With the autopilot cruising, it can stay on lower and nearer the field, as before.
+- **A note on performance:** above x4 the game simulates up to four times as much per frame, and the scenery streams in four times faster. On slower PCs, x8 and x16 may stutter. The game reminds you of this the first time you go above x4.
+
+### Flight assists
+- **Keys and gamepads now fly with assists by default.** The roll and pitch inputs turn the aircraft, and when you let go it holds its bank and its flight path. A bank under 10° rolls back to wings level. The rudder is coordinated for you, and your own rudder adds to it. Near the stall the nose comes down by itself. The bank stops at 67°.
+- **Settings → Flying → Flight assists** has three choices:
+  - **Off:** every input moves the controls directly, as before.
+  - **Keys and pad:** the default. A joystick still flies directly.
+  - **All inputs:** the joystick is assisted too.
+- The research aircraft keep their own fly-by-wire and fly assisted only in Time Warp. The autopilot works as before.
+
+### Landing and arriving
+- **One touchdown scale everywhere:**
+
+  | Grade | Vertical speed |
+  |---|---|
+  | Butter | under 150 fpm |
+  | Smooth | under 250 fpm |
+  | Good | up to 350 fpm |
+  | Firm | up to 600 fpm |
+  | Hard | over 600 fpm |
+
+  The voice callout, the pay, the checkride, the instructor's coaching and the aircraft's wear used to grade touchdowns in slightly different ways. They now all use this scale.
+- **A landing stamp:** the moment you touch down, the grade and your vertical speed appear in the middle of the screen for a few seconds, and the camera gives a bump that matches how hard you landed.
+- **Jobs now end at the stand, not on the runway.** After you land, the game welcomes you to the airport. Taxi clear of the runway and set the parking brake (B) to finish. To end the job where you are, choose **Finish flight here** in the pause menu. Lessons, trials and practice flights still end when you stop, as their briefings say.
+- **Shut down the engine before you set the parking brake to earn the airmanship bonus:** hold the engine key (I) for a second while you're stopped. The bonus is 2% of the pay, shown as "Taxied clear and shut down". You couldn't earn it before, because the job ended as soon as you stopped. Press the engine key again to restart. The ENGINE OFF warning no longer sounds after you shut down on the ground on purpose.
+
+### Feel
+- **Camera shake:** touchdowns, turbulence, gusts, the stall buffet, high g, sonic booms, bombs and crashes now shake the view. The shake is lighter in the cockpit. **Settings → Flying → Camera shake** sets its strength from off to 150%.
+- **Gamepad rumble** on Xbox-compatible controllers, for the same moments. Turn it off in **Settings → Flying → Gamepad rumble**.
+- **Speed sensation:** the chase view widens by up to 5° as you speed up. Turn it off in **Settings → Flying → Speed sensation**.
+
+### More settings
+- **Random failures:** On, for worn and rented aircraft as before, or Off.
+- **Air:** **As forecast**, or **Calm**, which takes two thirds off every gust and all the turbulence.
+- **Flight HUD:** **Full**, or **Essentials**, which hides the systems tiles. The wind components and the g meter then show only when they matter.
+
+### Smaller fixes
+- The debrief no longer cuts the last row of the pay list in half when the list is long.
+- Long warning labels shrink to fit their box, and the "press I to restart" prompt under ENGINE OFF has a dark backing so you can read it over a bright sky.
+- The instructor's hints get a third line when they need one, instead of being cut off.
+- Local flights that start and end at the same airport now say "Local flight" and how many checkpoints they have, instead of "0 km".
+- The job board's tabs are written the same way: WORK, TRIALS, MILITARY.
+- The main menu's footer and the Settings page show the game's version.
 
 ### Checkpoints
 - **The checkpoint marker no longer draws over your aircraft or the HUD.** The magenta diamond, its distance label and the dashed line down to the ground now go behind the aircraft wherever the airframe is in front of them. In the cockpit, the windscreen frame and the instrument panel hide them too, so you only see the marker through the glass. Every HUD panel, the map and the menus now draw over it. When the checkpoint is off-screen, the arrow at the screen's edge also stays under the HUD panels.

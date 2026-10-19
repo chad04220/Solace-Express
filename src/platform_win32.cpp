@@ -63,6 +63,19 @@ struct XGamepad { WORD wButtons; BYTE bLeftTrigger, bRightTrigger; SHORT sThumbL
 struct XState { DWORD dwPacketNumber; XGamepad Gamepad; };
 typedef DWORD(WINAPI* PFNXINPUTGETSTATE)(DWORD, XState*);
 static PFNXINPUTGETSTATE s_xinput = nullptr;
+struct XVibration { WORD left, right; };
+typedef DWORD(WINAPI* PFNXINPUTSETSTATE)(DWORD, XVibration*);
+static PFNXINPUTSETSTATE s_xinputSet = nullptr;
+// the game's rumble (Game::rumbleLo / rumbleHi, 0..1) to the pad's motors: sent when it changes, off when the window
+// loses the focus or the game ends
+static void sendRumble(float lo, float hi) {
+  if (!s_xinputSet) return;
+  static int last[2] = {-1, -1};
+  const int l = (int)(clampf(lo, 0.f, 1.f) * 65535.f), r = (int)(clampf(hi, 0.f, 1.f) * 65535.f);
+  if (abs(l - last[0]) < 600 && abs(r - last[1]) < 600 && !(l == 0 && last[0] != 0) && !(r == 0 && last[1] != 0)) return;
+  XVibration v{(WORD)l, (WORD)r};
+  if (s_xinputSet(0, &v) == 0) { last[0] = l; last[1] = r; }
+}
 
 static Game* g_game = nullptr;
 static HWND g_hwnd = nullptr;
@@ -671,7 +684,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   timeBeginPeriod(1);   // 1 ms Sleep granularity for the frame limiter
   setupPacing(g_hwnd);
   const char* xdlls[] = {"xinput1_4.dll", "xinput9_1_0.dll", "xinput1_3.dll"};
-  for (auto d : xdlls) { HMODULE m = LoadLibraryA(d); if (m) { s_xinput = (PFNXINPUTGETSTATE)GetProcAddress(m, "XInputGetState"); if (s_xinput) break; } }
+  for (auto d : xdlls) { HMODULE m = LoadLibraryA(d); if (m) { s_xinput = (PFNXINPUTGETSTATE)GetProcAddress(m, "XInputGetState"); s_xinputSet = (PFNXINPUTSETSTATE)GetProcAddress(m, "XInputSetState"); if (s_xinput) break; } }
   joyInit(g_hwnd);   // joysticks, throttles and pedals (joystick_win.cpp); none: the game runs without them
 
   ShowWindow(g_hwnd, SW_SHOW);
@@ -1767,6 +1780,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       game.update(dt);
       game.render();
       if (SwapBuffers(g_hdc)) game.framePresented();
+      if (game.in.pad) { const bool fg = GetForegroundWindow() == g_hwnd; sendRumble(fg ? game.rumbleLo : 0.f, fg ? game.rumbleHi : 0.f); }
       if (s_limitHz > 0) {   // software limiter: sleep most of the way, spin the last ~2 ms
         static LONGLONG deadline = 0;
         const LONGLONG period = freq.QuadPart / s_limitHz;
@@ -1785,6 +1799,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     if (game.wantFullscreenToggle) { game.wantFullscreenToggle = false; toggleFullscreen(); game.set.fullscreen = g_fullscreen; setupPacing(g_hwnd); }
     game.in.endFrame();
   }
+  sendRumble(0.f, 0.f);
   game.shutdown();
   stopAudio();
   timeEndPeriod(1);

@@ -318,6 +318,12 @@ public:
   static bool perfLoad(const std::string& path, const std::string& stamp);   // every type's, from a cache of this build's
   static void perfSave(const std::string& path, const std::string& stamp);
   float fbwRollMax(float hover) const { return (spec->special == 2 ? 7.0f : 5.5f) * (1.f - 0.6f * hover); }
+  // Assisted flying (the game's Flight assists, and always in time warp): the pilot's inputs (-1..1) command a roll rate
+  // and a pitch rate; let go, the aircraft holds its bank (wings level from under 10 deg) and its flight path, and the
+  // rudder coordinates (assistYaw adds the pilot's own). Flown through the autopilot's inner loops (apRates) inside the
+  // airframe's envelope, the nose lowered near the stall; off on the ground and under the autopilot
+  bool assistOn = false; float assistRoll = 0, assistPitch = 0, assistYaw = 0;
+  float assistBank = 0, assistGamma = 0; bool assistHeld = false;
   ApEnvelope apEnv;            // what it can do now (apSense)
   void apSense();              // read it: the learned envelope, corrected for weight, air, configuration and condition
 private:
@@ -337,6 +343,7 @@ private:
   float apStopNeed(const Airport& a, bool rev, const Weather& wx, float* tw) const;
   void apHover(float dt);
   void apBellyUp(float dt);   // the research craft's speed-shedding pitch-up on the final (APS_BLEED)
+  void assistControl(float dt);   // the assisted flying's law (assistOn)
   void somnusThrust(vec3& F, vec3& T, float podThrust, vec3 wd, vec3 Taero, vec3 surfMax, float dt);
   vec3 gust;
   float cd0 = 0.03f;
