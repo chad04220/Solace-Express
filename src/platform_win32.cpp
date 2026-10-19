@@ -357,9 +357,29 @@ static std::string userDir() {
 // first-time compile this way because NVIDIA's driver holds a process-wide lock while it links the big scene programs: no
 // thread of the compiling process, whatever its context, can draw until it lets go, so the intro froze. A separate
 // process has its own driver state, and the game then loads the finished programs from the cache in a moment.
+// a helper process at full speed: Windows may run a process with no window of its own "efficiently" (power throttling,
+// EcoQoS: lower clocks), and a helper's compile is what the launch is waiting for. v3.50.2's helpers each took two or
+// three times as long over a program as the game itself had, the last one compiling alone too. (SetProcessInformation
+// is Windows 8's, its power throttling Windows 10's: looked up, so an older Windows simply goes without)
+static void helperUnthrottled() {
+  struct PowerThrottling { ULONG version, controlMask, stateMask; } s = {1, 0x1, 0};   // (EXECUTION_SPEED controlled, and off)
+  typedef BOOL(WINAPI* SetInfoFn)(HANDLE, int, LPVOID, DWORD);
+  if (HMODULE k = GetModuleHandleA("kernel32.dll"))
+    if (auto set = (SetInfoFn)(void*)GetProcAddress(k, "SetProcessInformation")) set(GetCurrentProcess(), 4 /* ProcessPowerThrottling */, &s, sizeof s);
+}
+
+// the process's CPU time so far (every thread's: the driver's compiler may run on several), seconds
+static double processCpuSeconds() {
+  FILETIME c, e, k, u;
+  if (!GetProcessTimes(GetCurrentProcess(), &c, &e, &k, &u)) return 0.0;
+  auto s = [](const FILETIME& f) { return (double)(((ULONGLONG)f.dwHighDateTime << 32) | f.dwLowDateTime) * 1e-7; };
+  return s(k) + s(u);
+}
+
 // a helper process's GL context, current: core 3.3 on a hidden window of its own, its functions loaded. 0, else 2 (no
 // context) or 3 (the functions)
 static int helperContext(HINSTANCE hInst, HGLRC& ctx) {
+  helperUnthrottled();
   WNDCLASSEXW wc = {sizeof(wc)}; wc.style = CS_OWNDC; wc.lpfnWndProc = DefWindowProcW; wc.hInstance = hInst; wc.lpszClassName = L"SomniumVolandiCompile";
   RegisterClassExW(&wc);
   HWND hw = CreateWindowExW(0, wc.lpszClassName, L"", WS_POPUP, 0, 0, 8, 8, nullptr, nullptr, hInst, nullptr);
@@ -413,10 +433,20 @@ static int buildAircraftShadersChild(HINSTANCE hInst, const std::string& dir, co
   HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
   auto say = [&](const std::string& l) { DWORD w; if (out && out != INVALID_HANDLE_VALUE) WriteFile(out, l.data(), (DWORD)l.size(), &w, nullptr); };
   int done = 0;
+  LARGE_INTEGER f; QueryPerformanceFrequency(&f);
   for (size_t at = 0; at < list.size();) {
     const size_t comma = std::min(list.find(',', at), list.size());
     const int item = atoi(list.c_str() + at);
-    if (item >= 0 && item < Renderer::afItemCount()) g_ren.buildAfItem(item);
+    if (item >= 0 && item < Renderer::afItemCount()) {
+      // (each one's time and the CPU it took, in compile.log: CPU well over the time, the compiler runs on several
+      // threads and helpers side by side share the cores; about the same but slower than the game compiles it, the
+      // CPU runs slower in them)
+      LARGE_INTEGER a, b; QueryPerformanceCounter(&a); const double c0 = processCpuSeconds();
+      g_ren.buildAfItem(item);
+      QueryPerformanceCounter(&b);
+      compileLogLine(fmt("helper %lu: item %d took %.1f s, %.1f s of CPU", (unsigned long)GetCurrentProcessId(), item,
+                            (double)(b.QuadPart - a.QuadPart) / f.QuadPart, processCpuSeconds() - c0));
+    }
     say(std::to_string(++done) + "\n");
     at = comma + 1;
   }

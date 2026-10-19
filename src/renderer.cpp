@@ -129,6 +129,7 @@ static void compileLog(const std::string& line) {
   }
 }
 void Renderer::bakeLog(const std::string& line) { compileLog(line); }
+void compileLogLine(const std::string& line) { compileLog(line); }
 thread_local std::function<void(const std::string&)> g_onProgramBuild;
 static thread_local std::string g_compileWhat;   // what linkProgramCached is building (for compile.log)
 static GLuint linkOnce(const std::string& vsIn, const std::string& fsIn, std::string& err, bool& rejectedBefore, const char* variant) {

@@ -95,6 +95,7 @@ std::string meshGeometryStamp(const std::string& defines); // SHA256 of full-qua
 std::string meshCacheStamp(const std::string& defines = "");     // fingerprint of the sources the aircraft mesh bake depends on + the driver
 std::string shaderCacheStamp();   // fingerprint of all shader sources + the driver (current context needed)
 std::string aircraftProgramStamp();   // and of every type's own build (Renderer::buildAfItem): its packed model too
+void compileLogLine(const std::string& line);   // a line in <cache>/compile.log (the launch's helpers: each item's time)
 bool writePNG(const char* path, int w, int h, const std::vector<uint8_t>& rgbBottomUp);
 bool readImage(const char* path, int& w, int& h, std::vector<uint8_t>& rgbaTopDown);   // PNG or JPEG
 GLuint linkProgramCached(const std::string& vs, const std::string& fs, std::string& err, bool* usedSafeGear = nullptr);

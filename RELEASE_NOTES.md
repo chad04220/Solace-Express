@@ -1,3 +1,10 @@
+## What's new in v3.50.3
+
+### The first start after an update, measured
+- **v3.50.2's side-by-side compiling was faster, but not by as much as expected.** On the RTX 3070 laptop the aircraft's shader programs took 105 seconds, down from 156 seconds one after another, instead of the estimated 35. Each helper compiled every program two to three times slower than the game itself does, even the last one when it was compiling alone.
+- **The helpers now ask Windows to run them at full speed.** Windows can run a process that has no window of its own in a power-saving mode, at lower clock speeds. That may be what slowed them down.
+- **The diagnostics now record each program's compile time and CPU time.** The next diagnostics will show whether the slowdown is gone. If it isn't, they'll show whether the cause is the driver's compiler sharing the cores or the CPU running slower.
+
 ## What's new in v3.50.2
 
 ### A much shorter first start after an update
