@@ -126,7 +126,7 @@ Can't wait for a close encounter? Hold **J** and **K** together for a second whi
 
 Bored on a long leg? Hold **O** and **P** together for a second while flying and the **Nocturne display pair** joins you: two XR-30 Nocturnes in red-and-gold and blue-and-white livery, trailing coloured smoke. They fly a show around you all the way to your destination: synchronised rolls in formation, a double helix around your flight path, a head-on knife-edge crossover with a fly-by roar, synchronised loops off your nose, and a split-and-cross with one high and one low. The radio calls each act. Hold O + P again to send them home; they also rock their wings and pull away in reheat when you settle onto an approach.
 
-Hold **U** and **I** together on the main menu, or click in **both sticks** on a gamepad, to open the hidden Project NIGHTGLASS research terminal (there is no menu entry; nothing flown there counts for the career). Its boot screen comes up at once. Its biometric scans and loading bar move as the research craft and their launch site load, and access is granted when everything is ready.
+Hold **U** and **I** together on the main menu, or click in **both sticks** on a gamepad, to open the Project NIGHTGLASS research terminal (it gets a menu entry once you hold the Airline Transport licence or finish the campaign; nothing flown there counts for the career). Its boot screen comes up at once. Its biometric scans and loading bar move as the research craft and their launch site load, and access is granted when everything is ready.
 
 - **Performance:** full reheat doubles the thrust, for a thrust-to-weight ratio of about 4.4 and Mach 2.5 at 3,000 m. Just below Mach 1 in humid air a volumetric vapour cone forms around the airframe: a sharp edge at the shock and a streaky, sunlit shell that fades aft. Breaking Mach 1 sets off a sonic boom.
 - **Take-off and landing:** a conventional runway jet with no flaps, landing fast on its cranked delta wing at about 140 kt.
@@ -156,7 +156,9 @@ Two more airframes round out the register. The **XR-10 Vigil** is the programme'
 
 ## Your profile, the music
 
-Every landing gets a grade from S to D in the debrief. It's scored on the touchdown, the zone, the centreline and the approach; three stars and an S together make a **Flawless flight**. Your pilot profile collects 36 achievements, an airport stamp for each airport you land at, and the twelve landmarks you can find from the air. It also keeps your softest touchdown in each aircraft. It covers all your careers and is saved in `profile.cfg` beside the settings; **Logbook → Achievements** and **Logbook → Passport** show it.
+Every landing gets a grade from S to D in the debrief. It's scored on the touchdown, the zone, the centreline and the approach; three stars and an S together make a **Flawless flight**. Your pilot profile collects 37 achievements, an airport stamp for each airport you land at, and the twelve landmarks you can find from the air. It also keeps your softest touchdown in each aircraft. It covers all your careers and is saved in `profile.cfg` beside the settings; **Logbook → Achievements** and **Logbook → Passport** show it.
+
+The job board also has **photo flights** over the landmarks, and passengers sometimes ask to see a landmark on the way, for a tip. After the campaign, five **legendary contracts** join the board. The Military board opens after ten flights in your logbook, and the research terminal appears on the main menu as **Project NIGHTGLASS** once you hold the Airline Transport licence.
 
 Trials award gold, silver and bronze, with marks set for the aircraft you fly. After each one, a results card shows the medal, your place on the local board and, on gate runs, every gate's split against your best run; **Retry** flies it again. On a gate run, a marker shows where your best run was at the same moment.
 

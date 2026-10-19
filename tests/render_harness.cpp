@@ -145,6 +145,10 @@ struct GameTest {
       g.drawMenu();
     }
     else if (what == "radioempty") { g.stations.clear(); g.saveDir = "C:\\Users\\Pilot\\AppData\\Roaming\\SomniumVolandi"; g.platformOpen = [](const std::string&) {}; g.screen = SCR_HUB; g.showRadio = true; g.hubTab = TAB_CONTRACTS; g.drawRadioPanel(60 * g.S(), 90 * g.S()); }
+    else if (what == "welcome") { g.headless = false; g.profile.name = getenv("WNAME") ? getenv("WNAME") : ""; g.drawMenu(); g.headless = true; }   // (the first start)
+    else if (what == "milock") { g.career.flights = 4; g.screen = SCR_HUB; g.hubTab = TAB_CONTRACTS; g.hubList = 2; g.drawHub(); }   // (the Military board before ten flights)
+    else if (what == "legends") { g.career.finished = true; g.career.license = LIC_ATP; g.career.storyIndex = (int)g_story.size(); g.profile.num["legend.LEG2"] = 1;
+      g.screen = SCR_HUB; g.hubTab = TAB_CONTRACTS; g.hubList = 0; g.selContract = 2; g.drawHub(); }
     else if (what == "pause") { g.drawPause(); }
     else if (what == "menu") { g.drawMenu(); }
     else if (what == "debrief") {   // a story delivery's settlement with eleven lines and a new licence (the review of v3.24.0, R9)

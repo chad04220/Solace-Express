@@ -38,6 +38,25 @@
 - **A licence card** celebrates each new licence and lists what it opens up: the aircraft, the kinds of work, the Military board.
 - **A finale card** marks the end of the campaign. It shows your career in numbers and what's still out there to do.
 
+### New work, and more to do after the campaign
+- **Photo flights** on the job board: a photographer wants one of the landmarks from the air. Fly through the gate that lines you up, then the gate over the landmark for the shot, and land at the destination. The shot pays a 10% bonus. Miss the gate over the landmark and the job pays half.
+- **Sightseeing requests:** on passenger jobs that pass near a landmark, the passengers may ask to see it on the way. A gold marker shows where it is. Fly by within sight of it and they tip 8% of the pay, plus a point of reputation. It's optional.
+- **Five legendary contracts** open once the campaign is done:
+  - **The Island Marathon:** the islands end to end in the Emissary.
+  - **Summit Pass in the Snow:** in the Scrubrunner.
+  - **The Midnight Medevac:** through a storm.
+  - **Into the Crater:** onto Mount Kaleo's caldera strip.
+  - **The Galleon Night Run:** to Port Verde at midnight in rain.
+
+  Each one pays big every time you fly it, and the board marks the ones you've flown.
+- **New achievements:** Living Legend for flying all five legendary contracts, and Airline Tycoon for an airline that has earned $1,000,000.
+
+### A better first start
+- **A welcome on the first start:** tell the tower what to call you, choose **Assisted** or **Realistic** flying (you can change either later in Settings), and see the road from Student to the XR jets.
+- **A lesson you've failed twice in a row** offers to try again in calm air.
+- **The Military board now opens after ten flights in your logbook.** Before that, a card explains the XR programme and shows how many flights you have. If you've already flown a sortie, the board stays open. When it opens, Defense Command tells you.
+- **The research terminal is now on the main menu** as **Project NIGHTGLASS** once you hold the Airline Transport licence or have finished the campaign. The licence card mentions the invitation. The hidden U + I shortcut still works.
+
 ### Trials worth replaying
 - **Medals:** each trial now awards gold, silver or bronze. The marks are set for the aircraft you fly:
   - **Spot landing:** points.
@@ -52,7 +71,7 @@
 - **The daily course now has a board for each day.** Times from different days' courses were mixed together before.
 
 ### Your pilot profile
-- **36 achievements**, from Wheels Up and Butter to Crab Walk, Deadstick, Grand Tour and Golden Wings, plus a few secret ones. Each one appears in a banner as you earn it, with a chime.
+- **37 achievements**, from Wheels Up and Butter to Crab Walk, Deadstick, Grand Tour and Golden Wings, plus a few secret ones. Each one appears in a banner as you earn it, with a chime.
 - **Airport stamps:** your first landing at each airport stamps your passport.
 - **Landmarks to find:** fly over the wind farm, the stone circle, the wreck on the reef, the offshore platform, the observatory, the star fort, the racetrack, the Fjordhaven dam, the stadium, the container port, Lighthouse Key and the strait bridge to add them to your passport.
 - **Logbook → Achievements** shows what you've earned and when, and how far along you are on the rest. **Logbook → Passport** shows every airport, landmark and sighting. The left column now lists your softest touchdown in each aircraft type.

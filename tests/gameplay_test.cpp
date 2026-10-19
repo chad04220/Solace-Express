@@ -1085,9 +1085,10 @@ struct GameTest {
         size_t nSpot = g.trialBest["T_SPOT"].size(); g.loadSettings(); g.loadSettings();
         bool twice = g.trialBest["T_SPOT"].size() == nSpot && g.trialBest["T_FORM"].size() == 1 && nSpot == 2;
         remove("./settings.cfg"); g.saveDir = sd; g.settingsWritten.clear();
-        ok = ok && scored && sorted && roll && gates && form && twice;
-        printf("Trials: courses %d, spot scored %d, board sorted %d, STOL roll %d, gate time %d, formation %d, settings read twice %d (%s): %s\n", ok || true, scored, sorted, roll, gates, form, twice, g.hubMsg.c_str(), ok ? "ok" : "FAIL"); fails += !ok;
-        g.trialBest.clear();
+        const bool card = g.trialResult.kind == Game::TR_FORMATION && g.trialResult.score < 0.f;   // (the last run's card: the formation cut short, DNF)
+        ok = ok && scored && sorted && roll && gates && form && twice && card;
+        printf("Trials: courses %d, spot scored %d, board sorted %d, STOL roll %d, gate time %d, formation %d, settings read twice %d, results card %d (%s): %s\n", ok || true, scored, sorted, roll, gates, form, twice, card, g.hubMsg.c_str(), ok ? "ok" : "FAIL"); fails += !ok;
+        g.trialBest.clear(); g.trialResult.kind = -1;   // (its card dismissed, as the pilot would: Done)
       }
       // ---- the airline (C11): with the ATP, a hired pilot flies an owned aircraft on a route, a leg (fares less fuel and
       // wages, the aircraft swapping ends and wearing) for each of its leg's minutes you fly; the aircraft can't be flown or

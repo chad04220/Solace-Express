@@ -1783,10 +1783,12 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
   combatCollisionWarm=false; combatCollisionWarmMs=0; combatPrefetchCursor=0;
   researchFlight = freeFlight = false;   // isolated launchers set their own mode after the shared reset
   wx = c.wx; timeOfDay = wx.timeOfDay; apRepickT = 0;
-  if (set.air == 0 && !botControl) {   // (Settings: calm air - a third of the gusts and the turbulence, the fronts' too)
+  if ((set.air == 0 || calmRetry) && !botControl) {   // (Settings: calm air - a third of the gusts and the turbulence, the fronts' too; a lesson retried in calm air, this once)
     wx.gust *= 0.35f; wx.turbulence *= 0.35f;
+    if (calmRetry) { wx.windSpeed = std::min(wx.windSpeed, 4.f); wx.gust = 0.f; }
     if (contract.wxShift) { contract.wxEnd.gust *= 0.35f; contract.wxEnd.turbulence *= 0.35f; }
   }
+  calmRetry = false;
   wxStart = wx;
   wx.cloudDrift = cloudOff; wx.cloudDetail = cloudDet; wx.cloudBoil = cloudBoil;
   cloudWake.clear(); wakeGap = true; wakeOdo = 0; wispAccum = 0; rainNow = mistNow = 0;
@@ -1829,6 +1831,16 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
   arrivalAt = -1; arrivalTold = false; engineShutDown = false; engineHold = 0; engineHeld = false; tdStampT = -1.f;
   flightAch.clear(); flightKm = 0; profileT = 0; pbOld = -1.f; pbNew = false; lastMark = LandingMark();
   trialSplits.clear(); ghostRec.clear(); ghostBest.clear();   // (a trial loads its ghost after: startTrial)
+  sightReq = -1; sightAsked = sightDone = false; photoFlashT = -10.f;
+  if ((c.type == CT_PAX || c.type == CT_VIP) && !c.story && !g_world.procedural && c.from != c.to) {   // a landmark near the way: the passengers may ask
+    const Airport& A = g_world.airports[c.from]; const Airport& B = g_world.airports[c.to];
+    const auto& sites = profileSites(); float best = 12000.f;
+    for (int i = 0; i < (int)sites.size(); i++) {
+      const vec3& p = sites[i].pos;
+      const float d = length(vec3(p.x - A.x, 0, p.z - A.z)) + length(vec3(p.x - B.x, 0, p.z - B.z)) - length(vec3(B.x - A.x, 0, B.z - A.z));
+      if (d < best) { best = d; sightReq = i; }
+    }
+  }
   takeoffAnnounced = c.startAirborne; touchedDown = false; touchdownFpm = 0; stillTimer = 0; tdRunway = -2;   // (an airborne start has no takeoff to announce)
   engineAutoStarted = false; startDelay = 1.2f;
   parkingBrake = !c.startAirborne;   // a start on the ground is parked: the brake is released to roll
@@ -1945,12 +1957,19 @@ void Game::endFlight(bool success, const std::string& reason, FlightOutcome outc
     if (jobGoesOn && career.job) debriefTitle = fmt("%s - job continues from %s", reason.c_str(), g_world.airports[career.job->at].code);
   }
   lastSuccess = success;
+  if (c.type == CT_LESSON) { if (success) lessonFails.erase(c.id); else lessonFails[c.id]++; }   // (twice running: the debrief offers calm air)
   if (debriefTitle.empty()) debriefTitle = success ? (c.type == CT_FERRY ? "Flight complete" : "Contract complete!") : (reason.empty() ? "Flight failed" : reason);
   // the profile: the landing's mark, a flight by the book, a flawless one; then the career's milestones
   if (success && result.landed) {
     if (lastMark.letter == 'S') award("grade_s");
     if (lastMark.letter == 'S' && stars == 3 && c.payout > 0) award("flawless");
     if (result.shutDownAtStand) award("by_the_book");
+  }
+  if (success && c.type == CT_TOUR && !c.story && result.wpDone >= (int)c.wps.size()) award("photo");
+  if (success && c.id.rfind("LEG", 0) == 0) {   // a legendary contract: the pilot's, for good
+    profile.num["legend." + c.id] = 1.f;
+    bool all = true; for (const Contract& l : Career::legendaryContracts()) all &= profile.count("legend." + l.id) > 0.f;
+    if (all) award("legend");
   }
   profileFlightEnd(success);
   profileCareerCheck();
@@ -2538,6 +2557,7 @@ void Game::updateFlight(float dt) {
   }
   if (!plane.onGround) result.maxBank = std::max(result.maxBank, fabsf(plane.bankDeg()));
   profileTick(dt);   // (landmarks found, sightings, the distance flown)
+  updateSightseeing();
   if (contract.type == CT_TRIAL && trialT0 >= 0.f && trialT1 < 0.f)   // (the ghost's track: where this run was, every kGhostDt s from the first gate)
     while ((float)ghostRec.size() * kGhostDt <= flightClock - trialT0 && ghostRec.size() < 100000) ghostRec.push_back(plane.pos);
   // rolling dust / spray
@@ -2629,6 +2649,10 @@ void Game::updateFlight(float dt) {
         }
       }
       wpIndex++; result.wpDone = wpIndex; shake(0.1f);
+      if (contract.type == CT_TOUR && !contract.story && wpIndex >= (int)contract.wps.size()) {   // the photo flight's shot
+        photoFlashT = realTime; g_audio.trigger(SFX_CLICK, 1.f);
+        toast("Click! The photographer has the shot", vec3(1.f, 0.95f, 0.8f), false);
+      }
       if (contract.type == CT_TRIAL) {
         if (wpIndex == 1) trialT0 = flightClock;
         if (wpIndex >= (int)contract.wps.size()) trialT1 = flightClock;
@@ -5372,6 +5396,7 @@ void Game::render() {
         g_ren.flushUIPublic(); g_ren.uiGLoad = fp.gLoad; g_ren.uiTime = fp.time;
         drawHud(fp); g_ren.flushUIPublic(); g_ren.uiGLoad = 0;
         if (!uiHidden && !showMap) drawLandingStamp();
+        if (realTime - photoFlashT < 0.4f) { const float k = 1.f - (realTime - photoFlashT) / 0.4f; g_ren.rect(0, 0, (float)g_ren.W, (float)g_ren.H, vec3(1, 1, 1), 0.75f * k * k); }   // (the photo flight's shot)
         drawMapOverlay();
       }
       if (paused) drawPause();

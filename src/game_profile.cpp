@@ -101,6 +101,31 @@ void Game::profileCareerCheck() {
   if (!career.airline.routes.empty()) award("airline");
   if (career.money >= 1000000) award("millionaire");
   if (career.finished) award("campaign");
+  if (career.airline.earned >= 1000000) award("tycoon");
+  if (career.flights >= kMilitaryFlights && career.military.sorties == 0 && profile.count("militaryInvite") <= 0.f) {   // (once: the board has opened)
+    profile.num["militaryInvite"] = 1.f; saveProfile();
+    toast("Defense Command has an offer for you: the Military board is open (Contracts > Military)", vec3(1.f, 0.78f, 0.3f), false);
+  }
+}
+
+// The passengers' request: once airborne and clear of the field they ask to see the landmark nearest the way; flying
+// within sight of it (low enough to make it out) earns the tip. Optional: the job pays as it would without it
+void Game::updateSightseeing() {
+  if (sightReq < 0 || sightDone || crashed || plane.onGround) return;
+  const auto& sites = profileSites();
+  if (sightReq >= (int)sites.size()) { sightReq = -1; return; }
+  const Site& st = sites[sightReq];
+  if (!sightAsked && takeoffAnnounced && plane.agl() > 250.f) {
+    sightAsked = true;
+    std::string nm = st.name; if (nm.rfind("The ", 0) == 0) nm = "the " + nm.substr(4);
+    toast("Passengers: \"Could we see " + nm + " on the way?\"  (optional - they tip)", vec3(1.f, 0.85f, 0.45f), false);
+    g_audio.trigger(SFX_CHIME, 0.6f);
+  }
+  const float dx = g_world.wrap(plane.pos.x - st.pos.x), dz = g_world.wrap(plane.pos.z - st.pos.z);
+  if (sightAsked && dx * dx + dz * dz < (st.radius + 900.f) * (st.radius + 900.f) && plane.pos.y - st.pos.y < 1500.f) {
+    sightDone = true; result.sightseen = true;
+    toast("The passengers loved the view of " + st.name, vec3(0.6f, 1.f, 0.7f), false);
+  }
 }
 
 // ---- the score

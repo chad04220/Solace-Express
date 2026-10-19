@@ -29,6 +29,7 @@ const Achievement kAchievements[] = {
   {"owner", "Owner-Operator", "Buy your first aircraft", false},
   {"fleet3", "Fleet Manager", "Own three aircraft at once", false},
   {"airline", "Airline Founder", "Put an aircraft on a route with a hired pilot", false},
+  {"tycoon", "Airline Tycoon", "Your airline earns $1,000,000", false},
   {"millionaire", "Deep Pockets", "Have $1,000,000 in the bank", false},
   {"campaign", "Captain", "Complete the campaign", false},
   {"legend", "Living Legend", "Complete every legendary contract", false},
@@ -108,7 +109,7 @@ static bool s_sitesBuilt = false;
 void resetProfileSites() { s_sites.clear(); s_sitesBuilt = false; }
 
 const std::vector<Site>& profileSites() {
-  if (s_sitesBuilt || g_world.airports.empty()) return s_sites;
+  if (s_sitesBuilt || g_world.airports.empty() || g_world.procedural) return s_sites;   // (the islands' own: built where they are)
   s_sitesBuilt = true;
   // each landmark's kind, gathered to the middle of its pieces (the wind farm's turbines, the racetrack's stands)
   struct K { int kind; const char* id; const char* name; float radius; bool civic; };

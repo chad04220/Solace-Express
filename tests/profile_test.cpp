@@ -130,6 +130,49 @@ struct GameTest {
       check(marks && card && kept && slower && ghostKept && daily.rfind("T_DAILY.", 0) == 0,
             fmt("A gate run inside %.0f s: gold, a new best, its splits and ghost kept; a slower one after it rank 2, no medal; the daily's board is the day's (%s)", m[0], daily.c_str()));
     }
+    {   // the photo flights on the board: over a landmark, two gates; the shot paid, a missed one costs half
+      Career k; k.newGame(); k.license = LIC_CPL; int found = 0; Contract photo;
+      for (int seed = 1; seed < 400 && !found; seed++) {
+        k.boardSeed = (uint32_t)seed; k.location = seed % (int)g_world.airports.size(); k.refreshBoard();
+        for (auto& c : k.board) if (c.type == CT_TOUR) { photo = c; found++; break; }
+      }
+      bool sane = found && photo.wps.size() == 2 && photo.pax == 1 && photo.payout > 0 && photo.title.rfind("Photo flight: ", 0) == 0;
+      if (sane) for (auto& w : photo.wps) sane &= w.alt > std::max(g_world.height(w.x, w.z), 0.f) + 200.f;
+      FlightResult r; r.success = true; r.landed = true; r.touchdownFpm = 200; r.fuelLeftFrac = 0.5f; r.flightMin = 20; r.wpDone = 2;
+      Career a; a.newGame(); a.license = LIC_CPL; int st = 0; auto L1 = a.settle(photo, 1, Career::SRC_RENT, r, &st);
+      r.wpDone = 1; Career b; b.newGame(); b.license = LIC_CPL; int st2 = 0; auto L2 = b.settle(photo, 1, Career::SRC_RENT, r, &st2);
+      bool paid = false, missed = false; for (auto& l : L1) paid |= l.label == "The photographs"; for (auto& l : L2) missed |= l.label.rfind("No photographs", 0) == 0;
+      check(sane && paid && missed && st2 < st, "A photo flight on the board: " + (found ? photo.title : std::string("none")) + ", two gates clear of the ground; the shot paid, a missed one costs half");
+    }
+    {   // the passengers' request: the landmark asked for, flown by - the tip
+      Game g; g.initHeadless(); g.set.traffic = false; g.failuresArmed = false;
+      Contract c; c.id = "PAXT"; c.title = "Pax"; c.type = CT_PAX; c.pax = 4; c.payout = 3000; c.startAirborne = true;
+      c.from = g_world.findAirport("MDB"); c.to = g_world.findAirport("CAP"); c.wx = Weather();
+      g.startFlight(c, 1, Career::SRC_RENT); g.screen = SCR_FLIGHT; g.takeoffAnnounced = true;
+      const int req = g.sightReq;
+      bool asked = false, tipped = false;
+      if (req >= 0) {
+        const Site& st = profileSites()[req];
+        g.plane.reset(&kAircraft[1], vec3(st.pos.x + 8000.f, std::max(st.pos.y, 0.f) + 600.f, st.pos.z), 90.f, kAircraft[1].maxFuel, 100.f, true, kAircraft[1].cruise);
+        g.updateSightseeing(); asked = g.sightAsked && !g.sightDone;
+        g.plane.pos = vec3(st.pos.x, std::max(st.pos.y, 0.f) + 600.f, st.pos.z);
+        g.updateSightseeing(); tipped = g.sightDone && g.result.sightseen;
+      }
+      Career k; k.newGame(); k.license = LIC_CPL; FlightResult r; r.success = true; r.landed = true; r.touchdownFpm = 200; r.fuelLeftFrac = 0.5f; r.sightseen = true; int st = 0;
+      bool tip = false; for (auto& l : k.settle(c, 1, Career::SRC_RENT, r, &st)) tip |= l.label.rfind("Sightseeing tip", 0) == 0;
+      check(req >= 0 && asked && tipped && tip, fmt("A passenger job MDB-CAP: asked for %s, flown by, the tip paid", req >= 0 ? profileSites()[req].name.c_str() : "nothing"));
+    }
+    {   // the legendary contracts: five, each flyable by its type (the career autopilot flies each to its end)
+      const auto L = Career::legendaryContracts();
+      int flown = 0; std::string which;
+      for (const Contract& c : L) {
+        const int spec = c.requireSpec >= 0 ? c.requireSpec : 5;   // (each names its type)
+        const float m = simulateFlightMinutes(c, spec);
+        printf("  %s (%s): %.1f min\n", c.title.c_str(), kAircraft[spec].name, m);
+        if (m > 0.f && (c.timeLimitMin <= 0.f || m <= c.timeLimitMin)) flown++; else which += " " + c.id;
+      }
+      check(L.size() == 5 && flown == 5, fmt("The five legendary contracts, each flown to its end by the autopilot (and inside its limit)%s", which.c_str()));
+    }
     printf("%d failures\n", fails);
     return fails ? 1 : 0;
   }

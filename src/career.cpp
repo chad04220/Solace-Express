@@ -1,5 +1,6 @@
 // Somnium Volandi - career progression and hand-designed story campaign
 #include "career.h"
+#include "profile.h"
 #include "military_missions.h"
 #include "finite_float.h"
 #include <charconv>
@@ -200,6 +201,33 @@ void buildStory() {
   { S s("A7", 4, CT_PAX, "CAP", "FAR", "Finale: The Red-Eye");
     s.load(600, 40).pay(150000).lic(LIC_ATP).wx(W(160, 16, 9, 0.5f, 0.85f, 2000, 8, 1, true, 23.0f))
      .brief("The last flight of the night, through a storm, to Far Isle. Bring them home, Captain."); add(s); }
+}
+
+std::vector<Contract> Career::legendaryContracts() {
+  std::vector<Contract> L;
+  auto add = [&](S& s) { s.c.story = false; s.c.chapter = 5; L.push_back(s.c); };
+  { S s("LEG1", 5, CT_CARGO, "MDB", "FAR", "Legend: The Island Marathon");
+    s.load(300, 0).pay(65000).lic(LIC_ATP).type("emissary").wx(W(240, 12, 4, 0.25f, 0.4f, 6500, 40, 0, false, 9.0f))
+     .wp(wpAbs("LHK", 600)).wp(wpAbs("NPT", 600)).wp(wpAbs("GLS", 700)).wp(wpAbs("VCF", 1800))
+     .brief("The islands end to end in one flight: over Lighthouse Key, Northpoint, the Glacier and Mount Kaleo, then down at Far Isle. "
+            "The longest flight in the islands, at full speed in the Emissary."); add(s); }
+  { S s("LEG2", 5, CT_CARGO, "CDR", "SMP", "Legend: Summit Pass in the Snow");
+    s.load(250, 0).pay(45000).lic(LIC_ATP).type("scrubrunner").wx(W(320, 14, 8, 0.4f, 0.8f, 9000, 8, 2, false, 13.0f))
+     .brief("The pass is cut off by snow and the hut needs supplies. Six hundred metres of gravel at 5,400 ft, a gusting crosswind and "
+            "falling snow: only the Scrubrunner can do it, and only just."); add(s); }
+  { S s("LEG3", 5, CT_MEDEVAC, "GLS", "CAP", "Legend: The Midnight Medevac");
+    s.load(60, 1).pay(70000).lic(LIC_ATP).type("skerry").limit(45).wx(W(200, 16, 9, 0.45f, 0.85f, 2500, 10, 1, true, 0.5f))
+     .brief("A climber is hurt at Glacier Station, and the storm has grounded the rescue helicopter. Get the patient to the hospital at "
+            "the Capital inside 45 minutes, gently, at night, through the weather."); add(s); }
+  { S s("LEG4", 5, CT_PAX, "PMB", "VCF", "Legend: Into the Crater");
+    s.load(120, 6).pay(55000).lic(LIC_ATP).type("skerry").wx(W(90, 18, 10, 0.6f, 0.45f, 7000, 25, 0, false, 15.0f))
+     .brief("Six volcanologists for the crater field on Mount Kaleo: a short strip in the caldera, the mountain's own wind tumbling over "
+            "the rim. Come in steady and land in the first third."); add(s); }
+  { S s("LEG5", 5, CT_PAX, "CAP", "PVI", "Legend: The Galleon Night Run");
+    s.load(2800, 170).pay(260000).lic(LIC_ATP).type("galleon_180").wx(W(150, 14, 7, 0.35f, 0.9f, 1200, 6, 1, false, 23.5f))
+     .brief("A full Galleon 180 to Port Verde, at midnight, in rain under a low ceiling. One hundred and seventy passengers who would like to "
+            "sleep through the landing."); add(s); }
+  return L;
 }
 
 // the flight-time estimate's weights: a constant (taxi, takeoff, landing roll) and the en-route, climb, orbit and
@@ -624,7 +652,28 @@ void Career::refreshBoard() {
       else if (u < 0.23f && A.size >= 1 && B.size >= 1) c.type = CT_NIGHT;
       else if (u < 0.30f && license >= LIC_CPL && B.size >= 1 && B.surface == SURF_ASPHALT && fabsf(A.elev - B.elev) < 60.f) c.type = CT_IFR;   // (one cloud base for both fields)
       else if (u < 0.37f && license >= LIC_PPL) c.type = CT_SURVEY;
+      else if (u < 0.44f && license >= LIC_PPL && !profileSites().empty()) c.type = CT_TOUR;   // a photo flight over a landmark
       pax = c.type == CT_PAX || c.type == CT_VIP; }
+    const Site* photo = nullptr;
+    if (c.type == CT_TOUR) {   // the landmark nearest the way between the two fields, if the detour to it is a short one
+      const auto& sites = profileSites();
+      float bestDetour = 1e9f;
+      for (const Site& st : sites) {
+        const float da = length(vec3(st.pos.x - A.x, 0, st.pos.z - A.z)), db = length(vec3(st.pos.x - B.x, 0, st.pos.z - B.z)), dab = length(vec3(B.x - A.x, 0, B.z - A.z));
+        if (da + db - dab < bestDetour) { bestDetour = da + db - dab; photo = &st; }
+      }
+      if (!photo || bestDetour > 25000.f) c.type = CT_CARGO;
+      else {   // two gates: one lining up 1.2 km out on the way in, the shot over the landmark
+        float hmax = photo->pos.y;
+        for (int k = 0; k < 8; k++) { const float a = k * 0.785f; hmax = std::max(hmax, g_world.height(photo->pos.x + cosf(a) * 600.f, photo->pos.z + sinf(a) * 600.f)); }
+        const float alt = std::max(hmax, 0.f) + 320.f;
+        vec3 in = vec3(photo->pos.x - A.x, 0, photo->pos.z - A.z); const float il = length(in);
+        in = il > 1.f ? in / il : vec3(1, 0, 0);
+        c.wps.push_back({photo->pos.x - in.x * 1200.f, photo->pos.z - in.z * 1200.f, alt});
+        c.wps.push_back({photo->pos.x, photo->pos.z, alt});
+        c.pax = 1; c.cargoKg = 30;
+      }
+    }
     if (c.type == CT_MEDEVAC) { c.pax = 1; c.cargoKg = 60; }
     else if (c.type == CT_SURVEY) { c.pax = 1; c.cargoKg = 40; }
     else if (pax) { c.pax = std::max(1, (int)(s.pax * r.range(0.4f, 1.0f))); c.cargoKg = c.pax * 15; }
@@ -650,6 +699,7 @@ void Career::refreshBoard() {
     else if (c.type == CT_NIGHT) c.payout = c.payout * 13 / 10;
     else if (c.type == CT_IFR) c.payout = c.payout * 15 / 10;
     else if (c.type == CT_SURVEY) c.payout = c.payout * 14 / 10 + 300;
+    else if (c.type == CT_TOUR) c.payout = c.payout * 13 / 10 + 250;
     { int chapter = nextStory() ? nextStory()->chapter : 5; c.payout = (int)(c.payout * (1.f + 0.35f * chapter)) / 10 * 10; }   // the work pays more as the career advances (pacing)
     c.repBonusPct = repBonusPct();   // clients pay a reliable pilot a little more
     c.payout = c.payout * (100 + c.repBonusPct) / 100 / 10 * 10;
@@ -668,6 +718,13 @@ void Career::refreshBoard() {
       case CT_NIGHT: c.title = fmt("Night freight to %s", B.name); c.brief = fmt("%s for the morning at %s, flown overnight between two lit fields. Have the landing light on for the touchdown.", cargoNames[r.next() % 10], B.name); break;
       case CT_IFR: c.title = fmt("Low-vis run to %s", B.name); c.brief = fmt("%s to %s under a low overcast in poor visibility. Fly the approach on the instruments: if you are not lined up with the runway when you break out, go around.", cargoNames[r.next() % 10], B.name); break;
       case CT_SURVEY: c.title = fmt("%s near %s", surveyNames[r.next() % 6], B.name); c.brief = fmt("Fly the six survey checkpoints in order, holding %.0f ft within 150 ft, then land at %s. Pay follows the share of the pattern flown in the band.", c.wps[0].alt * M_TO_FT, B.name); break;
+      case CT_TOUR: {   // (one draw, as the plain jobs' names take: the rest of the board stays as it was)
+        (void)r.next();
+        std::string nm = photo->name; if (nm.rfind("The ", 0) == 0) nm = "the " + nm.substr(4);
+        c.title = "Photo flight: " + photo->name;
+        c.brief = fmt("A photographer wants %s from the air. Fly through the first gate to line up and the second, over it, for the shot - a steady line, wings level - then land at %s.", nm.c_str(), B.name);
+        break;
+      }
       default: c.title = pax ? fmt("%s to %s", paxNames[r.next() % 8], B.name) : fmt("%s to %s", cargoNames[r.next() % 10], B.name); c.brief = fmt("Freelance job posted at %s. Distance %.0f km.", A.name, km); break;
     }
     float tod = c.type == CT_NIGHT ? (r.uni() < 0.5f ? r.range(21.f, 23.9f) : r.range(0.f, 5.f)) : r.range(7.f, 19.5f);
@@ -684,11 +741,12 @@ void Career::refreshBoard() {
       if (c.wxEnd.cloudCover > 0.6f && r.uni() < 0.4f) c.wxEnd.precip = g_world.airports[to].z < -20000 ? 2 : 1;
     }
     if (c.type == CT_IFR) { c.wx.cloudCover = 0.95f; c.wx.cloudBase = r.range(300.f, 600.f) / M_TO_FT + B.elev; c.wx.visibility = r.range(1500.f, 3000.f); c.wx.precip = r.uni() < 0.5f ? 1 : 0; c.wx.windSpeed = std::min(c.wx.windSpeed, 6.f / MS_TO_KT); }
-    if (c.type == CT_SURVEY) { c.wx.cloudCover = std::min(c.wx.cloudCover, 0.4f); c.wx.cloudBase = std::max(c.wx.cloudBase, c.wps[0].alt + 300.f); c.wx.gust = 0; c.wx.turbulence = std::min(c.wx.turbulence, 0.12f); }
+    if (c.type == CT_SURVEY || c.type == CT_TOUR) { c.wx.cloudCover = std::min(c.wx.cloudCover, 0.4f); c.wx.cloudBase = std::max(c.wx.cloudBase, c.wps[0].alt + 300.f); c.wx.gust = 0; c.wx.turbulence = std::min(c.wx.turbulence, 0.12f); }
+    if (c.type == CT_TOUR) { c.wx.precip = 0; c.wx.storm = false; c.wx.visibility = std::max(c.wx.visibility, 20000.f); c.wxShift = false; c.wx.timeOfDay = clampf(c.wx.timeOfDay, 8.f, 17.5f); }
     if (c.type == CT_MEDEVAC || c.type == CT_VIP) { c.wx.gust = std::min(c.wx.gust, 4.f / MS_TO_KT); c.wx.storm = false; }
     if (timed) c.timeLimitMin = ceilf(plan(c, si, SRC_RENT).minutesEst * 1.25f);
     bool dup = false;
-    for (auto& b : board) if (b.to == c.to && b.type == c.type) dup = true;
+    for (auto& b : board) if ((b.to == c.to && b.type == c.type) || (c.type == CT_TOUR && b.type == CT_TOUR)) dup = true;   // (one photo flight a board)
     if (!dup) board.push_back(c);
   }
   if (!earningPath()) { Contract rc = recoveryContract(); if (rc.payout > 0) board.insert(board.begin(), rc); }
@@ -914,6 +972,11 @@ std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, co
         if (r.belowMinimumsUnaligned) { L.push_back({"Continued below minimums without the runway lined up", -c.payout * 25 / 100}); st--; reputation = std::max(0, reputation - 1); }
         else if (r.landed) L.push_back({"Approach flown to minimums", c.payout * 5 / 100});
       }
+      if (c.type == CT_TOUR && !c.story) {   // the photo flight: the shot over the landmark (its last gate)
+        if (r.wpDone >= (int)c.wps.size()) L.push_back({"The photographs", c.payout * 10 / 100});
+        else { L.push_back({"No photographs: the gate over the landmark was missed", -c.payout / 2}); st--; }
+      }
+      if ((c.type == CT_PAX || c.type == CT_VIP) && r.sightseen) { L.push_back({"Sightseeing tip from the passengers", c.payout * 8 / 100}); reputation++; }
       if (c.type == CT_SURVEY && !r.surveyHistoryKnown)
         L.push_back({"Survey altitude adjustment waived: older save has no altitude history", 0});
       if (c.type == CT_SURVEY && r.surveyHistoryKnown) {

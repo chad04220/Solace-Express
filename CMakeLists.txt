@@ -38,11 +38,11 @@ add_custom_target(aircraft_geometry_gen DEPENDS ${AIRCRAFT_GEOMETRY_GEN})
 # test compiled the shared sources itself: the islands' five 39 times over (the review of v3.44.0, ENG-1).
 set(ENVIRONMENT_SOURCES src/geo.cpp src/region_travel.cpp src/procedural_regions.cpp src/distant_regions.cpp src/regional_surface.cpp src/world.cpp src/road_network.cpp src/bridges.cpp src/settlements.cpp src/road_furniture.cpp src/landmarks.cpp src/road_traffic.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp)
 set(CORE_ONLY_SOURCES
-  src/aircraft.cpp src/aircraft_perf.cpp src/aircraft_stunt.cpp src/aero.cpp src/aero_strips.cpp src/aero_wake.cpp src/breakup.cpp src/models.cpp src/career.cpp src/weather.cpp src/hive_combat.cpp src/hive_loadout.cpp src/hive_world_collision.cpp)
+  src/aircraft.cpp src/aircraft_perf.cpp src/aircraft_stunt.cpp src/aero.cpp src/aero_strips.cpp src/aero_wake.cpp src/breakup.cpp src/models.cpp src/career.cpp src/profile.cpp src/weather.cpp src/hive_combat.cpp src/hive_loadout.cpp src/hive_world_collision.cpp)
 set(CORE_SOURCES ${ENVIRONMENT_SOURCES} ${CORE_ONLY_SOURCES})
 set(GAME_ONLY_SOURCES
   src/aircraft_mesh_asset.cpp
-  src/joystick.cpp src/traffic.cpp src/game.cpp src/game_ui.cpp src/game_profile.cpp src/profile.cpp src/music.cpp src/game_research_ui.cpp src/game_military_ui.cpp src/game_somnus.cpp src/renderer.cpp src/materials.cpp src/texture_compress.cpp src/raster_renderer.cpp src/prop_disc.cpp src/terrain_mesh.cpp src/aircraft_mesh.cpp src/entity_render.cpp src/aircraft_hull.cpp src/camera_feeds.cpp src/atc.cpp src/gl.cpp src/audio.cpp src/sky.cpp src/enemy_fleet.cpp src/enemy_mesh.cpp)
+  src/joystick.cpp src/traffic.cpp src/game.cpp src/game_ui.cpp src/game_profile.cpp src/music.cpp src/game_research_ui.cpp src/game_military_ui.cpp src/game_somnus.cpp src/renderer.cpp src/materials.cpp src/texture_compress.cpp src/raster_renderer.cpp src/prop_disc.cpp src/terrain_mesh.cpp src/aircraft_mesh.cpp src/entity_render.cpp src/aircraft_hull.cpp src/camera_feeds.cpp src/atc.cpp src/gl.cpp src/audio.cpp src/sky.cpp src/enemy_fleet.cpp src/enemy_mesh.cpp)
 set(GAME_SOURCES ${CORE_SOURCES} src/entity_mesh.cpp src/bridge_mesh.cpp ${GAME_ONLY_SOURCES})
 add_library(env_objs OBJECT ${ENVIRONMENT_SOURCES})
 add_library(core_objs OBJECT ${CORE_ONLY_SOURCES})

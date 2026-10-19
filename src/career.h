@@ -83,6 +83,7 @@ struct FlightResult {
   float surveyInBand = 1.f;
   bool surveyHistoryKnown = true;
   float surveySec = 0, surveyInSec = 0;   // the survey pattern's seconds flown and those inside the band, the job's whole so far (a continued leg carries them on)
+  bool sightseen = false;       // the passengers' sightseeing request flown (a tip: Game::updateSightseeing)
 };
 
 struct PayoutLine { std::string label; int amount; };
@@ -272,6 +273,9 @@ public:
   int repBonusPct() const { return std::min(15, reputation / 4); }   // +1% per 4 reputation, at most +15%
   bool save(const std::string& path) const;
   bool load(const std::string& path);
+  // After the campaign: five legendary contracts on the board, the hardest flying in the islands - flown as often as
+  // you like, at full pay (their completion is the pilot's, in the profile: profile.h)
+  static std::vector<Contract> legendaryContracts();
 };
 
 extern std::vector<Contract> g_story;

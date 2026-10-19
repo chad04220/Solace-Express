@@ -146,6 +146,7 @@ static LRESULT CALLBACK wndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     case WM_MBUTTONDOWN: if (in) in->mDown[2] = in->mPressed[2] = true; return 0;
     case WM_MBUTTONUP: if (in) { in->mDown[2] = false; in->mReleased[2] = true; } return 0;
     case WM_MOUSEWHEEL: if (in) in->wheel += GET_WHEEL_DELTA_WPARAM(wp) / 120.f; return 0;
+    case WM_CHAR: if (in && wp >= 32 && wp < 127 && in->text.size() < 64) in->text += (char)wp; return 0;   // (typed text: the welcome's name)
   }
   return DefWindowProcW(h, msg, wp, lp);
 }

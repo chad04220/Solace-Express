@@ -537,6 +537,11 @@ void Game::drawLoading() {
 // ------------------------------------------------------------------ main menu
 void Game::enterCareerHub() { screen = SCR_HUB; hubTab = TAB_CONTRACTS; hubList = 0; selContract = 0; selAircraft = -1; }
 void Game::drawMenu() {
+  // the first start: the welcome over the menu, the menu under it without the clicks, the keys or the pad
+  const bool welcome = !profile.welcomed && !headless;
+  Input held;
+  if (welcome) { held = in; memset(in.pressed, 0, sizeof(in.pressed)); for (bool& m : in.mPressed) m = false; in.buttonsPressed = 0; in.wheel = 0; in.text.clear(); }
+  struct WelcomeAfter { Game* g; bool on; Input& held; ~WelcomeAfter() { if (!on) return; g->in = held; g_ren.flushUIPublic(); g->drawWelcome(); } } after{this, welcome, held};
   float W = (float)g_ren.W, H = (float)g_ren.H;
   float s = std::min(S(), std::min(H / 690.f, W / 1040.f));
   const float x = 48 * s, cw = std::min(370 * s, W * 0.43f), bw = cw - 48 * s;
@@ -570,6 +575,11 @@ void Game::drawMenu() {
   if (button(x, y, (cw - 12 * s) * 0.5f, 40 * s, "Settings")) { screen = SCR_HUB; hubTab = TAB_SETTINGS; settingsPage = 0; }
   if (button(x + (cw + 12 * s) * 0.5f, y, (cw - 12 * s) * 0.5f, 40 * s, "Controls")) { screen = SCR_HUB; hubTab = TAB_SETTINGS; settingsPage = 1; }
   y += 52 * s;
+  // the research terminal: hidden until the career has earned it (the ATP or the campaign), or it has been found
+  if (career.license >= LIC_ATP || career.finished || profile.has("classified")) {
+    if (button(x, y, cw, 36 * s, "Project NIGHTGLASS")) { screen = SCR_RESEARCH; resOpened = realTime; g_audio.trigger(SFX_BEEP); award("classified"); }
+    y += 46 * s;
+  }
   if (button(x, y, cw, 36 * s, "Quit to desktop")) quit = true;
   g_ren.text(x, H - 34 * s, 11 * s, "SOMNIUM VOLANDI " + version + " / CDAIII", C_DIM, 0.8f, 0, false);   // (the version a report names)
   const float fx = x + cw + 76 * s;
@@ -717,7 +727,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   float lw = std::min(w * 0.29f, 370 * s);
   panel(x, y, lw, h);
   // build card list: story, free flight, freelance
-  struct Card { const Contract* c; bool story; bool free; bool job = false; int trial = -1; };
+  struct Card { const Contract* c; bool story; bool free; bool job = false; int trial = -1; bool legend = false; };
   std::vector<Card> cards;
   static Contract jobCont;   // the open job's next leg (pinned on top while the job waits for it)
   const bool openJob = career.job && career.job->state == Career::JobState::RECOVERY;
@@ -727,6 +737,8 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
     const Contract* st = career.nextStory();
     if (st) cards.push_back({st, true, false});
     cards.push_back({nullptr, false, true});
+    static const std::vector<Contract> legends = Career::legendaryContracts();   // (after the campaign: the hardest flying in the islands)
+    if (career.finished) for (auto& c : legends) cards.push_back({&c, false, false, false, -1, true});
     for (auto& c : career.board) cards.push_back({&c, false, false});
   }
   selContract = std::clamp(selContract, 0, (int)cards.size() - 1);
@@ -765,7 +777,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   for (int i = listScroll; i < nCards && i < listScroll + visCards; i++) {
     bool sel = i == selContract;
     bool hov = hovered(x + 10 * s, cy, lw - 20 * s, chh);
-    card(x + 10 * s, cy, lw - 20 * s, chh, sel, hov, cards[i].job ? C_GOOD : cards[i].story ? C_WARN : C_ACCENT);
+    card(x + 10 * s, cy, lw - 20 * s, chh, sel, hov, cards[i].job ? C_GOOD : cards[i].story ? C_WARN : cards[i].legend ? vec3(1.f, 0.82f, 0.35f) : C_ACCENT);
     bool take = false; focusHere(cardId(i), x + 10 * s, cy, lw - 20 * s, chh, &take);
     if ((hov && !focusNav && in.mPressed[0]) || take) { selContract = i; selAircraft = -1; launchFuelKg = -1; if (!take) g_audio.trigger(SFX_CLICK); }
     if (cards[i].trial >= 0) {
@@ -786,9 +798,10 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
       g_ren.text(x + 24 * s, cy + 36 * s, 14 * s, ellipsize("Fly anywhere for fun or to reposition. No pay.", lw - 48 * s, 14 * s), C_DIM, 1);
     } else {
       const Contract& c = *cards[i].c;
-      std::string tag = cards[i].job ? fmt("CONTINUING JOB / LEG %d", career.job->legs + 1) : cards[i].story ? fmt("CAREER / CHAPTER %02d", c.chapter + 1) : "FREELANCE CONTRACT";
+      const bool legendDone = cards[i].legend && profile.count("legend." + c.id) > 0.f;
+      std::string tag = cards[i].job ? fmt("CONTINUING JOB / LEG %d", career.job->legs + 1) : cards[i].story ? fmt("CAREER / CHAPTER %02d", c.chapter + 1) : cards[i].legend ? (legendDone ? "LEGENDARY CONTRACT / FLOWN" : "LEGENDARY CONTRACT") : "FREELANCE CONTRACT";
       float cardW = lw - 48 * s;
-      g_ren.text(x + 24 * s, cy + 9 * s, 10 * s, tag, cards[i].story ? C_WARN : C_DIM, 1, 0, false);
+      g_ren.text(x + 24 * s, cy + 9 * s, 10 * s, tag, cards[i].legend ? vec3(1.f, 0.82f, 0.35f) : cards[i].story ? C_WARN : C_DIM, 1, 0, false);
       fitText(x + 24 * s, cy + 28 * s, cardW, 17 * s, 12 * s, c.title, C_TEXT);
       // (a flight that starts and ends at one field - a lesson's rings, a checkpoint course - is a local flight, not "0 km")
       std::string sub = c.from == c.to ? fmt("%s  %s  local flight", contractTypeName(c.type), g_world.airports[c.from].code)
@@ -2473,6 +2486,31 @@ void Game::drawHud(const FrameParams& fp) {
       g_ren.uiBehindAircraft(false);
     }
   }
+  // the passengers' sightseeing request: the landmark they asked for, in gold (an arrow at the edge when out of view)
+  if (!crashed && sightReq >= 0 && sightAsked && !sightDone && sightReq < (int)profileSites().size()) {
+    const Site& st = profileSites()[sightReq];
+    const vec3 sp(st.pos.x, std::max(st.pos.y, 0.f) + 80.f, st.pos.z), rel = sp - fp.camPos;
+    const vec3 gold(1.f, 0.82f, 0.35f);
+    const std::string t = fmt("%s  %.1f km", st.name.c_str(), length(vec3(rel.x, 0, rel.z)) / 1000.f);
+    float gx, gy;
+    if (dot(rel, -fp.camBack) > 1.f && g_ren.project(fp, sp, gx, gy) && gx > rail + 20 * s && gx < W - rail - 20 * s && gy > band + 60 * s && gy < H - 120 * s) {
+      const float r = 9 * s;
+      g_ren.uiBehindAircraft(true);
+      g_ren.line(gx - r, gy, gx, gy - r, 2 * s, gold, 0.9f); g_ren.line(gx, gy - r, gx + r, gy, 2 * s, gold, 0.9f);
+      g_ren.line(gx + r, gy, gx, gy + r, 2 * s, gold, 0.9f); g_ren.line(gx, gy + r, gx - r, gy, 2 * s, gold, 0.9f);
+      const float tw = g_ren.textWidth(t, 12 * s);
+      g_ren.rect(gx - tw * 0.5f - 5 * s, gy + r + 3 * s, tw + 10 * s, 17 * s, vec3(0.01f, 0.02f, 0.04f), 0.65f, 4 * s);
+      g_ren.text(gx, gy + r + 4 * s, 12 * s, t, gold, 1, 1);
+      g_ren.uiBehindAircraft(false);
+    } else {   // its bearing, along the top of the view
+      vec2 d(dot(rel, fp.camRight), -dot(rel, fp.camUp));
+      if (dot(rel, -fp.camBack) < 0) d = vec2(d.x >= 0 ? 1.f : -1.f, 0.f);
+      const float dl = std::max(length(d), 1e-3f); d = vec2(d.x / dl, d.y / dl);
+      const float ex = clampf(W * 0.5f + d.x * W * 0.4f, rail + 60 * s, W - rail - 60 * s), ey = band + 70 * s;
+      hudDart(ex + d.x * 10 * s, ey, d.x >= 0 ? 1.f : -1.f, 0.f, 16 * s, 7 * s, gold, 0.9f);
+      g_ren.text(ex - (d.x >= 0 ? 14 * s : -14 * s), ey - 7 * s, 12 * s, t, gold, 0.9f, d.x >= 0 ? 2 : 0);
+    }
+  }
   // ================================================================ the top band
   {
     hudStrip(0, 0, W, band, 1.f);
@@ -3275,7 +3313,7 @@ void Game::drawLicenceCard() {
   for (int i = 0; i < kAircraftCount; i++) if (kAircraft[i].license == licenceShown && !kAircraft[i].special) lines.push_back(std::string(kAircraft[i].name) + "  -  " + kAircraft[i].role);
   const char* work[] = {"", "Rentals and cargo work across the islands", "Passenger flights, and aircraft of your own to buy or finance", "Your own airline: routes, hired pilots, the biggest aircraft"};
   if (licenceShown >= 1 && licenceShown <= 3) lines.push_back(work[licenceShown]);
-  if (licenceShown >= LIC_CPL) lines.push_back("The Military board: sorties in the XR jets");
+  if (licenceShown >= LIC_ATP) lines.push_back("An invitation from Project NIGHTGLASS: its research terminal, on the main menu");
   int n = 0;
   for (auto& l : lines) {
     if (py > y + ph - 90 * s) break;
@@ -3352,6 +3390,84 @@ void Game::drawTrialCard() {
     return;
   }
   if (button(x + pw - 230 * s, by, 200 * s, 46 * s, "Done", true, true) || in.pressed[K_ENTER] || in.pressed[K_ESC]) { R.kind = -1; g_audio.trigger(SFX_CLICK); }
+}
+
+// The first start: what to call the pilot, how to fly (assisted or realistic), and the road from the first lesson to
+// the XR jets. Seen once (profile.welcomed); everything on it can be changed later in Settings
+void Game::drawWelcome() {
+  const float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
+  g_ren.rect(0, 0, W, H, vec3(0, 0, 0), 0.6f);
+  const float pw = std::min(640 * s, W - 40 * s), ph = std::min(560 * s, H - 40 * s), x = W * 0.5f - pw * 0.5f, y = H * 0.5f - ph * 0.5f;
+  g_ren.glow(x, y, pw, ph, C_ACCENT, 0.25f, 12 * s, 30 * s);
+  g_ren.rect(x, y, pw, ph, svui::ink, 1, 6 * s);
+  panel(x, y, pw, ph, 0.97f);
+  float py = y + 26 * s;
+  g_ren.text(x + pw * 0.5f, py, 12 * s, "WELCOME ABOARD", C_ACCENT, 1, 1, false); py += 22 * s;
+  g_ren.text(x + pw * 0.5f, py, 28 * s, "Somnium Volandi", C_TEXT, 1, 1); py += 40 * s;
+  fitText(x + 30 * s, py, pw - 60 * s, 14 * s, 11 * s, "The dream of flight: from your first lesson to an airline of your own.", C_DIM); py += 34 * s;
+  // the name: typed, or picked
+  header(x + 30 * s, py, pw - 60 * s, "WHAT SHOULD THE TOWER CALL YOU?"); py += 28 * s;
+  for (char ch : in.text) if (profile.name.size() < 16 && (isalnum((unsigned char)ch) || ch == ' ' || ch == '-' || ch == '\'')) profile.name += ch;
+  if (in.pressed[K_BACK] && !profile.name.empty()) profile.name.pop_back();
+  const float fw = pw - 60 * s - 170 * s;
+  g_ren.rect(x + 30 * s, py, fw, 38 * s, vec3(0.02f, 0.04f, 0.06f), 1, 4 * s);
+  g_ren.rectOutline(x + 30 * s, py, fw, 38 * s, C_ACCENT, 0.5f, 4 * s, s);
+  const std::string shown = profile.name.empty() ? std::string("Type a name") : profile.name;
+  const float tw = g_ren.text(x + 42 * s, py + 9 * s, 18 * s, shown, profile.name.empty() ? C_DIM : C_TEXT, profile.name.empty() ? 0.6f : 1.f);
+  if (!profile.name.empty() && fmodf(realTime, 1.f) < 0.55f) g_ren.rect(x + 44 * s + tw, py + 8 * s, 2 * s, 22 * s, C_ACCENT, 1);
+  if (button(x + pw - 30 * s - 160 * s, py, 160 * s, 38 * s, "Surprise me")) {
+    static const char* names[] = {"Kestrel", "Ada", "Juno", "Wren", "Maverick", "Skye", "Atlas", "Nova", "Falco", "Iris", "Vega", "Orion"};
+    static int k = (int)(realTime * 7.f); profile.name = names[(k++) % 12];
+  }
+  py += 56 * s;
+  // how to fly
+  header(x + 30 * s, py, pw - 60 * s, "HOW WOULD YOU LIKE TO FLY?"); py += 28 * s;
+  const float bw = (pw - 60 * s - 12 * s) * 0.5f;
+  const int cur = welcomeStyle >= 0 ? welcomeStyle : (set.assist == 0 ? 1 : 0);
+  if (button(x + 30 * s, py, bw, 40 * s, "Assisted", true, cur == 0)) { welcomeStyle = 0; set.assist = 1; set.air = 0; }
+  if (button(x + 30 * s + bw + 12 * s, py, bw, 40 * s, "Realistic", true, cur == 1)) { welcomeStyle = 1; set.assist = 0; set.air = 1; }
+  py += 48 * s;
+  fitText(x + 30 * s, py, pw - 60 * s, 12.5f * s, 10 * s, cur == 0 ? "Let go of the controls and the aircraft holds its bank and its climb; the air is calm." : "Every input moves the controls directly, and the air is as the forecast says.", C_DIM);
+  py += 20 * s;
+  fitText(x + 30 * s, py, pw - 60 * s, 12.5f * s, 10 * s, "You can change this any time in Settings > Flying.", C_DIM * 0.85f);
+  py += 34 * s;
+  header(x + 30 * s, py, pw - 60 * s, "THE ROAD AHEAD"); py += 28 * s;
+  const char* road[] = {"Student", "Private", "Commercial", "Airline", "XR jets"};
+  const float rw = (pw - 60 * s) / 5.f;
+  for (int i = 0; i < 5; i++) {
+    const float cx = x + 30 * s + rw * (i + 0.5f);
+    if (i < 4) g_ren.rect(cx, py + 9 * s, rw, 2 * s, C_ACCENT, 0.35f);
+    g_ren.rect(cx - 9 * s, py, 18 * s, 18 * s, i == 0 ? C_ACCENT : svui::ink, 1, 9 * s);
+    g_ren.rectOutline(cx - 9 * s, py, 18 * s, 18 * s, C_ACCENT, 0.8f, 9 * s, s);
+    g_ren.text(cx, py + 26 * s, 12 * s, road[i], i == 0 ? C_TEXT : C_DIM, 1, 1);
+  }
+  if (button(x + pw * 0.5f - 120 * s, y + ph - 66 * s, 240 * s, 46 * s, "Let's fly", true, true) || in.pressed[K_ENTER]) {
+    profile.welcomed = true; saveProfile(); saveSettings(); g_audio.trigger(SFX_CLICK);
+  }
+}
+
+// The Military board before the Commercial licence: what it is, and what clears a pilot for it
+void Game::drawMilitaryLocked() {
+  const float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
+  if (in.pressed[K_ESC] || (in.buttonsPressed & PAD_B)) { in.pressed[K_ESC] = false; hubList = 0; return; }
+  g_ren.rect(0, 0, W, H, vec3(0.01f, 0.012f, 0.015f), 0.92f);
+  const float pw = std::min(620 * s, W - 40 * s), ph = std::min(400 * s, H - 40 * s), x = W * 0.5f - pw * 0.5f, y = H * 0.5f - ph * 0.5f;
+  g_ren.rect(x, y, pw, ph, svui::ink, 1, 6 * s);
+  panel(x, y, pw, ph, 0.97f);
+  float py = y + 28 * s;
+  g_ren.text(x + pw * 0.5f, py, 12 * s, "DEFENSE COMMAND  //  RESTRICTED", C_WARN, 1, 1, false); py += 24 * s;
+  g_ren.text(x + pw * 0.5f, py, 26 * s, "The XR programme", C_TEXT, 1, 1); py += 46 * s;
+  for (auto& l : wrap("Funded sorties in the research jets - reconnaissance, interceptions, strikes - flown for Defense Command, "
+                      "with a service record of their own. Defense Command takes pilots with some flying behind them.", pw - 60 * s, 14 * s)) {
+    g_ren.text(x + 30 * s, py, 14 * s, l, C_DIM, 1); py += 20 * s;
+  }
+  py += 16 * s;
+  header(x + 30 * s, py, pw - 60 * s, "CLEARANCE"); py += 30 * s;
+  g_ren.text(x + 30 * s, py, 15 * s, fmt("Flights in your logbook:  %d of %d", career.flights, kMilitaryFlights), C_TEXT, 1); py += 26 * s;
+  g_ren.rect(x + 30 * s, py, pw - 60 * s, 4 * s, C_DIM, 0.2f, 2 * s);
+  g_ren.rect(x + 30 * s, py, std::max(2 * s, (pw - 60 * s) * std::min(1.f, career.flights / (float)kMilitaryFlights)), 4 * s, C_WARN, 1, 2 * s); py += 18 * s;
+  g_ren.text(x + 30 * s, py, 13 * s, "Every lesson and job you fly counts.", C_DIM, 1);
+  if (button(x + pw * 0.5f - 110 * s, y + ph - 66 * s, 220 * s, 46 * s, "Back to work", true, true) || in.pressed[K_ENTER]) { hubList = 0; g_audio.trigger(SFX_CLICK); }
 }
 
 // The campaign's end: the career in numbers, and what is still out there
@@ -3544,5 +3660,8 @@ void Game::drawDebrief() {
     if (campaignEnd && !commitBlocked()) finaleShown = true;
   }
   const bool jobWaits = !isMilitaryContract(contract.type) && career.job && career.job->state == Career::JobState::RECOVERY;
-  if (!lastSuccess && !commitBlocked() && button(x + 30 * s, y + ph - 66 * s, 200 * s, 46 * s, jobWaits ? "Continue job" : "Try again")) retryFromDebrief();
+  // (a lesson failed twice running: the retry in calm air, the gusts and the turbulence mostly gone)
+  const bool calmOffer = !lastSuccess && contract.type == CT_LESSON && lessonFails.count(contract.id) && lessonFails[contract.id] >= 2;
+  if (calmOffer && !commitBlocked()) fitText(px, y + ph - 96 * s, pw - 60 * s, 13 * s, 10 * s, "A tough one? Try it again in calm air - with Flight assists on (Settings) it flies itself straight and level.", C_ACCENT);
+  if (!lastSuccess && !commitBlocked() && button(x + 30 * s, y + ph - 66 * s, calmOffer ? 260 * s : 200 * s, 46 * s, jobWaits ? "Continue job" : calmOffer ? "Try again in calm air" : "Try again")) { if (calmOffer) calmRetry = true; retryFromDebrief(); }
 }

@@ -35,10 +35,11 @@ struct Input {
   bool down[256] = {}, pressed[256] = {};
   float mx = 0, my = 0, mdx = 0, mdy = 0, wheel = 0;
   bool mDown[3] = {}, mPressed[3] = {}, mReleased[3] = {};
+  std::string text;   // the characters typed this frame (the platform's WM_CHAR: printable ASCII)
   bool pad = false; float lx = 0, ly = 0, rx = 0, ry = 0, lt = 0, rt = 0; unsigned buttons = 0, buttonsPressed = 0;
   std::vector<JoyState> joys;   // joysticks, throttles and pedals (the platform's: joystick.h)
   void endFrame() {
-    memset(pressed, 0, sizeof(pressed)); for (int i = 0; i < 3; i++) mPressed[i] = mReleased[i] = false; wheel = 0; mdx = mdy = 0; buttonsPressed = 0;
+    memset(pressed, 0, sizeof(pressed)); for (int i = 0; i < 3; i++) mPressed[i] = mReleased[i] = false; wheel = 0; mdx = mdy = 0; buttonsPressed = 0; text.clear();
     for (JoyState& j : joys) memset(j.pressed, 0, sizeof(j.pressed));
   }
 };
@@ -384,6 +385,19 @@ private:
   void drawLicenceCard();
   void drawFinaleCard();
   int musicMood() const;                // the score's mood for what is on screen
+  // the passengers' sightseeing request on a passenger job: a landmark near the way (profileSites), asked for once
+  // airborne; flown by within sight of it, a tip (FlightResult::sightseen)
+  int sightReq = -1; bool sightAsked = false, sightDone = false;
+  void updateSightseeing();
+  float photoFlashT = -10.f;            // the photo flight's shot: the screen flashes white
+  // the first start's welcome (profile.welcomed): a name, how to fly, the road ahead
+  void drawWelcome();
+  int welcomeStyle = -1;                // the choice made on it: 0 assisted, 1 realistic (-1 none yet)
+  // a lesson failed twice running: the debrief offers it again in calm air (calmRetry: the next start's air only)
+  std::map<std::string, int> lessonFails;
+  bool calmRetry = false;
+  void drawMilitaryLocked();
+  static constexpr int kMilitaryFlights = 10;   // the flights in the logbook Defense Command asks for
   void updateMusic();
   void callout(const std::string& s);   // a line for the voices only: shown elsewhere (the stamp) or not at all
   bool engineAutoStarted = false;
