@@ -38,6 +38,7 @@ struct GameTest {
     g.screen = SCR_HUB; g.hubTab = TAB_HANGAR; g.uiDt = 1.f/60.f;
     g.researchView.yaw = .57f; g.researchView.pitch = .31f; g.researchView.zoom = 1.23f;
     g.resCraft = kSomnus; g.militarySelection = 1;
+    g.career.flights = Game::kMilitaryFlights;   // (the Military board opens with ten flights logged: drawMilitaryLocked)
     const auto originalGun = g.practiceForward;
     const auto originalBomb = g.practiceBomb;
     const int originalWave = g.practiceWave;
