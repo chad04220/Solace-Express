@@ -103,6 +103,33 @@ struct GameTest {
       bool flawless2 = false; for (auto& l : lines2) flawless2 |= l.label == "Flawless flight";
       check(stars == 3 && flawless && !flawless2, fmt("Flawless flight paid for three stars and an S (%d stars), not for an A", stars));
     }
+    {   // the trials: a gate run finished - its card, the medal, the board; the splits and the ghost kept for the next run
+      Game g; g.initHeadless(); g.saveDir = dir; g.set.traffic = false;
+      remove((dir + "/ghost_T_GATES.bin").c_str()); remove((dir + "/settings.cfg").c_str());
+      g.startTrial(Game::TR_GATES, 1, Career::SRC_LESSON);
+      float m[3]; g.trialMedalMarks(Game::TR_GATES, 1, m);
+      const bool marks = m[0] > 60.f && m[0] < 400.f && m[1] > m[0] && m[2] > m[1];
+      g.trialT0 = 10.f; g.trialT1 = 10.f + m[0] * 0.98f;   // (just inside gold)
+      for (int i = 0; i < 6; i++) g.trialSplits.push_back(10.f + i * 12.f);
+      for (int i = 0; i < 50; i++) g.ghostRec.push_back(vec3((float)i, 100.f, 0.f));
+      g.wpIndex = (int)g.contract.wps.size(); g.touchedDown = true; g.plane.onGround = true;
+      g.endFlight(true, "");
+      const Game::TrialResult& R = g.trialResult;
+      const bool card = R.kind == Game::TR_GATES && R.medal == 3 && R.newBest && R.rank == 1 && fabsf(R.score - m[0] * 0.98f) < 0.01f && g.screen == SCR_HUB && g.profile.has("gold");
+      Game h; h.initHeadless(); h.saveDir = dir; h.loadSettings(); h.set.traffic = false;
+      h.startTrial(Game::TR_GATES, 1, Career::SRC_LESSON);
+      const bool kept = h.trialBest.count("T_GATES") && h.trialBestSplits["T_GATES"].size() == 6 && fabsf(h.trialBestSplits["T_GATES"][3] - 46.f) < 0.01f && h.ghostBest.size() == 50;
+      // a slower run: no new best, the best's splits kept, its ghost kept
+      h.trialT0 = 5.f; h.trialT1 = 5.f + m[2] * 1.2f; h.trialSplits = {1, 2, 3}; h.ghostRec.assign(10, vec3());
+      h.wpIndex = (int)h.contract.wps.size(); h.touchedDown = true; h.plane.onGround = true;
+      h.endFlight(true, "");
+      const bool slower = h.trialResult.medal == 0 && !h.trialResult.newBest && h.trialResult.rank == 2 && h.trialBestSplits["T_GATES"].size() == 6;
+      Game k; k.initHeadless(); k.saveDir = dir; k.startTrial(Game::TR_GATES, 1, Career::SRC_LESSON);
+      const bool ghostKept = k.ghostBest.size() == 50;
+      const std::string daily = g.trialKey(Game::TR_DAILY);
+      check(marks && card && kept && slower && ghostKept && daily.rfind("T_DAILY.", 0) == 0,
+            fmt("A gate run inside %.0f s: gold, a new best, its splits and ghost kept; a slower one after it rank 2, no medal; the daily's board is the day's (%s)", m[0], daily.c_str()));
+    }
     printf("%d failures\n", fails);
     return fails ? 1 : 0;
   }

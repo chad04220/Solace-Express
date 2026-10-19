@@ -38,6 +38,19 @@
 - **A licence card** celebrates each new licence and lists what it opens up: the aircraft, the kinds of work, the Military board.
 - **A finale card** marks the end of the campaign. It shows your career in numbers and what's still out there to do.
 
+### Trials worth replaying
+- **Medals:** each trial now awards gold, silver or bronze. The marks are set for the aircraft you fly:
+  - **Spot landing:** points.
+  - **STOL contest:** your landing roll, against that aircraft's runway needs.
+  - **Gate runs:** your time, against the course flown at that aircraft's cruise speed.
+  - **Formation run:** seconds out of formation.
+
+  The trial's briefing shows the marks, and each trial's card in the hub shows the best medal you've won there.
+- **A results card** after every trial shows your score, the medal, your place on the local board and the medal marks. **Retry** flies the same trial again in the same aircraft.
+- **Gate splits:** each gate on a gate run shows your time and how far ahead or behind your best run you are. The results card lists every split.
+- **Race your ghost:** on a gate run, a marker shows where your best run was at the same moment, with the distance ahead or behind.
+- **The daily course now has a board for each day.** Times from different days' courses were mixed together before.
+
 ### Your pilot profile
 - **36 achievements**, from Wheels Up and Butter to Crab Walk, Deadstick, Grand Tour and Golden Wings, plus a few secret ones. Each one appears in a banner as you earn it, with a chime.
 - **Airport stamps:** your first landing at each airport stamps your passport.

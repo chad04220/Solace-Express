@@ -170,9 +170,14 @@ struct GameTest {
       g.screen = SCR_HUB; g.hubTab = what == "logach" || what == "logpass" ? TAB_LOGBOOK : TAB_CONTRACTS;
       g.logPage = what == "logach" ? 1 : what == "logpass" ? 2 : 0;
       if (what == "licence") g.licenceShown = LIC_CPL;
+      if (getenv("TRIALCARD")) {   // TRIALCARD=medal (0..3): a gate run's card, with splits against a best run
+        Game::TrialResult& R = g.trialResult; R.kind = Game::TR_GATES; R.spec = 2; R.medal = atoi(getenv("TRIALCARD")); R.score = 131.4f; R.rank = 1; R.best = 131.4f; R.newBest = true;
+        R.splits = {14.2f, 30.9f, 47.1f, 66.0f, 84.3f, 103.8f, 131.4f}; R.bestSplits = {14.6f, 31.2f, 46.5f, 66.9f, 85.0f, 104.9f, 133.0f};
+        g.hubList = 1;
+      }
       if (what == "finale") { g.career.finished = true; g.career.storyIndex = (int)g_story.size(); g.finaleShown = true; }
       g.drawHub();
-      if (what == "licence" || what == "finale") { g.realTime += 3.f; g_ren.uiEnd(); glClear(GL_COLOR_BUFFER_BIT); g_ren.uiBegin(); g.drawHub(); }   // (in, once its card has come in)
+      if (what == "licence" || what == "finale" || getenv("TRIALCARD")) { g.realTime += 3.f; g_ren.uiEnd(); glClear(GL_COLOR_BUFFER_BIT); g_ren.uiBegin(); g.drawHub(); }   // (in, once its card has come in)
       if (what == "banner") { g.achShow.push_back({"greaser", 1.2f, true}); g.drawAchievementBanner(); }
     }
     else if (what == "wavecrest_free") {   // the review of v3.31.0, U1: a CPL pilot owning only the Wavecrest, Free Flight MDB -> HFS

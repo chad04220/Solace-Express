@@ -158,6 +158,8 @@ Two more airframes round out the register. The **XR-10 Vigil** is the programme'
 
 Every landing gets a grade from S to D in the debrief. It's scored on the touchdown, the zone, the centreline and the approach; three stars and an S together make a **Flawless flight**. Your pilot profile collects 36 achievements, an airport stamp for each airport you land at, and the twelve landmarks you can find from the air. It also keeps your softest touchdown in each aircraft. It covers all your careers and is saved in `profile.cfg` beside the settings; **Logbook → Achievements** and **Logbook → Passport** show it.
 
+Trials award gold, silver and bronze, with marks set for the aircraft you fly. After each one, a results card shows the medal, your place on the local board and, on gate runs, every gate's split against your best run; **Retry** flies it again. On a gate run, a marker shows where your best run was at the same moment.
+
 The game has its own generative soundtrack: a theme on the main menu, a lighter groove in the hub, a finale theme, and stingers for jobs, licences, achievements and medals. Its volume is in **Settings**, along with an optional quiet ambience for the cruise. The score steps aside whenever the internet radio plays.
 
 ## Flying tips

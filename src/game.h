@@ -262,6 +262,25 @@ private:
   static const float kFormationRunS;   // the formation run: seconds with the pair alongside
   float formT = 0, formLost = 0; bool formDone = false;   // the formation run: time with the pair, time spent out of a steady platform
   std::string trialScore(int kind, float v) const;   // "14 m from the mark", "212 m roll", "1:42"
+  // Medals: each trial's gold, silver and bronze marks for the aircraft flown (lower is better): the spot landing's
+  // points, the STOL roll against the type's runway, the gate runs' time against the course at its cruise speed, the
+  // formation's seconds out. 3 gold, 2 silver, 1 bronze, 0 none
+  void trialMedalMarks(int kind, int spec, float marks[3]) const;
+  int trialMedal(int kind, int spec, float score) const;
+  std::string trialKey(int kind) const;   // the local board's key: the daily course's is that day's
+  // the run in progress: the gate splits (s since the first gate) and the ghost's track (every kGhostDt s)
+  static constexpr float kGhostDt = 0.2f;
+  std::vector<float> trialSplits;
+  std::vector<vec3> ghostRec, ghostBest;       // this run's track; the best run's, flown alongside
+  std::map<std::string, std::vector<float>> trialBestSplits;   // the best run's splits (settings.cfg trialSplits.<key>)
+  // the card in the hub after a trial: the score, the medal, the board, the splits; Retry flies it again
+  struct TrialResult { int kind = -1, spec = 0, src = 0, medal = 0, rank = 0; float score = -1, best = -1; bool newBest = false;
+                       std::string why; std::vector<float> splits, bestSplits; };
+  TrialResult trialResult;
+  void drawTrialCard();
+  void startTrial(int kind, int spec, int src);
+  void loadGhost(int kind);
+  void saveGhost(int kind);
   // C6 job meters: the patient / VIP comfort, the survey band time, the low-vis minimums check
   float surveyT = 0, surveyInT = 0; bool minimumsChecked = false; int minimumsGoArounds = 0;
   void updateJobMeters(float dt, float gs);

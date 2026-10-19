@@ -597,10 +597,10 @@ void Game::drawMenu() {
 void Game::drawHub() {
   // a card over the hub (a new licence, the campaign's end) takes the clicks, the keys and the pad: the hub under it
   // is drawn without them
-  const bool card = licenceShown >= 0 || finaleShown;
+  const bool card = licenceShown >= 0 || finaleShown || trialResult.kind >= 0;
   Input held;
   if (card) { held = in; memset(in.pressed, 0, sizeof(in.pressed)); for (bool& m : in.mPressed) m = false; in.buttonsPressed = 0; in.wheel = 0; }
-  struct CardAfter { Game* g; bool on; Input& held; ~CardAfter() { if (!on) return; g->in = held; g->uiGlass = false; g_ren.flushUIPublic(); if (g->licenceShown >= 0) g->drawLicenceCard(); else if (g->finaleShown) g->drawFinaleCard(); } } after{this, card, held};
+  struct CardAfter { Game* g; bool on; Input& held; ~CardAfter() { if (!on) return; g->in = held; g->uiGlass = false; g_ren.flushUIPublic(); if (g->licenceShown >= 0) g->drawLicenceCard(); else if (g->finaleShown) g->drawFinaleCard(); else if (g->trialResult.kind >= 0) g->drawTrialCard(); } } after{this, card, held};
   if (hubTab == TAB_CONTRACTS && hubList == 2) { FrameParams fp{}; drawMilitary(fp); return; }
   float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
   uiGlass = true;   // (panels and cards in the hub's glass style; reset at the end)
@@ -770,9 +770,17 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
     if ((hov && !focusNav && in.mPressed[0]) || take) { selContract = i; selAircraft = -1; launchFuelKg = -1; if (!take) g_audio.trigger(SFX_CLICK); }
     if (cards[i].trial >= 0) {
       int k = cards[i].trial;
-      auto it = trialBest.find(trialId(k));
+      auto it = trialBest.find(trialKey(k));
       fitText(x + 24 * s, cy + 9 * s, lw - 48 * s, 18 * s, 13 * s, std::string("TRIAL  ") + trialName(k), C_TEXT);
-      g_ren.text(x + 24 * s, cy + 36 * s, 14 * s, ellipsize(it != trialBest.end() && !it->second.empty() ? "Best: " + trialScore(k, it->second[0]) : "No time set yet", lw - 48 * s, 14 * s), it != trialBest.end() ? C_GOOD : C_DIM, 1);
+      const int medal = (int)profile.count(std::string("medal.") + trialId(k));   // (the best medal won here, any aircraft)
+      const float mw = medal > 0 ? 26 * s : 0.f;
+      g_ren.text(x + 24 * s, cy + 36 * s, 14 * s, ellipsize(it != trialBest.end() && !it->second.empty() ? "Best: " + trialScore(k, it->second[0]) : "No time set yet", lw - 48 * s - mw, 14 * s), it != trialBest.end() ? C_GOOD : C_DIM, 1);
+      if (medal > 0) {
+        const vec3 mc = medal == 3 ? vec3(1.f, 0.82f, 0.3f) : medal == 2 ? vec3(0.8f, 0.85f, 0.9f) : vec3(0.85f, 0.55f, 0.3f);
+        const float mx = x + lw - 40 * s, my = cy + 44 * s;
+        g_ren.rect(mx - 9 * s, my - 9 * s, 18 * s, 18 * s, mc, 1, 9 * s);
+        g_ren.rect(mx - 5 * s, my - 5 * s, 10 * s, 10 * s, mc * 0.55f, 1, 5 * s);
+      }
     } else if (cards[i].free) {
       fitText(x + 24 * s, cy + 9 * s, lw - 48 * s, 18 * s, 13 * s, "Free Flight / Ferry", C_TEXT);
       g_ren.text(x + 24 * s, cy + 36 * s, 14 * s, ellipsize("Fly anywhere for fun or to reposition. No pay.", lw - 48 * s, 14 * s), C_DIM, 1);
@@ -862,10 +870,14 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   row("Weather", c.wx.describe());
   if (c.wxShift) row("Forecast", "by arrival: " + c.wxEnd.describe(), C_WARN);
   if (cd.trial >= 0) {   // the local board
-    auto it = trialBest.find(trialId(cd.trial));
+    auto it = trialBest.find(trialKey(cd.trial));
     std::string b;
     if (it != trialBest.end()) for (size_t i = 0; i < it->second.size(); i++) b += (i ? "   " : "") + fmt("%d. %s", (int)i + 1, trialScore(cd.trial, it->second[i]).c_str());
     row("Best", b.empty() ? "no time set yet" : b, C_GOOD);
+    if (isCareerAircraft(selAircraft) || (selAircraft >= 0 && selAircraft < kAircraftCount)) {   // the medals' marks for the aircraft picked
+      float m[3]; trialMedalMarks(cd.trial, selAircraft, m);
+      row("Medals", fmt("Gold %s   Silver %s   Bronze %s", trialScore(cd.trial, m[0]).c_str(), trialScore(cd.trial, m[1]).c_str(), trialScore(cd.trial, m[2]).c_str()), vec3(1.f, 0.82f, 0.35f));
+    }
     row("Counts for", "nothing: no pay, no fees, no logbook entry", C_DIM);
   }
   if (c.payout) row("Payment", c.repBonusPct > 0 ? fmt("%s (incl. +%d%% reputation bonus)", fmtMoney(c.payout).c_str(), c.repBonusPct) : fmtMoney(c.payout), C_GOOD);
@@ -1050,7 +1062,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
     if ((c.type == CT_FERRY || c.type == CT_TRIAL) && src == Career::SRC_NONE) src = Career::SRC_LESSON;
     Contract go = c;
     if (go.type == CT_FERRY) { go.from = career.location; }
-    if (cd.trial >= 0) { startFlight(go, selAircraft, src); isolatedFlight = true; }   // (a trial: off the books)
+    if (cd.trial >= 0) startTrial(cd.trial, selAircraft, (int)src);   // (a trial: off the books, its ghost loaded)
     else if (cd.job) continueJob(selAircraft, src); else beginCareerFlight(go, selAircraft, src);
   }
   if (commitBlocked()) g_ren.text(px, y + h - 50 * s, 14 * s, "Your last result isn't saved yet (" + saveWhy + "). Retrying...", C_BAD, 1);
@@ -2439,6 +2451,28 @@ void Game::drawHud(const FrameParams& fp) {
       label(ex2 - dir.x * 48 * s, ey2 - dir.y * 48 * s - 8 * s, lab);
     }
   }
+  // the best run's ghost on a gate run: where it was at this moment of its run (from the first gate)
+  if (!crashed && contract.type == CT_TRIAL && trialT0 >= 0.f && trialT1 < 0.f && ghostBest.size() > 1) {
+    const float gt = (flightClock - trialT0) / kGhostDt;
+    const int i0 = std::min((int)gt, (int)ghostBest.size() - 1), i1 = std::min(i0 + 1, (int)ghostBest.size() - 1);
+    const vec3 gp = ghostBest[i0] + (ghostBest[i1] - ghostBest[i0]) * clampf(gt - i0, 0.f, 1.f);
+    const vec3 rel = gp - fp.camPos;
+    float gx, gy;
+    if (gt < (float)ghostBest.size() && dot(rel, -fp.camBack) > 1.f && length(rel) < 6000.f && g_ren.project(fp, gp, gx, gy)) {
+      const vec3 gc(0.45f, 0.85f, 1.f);
+      const float pulse = 0.75f + 0.25f * sinf(realTime * 6.f), r = clampf(1400.f / std::max(length(rel), 1.f), 8.f, 26.f) * s;
+      g_ren.uiBehindAircraft(true);
+      g_ren.glow(gx - r, gy - r, r * 2, r * 2, gc, 0.65f * pulse, r, 12 * s);
+      g_ren.rect(gx - 2.5f * s, gy - 2.5f * s, 5 * s, 5 * s, gc, 1, 2.5f * s);
+      hudRing(gx, gy, r, 1.6f * s, gc, 0.9f, 32);
+      const float ahead = dot(gp - plane.pos, normalize(plane.vel + vec3(0, 0, 1e-3f)));
+      const std::string t = fmt("BEST  %s%.0f m", ahead >= 0 ? "+" : "-", fabsf(ahead));
+      const float tw = g_ren.textWidth(t, 12 * s);
+      g_ren.rect(gx - tw * 0.5f - 5 * s, gy + r + 3 * s, tw + 10 * s, 17 * s, vec3(0.01f, 0.02f, 0.04f), 0.65f, 4 * s);
+      g_ren.text(gx, gy + r + 4 * s, 12 * s, t, gc, 1, 1);
+      g_ren.uiBehindAircraft(false);
+    }
+  }
   // ================================================================ the top band
   {
     hudStrip(0, 0, W, band, 1.f);
@@ -3218,6 +3252,7 @@ void Game::drawLicenceCard() {
   g_ren.rect(0, 0, W, H, vec3(0, 0, 0), 0.55f * ease);
   const float pw = std::min(620 * s, W - 40 * s), ph = std::min(470 * s, H - 40 * s), x = W * 0.5f - pw * 0.5f, y = H * 0.5f - ph * 0.5f + (1.f - ease) * 30 * s;
   g_ren.glow(x, y, pw, ph, vec3(1.f, 0.82f, 0.35f), 0.25f * ease, 12 * s, 30 * s);
+  g_ren.rect(x, y, pw, ph, svui::ink, 1, 6 * s);   // (opaque: the hub stays under it)
   panel(x, y, pw, ph, 0.97f);
   // the wings: two bars either side of a circle
   const float cx = x + pw * 0.5f, cy = y + 62 * s;
@@ -3252,6 +3287,73 @@ void Game::drawLicenceCard() {
   if (button(x + pw * 0.5f - 110 * s, y + ph - 66 * s, 220 * s, 46 * s, "Continue", true, true) || in.pressed[K_ENTER] || in.pressed[K_ESC]) { licenceShown = -1; g_audio.trigger(SFX_CLICK); }
 }
 
+// A trial's result over the hub: the score, the medal and its marks, the local board, the gate splits against the
+// best run's; Retry flies it again in the same aircraft
+void Game::drawTrialCard() {
+  TrialResult& R = trialResult;
+  const float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
+  static float opened = -1.f; static const TrialResult* was = nullptr; static float scoreWas = -2.f;
+  if (was != &R || scoreWas != R.score || opened < 0.f) { was = &R; scoreWas = R.score; opened = realTime; }
+  const float e = realTime - opened, k = clampf(e / 0.35f, 0.f, 1.f), ease = 1.f - (1.f - k) * (1.f - k);
+  g_ren.rect(0, 0, W, H, vec3(0, 0, 0), 0.55f * ease);
+  const bool splits = !R.splits.empty();
+  const float pw = std::min(620 * s, W - 40 * s), ph = std::min((splits ? 600.f : 440.f) * s, H - 40 * s), x = W * 0.5f - pw * 0.5f, y = H * 0.5f - ph * 0.5f;
+  const vec3 mc = R.medal == 3 ? vec3(1.f, 0.82f, 0.3f) : R.medal == 2 ? vec3(0.82f, 0.87f, 0.92f) : R.medal == 1 ? vec3(0.86f, 0.56f, 0.3f) : C_DIM;
+  if (R.medal > 0) g_ren.glow(x, y, pw, ph, mc, 0.25f * ease, 12 * s, 30 * s);
+  g_ren.rect(x, y, pw, ph, svui::ink, 1, 6 * s);   // (opaque: the hub stays under it)
+  panel(x, y, pw, ph, 0.97f);
+  const float cx = x + pw * 0.5f;
+  float py = y + 24 * s;
+  g_ren.text(cx, py, 12 * s, "TRIAL RESULT", C_ACCENT, ease, 1, false); py += 20 * s;
+  { std::string t = trialName(R.kind); std::string up; for (char ch : t) up += (char)toupper((unsigned char)ch);
+    g_ren.text(cx, py, 22 * s, up + "  -  " + kAircraft[std::clamp(R.spec, 0, kAircraftCount - 1)].name, C_TEXT, ease, 1); }
+  py += 42 * s;
+  // the medal
+  const float mr = 34 * s * (0.7f + 0.3f * clampf((e - 0.2f) / 0.3f, 0.f, 1.f));
+  if (R.medal > 0) {
+    g_ren.glow(cx - mr, py, mr * 2, mr * 2, mc, 0.5f * ease, mr, 18 * s);
+    g_ren.rect(cx - mr, py, mr * 2, mr * 2, mc, ease, mr);
+    g_ren.rect(cx - mr * 0.74f, py + mr * 0.26f, mr * 1.48f, mr * 1.48f, mc * 0.5f, ease, mr * 0.74f);
+    const char* nm[] = {"", "BRONZE", "SILVER", "GOLD"};
+    g_ren.text(cx, py + mr - 8 * s, 15 * s, nm[R.medal], vec3(1, 1, 1), ease, 1);
+  } else {
+    hudRing(cx, py + mr, mr, 2 * s, C_DIM, 0.6f * ease, 48);
+    g_ren.text(cx, py + mr - 8 * s, 13 * s, R.score >= 0 ? "NO MEDAL" : "DNF", C_DIM, ease, 1);
+  }
+  py += 34 * s * 2 + 14 * s;
+  // the score and the board
+  g_ren.text(cx, py, 30 * s, trialScore(R.kind, R.score), R.score >= 0 ? C_TEXT : C_BAD, ease, 1); py += 40 * s;
+  if (R.score < 0) { fitText(x + 30 * s, py, pw - 60 * s, 14 * s, 11 * s, R.why, C_BAD, ease); py += 26 * s; }
+  else if (R.newBest) { g_ren.text(cx, py, 15 * s, "A NEW BEST ON THIS BOARD!", vec3(1.f, 0.85f, 0.45f), ease, 1); py += 26 * s; }
+  else { g_ren.text(cx, py, 14 * s, fmt("Rank %d on the board  -  best %s", R.rank, trialScore(R.kind, R.best).c_str()), C_DIM, ease, 1); py += 26 * s; }
+  { float m[3]; trialMedalMarks(R.kind, R.spec, m);
+    fitText(x + 30 * s, py, pw - 60 * s, 13 * s, 10 * s, fmt("Gold %s    Silver %s    Bronze %s", trialScore(R.kind, m[0]).c_str(), trialScore(R.kind, m[1]).c_str(), trialScore(R.kind, m[2]).c_str()), C_DIM, ease);
+    py += 30 * s; }
+  if (splits) {   // the gates: this run's time at each, and against the best run's (before this one)
+    header(x + 30 * s, py, pw - 60 * s, "SPLITS"); py += 28 * s;
+    const int n = (int)R.splits.size(), half = (n + 1) / 2;
+    const float colW = (pw - 60 * s) * 0.5f;
+    for (int i = 0; i < n; i++) {
+      const float rx = x + 30 * s + (i >= half ? colW : 0.f), ry = py + (i % half) * 22 * s;
+      const float a = clampf((e - 0.4f - i * 0.06f) / 0.2f, 0.f, 1.f);
+      g_ren.text(rx, ry, 13 * s, fmt("Gate %d", i + 2), C_DIM, a);
+      g_ren.text(rx + 80 * s, ry, 13 * s, trialScore(TR_GATES, R.splits[i]), C_TEXT, a);
+      if (i < (int)R.bestSplits.size() && R.bestSplits[i] > 0.f) {
+        const float d = R.splits[i] - R.bestSplits[i];
+        g_ren.text(rx + colW - 20 * s, ry, 13 * s, fmt("%+.1f s", d), d <= 0.f ? C_GOOD : C_BAD, a, 2);
+      }
+    }
+    py += half * 22 * s + 10 * s;
+  }
+  const float by = y + ph - 66 * s;
+  if (button(x + 30 * s, by, 200 * s, 46 * s, "Retry") || (in.buttonsPressed & PAD_Y)) {
+    const TrialResult r = R; R.kind = -1;
+    startTrial(r.kind, r.spec, r.src);
+    return;
+  }
+  if (button(x + pw - 230 * s, by, 200 * s, 46 * s, "Done", true, true) || in.pressed[K_ENTER] || in.pressed[K_ESC]) { R.kind = -1; g_audio.trigger(SFX_CLICK); }
+}
+
 // The campaign's end: the career in numbers, and what is still out there
 void Game::drawFinaleCard() {
   const float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
@@ -3261,6 +3363,7 @@ void Game::drawFinaleCard() {
   g_ren.rect(0, 0, W, H, vec3(0, 0, 0), 0.6f * ease);
   const float pw = std::min(680 * s, W - 40 * s), ph = std::min(560 * s, H - 40 * s), x = W * 0.5f - pw * 0.5f, y = H * 0.5f - ph * 0.5f;
   g_ren.glow(x, y, pw, ph, vec3(1.f, 0.82f, 0.35f), 0.3f * ease, 14 * s, 36 * s);
+  g_ren.rect(x, y, pw, ph, svui::ink, 1, 6 * s);   // (opaque: the hub stays under it)
   panel(x, y, pw, ph, 0.97f);
   float py = y + 28 * s;
   g_ren.text(x + pw * 0.5f, py, 12 * s, "THE SOMNIUM VOLANDI CAMPAIGN", C_ACCENT, ease, 1, false); py += 24 * s;

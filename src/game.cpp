@@ -328,14 +328,30 @@ static std::string joinPath(const std::string& d, const char* f) { return d.empt
 void Game::loadSettings() {
   FILE* f = fopen(joinPath(saveDir, "settings.cfg").c_str(), "r");
   if (!f) { loadJoystickConfig(); return; }
-  resDone.clear(); trialBest.clear();   // (read twice at startup: the lists are the file's, not appended to)
+  resDone.clear(); trialBest.clear(); trialBestSplits.clear();   // (read twice at startup: the lists are the file's, not appended to)
+  const std::string today = trialKey(TR_DAILY);
   char k[64]; float v;
   while (fscanf(f, "%63s %f", k, &v) == 2) {
     if (!std::isfinite(v) || fabsf(v) > 1e6f) continue;   // a damaged value keeps the default
     std::string s = k;
     if (s == "renderScale") continue;   // old setting (the renderer scales itself)
     else if (s.rfind("rescard.", 0) == 0) { if (v > 0.5f) resDone.insert(s.substr(8)); }
-    else if (s.rfind("trial.", 0) == 0) { size_t dot = s.rfind('.'); if (dot > 6 && v >= 0.f) { auto& L = trialBest[s.substr(6, dot - 6)]; L.push_back(v); std::sort(L.begin(), L.end()); if (L.size() > 5) L.resize(5); } }
+    else if (s.rfind("trial.", 0) == 0) {
+      size_t dot = s.rfind('.');
+      if (dot > 6 && v >= 0.f) {
+        const std::string id = s.substr(6, dot - 6);
+        if (id.rfind("T_DAILY", 0) == 0 && id != today) continue;   // (another day's course: its board went with it)
+        auto& L = trialBest[id]; L.push_back(v); std::sort(L.begin(), L.end()); if (L.size() > 5) L.resize(5);
+      }
+    }
+    else if (s.rfind("trialSplit.", 0) == 0) {   // the best run's gate splits, in gate order
+      size_t dot = s.rfind('.');
+      if (dot > 11 && v >= 0.f) {
+        const std::string id = s.substr(11, dot - 11); const int i = atoi(s.c_str() + dot + 1);
+        if ((id.rfind("T_DAILY", 0) == 0 && id != today) || i < 0 || i > 64) continue;
+        auto& L = trialBestSplits[id]; if ((int)L.size() <= i) L.resize(i + 1, 0.f); L[i] = v;
+      }
+    }
     else if (s == "quality") set.quality = (int)clampf(v, 0, 2);
     else if (s == "master") set.master = clampf(v, 0, 1);
     else if (s == "engineVol") set.engineVol = clampf(v, 0, 1.5f);
@@ -424,6 +440,7 @@ bool Game::saveSettings() {
   for (int i = 0; i < ACT_COUNT; i++) t += fmt("key.%s %d\npad.%s %u\n", kActions[i].id, set.keyBind[i], kActions[i].id, set.padBind[i]);
   for (const std::string& id : resDone) t += "rescard." + id + " 1\n";
   for (auto& tb : trialBest) for (size_t i = 0; i < tb.second.size(); i++) t += fmt("trial.%s.%d %f\n", tb.first.c_str(), (int)i, tb.second[i]);
+  for (auto& tb : trialBestSplits) for (size_t i = 0; i < tb.second.size(); i++) t += fmt("trialSplit.%s.%d %f\n", tb.first.c_str(), (int)i, tb.second[i]);
   if (t == settingsWritten) return true;
   std::string path = joinPath(saveDir, "settings.cfg"), tmp = path + ".tmp";
   FILE* f = fopen(tmp.c_str(), "w");
@@ -1527,6 +1544,57 @@ std::string Game::trialScore(int kind, float v) const {
   if (kind == TR_FORMATION) return fmt("%.0f s out", v);
   return fmt("%d:%02d.%d", (int)v / 60, (int)v % 60, (int)(v * 10) % 10);
 }
+std::string Game::trialKey(int kind) const {
+  if (kind != TR_DAILY) return trialId(kind);
+  return fmt("%s.%u", trialId(kind), (unsigned)(time(nullptr) / 86400));   // (today's course: its own board)
+}
+void Game::trialMedalMarks(int kind, int spec, float m[3]) const {
+  const AircraftSpec& s = kAircraft[std::clamp(spec, 0, kAircraftCount - 1)];
+  if (kind == TR_SPOT) { m[0] = 25.f; m[1] = 50.f; m[2] = 90.f; return; }
+  if (kind == TR_FORMATION) { m[0] = 3.f; m[1] = 10.f; m[2] = 25.f; return; }
+  if (kind == TR_STOL) { const float r = std::max(s.runwayM, 150.f); m[0] = r * 0.5f; m[1] = r * 0.75f; m[2] = r * 1.1f; return; }
+  // the gate runs: the course from the first gate to the last at the type's cruise speed
+  const Contract c = trialContract(kind);
+  float len = 0.f;
+  for (size_t i = 1; i < c.wps.size(); i++) len += length(vec3(c.wps[i].x - c.wps[i - 1].x, c.wps[i].alt - c.wps[i - 1].alt, c.wps[i].z - c.wps[i - 1].z));
+  const float t = len / std::max(s.cruise, 20.f);
+  m[0] = t; m[1] = t * 1.2f; m[2] = t * 1.5f;
+}
+int Game::trialMedal(int kind, int spec, float score) const {
+  if (score < 0.f) return 0;
+  float m[3]; trialMedalMarks(kind, spec, m);
+  return score <= m[0] ? 3 : score <= m[1] ? 2 : score <= m[2] ? 1 : 0;
+}
+static std::string ghostPath(const std::string& dir, const std::string& key) { return (dir.empty() ? std::string() : dir + "/") + "ghost_" + key + ".bin"; }
+void Game::loadGhost(int kind) {
+  ghostBest.clear();
+  if (diskless || (headless && saveDir.empty()) || (kind != TR_GATES && kind != TR_DAILY)) return;
+  FILE* f = fopen(ghostPath(saveDir, trialKey(kind)).c_str(), "rb");
+  if (!f) return;
+  uint32_t n = 0;
+  if (fread(&n, 4, 1, f) == 1 && n > 0 && n < 200000) {
+    ghostBest.resize(n);
+    if (fread(ghostBest.data(), sizeof(vec3), n, f) != n) ghostBest.clear();
+  }
+  fclose(f);
+}
+void Game::saveGhost(int kind) {
+  if (diskless || (headless && saveDir.empty()) || ghostRec.empty()) return;
+  if (kind == TR_DAILY) {   // (yesterday's course's ghost goes with it)
+    const unsigned day = (unsigned)(time(nullptr) / 86400);
+    for (unsigned d = day - 7; d < day; d++) remove(ghostPath(saveDir, fmt("%s.%u", trialId(kind), d)).c_str());
+  }
+  FILE* f = fopen(ghostPath(saveDir, trialKey(kind)).c_str(), "wb");
+  if (!f) return;
+  const uint32_t n = (uint32_t)ghostRec.size();
+  fwrite(&n, 4, 1, f); fwrite(ghostRec.data(), sizeof(vec3), n, f);
+  fclose(f);
+}
+void Game::startTrial(int kind, int spec, int src) {
+  startFlight(trialContract(kind), spec, (Career::Source)src); isolatedFlight = true;   // (a trial: off the books)
+  trialResult = TrialResult(); trialResult.kind = -1;
+  trialSplits.clear(); ghostRec.clear(); loadGhost(kind);
+}
 void Game::finishTrial(bool success) {
   int kind = -1; for (int k = 0; k < TR_COUNT; k++) if (contract.id == trialId(k)) kind = k;
   if (kind < 0) return;
@@ -1537,14 +1605,35 @@ void Game::finishTrial(bool success) {
     else if ((kind == TR_GATES || kind == TR_DAILY) && trialT0 >= 0 && trialT1 > trialT0 && wpIndex >= (int)contract.wps.size()) score = trialT1 - trialT0;
     else if (kind == TR_FORMATION && formT >= kFormationRunS) score = formLost;
   }
+  TrialResult& R = trialResult;
+  R = TrialResult(); R.kind = kind; R.spec = specIdx; R.src = (int)source; R.score = score; R.splits = trialSplits;
+  const std::string key = trialKey(kind);
+  R.bestSplits = trialBestSplits.count(key) ? trialBestSplits[key] : std::vector<float>();
+  if (score < 0) R.why = result.failReason.empty() ? (success ? "The run didn't count: land back on the runway to finish" : "Did not finish") : result.failReason;
   std::string msg = std::string(trialName(kind)) + ": " + trialScore(kind, score);
   if (score >= 0) {
-    auto& L = trialBest[contract.id];
+    auto& L = trialBest[key];
     L.push_back(score); std::sort(L.begin(), L.end()); if (L.size() > 5) L.resize(5);
     int rank = 1; for (float v : L) { if (v < score) rank++; }
+    R.rank = rank; R.best = L[0]; R.newBest = rank == 1;
     msg += rank == 1 ? "  -  a new best!" : fmt("  -  rank %d (best %s)", rank, trialScore(kind, L[0]).c_str());
+    if (R.newBest) { if (!trialSplits.empty()) trialBestSplits[key] = trialSplits; saveGhost(kind); }
+    // the medal, the profile's best of it for this trial, the achievements
+    R.medal = trialMedal(kind, specIdx, score);
+    if (R.medal > 0) {
+      const std::string mk = std::string("medal.") + trialId(kind);
+      if (R.medal > profile.count(mk)) profile.num[mk] = (float)R.medal;
+      award("medal");
+      if (R.medal == 3) award("gold");
+      bool all = true; for (int k = 0; k < TR_COUNT; k++) all &= profile.count(std::string("medal.") + trialId(k)) >= 3.f;
+      if (all) award("gold_all");
+      saveProfile();
+      const char* names[] = {"", "BRONZE", "SILVER", "GOLD"};
+      msg += std::string("  -  ") + names[R.medal];
+    }
     saveSettings();
   }
+  if (g_music.owns()) g_music.sting(R.medal > 0 ? STING_MEDAL : score >= 0 ? STING_SUCCESS : STING_FAIL);
   hubMsg = msg; hubMsgTime = 8;
 }
 void Game::fireFailure(int kind, int engine) {
@@ -1739,6 +1828,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
   joyThrTaken = false; joyThrLast = -1;   // (the throttle lever takes over when it moves, not at the start)
   arrivalAt = -1; arrivalTold = false; engineShutDown = false; engineHold = 0; engineHeld = false; tdStampT = -1.f;
   flightAch.clear(); flightKm = 0; profileT = 0; pbOld = -1.f; pbNew = false; lastMark = LandingMark();
+  trialSplits.clear(); ghostRec.clear(); ghostBest.clear();   // (a trial loads its ghost after: startTrial)
   takeoffAnnounced = c.startAirborne; touchedDown = false; touchdownFpm = 0; stillTimer = 0; tdRunway = -2;   // (an airborne start has no takeoff to announce)
   engineAutoStarted = false; startDelay = 1.2f;
   parkingBrake = !c.startAirborne;   // a start on the ground is parked: the brake is released to roll
@@ -1819,9 +1909,10 @@ void Game::endFlight(bool success, const std::string& reason, FlightOutcome outc
   lastMark = landingMark(result, *plane.spec);
   if (isolatedFlight) {   // a practice flight or a trial: back to the hub, nothing settled
     profileFlightEnd(success);
-    if (contract.type == CT_TRIAL) finishTrial(success);
+    const bool trial = contract.type == CT_TRIAL;
+    if (trial) finishTrial(success);
     isolatedFlight = false; paused = false; showMap = false; screen = SCR_HUB; hubTab = TAB_CONTRACTS;
-    toast(success ? "Practice flight complete" : reason.empty() ? "Practice flight over" : reason, success ? vec3(0.6f, 1, 0.7f) : vec3(1, 0.5f, 0.4f));
+    if (!trial) toast(success ? "Practice flight complete" : reason.empty() ? "Practice flight over" : reason, success ? vec3(0.6f, 1, 0.7f) : vec3(1, 0.5f, 0.4f));   // (a trial: its card says it)
     announceFlightEnd(success?"Practice flight complete":"Practice flight over");
     return;
   }
@@ -2447,6 +2538,8 @@ void Game::updateFlight(float dt) {
   }
   if (!plane.onGround) result.maxBank = std::max(result.maxBank, fabsf(plane.bankDeg()));
   profileTick(dt);   // (landmarks found, sightings, the distance flown)
+  if (contract.type == CT_TRIAL && trialT0 >= 0.f && trialT1 < 0.f)   // (the ghost's track: where this run was, every kGhostDt s from the first gate)
+    while ((float)ghostRec.size() * kGhostDt <= flightClock - trialT0 && ghostRec.size() < 100000) ghostRec.push_back(plane.pos);
   // rolling dust / spray
   float gs = length(vec3(plane.vel.x, 0, plane.vel.z));
   updateJobMeters(simDt, gs);   // (simulated time: at 4x the patient rides four seconds of turbulence a frame)
@@ -2536,7 +2629,20 @@ void Game::updateFlight(float dt) {
         }
       }
       wpIndex++; result.wpDone = wpIndex; shake(0.1f);
-      if (contract.type == CT_TRIAL) { if (wpIndex == 1) trialT0 = flightClock; if (wpIndex >= (int)contract.wps.size()) trialT1 = flightClock; }
+      if (contract.type == CT_TRIAL) {
+        if (wpIndex == 1) trialT0 = flightClock;
+        if (wpIndex >= (int)contract.wps.size()) trialT1 = flightClock;
+        if (wpIndex >= 2 && trialT0 >= 0.f) {   // the split at this gate, against the best run's
+          const float sp = flightClock - trialT0; trialSplits.push_back(sp);
+          int kind = -1; for (int k = 0; k < TR_COUNT; k++) if (contract.id == trialId(k)) kind = k;
+          auto it = kind >= 0 ? trialBestSplits.find(trialKey(kind)) : trialBestSplits.end();
+          const size_t i = trialSplits.size() - 1;
+          if (it != trialBestSplits.end() && i < it->second.size() && it->second[i] > 0.f) {
+            const float d = sp - it->second[i];
+            toast(fmt("Gate %d  %s  %+.1f s", wpIndex, trialScore(TR_GATES, sp).c_str(), d), d <= 0.f ? vec3(0.45f, 1.f, 0.6f) : vec3(1.f, 0.55f, 0.4f), false);
+          } else toast(fmt("Gate %d  %s", wpIndex, trialScore(TR_GATES, sp).c_str()), vec3(0.6f, 0.9f, 1.f), false);
+        }
+      }
       g_audio.trigger(SFX_CHIME);
       toast(wpIndex < (int)contract.wps.size() ? fmt("Checkpoint %d of %d", wpIndex, (int)contract.wps.size()) : "All checkpoints passed!", vec3(0.5f, 1, 0.7f));
       if (contract.wps.size() && wpIndex >= (int)contract.wps.size() && contract.id == "L1") { endTimer = 2.f; }
@@ -4916,10 +5022,9 @@ void Game::feedAudio() {
   }
   ap.master = set.master; ap.engineVol = set.engineVol * (1.f - 0.35f * voiceDuck); ap.sfxVol = set.sfxVol; ap.voiceVol = set.atcVol;
   {   // the radio music, at the master volume (the review of v3.44.0, AUD-1), lowered under speech
-    // (only while the radio plays: idle, the music ring is the score's, at its own volume - updateMusic)
+    // (Radio::setVolume reaches the music ring only while the radio plays: idle, the ring is the score's - updateMusic)
     const float rv = radioLevel();
-    if (radio.state() == Radio::IDLE) radioSentVol = -1.f;
-    else if (rv != radioSentVol) { radio.setVolume(rv); radioSentVol = rv; }
+    if (rv != radioSentVol) { radio.setVolume(rv); radioSentVol = rv; }
   }
   static bool muffled = false;
   if (actKeyP(ACT_ANR) || actJoyP(ACT_ANR) || (screen == SCR_FLIGHT && !paused && actPadP(ACT_ANR))) { muffled = !muffled; toast(muffled ? "Engine noise muffled (headset ANR on)" : "Headset ANR off"); }
@@ -5725,6 +5830,11 @@ void Game::debugScene(const std::string& name) {
     takeoffAnnounced = true; camQ = plane.q; hint.clear(); toasts.clear(); botControl = true;
     if (getenv("RINGCOCKPIT")) camMode = 1;
     plane.ctl = Controls(); plane.ctl.throttle = 0.7f;
+    if (getenv("GHOST")) {   // (a gate run's ghost alongside: the best run 80 m ahead and 30 m to the right)
+      contract.type = CT_TRIAL; trialT0 = flightClock; trialT1 = -1.f; ghostBest.clear();
+      const vec3 rt = normalize(cross(nd, vec3(0, 1, 0)));
+      for (int i = 0; i < 400; i++) ghostBest.push_back(plane.pos + nd * (80.f + i * kGhostDt * kAircraft[0].cruise * 1.05f) + rt * 30.f);
+    }
     for (int i = 0; i < 30; i++) updateCamera(0.1f);
     for (int i = 0; i < (name == "rings" ? 60 : 42); i++) { realTime += 1 / 30.f; update(1 / 30.f); }
     return;
