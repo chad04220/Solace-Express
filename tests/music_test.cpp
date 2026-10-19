@@ -6,6 +6,18 @@
 #include <cmath>
 #include <cstdio>
 #include <vector>
+#if defined(__SANITIZE_ADDRESS__)
+#define MUSIC_SANITIZED 1
+#elif defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define MUSIC_SANITIZED 1
+#endif
+#endif
+#ifdef MUSIC_SANITIZED
+static const double kCpuBudgetMs = 1e9;   // (the sanitizers' instrumentation costs several times the score itself: the cost is printed, not judged)
+#else
+static const double kCpuBudgetMs = 100.0;   // a tenth of a core at most
+#endif
 
 int main() {
   int fails = 0;
@@ -25,7 +37,7 @@ int main() {
       if (sec >= 2 && sqrt(s2 / b.size()) < 0.005) quietSec++;   // (after its pads have swelled in)
     }
     const double rms = sqrt(sum / (60.0 * b.size()));
-    const bool ok = bad == 0 && peak < 0.86f && rms > 0.03 && quietSec == 0 && ms / 60 < 100.0;
+    const bool ok = bad == 0 && peak < 0.86f && rms > 0.03 && quietSec == 0 && ms / 60 < kCpuBudgetMs;
     printf("%-7s rms %.3f, peak %.3f, silent seconds %d, non-finite %d, %.1f ms of CPU a second: %s\n", names[m], rms, peak, quietSec, bad, ms / 60, ok ? "ok" : "FAIL");
     fails += !ok;
   }
