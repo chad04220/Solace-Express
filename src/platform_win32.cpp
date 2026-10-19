@@ -609,6 +609,11 @@ static std::string cacheDirFor(const std::string& exeDir, const std::string& sav
 // the benchmark loops: the window answers its messages between frames (no "Not Responding" on a slow scene)
 static void pumpB() { MSG m; while (PeekMessageW(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageW(&m); } }
 
+// A tool's run (diagnostics.bat's benchmarks, shots, the soak, the analysis): no career of the player's is touched
+static bool toolLaunch(const std::string& cmdLine) {
+  return cmdLine.find("--bench ") != std::string::npos || cmdLine.find("--soak ") != std::string::npos || cmdLine.find("--shots ") != std::string::npos || cmdLine.find("--profile ") != std::string::npos || cmdLine.find("--analyze") != std::string::npos || cmdLine.find("--loadshots") != std::string::npos;
+}
+
 int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   {
     std::string cl = GetCommandLineA();
@@ -647,6 +652,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     game.platformOpen = [](const std::string& path) { ShellExecuteA(nullptr, "open", path.c_str(), nullptr, nullptr, SW_SHOWNORMAL); };
     if (strstr(GetCommandLineA(), "--test-crash")) { volatile int* none = nullptr; *none = 1; }   // (checks the reports end to end)
   }
+  // Steam (steam.h): before the window, as Valve asks, when steam_api64.dll is beside the exe; never in a tool's run
+  if (!toolLaunch(GetCommandLineA())) steam::init(game.assetDir);
 
   WNDCLASSEXW wc = {sizeof(wc)};
   wc.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
@@ -785,7 +792,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   // aircraft's meshes
   const std::string cmdLine = GetCommandLineA();
   // (--raster, from older scripts, is accepted and ignored: there is one renderer)
-  const bool tool = cmdLine.find("--bench ") != std::string::npos || cmdLine.find("--soak ") != std::string::npos || cmdLine.find("--shots ") != std::string::npos || cmdLine.find("--profile ") != std::string::npos || cmdLine.find("--analyze") != std::string::npos || cmdLine.find("--loadshots") != std::string::npos;
+  const bool tool = toolLaunch(cmdLine);
   auto exists = [](const std::string& p) { return !p.empty() && GetFileAttributesA(p.c_str()) != INVALID_FILE_ATTRIBUTES; };
   g_ren.prebuiltAircraftDir = game.assetDir + "\\aircraft"; // immutable full-quality geometry bundled beside the exe
   g_ren.checkMeshCache();
@@ -1757,7 +1764,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   }
   // (the menus render their scenes live: a menu.mp4 left from an older version is not played)
   startAudio();
-  if (FILE* f = fopen((game.saveDir + "\\startup.log").c_str(), "a")) { fprintf(f, "Audio: %s\n", audioBackendName()); fclose(f); }
+  if (FILE* f = fopen((game.saveDir + "\\startup.log").c_str(), "a")) { fprintf(f, "Audio: %s\n%s\n", audioBackendName(), steam::status().c_str()); fclose(f); }
   joyPoll(game.in.joys);   // (the joysticks found: a support aid, like the GPU)
   if (FILE* f = fopen((game.saveDir + "\\startup.log").c_str(), "a")) {
     fprintf(f, "Joysticks: %d\n", (int)game.in.joys.size());
@@ -1802,6 +1809,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   }
   sendRumble(0.f, 0.f);
   game.shutdown();
+  steam::shutdown();
   stopAudio();
   timeEndPeriod(1);
   timeEndPeriod(1);

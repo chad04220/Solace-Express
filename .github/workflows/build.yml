@@ -300,3 +300,37 @@ jobs:
           body_path: RELEASE_NOTES.md   # what's new (kept up to date before each release); the generated changelog follows
           generate_release_notes: true
           files: dist/SomniumVolandi-windows-x64.zip
+
+  # A release, uploaded to Steam too, to a beta branch (set live for everyone on the Steamworks site). Off until the
+  # Steamworks app exists: the repository variable STEAM_APP_ID and the secrets STEAM_USERNAME and STEAM_CONFIG_VDF
+  # (steam/README.md). The depot is the same folder as the zip, with Valve's steam_api64.dll added beside the exe
+  steam:
+    if: (startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != '') && vars.STEAM_APP_ID != ''
+    needs: [linux-sanitizers, aircraft-meshes, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: SomniumVolandi-windows-x64
+          path: steam-content/SomniumVolandi
+
+      - name: Add the Steam runtime
+        run: |
+          if [ ! -f steam/redist/steam_api64.dll ]; then
+            echo "::error::steam/redist/steam_api64.dll isn't in the repository (steam/redist/README.md): a Steam build without it has no achievements"
+            exit 1
+          fi
+          cp steam/redist/steam_api64.dll steam-content/SomniumVolandi/
+          ls -la steam-content/SomniumVolandi
+
+      - uses: game-ci/steam-deploy@v3
+        with:
+          username: ${{ secrets.STEAM_USERNAME }}
+          configVdf: ${{ secrets.STEAM_CONFIG_VDF }}
+          appId: ${{ vars.STEAM_APP_ID }}
+          buildDescription: ${{ inputs.release_tag || github.ref_name }}
+          rootPath: steam-content
+          depot1Path: SomniumVolandi
+          releaseBranch: ${{ vars.STEAM_BRANCH || 'beta' }}

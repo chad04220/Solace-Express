@@ -5137,7 +5137,7 @@ void Game::update(float dt) {
   if (screen == SCR_REGION_LOADING) {
     realTime += std::min(dt, .1f); lastDt = std::min(dt, .05f);
     if (in.pressed[K_F11]) wantFullscreenToggle = true;
-    gamepadMenus(lastDt); focusNavigate(); radio.poll(); updateMusic();
+    gamepadMenus(lastDt); focusNavigate(); radio.poll(); updateMusic(); updateSteam(dt);
     updateRegionLoading(std::min(dt, .25f));
     return;
   }
@@ -5216,6 +5216,7 @@ void Game::update(float dt) {
   if (screen == SCR_FLIGHT && (actKeyP(ACT_RADIO) || actJoyP(ACT_RADIO) || (!paused && actPadP(ACT_RADIO)))) showRadio = !showRadio;
   radio.poll();
   updateMusic();
+  updateSteam(dt);
   if (screen == SCR_HUB) { static float careerCheckT = 0; if ((careerCheckT += dt) > 1.f) { careerCheckT = 0; profileCareerCheck(); } }   // (licences, the fleet, the airline: achievements)
   for (size_t i = 0; i < achShow.size() && i < 1; i++) achShow[i].t += dt;   // (the banner on show)
   if (!achShow.empty() && achShow.front().t > 4.5f) achShow.erase(achShow.begin());

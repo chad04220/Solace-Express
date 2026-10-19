@@ -1,0 +1,38 @@
+api_name,display_name,description,hidden,group,icon,icon_locked
+ACH_FIRST_FLIGHT,Wheels Up,Complete your first flight,0,flying,achievements/ACH_FIRST_FLIGHT.png,achievements/ACH_FIRST_FLIGHT_locked.png
+ACH_BUTTER,Butter,Touch down under 150 fpm,0,flying,achievements/ACH_BUTTER.png,achievements/ACH_BUTTER_locked.png
+ACH_GREASER,Greaser,Touch down under 60 fpm,0,flying,achievements/ACH_GREASER.png,achievements/ACH_GREASER_locked.png
+ACH_BUTTER25,Pastry Chef,Make 25 butter landings,0,flying,achievements/ACH_BUTTER25.png,achievements/ACH_BUTTER25_locked.png
+ACH_GRADE_S,Textbook,Earn an S for a landing,0,flying,achievements/ACH_GRADE_S.png,achievements/ACH_GRADE_S_locked.png
+ACH_FLAWLESS,Flawless,Three stars and an S landing on the same job,0,flying,achievements/ACH_FLAWLESS.png,achievements/ACH_FLAWLESS_locked.png
+ACH_CROSSWIND,Crab Walk,Land with more than 15 kt of crosswind,0,flying,achievements/ACH_CROSSWIND.png,achievements/ACH_CROSSWIND_locked.png
+ACH_NIGHT,Night Owl,Land at night,0,flying,achievements/ACH_NIGHT.png,achievements/ACH_NIGHT_locked.png
+ACH_WEATHER,In the Soup,Land in rain or snow with the cloud base under 300 m,0,flying,achievements/ACH_WEATHER.png,achievements/ACH_WEATHER_locked.png
+ACH_DEADSTICK,Deadstick,Land at an airport with every engine stopped,0,flying,achievements/ACH_DEADSTICK.png,achievements/ACH_DEADSTICK_locked.png
+ACH_BY_THE_BOOK,By the Book,"Taxi clear, shut down and set the parking brake at the end of a job",0,flying,achievements/ACH_BY_THE_BOOK.png,achievements/ACH_BY_THE_BOOK_locked.png
+ACH_GO_AROUND,Better Safe,"Go around, then land",0,flying,achievements/ACH_GO_AROUND.png,achievements/ACH_GO_AROUND_locked.png
+ACH_LONG_HAUL,Long Haul,Fly a single flight of 150 km or more,0,flying,achievements/ACH_LONG_HAUL.png,achievements/ACH_LONG_HAUL_locked.png
+ACH_WARP,Warp Drive,Cover 500 km in Time Warp,0,flying,achievements/ACH_WARP.png,achievements/ACH_WARP_locked.png
+ACH_LIC_PPL,Private Pilot,Earn the private pilot licence,0,career,achievements/ACH_LIC_PPL.png,achievements/ACH_LIC_PPL_locked.png
+ACH_LIC_CPL,Commercial Pilot,Earn the commercial pilot licence,0,career,achievements/ACH_LIC_CPL.png,achievements/ACH_LIC_CPL_locked.png
+ACH_LIC_ATP,Airline Transport Pilot,Earn the airline transport pilot licence,0,career,achievements/ACH_LIC_ATP.png,achievements/ACH_LIC_ATP_locked.png
+ACH_OWNER,Owner-Operator,Buy your first aircraft,0,career,achievements/ACH_OWNER.png,achievements/ACH_OWNER_locked.png
+ACH_FLEET3,Fleet Manager,Own three aircraft at once,0,career,achievements/ACH_FLEET3.png,achievements/ACH_FLEET3_locked.png
+ACH_AIRLINE,Airline Founder,Put an aircraft on a route with a hired pilot,0,career,achievements/ACH_AIRLINE.png,achievements/ACH_AIRLINE_locked.png
+ACH_TYCOON,Airline Tycoon,"Your airline earns $1,000,000",0,career,achievements/ACH_TYCOON.png,achievements/ACH_TYCOON_locked.png
+ACH_MILLIONAIRE,Deep Pockets,"Have $1,000,000 in the bank",0,career,achievements/ACH_MILLIONAIRE.png,achievements/ACH_MILLIONAIRE_locked.png
+ACH_CAMPAIGN,Captain,Complete the campaign,0,career,achievements/ACH_CAMPAIGN.png,achievements/ACH_CAMPAIGN_locked.png
+ACH_LEGEND,Living Legend,Complete every legendary contract,0,career,achievements/ACH_LEGEND.png,achievements/ACH_LEGEND_locked.png
+ACH_AIRPORTS10,Island Hopper,Land at 10 different airports,0,exploring,achievements/ACH_AIRPORTS10.png,achievements/ACH_AIRPORTS10_locked.png
+ACH_AIRPORTS_ALL,Every Field,Land at every airport in the islands,0,exploring,achievements/ACH_AIRPORTS_ALL.png,achievements/ACH_AIRPORTS_ALL_locked.png
+ACH_SITES5,Sightseer,Find 5 landmarks,0,exploring,achievements/ACH_SITES5.png,achievements/ACH_SITES5_locked.png
+ACH_SITES_ALL,Grand Tour,Find every landmark,0,exploring,achievements/ACH_SITES_ALL.png,achievements/ACH_SITES_ALL_locked.png
+ACH_PHOTO,Shutterbug,Complete a photo flight,0,exploring,achievements/ACH_PHOTO.png,achievements/ACH_PHOTO_locked.png
+ACH_MEDAL,On the Podium,Win a medal in a trial,0,trials,achievements/ACH_MEDAL.png,achievements/ACH_MEDAL_locked.png
+ACH_GOLD,Gold Standard,Win a gold medal in a trial,0,trials,achievements/ACH_GOLD.png,achievements/ACH_GOLD_locked.png
+ACH_GOLD_ALL,Golden Wings,Win gold in every trial,0,trials,achievements/ACH_GOLD_ALL.png,achievements/ACH_GOLD_ALL_locked.png
+ACH_SORTIE,Commissioned,Complete a military sortie,0,the rest,achievements/ACH_SORTIE.png,achievements/ACH_SORTIE_locked.png
+ACH_UFO,Close Encounter,Meet the visitors,1,the rest,achievements/ACH_UFO.png,achievements/ACH_UFO_locked.png
+ACH_DISPLAY,Front Row,Fly with the Nocturne display pair,1,the rest,achievements/ACH_DISPLAY.png,achievements/ACH_DISPLAY_locked.png
+ACH_CLASSIFIED,Classified,Open the research terminal,1,the rest,achievements/ACH_CLASSIFIED.png,achievements/ACH_CLASSIFIED_locked.png
+ACH_SUPERSONIC,Through the Barrier,Fly faster than sound,1,the rest,achievements/ACH_SUPERSONIC.png,achievements/ACH_SUPERSONIC_locked.png

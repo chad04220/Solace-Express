@@ -3411,6 +3411,11 @@ void Game::drawWelcome() {
   for (char ch : in.text) if (profile.name.size() < 16 && (isalnum((unsigned char)ch) || ch == ' ' || ch == '-' || ch == '\'')) profile.name += ch;
   if (in.pressed[K_BACK] && !profile.name.empty()) profile.name.pop_back();
   const float fw = pw - 60 * s - 170 * s;
+  // (on a Steam Deck or in Big Picture: Steam's floating keyboard over the field, when the card shows and on a tap or X)
+  if (!steamKeyboardAsked || (in.mPressed[0] && hovered(x + 30 * s, py, fw, 38 * s)) || (in.buttonsPressed & PAD_X)) {
+    steamKeyboardAsked = true;
+    steam::showKeyboard((int)(x + 30 * s), (int)py, (int)fw, (int)(38 * s));
+  }
   g_ren.rect(x + 30 * s, py, fw, 38 * s, vec3(0.02f, 0.04f, 0.06f), 1, 4 * s);
   g_ren.rectOutline(x + 30 * s, py, fw, 38 * s, C_ACCENT, 0.5f, 4 * s, s);
   const std::string shown = profile.name.empty() ? std::string("Type a name") : profile.name;

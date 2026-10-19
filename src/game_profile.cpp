@@ -8,6 +8,11 @@ static std::string profilePath(const std::string& dir) { return dir.empty() ? st
 void Game::loadProfile() {
   if (diskless || (headless && saveDir.empty())) return;   // (a tool's or a test's session: a fresh profile, in memory)
   profile.load(profilePath(saveDir));
+  if (!headless) {   // (Steam has every achievement already earned: those from before the Steam build, or earned offline)
+    std::vector<std::string> ids;
+    for (const auto& a : profile.ach) ids.push_back(a.first);
+    steam::sync(ids);
+  }
 }
 
 void Game::saveProfile() {
@@ -22,6 +27,7 @@ void Game::award(const std::string& id) {
   flightAch.push_back(id);
   achShow.push_back({id, 0.f});
   saveProfile();
+  if (!headless && !diskless) steam::unlock(id);   // (a tool's session in the same process earns nothing on Steam)
 }
 
 void Game::profileTouchdown(float fpm, int ap) {
@@ -152,4 +158,50 @@ void Game::updateMusic() {
     const float v = set.master * set.musicVol * (1.f - 0.5f * voiceDuck);
     if (fabsf(v - musicSentVol) > 1e-3f) { g_audio.musicVolume(v); musicSentVol = v; }
   } else musicSentVol = -1.f;
+}
+
+// ---- Steam: what the player's friends see (steam/rich_presence_english.vdf has every token and the values it uses)
+void Game::steamPresence(std::string& token, steam::Pairs& values) const {
+  token.clear(); values.clear();
+  const int nAp = (int)g_world.airports.size();
+  auto apName = [&](int i) { return i >= 0 && i < nAp ? std::string(g_world.airports[i].name) : std::string(); };
+  const std::string craft = plane.spec ? std::string(plane.spec->name) : std::string();
+  switch (screen) {
+    case SCR_MENU: token = "#Status_Menu"; return;
+    case SCR_RESEARCH: token = "#Status_Research"; return;
+    case SCR_FREE_FLIGHT: token = "#Status_FreeFlightSetup"; return;
+    case SCR_HUB: case SCR_DEBRIEF: {
+      const std::string at = g_world.procedural ? std::string() : apName(career.location);
+      if (at.empty()) { token = "#Status_HubPlain"; return; }
+      token = "#Status_Hub"; values.push_back({"airport", at}); return;
+    }
+    case SCR_FLIGHT: break;
+    default: return;   // (a loading screen: the last status stays up)
+  }
+  if (craft.empty()) return;
+  values.push_back({"aircraft", craft});
+  if (militaryFlight) { token = "#Status_Military"; return; }
+  if (researchFlight) { token = "#Status_ResearchFlight"; return; }
+  if (freeFlight) { token = "#Status_FreeFlight"; return; }
+  if (contract.type == CT_TRIAL) {
+    std::string name = "a trial";
+    for (int k = 0; k < 5; k++) if (contract.id == trialId(k)) name = trialName(k);
+    token = "#Status_Trial"; values.push_back({"trial", name}); return;
+  }
+  if (contract.type == CT_LESSON) { token = "#Status_Lesson"; return; }
+  const std::string from = g_world.procedural ? std::string() : apName(contract.from), to = g_world.procedural ? std::string() : apName(contract.to);
+  if (isolatedFlight && !to.empty()) { token = "#Status_Practice"; values.push_back({"to", to}); return; }
+  if (from.empty() || to.empty()) { token = "#Status_FreeFlight"; return; }
+  token = "#Status_Job"; values.push_back({"from", from}); values.push_back({"to", to});
+}
+
+void Game::updateSteam(float dt) {
+  if (headless || diskless || !steam::active()) return;
+  steam::tick(dt);
+  if (steam::overlayOpened() && screen == SCR_FLIGHT && !paused && !crashed) { paused = true; settingsFromPause = false; }   // (as Valve asks: the overlay pauses the flight)
+  if ((steamPresenceT -= dt) > 0.f) return;
+  steamPresenceT = 1.f;
+  std::string token; steam::Pairs values;
+  steamPresence(token, values);
+  if (!token.empty()) steam::presence(token, values);
 }

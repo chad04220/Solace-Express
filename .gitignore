@@ -9,3 +9,6 @@ out/
 CMakeUserPresets.json
 __pycache__/
 *.pyc
+# Valve's steam_api64.dll (steam/README.md): the Steamworks SDK's terms don't allow it in a public repository.
+# Delete this line once the repository is private, then commit steam/redist/steam_api64.dll for the CI's Steam upload
+steam/redist/*.dll

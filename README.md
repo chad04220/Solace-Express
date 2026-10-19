@@ -185,6 +185,14 @@ My Station|https://example.com/stream.mp3
 
 Any MP3 or AAC stream over HTTP or HTTPS that Windows Media Foundation can play will work. Press **Reload** in the radio panel after editing; there's no need to restart. A list an earlier version filled with its presets is kept as your own. The list scrolls with the mouse wheel.
 
+## Steam
+
+The same build runs on Steam: when Valve's `steam_api64.dll` is beside the exe (the Steam version has it), the game
+mirrors its achievements to Steam, shows friends what you're flying, pauses a flight when the Steam overlay opens and,
+on a Steam Deck, brings up the on-screen keyboard for your pilot's name. Without the DLL none of that happens and
+nothing else changes. There's no DRM: started outside Steam, the game runs as it always has. `steam/README.md` covers
+the Steamworks settings, the achievement table and icons, and the upload; `startup.log` says whether Steam is on.
+
 ## Crash reports
 
 If the game crashes, it writes a crash report to `%APPDATA%\SomniumVolandi\crash`: a minidump, a short summary of what failed and where, and a copy of `startup.log`. The next launch says so on the main menu, with a button that opens the folder. Nothing is uploaded; send the report with a note of what you were doing if you'd like the crash fixed. The newest 10 reports are kept. `SomniumVolandi.exe --test-crash` crashes on purpose, to check that reports are written.
@@ -278,6 +286,7 @@ src/renderer.*     GL pipeline, the material texture array (scans + procedural, 
 src/audio.*        procedural audio engine (engines, environment, effects, UI)
 src/game*.cpp      game flow, flight session, cameras, particles, lights, HUD and menus
 src/platform_win32.cpp, src/radio_win.cpp   Win32 window/input/audio output, Media Foundation radio
+src/steam.*        Steam's achievements, rich presence, overlay pause and Deck keyboard (runtime-loaded; steam/ has the Steamworks assets)
 tools/gen_font.py  regenerates the embedded SDF font atlas
 ```
 

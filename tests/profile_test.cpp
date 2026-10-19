@@ -58,6 +58,21 @@ struct GameTest {
       c.from = g_world.findAirport("MDB"); c.to = g_world.findAirport("FAR"); c.wx = Weather(); c.wx.windSpeed = 2.f; c.wx.timeOfDay = 12.f;
       g.startFlight(c, 1, Career::SRC_RENT);
       g.screen = SCR_FLIGHT;
+      {   // what friends see on Steam (steam.h; the tokens are steam/rich_presence_english.vdf's, steam_test)
+        std::string tok; steam::Pairs v;
+        auto val = [&](const char* k) { for (const auto& p : v) if (p.first == k) return p.second; return std::string(); };
+        g.steamPresence(tok, v);
+        const bool job = tok == "#Status_Job" && val("aircraft") == kAircraft[1].name && val("from") == g_world.airports[c.from].name && val("to") == g_world.airports[c.to].name;
+        g.screen = SCR_MENU; g.steamPresence(tok, v);
+        const bool menu = tok == "#Status_Menu" && v.empty();
+        const int loc = g.career.location;
+        g.screen = SCR_HUB; g.career.location = c.to; g.steamPresence(tok, v);
+        const bool hub = tok == "#Status_Hub" && val("airport") == g_world.airports[c.to].name;
+        g.screen = SCR_LOADING; g.steamPresence(tok, v);
+        const bool loading = tok.empty();
+        g.career.location = loc; g.screen = SCR_FLIGHT;
+        check(job && menu && hub && loading, "Steam's status: the job (its aircraft, from, to), the menu, the hub's airport; a loading screen leaves the last up");
+      }
       const int far = g_world.findAirport("FAR");
       g.profileTouchdown(55.f, far);
       const bool stamped = g.profile.airports.count("FAR") == 1;

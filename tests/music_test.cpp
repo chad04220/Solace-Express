@@ -2,10 +2,17 @@
 // number; it changes mood without a click; every stinger sounds over silence and over a mood; the same seed gives the
 // same notes; and it costs well under a tenth of a core
 #include "../src/music.h"
-#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <vector>
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#else
+#include <ctime>
+#endif
 #if defined(__SANITIZE_ADDRESS__)
 #define MUSIC_SANITIZED 1
 #elif defined(__has_feature)
@@ -19,6 +26,23 @@ static const double kCpuBudgetMs = 1e9;   // (the sanitizers' instrumentation co
 static const double kCpuBudgetMs = 100.0;   // a tenth of a core at most
 #endif
 
+// The CPU time this thread has used (ms): the score's own cost, whatever else the machine is running (a wall clock
+// counted the time the test waited for a core too)
+static double threadCpuMs() {
+#ifdef _WIN32
+  FILETIME created, ended, kernel, user;
+  GetThreadTimes(GetCurrentThread(), &created, &ended, &kernel, &user);
+  ULARGE_INTEGER k, u;
+  k.LowPart = kernel.dwLowDateTime; k.HighPart = kernel.dwHighDateTime;
+  u.LowPart = user.dwLowDateTime; u.HighPart = user.dwHighDateTime;
+  return (double)(k.QuadPart + u.QuadPart) / 1e4;
+#else
+  timespec t;
+  clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t);
+  return t.tv_sec * 1e3 + t.tv_nsec / 1e6;
+#endif
+}
+
 int main() {
   int fails = 0;
   const float sr = 48000.f;
@@ -28,9 +52,9 @@ int main() {
     std::vector<float> b((size_t)sr * 2);
     double sum = 0, ms = 0; float peak = 0; int bad = 0, quietSec = 0;
     for (int sec = 0; sec < 60; sec++) {
-      const auto t0 = std::chrono::steady_clock::now();
+      const double t0 = threadCpuMs();
       g.render(b.data(), (int)sr);
-      ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+      ms += threadCpuMs() - t0;
       double s2 = 0;
       for (float v : b) { if (!std::isfinite(v)) bad++; s2 += v * v; peak = std::max(peak, fabsf(v)); }
       sum += s2;

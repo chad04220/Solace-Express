@@ -114,6 +114,16 @@
 - **Air:** **As forecast**, or **Calm**, which takes two thirds off every gust and all the turbulence.
 - **Flight HUD:** **Full**, or **Essentials**, which hides the systems tiles. The wind components and the g meter then show only when they matter.
 
+### Ready for Steam
+- **The game can now run as a Steam game, from this same build.** When Valve's `steam_api64.dll` sits beside the exe, as it will in the Steam version:
+  - your achievements are mirrored to Steam as you earn them, and the ones you already have are sent at the next start;
+  - your friends see what you're doing, for example "Flying the Skerry Twin from Glacier Station to Solace Capital";
+  - opening the Steam overlay pauses your flight;
+  - on a Steam Deck, the first start's name field brings up the on-screen keyboard (X brings it up again).
+- **Without the DLL nothing changes,** and the download from this page doesn't include it. There's no DRM: outside Steam, the game runs as it always has. `startup.log` says whether Steam is on, and if not, why.
+- **The privacy notice is updated (version 2)** with what Steam itself receives. The game still sends nothing to us.
+- The repository now has the Steam store's achievement table, all 74 achievement icons (earned and locked), the rich presence text, the library logo, upload scripts and an optional upload step in the release workflow (`steam/README.md`).
+
 ### Smaller fixes
 - The debrief no longer cuts the last row of the pay list in half when the list is long.
 - Long warning labels shrink to fit their box, and the "press I to restart" prompt under ENGINE OFF has a dark backing so you can read it over a bright sky.

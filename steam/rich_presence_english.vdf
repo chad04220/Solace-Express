@@ -1,0 +1,19 @@
+"lang"
+{
+	"language"	"english"
+	"tokens"
+	{
+		"#Status_Menu"	"In the main menu"
+		"#Status_Hub"	"Planning the next job at %airport%"
+		"#Status_HubPlain"	"Planning the next job"
+		"#Status_Research"	"At the research terminal"
+		"#Status_FreeFlightSetup"	"Choosing an aircraft for free flight"
+		"#Status_Job"	"Flying the %aircraft% from %from% to %to%"
+		"#Status_Practice"	"Practising the approach to %to% in the %aircraft%"
+		"#Status_Lesson"	"Taking a flying lesson in the %aircraft%"
+		"#Status_Trial"	"In a trial: %trial%, in the %aircraft%"
+		"#Status_FreeFlight"	"Free flight in the %aircraft%"
+		"#Status_Military"	"On a sortie for Defense Command in the %aircraft%"
+		"#Status_ResearchFlight"	"Test-flying the %aircraft%"
+	}
+}

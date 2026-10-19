@@ -30,6 +30,7 @@
 #include "joystick.h"
 #include "profile.h"
 #include "music.h"
+#include "steam.h"
 
 struct Input {
   bool down[256] = {}, pressed[256] = {};
@@ -402,6 +403,12 @@ private:
   void drawMilitaryLocked();
   static constexpr int kMilitaryFlights = 10;   // the flights in the logbook Defense Command asks for
   void updateMusic();
+  // Steam (steam.h, inert without Steam): the status friends see (a token of steam/rich_presence_english.vdf and the
+  // values it fills in; an empty token leaves the last one up), the overlay's pause, the Deck's keyboard on the welcome
+  void steamPresence(std::string& token, steam::Pairs& values) const;
+  void updateSteam(float dt);
+  float steamPresenceT = 0.f;
+  bool steamKeyboardAsked = false;
   void callout(const std::string& s);   // a line for the voices only: shown elsewhere (the stamp) or not at all
   bool engineAutoStarted = false;
   float startDelay = 0;

@@ -1,13 +1,13 @@
 # Somnium Volandi - Privacy Notice
 
-Version 1, 2026. This notice explains what Somnium Volandi ("the game") does with data. The game is made by CDAIII
+Version 2, 2026. This notice explains what Somnium Volandi ("the game") does with data. The game is made by CDAIII
 ("we", "us").
 
 ## The short version
 
 The game has no accounts, no telemetry, no analytics and no advertising. It never sends anything to us. Everything it
 saves stays on your computer, and the only network connections it makes are to internet radio stations you add
-yourself.
+yourself and, in the Steam version, to Steam (see "Steam" below).
 
 ## What the game stores on your computer
 
@@ -27,6 +27,14 @@ doesn't delete your career, so you can reinstall without losing it.
 When you play a station, your computer connects directly to that station's server through Windows Media Foundation.
 Like any website, the station sees your IP address and basic request details, and its own privacy policy applies. The
 game ships with no stations; you choose every one.
+
+## Steam
+
+When you play the game from Steam, it tells the Steam client on your computer which achievements you have earned and
+a short status for your friends list (for example "Flying the Skerry Twin from Glacier Station to Solace Capital").
+If you have Steam Cloud turned on, Steam keeps a copy of your career, profile, settings and trial records. Valve
+handles all of that under its own privacy policy; none of it reaches us. Outside Steam, or in the version from our
+own download, the game doesn't talk to Steam at all.
 
 ## Diagnostics
 
