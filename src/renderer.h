@@ -94,6 +94,7 @@ extern std::atomic<long long> g_shaderCompileUs;   // the time spent compiling p
 std::string meshGeometryStamp(const std::string& defines); // SHA256 of full-quality shader geometry, CPU builder contract; no driver
 std::string meshCacheStamp(const std::string& defines = "");     // fingerprint of the sources the aircraft mesh bake depends on + the driver
 std::string shaderCacheStamp();   // fingerprint of all shader sources + the driver (current context needed)
+std::string aircraftProgramStamp();   // and of every type's own build (Renderer::buildAfItem): its packed model too
 bool writePNG(const char* path, int w, int h, const std::vector<uint8_t>& rgbBottomUp);
 bool readImage(const char* path, int& w, int& h, std::vector<uint8_t>& rgbaTopDown);   // PNG or JPEG
 GLuint linkProgramCached(const std::string& vs, const std::string& fs, std::string& err, bool* usedSafeGear = nullptr);
@@ -676,6 +677,14 @@ public:
     tshFront = -1; tshBack = 0; tshRow = 0; tshBaking = false; tshStreaming = streamedWorld;
     for (bool& v : shValid) v = false;   // shadow cascades re-render
   }
+  // Each aircraft type's own builds (afMeshProgram, afPassProgram) as items to make ahead of the frames that want them:
+  // every type's mesh-pass, objects and shadow-proxy programs, and the XR-40's effects. The launch shares them out
+  // (afShareItems: the longest first, each to the helper with the least so far) to helper processes that compile them
+  // side by side into the cache (platform_win32.cpp); buildAfItem builds one as the first frame that wants it would
+  static int afItemCount();
+  static void afItemOf(int item, int& model, int& kind);   // kind: 0 the mesh pass's, 1 objects, 2 shadow proxy, 3 effects
+  static std::vector<std::vector<int>> afShareItems(int helpers);
+  void buildAfItem(int item);
 private:
   GLuint screenFbo = 0;
   LoadingPreview retainedLoadingPreview;

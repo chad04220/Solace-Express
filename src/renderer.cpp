@@ -218,7 +218,10 @@ static GLuint linkOnce(const std::string& vsIn, const std::string& fsIn, std::st
       std::vector<char> data(len); GLsizei got = 0; GLenum fmt = 0;
       glGetProgramBinary(p, len, &got, &fmt, data.data());
       if (got > 0) {
-        std::string tmp = path + ".tmp";   // written whole, then renamed: a crash never leaves a torn file
+        // written whole, then renamed: a crash never leaves a torn file (named for this process: the launch's helpers
+        // write into the same folder)
+        static const std::string tag = std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+        std::string tmp = path + "." + tag + ".tmp";
         if (FILE* fo = fopen(tmp.c_str(), "wb")) {
           uint32_t f32 = fmt, l32 = (uint32_t)got;
           bool w = fwrite("AXSC", 1, 4, fo) == 4 && fwrite(&f32, 4, 1, fo) == 1 && fwrite(&l32, 4, 1, fo) == 1 && fwrite(data.data(), 1, got, fo) == (size_t)got;
@@ -285,6 +288,13 @@ std::string shaderCacheStamp() {
   for (const char* src : {hangarPreview::kVS, hangarPreview::kFS, hangarPreview::kClassifiedFS, kFullscreenVS, kCommonGLSL, kRtIO, kSceneUniforms, kRoads, kPlaneCommon, kCockpitLayout, kCockpitFittings, kResearchCockpitLayout, kPlaneParts, kPlaneSDF, kPlaneTrace, kTerrainTrace, kMaterialCommon, kLightCommon, kClouds, kTerrainMaterial, kRaytraceUfo, kRaytraceText, kRaytraceDisplays, kRtPrims, kPlaneScreens, kFeeds, kPlaneFx, kSomnusWeaponSDF, kSomnusSDF, kSomnusStoreMaterial, kSomnusMaterial, kSomnusFx, kSomnusCockpitCommon, kCabinWindows, kSomnusCockpitSDF, kSomnusCockpitMaterial, kCockpitMaterial, kPlaneMaterial, kWater, kViewUniforms, kNoiseTex, kGBuffer, kGBWrite, kTerrainVS, kTerrainFS, kFarRegionVS, kFarRegionFS, kWaterVS, kWaterFS, kLightFS, kMapMain, kDispMain, kSpriteVS, kSpriteFS, kPropellerGLSL, kPropDiscVS, kPropDiscFS, kDownFS, kUpFS, kRayMaskFS, kRayFS, kFeedRaysFS, kTaaFS, kPostFS, kGLens, kUIVS, kUIFS, kEntCommon, kEntVS, kEntFS1, kEntFS2, kEntShadowFS, kCloudMain, kCloudCompFS, kCloudAccFS, kHullBakeMain, kTShBakeMain, kAfShMap, kEnemyCommon, kEnemyNeedle, kEnemyBastion, kEnemyHeavyCommon, kEnemyCantor, kEnemyArchon, kEnemyMaterial, kEnemyMeshVS, kEnemyMeshFS, kEnemyShadow, kReleasedStoreVS, kReleasedStoreFS, kPlanet}) h = fnv1a(src, h);
   auto str = [](GLenum e) { const GLubyte* s = glGetString(e); return std::string(s ? (const char*)s : "?"); };
   h = fnv1a(str(GL_VENDOR) + "|" + str(GL_RENDERER) + "|" + str(GL_VERSION), h);
+  char b[24]; snprintf(b, sizeof b, "%016llx", (unsigned long long)h);
+  return b;
+}
+
+std::string aircraftProgramStamp() {
+  uint64_t h = fnv1a(shaderCacheStamp());
+  for (int m = 0; m < kAircraftCount; m++) { float M[96]; packModelOf(m, M); h = fnv1a(aircraftDefines(m, M), h); }
   char b[24]; snprintf(b, sizeof b, "%016llx", (unsigned long long)h);
   return b;
 }

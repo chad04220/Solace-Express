@@ -4,6 +4,8 @@
 // light shafts, post). See docs/RENDERER_REBUILD.md.
 #include "renderer.h"
 #include "shaders.h"
+#include <algorithm>
+#include <numeric>
 
 bool Renderer::compileRaster(const std::function<void()>& step) {
   std::string e;   // (each program's own log: linkProgramCached appends, so it is cleared before every build)
@@ -100,6 +102,36 @@ GLuint Renderer::afPassProgram(int pass, int model, bool research) {
   const int v = research || all ? 0 : 1;
   if (!afSharedTried[pass][v]) { afSharedTried[pass][v] = true; afShared[pass][v] = linkAfPass(pass, v ? "#define AF_LIGHT\n" : "", v ? "light aircraft build" : "every aircraft"); }
   return afShared[pass][v];
+}
+// the items: three for each type (item / 3 its type, item % 3 the kind), then the XR-40's effects
+int Renderer::afItemCount() { return kAfModels * 3 + 1; }
+void Renderer::afItemOf(int item, int& model, int& kind) {
+  if (item >= kAfModels * 3) { model = kSomnus; kind = 3; return; }
+  model = item / 3; kind = item % 3;
+}
+// what each takes to compile, roughly (seconds on v3.50.1's diagnostics' RTX 3070 laptop: only their ratios matter)
+static float afItemCost(int item) {
+  int model, kind; Renderer::afItemOf(item, model, kind);
+  static const float light[3] = {2.4f, 5.8f, 1.0f}, xr30[3] = {5.1f, 10.3f, 4.3f}, xr40[3] = {9.5f, 12.6f, 7.3f};
+  return kind == 3 ? 3.7f : model == kSomnus ? xr40[kind] : model == kResearchJet ? xr30[kind] : light[kind];
+}
+std::vector<std::vector<int>> Renderer::afShareItems(int helpers) {
+  std::vector<int> order(afItemCount());
+  std::iota(order.begin(), order.end(), 0);
+  std::stable_sort(order.begin(), order.end(), [](int a, int b) { return afItemCost(a) > afItemCost(b); });
+  std::vector<std::vector<int>> share(std::max(helpers, 1));
+  std::vector<float> load(share.size(), 0.f);
+  for (int it : order) {
+    const size_t h = std::min_element(load.begin(), load.end()) - load.begin();
+    share[h].push_back(it); load[h] += afItemCost(it);
+  }
+  return share;
+}
+void Renderer::buildAfItem(int item) {
+  int model, kind; afItemOf(item, model, kind);
+  if (kind == 0) { afMeshProgram(model); return; }
+  float M[96]; packModelOf(model, M);
+  afPassProgram(kind - 1, model, M[2] > 4.5f);   // (research as afCover has it: for the shared build, should its own fail)
 }
 // one more aircraft a pass covers: model collects its type (-2 none yet, -1 several, or one without an own build) and
 // research whether a research jet is among them

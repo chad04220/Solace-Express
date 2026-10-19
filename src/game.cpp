@@ -4638,7 +4638,7 @@ void Game::updateComms(float dt) {
   // call short: the review of v3.44.0, AUD-2)
   if (!live) { atc.cancel(); commsPending.clear(); commsCrashSeen = false; voiceDuck = approach(voiceDuck, 0.f, 1.5f, dt); return; }
   auto lessonUnavailable = [&]() {
-    if (lessonVoiceWarned) return;
+    if (lessonVoiceWarned || voicesOff) return;
     lessonVoiceWarned = true;
     toast("Lesson recording unavailable. Use the on-screen controls; check the voice assets.", vec3(1.f, 0.8f, 0.4f), false);
   };

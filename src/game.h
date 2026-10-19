@@ -125,6 +125,7 @@ public:
   // them - fly a fresh career kept in memory. The player's career is never read for it, and no career, settings or
   // station file is written (the settings are read: the bench measures the player's quality)
   bool diskless = false;
+  bool voicesOff = false;   // (the diagnostics tools' games: no voices by design, so no lesson-recording warning in their pictures)
   std::string assetDir = ".";                          // folder of the exe (pre-rendered loading pictures live in assetDir\loading)
 
   void loadSettings();

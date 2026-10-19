@@ -357,7 +357,9 @@ static std::string userDir() {
 // first-time compile this way because NVIDIA's driver holds a process-wide lock while it links the big scene programs: no
 // thread of the compiling process, whatever its context, can draw until it lets go, so the intro froze. A separate
 // process has its own driver state, and the game then loads the finished programs from the cache in a moment.
-static int buildShaderCacheChild(HINSTANCE hInst, const std::string& dir) {
+// a helper process's GL context, current: core 3.3 on a hidden window of its own, its functions loaded. 0, else 2 (no
+// context) or 3 (the functions)
+static int helperContext(HINSTANCE hInst, HGLRC& ctx) {
   WNDCLASSEXW wc = {sizeof(wc)}; wc.style = CS_OWNDC; wc.lpfnWndProc = DefWindowProcW; wc.hInstance = hInst; wc.lpszClassName = L"SomniumVolandiCompile";
   RegisterClassExW(&wc);
   HWND hw = CreateWindowExW(0, wc.lpszClassName, L"", WS_POPUP, 0, 0, 8, 8, nullptr, nullptr, hInst, nullptr);
@@ -370,11 +372,16 @@ static int buildShaderCacheChild(HINSTANCE hInst, const std::string& dir) {
   if (!legacy || !wglMakeCurrent(dc, legacy)) return 2;
   auto createAttribs = (PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");
   int attrs[] = {WGL_CONTEXT_MAJOR_VERSION_ARB, 3, WGL_CONTEXT_MINOR_VERSION_ARB, 3, WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB, 0};
-  HGLRC ctx = createAttribs ? createAttribs(dc, nullptr, attrs) : nullptr;
+  ctx = createAttribs ? createAttribs(dc, nullptr, attrs) : nullptr;
   if (!ctx) return 2;
   wglMakeCurrent(dc, ctx); wglDeleteContext(legacy);
   g_opengl32 = LoadLibraryA("opengl32.dll");
-  if (!glLoad(wglProc, nullptr)) return 3;
+  return glLoad(wglProc, nullptr) ? 0 : 3;
+}
+
+static int buildShaderCacheChild(HINSTANCE hInst, const std::string& dir) {
+  HGLRC ctx = nullptr;
+  if (const int r = helperContext(hInst, ctx)) return r;
   g_shaderCacheDir = dir;
   HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
   auto say = [&](const char* fmt2, int v) { char b[32]; int n = snprintf(b, sizeof b, fmt2, v); DWORD w; if (out && out != INVALID_HANDLE_VALUE) WriteFile(out, b, n, &w, nullptr); };
@@ -395,6 +402,127 @@ static int buildShaderCacheChild(HINSTANCE hInst, const std::string& dir) {
   wglMakeCurrent(nullptr, nullptr); wglDeleteContext(ctx);
   return ok ? 0 : 1;
 }
+
+// SomniumVolandi.exe --build-aircraft-shaders "<cache>" <item>,<item>,...: a helper of the launch's (AircraftShaderHelpers)
+// building those of the aircraft types' own programs (Renderer::buildAfItem) into the cache, saying on its output how
+// many are done as each is, then "m <compiled>"
+static int buildAircraftShadersChild(HINSTANCE hInst, const std::string& dir, const std::string& list) {
+  HGLRC ctx = nullptr;
+  if (const int r = helperContext(hInst, ctx)) return r;
+  g_shaderCacheDir = dir;
+  HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
+  auto say = [&](const std::string& l) { DWORD w; if (out && out != INVALID_HANDLE_VALUE) WriteFile(out, l.data(), (DWORD)l.size(), &w, nullptr); };
+  int done = 0;
+  for (size_t at = 0; at < list.size();) {
+    const size_t comma = std::min(list.find(',', at), list.size());
+    const int item = atoi(list.c_str() + at);
+    if (item >= 0 && item < Renderer::afItemCount()) g_ren.buildAfItem(item);
+    say(std::to_string(++done) + "\n");
+    at = comma + 1;
+  }
+  say("m " + std::to_string(g_shaderCacheMisses.load()) + "\n");
+  wglMakeCurrent(nullptr, nullptr); wglDeleteContext(ctx);
+  return 0;
+}
+
+// The aircraft types' own shader programs (Renderer::buildAfItem: 46 of them) were most of a first launch's compiling
+// after an update: one after another in the prewarm, 2.5 minutes on an RTX 3070 laptop (v3.50.1's diagnostics). Helper
+// processes compile them side by side - each its own context, its own run of the driver's compiler - into the shader
+// cache while the launch does everything else; the prewarm then loads them. aircraft_stamp.txt says the cache holds
+// this build's. What a helper that fails, or is stopped, did not build the prewarm compiles itself, as before.
+struct AircraftShaderHelpers {
+  struct Helper { PROCESS_INFORMATION pi = {}; std::thread reader; std::atomic<int> done{0}, built{0}; int items = 0; };
+  std::vector<std::unique_ptr<Helper>> helpers;
+  int items = 0;
+  std::string stampPath, stamp;
+  LARGE_INTEGER t0 = {};
+  bool started() const { return !helpers.empty(); }
+  int done() const { int n = 0; for (const auto& h : helpers) n += std::min(h->done.load(), h->items); return n; }
+  int built() const { int n = 0; for (const auto& h : helpers) n += h->built.load(); return n; }
+  bool running() const { for (const auto& h : helpers) if (WaitForSingleObject(h->pi.hProcess, 0) == WAIT_TIMEOUT) return true; return false; }
+  ~AircraftShaderHelpers() { finish(true); }
+  // when the cache doesn't hold this build's (the calling thread's context current: the stamp is the driver's too)
+  void start(const std::string& cacheDir) {
+    if (cacheDir.empty() || started()) return;
+    stampPath = cacheDir + "\\aircraft_stamp.txt"; stamp = aircraftProgramStamp();
+    if (FILE* f = fopen(stampPath.c_str(), "r")) { char b[32] = {}; const bool current = fscanf(f, "%31s", b) == 1 && stamp == b; fclose(f); if (current) return; }
+    // how many: half the CPU's threads less one (the launch's own work runs beside them), 1 to 6, and no more than the
+    // free memory holds (the compiler takes some hundreds of MB on these programs)
+    int n = std::clamp((int)std::thread::hardware_concurrency() / 2 - 1, 1, 6);
+    MEMORYSTATUSEX ms = {}; ms.dwLength = sizeof ms;
+    if (GlobalMemoryStatusEx(&ms)) n = std::clamp((int)(((long long)ms.ullAvailPhys - (1536ll << 20)) / (512ll << 20)), 1, n);
+    char exe[MAX_PATH] = {}; GetModuleFileNameA(nullptr, exe, MAX_PATH);
+    QueryPerformanceCounter(&t0);
+    for (const std::vector<int>& share : Renderer::afShareItems(n)) {
+      if (share.empty()) continue;
+      std::string cmd = std::string("\"") + exe + "\" --build-aircraft-shaders \"" + cacheDir + "\" ";
+      for (size_t k = 0; k < share.size(); k++) cmd += (k ? "," : "") + std::to_string(share[k]);
+      SECURITY_ATTRIBUTES sa = {sizeof(sa), nullptr, TRUE};
+      HANDLE rd = nullptr, wr = nullptr;
+      if (!CreatePipe(&rd, &wr, &sa, 0)) continue;
+      SetHandleInformation(rd, HANDLE_FLAG_INHERIT, 0);
+      STARTUPINFOA si = {sizeof(si)}; si.dwFlags = STARTF_USESTDHANDLES; si.hStdOutput = wr; si.hStdError = wr; si.hStdInput = nullptr;
+      std::vector<char> cmdBuf(cmd.begin(), cmd.end()); cmdBuf.push_back(0);
+      auto h = std::make_unique<Helper>(); h->items = (int)share.size();
+      if (!CreateProcessA(nullptr, cmdBuf.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW | BELOW_NORMAL_PRIORITY_CLASS, nullptr, nullptr, &si, &h->pi)) {
+        CloseHandle(rd); CloseHandle(wr); continue;
+      }
+      CloseHandle(wr);   // (the helper holds its own copy: the reader sees the pipe end when it exits)
+      Helper* hp = h.get();
+      hp->reader = std::thread([hp, rd] {
+        std::string line; char buf[256]; DWORD got = 0;
+        while (ReadFile(rd, buf, sizeof buf, &got, nullptr) && got > 0)
+          for (DWORD i = 0; i < got; i++) {
+            if (buf[i] != '\n') { line += buf[i]; continue; }
+            if (line.size() > 2 && line[0] == 'm') hp->built = atoi(line.c_str() + 2);
+            else if (!line.empty() && line[0] >= '0' && line[0] <= '9') hp->done = atoi(line.c_str());
+            line.clear();
+          }
+        CloseHandle(rd);
+      });
+      items += h->items;
+      helpers.push_back(std::move(h));
+    }
+  }
+  // waits for every helper (stop: ends them first); true when each built its share, and then the stamp is written
+  bool finish(bool stop) {
+    if (helpers.empty()) return false;
+    bool all = true;
+    for (const auto& h : helpers) {
+      if (stop) TerminateProcess(h->pi.hProcess, 9);
+      WaitForSingleObject(h->pi.hProcess, INFINITE);
+      if (h->reader.joinable()) h->reader.join();
+      DWORD code = 1; GetExitCodeProcess(h->pi.hProcess, &code);
+      all = all && code == 0 && h->done >= h->items;
+      CloseHandle(h->pi.hProcess); CloseHandle(h->pi.hThread);
+    }
+    lastCount = (int)helpers.size(); lastBuilt = built(); lastItems = items;
+    LARGE_INTEGER t1; QueryPerformanceCounter(&t1); LARGE_INTEGER f; QueryPerformanceFrequency(&f);
+    lastSecs = (double)(t1.QuadPart - t0.QuadPart) / f.QuadPart;
+    helpers.clear(); items = 0;
+    const bool ok = all && !stop;
+    if (ok) if (FILE* fo = fopen(stampPath.c_str(), "w")) { fprintf(fo, "%s\n", stamp.c_str()); fclose(fo); }
+    return ok;
+  }
+  // waits for them as long as they get on (with nothing done for 5 minutes, the shader cache helper's limit, they are
+  // stopped), `tick` called between looks: it draws the progress and answers the window, and false stops them (the game
+  // closed); true as finish
+  bool wait(const std::function<bool(int done, int items)>& tick) {
+    LARGE_INTEGER f, now, moved; QueryPerformanceFrequency(&f); QueryPerformanceCounter(&moved);
+    int last = -1;
+    const int all = items;
+    bool go = true;
+    while (go && running()) {
+      QueryPerformanceCounter(&now);
+      const int d = done();
+      if (d != last) { last = d; moved = now; }
+      else if (now.QuadPart - moved.QuadPart > f.QuadPart * 300) break;
+      go = tick(d, all);
+    }
+    return finish(!go || running());
+  }
+  int lastCount = 0, lastBuilt = 0, lastItems = 0; double lastSecs = 0;   // (the last finish's: the helpers, what they compiled, of how many, in how long)
+};
 
 // Where the launch keeps what it builds: %LOCALAPPDATA%\SomniumVolandi. Local, not Roaming: none of it is the player's
 // (it is all rebuilt at will), the shader binaries are this GPU's and driver's alone, and a roaming profile would carry
@@ -444,6 +572,14 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     if (k != std::string::npos) {
       size_t b = k + 22, e = cl.find('"', b);
       return buildShaderCacheChild(hInst, cl.substr(b, e == std::string::npos ? std::string::npos : e - b));
+    }
+    k = cl.find("--build-aircraft-shaders \"");
+    if (k != std::string::npos) {
+      const size_t b = k + 26, e = cl.find('"', b);
+      if (e == std::string::npos) return 2;
+      std::string list = cl.substr(e + 1);
+      list.erase(0, list.find_first_not_of(' ')); list = list.substr(0, list.find(' '));
+      return buildAircraftShadersChild(hInst, cl.substr(b, e - b), list);
     }
   }
   SetProcessDPIAware();
@@ -639,10 +775,15 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       CloseHandle(wr);   // the child holds its own copy: the reader sees the end of the pipe when the child exits
     }
   }
+  // the aircraft types' own programs, when the cache doesn't hold this build's: compiled by helpers from now on, beside
+  // everything else (the tools start theirs in buildBodies)
+  AircraftShaderHelpers afHelpers;
+  if (!tool) afHelpers.start(g_shaderCacheDir);
   const int stStart = pace.add("start", Renderer::kProgramCount + 16, 0.f, "GRAPHICS & WORLD");   // (each shader program built or loaded, and the islands)
   const int stCache = child.hProcess ? pace.add("optional-cache", Renderer::kProgramCount, 0.f, "SHADER CACHE") : -1;
   const int stInit = pace.add("career", kNumAircraft + 4, 0.f, "PILOT SYSTEMS");
   const int stTex = pace.add("renderer", 11, 0.f, "RENDERER");
+  const int stAfShaders = afHelpers.started() ? pace.add("aircraft-shaders", afHelpers.items, 0.f, "AIRCRAFT SHADERS") : -1;
   const int stMenu = tool ? -1 : pace.add("menu", 12, 0.f, "MENU SCENERY");
   std::vector<int> meshSteps;
   if (!tool)
@@ -854,7 +995,19 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   if (!tool) DeleteFileA((game.saveDir + "\\error.log").c_str());
   {
     // a normal start loads the menu's first place and builds (or reads) every aircraft's meshes, the research jets'
-    // too, under the intro (rendered offscreen: the intro keeps the window), so nothing past the menu waits for one
+    // too, under the intro (rendered offscreen: the intro keeps the window), so nothing past the menu waits for one;
+    // first the helpers' aircraft programs (the prewarm loads them), if they are still at it
+    if (afHelpers.started()) {
+      pace.begin(stAfShaders);
+      afHelpers.wait([&](int done, int items) {
+        pace.setDone(stAfShaders, (float)done);
+        pace.task("Aircraft shader programs", (float)done, (float)items);
+        introFrame(pace.fraction(), fmt("Compiling the aircraft's shader programs side by side  (once after an update)   %d of %d", std::min(done + 1, items), items), 1.f);
+        return !game.quit;
+      });
+      pace.clearTask();
+    }
+    if (game.quit) { stopIntro(false); return 0; }
     if (!tool) game.prewarm([&](float f, const std::string& what) { introFrame(f, what, 1.f); }, true, &pace, stMenu, &meshSteps);
     if (!game.quit) pace.end();
     if (game.quit) { stopIntro(false); return 0; }
@@ -863,6 +1016,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   if (FILE* f = fopen((game.saveDir + "\\startup.log").c_str(), "a")) {
     if (helperSkipped) fprintf(f, "Optional shader-cache preparation skipped unfinished work; main-context program loading completed independently.\n");
     fprintf(f, "Shader cache: %s (%d loaded, %d compiled)\n", g_shaderCacheDir.empty() ? "unavailable" : g_shaderCacheDir.c_str(), g_shaderCacheHits.load(), g_shaderCacheMisses.load());
+    if (afHelpers.lastCount)
+      fprintf(f, "Aircraft shader programs: %d compiled by %d helper processes side by side, %.1f s from the start (%d items)\n",
+              afHelpers.lastBuilt, afHelpers.lastCount, afHelpers.lastSecs, afHelpers.lastItems);
     fprintf(f, "Ground photographs: %s\n", g_ren.matEnvScanned ? (g_ren.envMatCompressed ? "2K, block-compressed (BC3)" : "2K, uncompressed") : g_ren.matEnvFallbackScanned ? "512" : "none (procedural)");
     fprintf(f, "Foveated shading: %s\n", g_ren.vrsAvailable ? "available (NVIDIA variable-rate shading)" : "not available on this card (Auto resolution lowers the whole frame)");
     fprintf(f, "Launch: shaders and islands %.1f s (islands %s), career %.1f s, renderer %.1f s, menu %.1f s, aircraft meshes %.1f s (%d built)\n",
@@ -878,16 +1034,28 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   // the bodies ready-built (the release's aircraft folder), from this PC's mesh cache or built from scratch, the
   // packaged ones missing or refused, and the programs compiled for them (each aircraft type's own: compiled the first
   // time it is drawn after an update, then loaded from the cache) and the seconds that took.
-  struct BodyLoad { int ready = 0, cached = 0, built = 0, refused = 0, programs = 0; double secs = 0, programSecs = 0; };
+  struct BodyLoad { int ready = 0, cached = 0, built = 0, refused = 0, programs = 0, helpers = 0, helperPrograms = 0; double secs = 0, programSecs = 0, helperSecs = 0; };
   auto buildBodies = [&](BodyLoad& r) {
     // (every Game a tool makes is diskless, as the tool's own: its scenes' crashes, fees and settlements stay in memory.
     // v3.47.0's diagnostics charged the player's career for their break-up scenes: these Games saved to its folder)
     Game* g = new Game();
     g->saveDir = game.saveDir; g->diskless = true;
-    g->initHeadless(); g->iconTex = iconTex;
+    g->initHeadless(); g->voicesOff = true; g->iconTex = iconTex;
     const int b0 = g_ren.bakeBuilt, p0 = g_ren.prebuiltMeshHits, m0 = g_ren.prebuiltMeshMisses, c0 = g_ren.meshCacheHits, s0 = g_shaderCacheMisses;
     const long long u0 = g_shaderCompileUs;
     LARGE_INTEGER t0, t1; QueryPerformanceCounter(&t0);
+    {   // the aircraft types' own programs, by helpers side by side as the game's launch has them (AircraftShaderHelpers)
+      AircraftShaderHelpers helpers;
+      helpers.start(g_shaderCacheDir);
+      if (helpers.started()) {
+        helpers.wait([](int done, int items) {
+          SetWindowTextA(g_hwnd, fmt("Somnium Volandi - compiling the aircraft's shader programs side by side   %d of %d", done, items).c_str());
+          pumpB(); Sleep(20);
+          return true;
+        });
+        r.helpers = helpers.lastCount; r.helperPrograms = helpers.lastBuilt; r.helperSecs = helpers.lastSecs;
+      }
+    }
     g_ren.bakeYield = [] { pumpB(); };
     g->prewarm([](float f, const std::string& what) {
       SetWindowTextA(g_hwnd, ("Somnium Volandi - preparing the aircraft " + std::to_string((int)(f * 100.f)) + "%  (" + what + ")").c_str());
@@ -951,7 +1119,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         g_ren.entSync = true;
         Game* g = new Game();
         g->saveDir = game.saveDir; g->diskless = true;
-        g->initHeadless(); g->iconTex = iconTex; g->debugScene(sc);
+        g->initHeadless(); g->voicesOff = true; g->iconTex = iconTex; g->debugScene(sc);
         g_ren.entSync = false;
         auto frames = [&](int n) { for (int i = 0; i < n; i++) { g->update(1.f / 60.f); g->render(); SwapBuffers(g_hdc); } };
         auto timed = [&](int n) { frames(8); glFinish(); LARGE_INTEGER t0, t1; QueryPerformanceCounter(&t0); frames(n); glFinish(); QueryPerformanceCounter(&t1); return qpcMs(t0, t1) / n; };
@@ -1160,7 +1328,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
           SetWindowTextA(g_hwnd, ("Somnium Volandi - profiling " + sc + ": " + F.name).c_str());
           Game* g = new Game();
           g->saveDir = game.saveDir; g->diskless = true;
-          g->initHeadless(); g->iconTex = iconTex; g->debugScene(sc);
+          g->initHeadless(); g->voicesOff = true; g->iconTex = iconTex; g->debugScene(sc);
           g_ren.entSync = false; g_ren.dbgOff = F.bit;
           for (int i = 0; i < 30; i++) { g->update(1.f / 60.f); g->render(); SwapBuffers(g_hdc); }
           glFinish();
@@ -1203,7 +1371,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       fprintf(sf, "Somnium Volandi soak, %d minutes; build %s\nGPU: %s\n\n", minutes, game.version.c_str(), gpu.c_str());
       static const char* cycle[] = {"air", "forest", "storm", "night", "cockpit", "hud", "rjet", "rjetc", "sunset", "mountain", "snow", "jet"};
       Game* g = new Game();
-      g->saveDir = game.saveDir; g->diskless = true; g->initHeadless(); g->iconTex = iconTex;
+      g->saveDir = game.saveDir; g->diskless = true; g->initHeadless(); g->voicesOff = true; g->iconTex = iconTex;
       LARGE_INTEGER f0, t0, last; QueryPerformanceFrequency(&f0); QueryPerformanceCounter(&t0); last = t0;
       std::vector<float> window;   // this 10 s's frame times (ms)
       std::vector<std::array<double, 3>> marks;   // (minutes, private MB, handles)
@@ -1333,8 +1501,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
           fprintf(bf, "aircraft bodies: %d ready-built (the aircraft folder), %d from this PC's mesh cache, %d built from scratch",
                   r.ready, r.cached, r.built);
           if (r.refused) fprintf(bf, "; %d packaged bodies missing or refused (compile.log says why)", r.refused);
-          fprintf(bf, "\n  %.1f s in all; of it %.1f s compiling %d shader programs for them (each aircraft type's own: compiled the first"
-                      " time it is drawn after an update, then loaded from the cache)\n\n", r.secs, r.programSecs, r.programs);
+          fprintf(bf, "\n  %.1f s in all; of it %.1f s compiling %d shader programs for them (each aircraft type's own: compiled once"
+                      " after an update, then loaded from the cache)", r.secs, r.programSecs + r.helperSecs, r.programs + r.helperPrograms);
+          if (r.helpers) fprintf(bf, ": %d of them by %d helper processes side by side in %.1f s, %d here in %.1f s", r.helperPrograms, r.helpers, r.helperSecs, r.programs, r.programSecs);
+          fprintf(bf, "\n\n");
           fflush(bf);
         }
       }
@@ -1352,7 +1522,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         g_ren.bakeYield = [] { if (!bakeNoted) { bakeNoted = true; SetWindowTextA(g_hwnd, ("Somnium Volandi - baking the airframe meshes for " + bakingScene + " (once; cached afterwards)").c_str()); } pumpB(); };
         Game* g = new Game();
         g->saveDir = game.saveDir; g->diskless = true;
-        g->initHeadless(); g->iconTex = iconTex; g->debugScene(sc);
+        g->initHeadless(); g->voicesOff = true; g->iconTex = iconTex; g->debugScene(sc);
         g_ren.setRenderScale(1.f);   // explicit benchmark invariant; does not change saved settings
         fprintf(bf, "\nScene %s; requested WX=%s\n", sc.c_str(), getenv("WX") ? getenv("WX") : "(scene/default)");
         printWeather(g, "preset");
@@ -1477,7 +1647,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         g_ren.entSync = true;
         Game* g = new Game();
         g->saveDir = game.saveDir; g->diskless = true; g->assetDir = game.assetDir;
-        g->initHeadless(); g->iconTex = iconTex; g->debugScene(J.first);
+        g->initHeadless(); g->voicesOff = true; g->iconTex = iconTex; g->debugScene(J.first);
         for (int i = 0; i < 4; i++) { g->update(1.f / 30.f); g->render(); }
         for (int i = 0; i < 40; i++) { g->update(1.f / 240.f); g->render(); }   // the TAA settles (barely moving)
         glFinish();
@@ -1530,7 +1700,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         SetWindowTextA(g_hwnd, ("Somnium Volandi - rendering " + sc).c_str());
         Game* g = new Game();
         g->saveDir = game.saveDir; g->diskless = true;
-        g->initHeadless(); g->iconTex = iconTex; g->debugScene(sc);
+        g->initHeadless(); g->voicesOff = true; g->iconTex = iconTex; g->debugScene(sc);
         for (int i = 0; i < 3; i++) { g->update(1.f / 30.f); g->render(); }
         for (int i = 0; i < 24; i++) g->render();   // TAA settles
         glFinish();

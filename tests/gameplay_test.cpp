@@ -88,6 +88,29 @@ struct GameTest {
       const bool ok = shown >= 6 && said >= 1 && said <= 3;
       printf("XR-40 overheat warning: overheated %d times in 90 s of held fire, said %d times: %s\n", shown, said, ok ? "ok" : "FAIL"); fails += !ok;
     }
+    // ---- the aircraft types' own programs as the launch's helper processes share them out: every type's mesh, objects and
+    // shadow-proxy programs and the XR-40's effects, each to exactly one helper, the longest (the XR-40's objects) first
+    if (in(1)) {
+      const int n = Renderer::afItemCount();
+      bool ok = n == kAircraftCount * 3 + 1;
+      std::vector<int> which(kAircraftCount * 4, 0);
+      for (int i = 0; i < n; i++) {
+        int m = -1, k = -1; Renderer::afItemOf(i, m, k);
+        const bool valid = m >= 0 && m < kAircraftCount && k >= 0 && k <= 3 && (k < 3 || m == kSomnus);
+        ok &= valid; if (valid) which[m * 4 + k]++;
+      }
+      for (int m = 0; m < kAircraftCount; m++) for (int k = 0; k < 4; k++) ok &= which[m * 4 + k] == (k < 3 || m == kSomnus ? 1 : 0);
+      for (int helpers : {1, 2, 5, 6, 60}) {
+        const auto share = Renderer::afShareItems(helpers);
+        std::vector<int> seen(n, 0);
+        ok &= (int)share.size() == helpers;
+        for (const auto& s : share) for (int it : s) { if (it >= 0 && it < n) seen[it]++; else ok = false; }
+        for (int c : seen) ok &= c == 1;
+        ok &= !share[0].empty() && share[0][0] == kSomnus * 3 + 1;
+      }
+      printf("Aircraft programs for the launch's helpers: %d items, each to one helper of 1, 2, 5, 6 or 60, the XR-40's objects first: %s\n", n, ok ? "ok" : "FAIL");
+      fails += !ok;
+    }
     // ---- sun: finite light for every second of the day, in clear and overcast weather
     if (in(1)) for (int wxi = 0; wxi < 2; wxi++) {
       g.wx.cloudCover = wxi ? 1.f : 0.f; g.wx.storm = wxi == 1;

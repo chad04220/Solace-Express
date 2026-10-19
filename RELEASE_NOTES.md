@@ -1,3 +1,11 @@
+## What's new in v3.50.2
+
+### A much shorter first start after an update
+- **Each aircraft's shader programs are now compiled side by side.** After an update, the first start compiles graphics programs for every aircraft, and they were done one after another: 46 programs, about 2.5 minutes on an RTX 3070 laptop. Several hidden helper copies of the game now compile them at the same time, while the rest of the game loads. On a 6-core CPU that should be about 35 seconds of compiling instead, most of it before the loading bar reaches the aircraft. This is an estimate from the last diagnostics; the next ones will measure it. Later starts load them from the cache as before.
+
+### Diagnostics
+- The diagnostics' screenshots no longer show a "Lesson recording unavailable" message. The diagnostics run without voices on purpose, and the message only applies when the game's voice files are missing.
+
 ## What's new in v3.50.1
 
 ### Less memory over a long session
