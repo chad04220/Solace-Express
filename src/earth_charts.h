@@ -28,6 +28,11 @@ float lushOf(int cover, double lat);
 procedural::Descriptor chartAt(double lat, double lon);
 std::string idAt(double lat, double lon);   // (its id alone: no name looked up)
 std::optional<procedural::Descriptor> find(const std::string& id);
+// Solace keeps its own chart in the real Earth (docs/REAL_EARTH_PLAN.md, E6): within kSolaceReach of its origin the
+// chart to fly into is the islands' ("solace"), so no real-Earth chart is centred there and theirs reach only open
+// ocean. Elsewhere it is idAt's
+constexpr double kSolaceReach = 110000.0;
+std::string slideIdAt(double lat, double lon);
 // The chart to start from at an airport (its runway's centre on the lattice point nearest it)
 std::optional<procedural::Descriptor> chartForAirport(const std::string& ident);
 // Airports by ident (exact, any case) and then by name or town (containing the query, any case), largest first;

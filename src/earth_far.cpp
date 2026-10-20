@@ -107,9 +107,14 @@ horizon::Selection select(geo::Position viewer, const geo::Position& chartOrigin
     return a.distance != b.distance ? a.distance < b.distance :
       std::tie(a.cell.level, a.cell.i, a.cell.j) < std::tie(b.cell.level, b.cell.i, b.cell.j); });
   horizon::Selection out;
-  out.complete = picks.size() <= maxCount;
   out.reachMetres = reach;
-  for (size_t k = 0; k < picks.size() && k < maxCount; k++) out.regions.push_back(patch(picks[k].cell.level, picks[k].cell.i, picks[k].cell.j));
+  // the Solace Islands, at their place in the Atlantic, as the generated regions' far pass draws them (their own
+  // silhouette, horizon::build): first, within sight, from any chart but theirs
+  const bool solace = geo::surfaceDistance(viewer, geo::solaceOrigin()) <= reach + std::sqrt(2.0) * WORLD_HALF &&
+                      geo::surfaceDistance(chartOrigin, geo::solaceOrigin()) > 1000.0;
+  if (solace && maxCount > 0) out.regions.push_back(procedural::solaceDescriptor());
+  for (size_t k = 0; k < picks.size() && out.regions.size() < maxCount; k++) out.regions.push_back(patch(picks[k].cell.level, picks[k].cell.i, picks[k].cell.j));
+  out.complete = picks.size() + (solace ? 1 : 0) <= maxCount;
   return out;
 }
 

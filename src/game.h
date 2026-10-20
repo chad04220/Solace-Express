@@ -245,6 +245,12 @@ private:
   // a folder for it (earthCharts::glo90Cache) and a pack
   std::unique_ptr<earthFetch::Glo90Fetcher> glo90Fetch;
   float glo90WantT = 0.f;
+  // The real Earth round Solace (docs/REAL_EARTH_PLAN.md, E6): a Free Flight out of the islands goes on into the real
+  // Earth's charts when the pack is there, unless the generated islands are chosen instead (the Free Flight screen)
+  bool freeGeneratedEarth = false;
+  bool realEarthPlay() const;
+  std::string earthRouteIdent;   // (the real airport a real-Earth route goes to: Game::setEarthAirportRoute)
+  void setEarthAirportRoute(const earth::AirportRecord& airport);
   earthFetch::Glo90Fetcher* glo90();
   void wantGlo90(const geo::Position& where);   // the tiles a chart there reads, queued
   bool earthSceneryDraining = false, earthFacilitiesPending = false, earthPromotionDeferred = false;

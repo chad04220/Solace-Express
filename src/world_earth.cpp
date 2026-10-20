@@ -188,11 +188,10 @@ void World::buildEarth(const procedural::Descriptor& chartDesc, const std::strin
 
   // ---- the airports: OurAirports' in the square, each on its main runway, the biggest first, none on another's grounds
   struct Candidate { earth::AirportRecord rec; float x, z, heading, length, width, elev; int size; };
-  std::vector<Candidate> cands;
-  for (auto& a : pack->airports(box)) {
-    if (a.runways.empty()) continue;
+  // (where its main runway lies on the chart, and which way)
+  auto placeRunway = [&](const earth::AirportRecord& a, Candidate& c) {
     const earth::Runway& r = a.runways[0];
-    Candidate c; c.size = std::clamp(a.type, 0, 2);
+    c.size = std::clamp(a.type, 0, 2);
     if (r.endsKnown) {
       const vec3 p1 = chart.local({r.lat1, r.lon1, 0}), p2 = chart.local({r.lat2, r.lon2, 0});
       c.x = 0.5f * (p1.x + p2.x); c.z = 0.5f * (p1.z + p2.z);
@@ -208,8 +207,14 @@ void World::buildEarth(const procedural::Descriptor& chartDesc, const std::strin
       hd += (float)chart.bearing(vec3(c.x, 0, c.z), {a.lat + 0.05, a.lon, 0}).value_or(0.0);
       c.heading = wrapDeg360(hd); c.length = std::max(r.length, 300.f);
     }
-    if (std::max(std::fabs(c.x), std::fabs(c.z)) > WORLD_HALF - kAirportMargin - 0.5f * c.length) continue;
     c.width = r.width > 5.f ? std::min(r.width, 75.f) : (c.size == 2 ? 45.f : c.size == 1 ? 30.f : 20.f);
+  };
+  std::vector<Candidate> cands;
+  for (auto& a : pack->airports(box)) {
+    if (a.runways.empty()) continue;
+    Candidate c;
+    placeRunway(a, c);
+    if (std::max(std::fabs(c.x), std::fabs(c.z)) > WORLD_HALF - kAirportMargin - 0.5f * c.length) continue;
     // the runway's height: the ground's along it (the median of nine points: a stray canopy or a ditch doesn't count)
     float hs[9];
     const float hd = c.heading * DEG;
@@ -234,6 +239,34 @@ void World::buildEarth(const procedural::Descriptor& chartDesc, const std::strin
       if (hypotf(c.x - o.x, c.z - o.z) < reach) { clear = false; break; }
     }
     if (clear) chosen.push_back(std::move(c));
+  }
+  // None in the square - the open ocean, the wilds: the nearest beyond it, so the flight has one to name and to steer for
+  // (a World has an airport: the game's flight, its GPS and its ATC count on one). It lies outside the square, where
+  // nothing of it is built; the chart that holds it builds it when the flight gets there
+  if (chosen.empty()) {
+    const geo::Position o = chartDesc.origin;
+    const earth::AirportRecord* best = nullptr;
+    double bestD = 1e18;
+    std::vector<earth::AirportRecord> found;
+    for (double r : {3.0, 10.0, 30.0, 90.0, 360.0}) {
+      const double dLon = r / std::max(0.05, std::cos(o.latitude * geo::kDegrees));
+      found = pack->airports(r >= 360.0 || dLon >= 180.0 ? earth::Box{-90, -180, 90, 180} :
+                             earth::Box{std::max(-90.0, o.latitude - r), o.longitude - dLon, std::min(90.0, o.latitude + r), o.longitude + dLon});
+      for (const auto& a : found) {
+        if (a.runways.empty()) continue;
+        const double d = geo::surfaceDistance(o, {a.lat, a.lon, 0});
+        if (d < bestD || (d == bestD && best && a.ident < best->ident)) { bestD = d; best = &a; }
+      }
+      if (best && bestD < r * 111000.0) break;   // (nearer than the search reaches: none nearer outside it)
+      best = nullptr; bestD = 1e18;
+    }
+    if (best) {
+      Candidate c;
+      placeRunway(*best, c);
+      c.elev = std::max(best->hasElevation ? best->elevation : 0.f, 1.5f);
+      c.rec = *best;
+      chosen.push_back(std::move(c));
+    }
   }
   data->codes.reserve(chosen.size()); data->names.reserve(chosen.size()); data->blurbs.reserve(chosen.size());
   for (const auto& c : chosen) {
@@ -490,7 +523,8 @@ RoadNetwork World::buildEarthRoads() const {
   const auto& data = *earthChart;
   const regionTravel::Chart chart(data.descriptor.origin);
   for (const Town& t : towns) net.nodes.push_back({t.x, t.z, t.kind, 0});
-  for (const Airport& a : airports) net.nodes.push_back({a.x, a.z, 3, 0});
+  for (const Airport& a : airports)
+    if (std::max(std::fabs(a.x), std::fabs(a.z)) < WORLD_HALF) net.nodes.push_back({a.x, a.z, 3, 0});   // (not one beyond the square)
   const auto edges = data.pack->roads(chartBox(chart, WORLD_HALF - kRoadMargin), false);
   const float lim = WORLD_HALF - kRoadMargin;
   for (const auto& e : edges) {

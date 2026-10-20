@@ -742,6 +742,7 @@ procedural::Descriptor Game::chartRegion() const {
 // where the Earth goes on past the islands' sea. On the real Earth, its far patches there (earth_far.h)
 void Game::updateHorizon() {
   if (!g_ren.ok || screen != SCR_FLIGHT || g_world.repeating) return;
+  g_ren.earthHorizon = realEarthPlay() ? earthCharts::pack() : nullptr;
   const procedural::Descriptor region = chartRegion();
   vec3 camera = dbgCam ? dbgCamPos : camPos;
   if (!std::isfinite(camera.x) || !std::isfinite(camera.y) || !std::isfinite(camera.z)) camera = plane.pos;
@@ -886,8 +887,18 @@ void Game::openEarthPicker() {
   freeRegionMap = true; showMap = showRadio = false; paused = true;
 }
 
+// On the real Earth a route goes to a real airport: its chart's place (the runway's centre on the lattice), the
+// autopilot holding the course there as for a region
+void Game::setEarthAirportRoute(const earth::AirportRecord& airport) {
+  const auto chart = earthCharts::chartForAirport(airport.ident);
+  if (!chart) return;
+  setEarthDestination(*chart);
+  earthRouteIdent = airport.ident + " " + airport.name;
+}
+
 void Game::setEarthDestination(const procedural::Descriptor& region) {
   if (!freeFlight || crashed || screen != SCR_FLIGHT) return;
+  earthRouteIdent.clear();
   const auto destination = region; // the picker may replace descriptor storage below
   earthDestination = destination; earthFlight = true;
   earthPrefetchFailedId.clear(); earthPrefetchError.clear(); // selecting a route explicitly retries a failed candidate
@@ -1008,12 +1019,13 @@ void Game::updateEarthFlight() {
     else if (geo::surfaceDistance(earthPosition, goal) < (haul.on ? 9000. : 2500.)) {
       earthCourseHold = false; plane.apDisengage();
       if (haul.on) toast(fmt("The %s ahead: land at %s %s", haul.to.name.c_str(), haul.target.code, haul.target.name), vec3(.6f, 1.f, .8f));
+      else if (!earthRouteIdent.empty()) toast(earthRouteIdent + " ahead: it is on the GPS map", vec3(.6f, 1.f, .8f));
       else toast(earthDestination->id == g_world.regionId ? "Destination region reached. Choose a local airport on the GPS map." :
         "Destination region reached. Local airports remain unavailable while detailed terrain prepares.", vec3(.6f, 1.f, .8f));
     } else if (auto heading = chart.bearing(plane.pos, goal)) plane.apHeading = (float)*heading;
   }
   updateHorizon();
-  if (earthCharts::isEarthId(flightRegion.id)) { slideEarthChart(chart); return; }
+  if (realEarthPlay()) { slideEarthChart(chart); return; }
   auto owner = procedural::describe(earthPosition, flightRegion.worldSeed);
   earthFacilitiesPending = owner.id != g_world.regionId; earthPromotionDeferred = false;
   procedural::Descriptor wanted = owner;
@@ -1136,6 +1148,13 @@ void Game::updateEarthFlight() {
   g_scenery.resumeStreaming(); earthSceneryDraining = false;
 }
 
+// On the real Earth: a chart of it, or Solace in a Free Flight with the pack there (and the generated islands not chosen)
+bool Game::realEarthPlay() const {
+  if (!earthFlight) return false;
+  if (earthCharts::isEarthId(flightRegion.id)) return true;
+  return freeFlight && !haul.on && flightRegion.id == "solace" && !freeGeneratedEarth && earthCharts::pack() != nullptr;
+}
+
 // The real Earth's fine elevation (earth_fetch.h): the fetcher made when first wanted, and the tiles a chart at a place reads
 earthFetch::Glo90Fetcher* Game::glo90() {
   if (!glo90Fetch && !earthCharts::glo90Cache().empty() && earthCharts::pack())
@@ -1171,7 +1190,7 @@ void Game::slideEarthChart(const regionTravel::Chart& chart) {
     auto near = [&](const geo::Position& origin) { const vec3 c = chart.local(origin); return hypotf(c.x - aim.x, c.z - aim.z) < 8000.f; };
     if (earthPrefetch && near(earthPrefetch->region.origin)) wanted = earthPrefetch->region.id;
     else if (earthPrefetchJob.valid() && near(earthPrefetchOrigin)) wanted = earthPrefetchId;
-    else { const geo::Position g = chart.position(aim); wanted = earthCharts::idAt(g.latitude, g.longitude); }
+    else { const geo::Position g = chart.position(aim); wanted = earthCharts::slideIdAt(g.latitude, g.longitude); }
   }
   if (earthRetireJob.valid()) {
     if (earthRetireJob.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
@@ -1190,19 +1209,24 @@ void Game::slideEarthChart(const regionTravel::Chart& chart) {
   if (earthPrefetch && earthPrefetch->region.id != wanted) { retireEarthPrefetch(); return; }
   if (!earthPrefetch) {
     if (wanted == flightRegion.id || wanted == earthPrefetchFailedId) return;
-    const auto next = earthCharts::find(wanted);
+    const auto next = wanted == "solace" ? std::optional<procedural::Descriptor>(procedural::solaceDescriptor(flightRegion.worldSeed)) :
+                                           earthCharts::find(wanted);
     if (!next) return;
     earthPrefetchId = wanted; earthPrefetchOrigin = next->origin; earthPrefetchError.clear();
     const bool prepareGpu = g_ren.ok;
     earthPrefetchCancel = std::make_shared<GenerationCancelState>();
-    // (built on two threads, never written to the cache: a flight lays down a chart every few minutes)
-    earthPrefetchJob = std::async(std::launch::async, [wanted = *next, prepareGpu, cancel = earthPrefetchCancel] {
+    // (built on two threads, never written to the cache: a flight lays down a chart every few minutes. The islands are
+    // read from theirs, as the launch reads them)
+    const std::string solacePath = diskless || cacheDir.empty() ? std::string() : joinPath(cacheDir, "world.bin");
+    earthPrefetchJob = std::async(std::launch::async, [wanted = *next, prepareGpu, cancel = earthPrefetchCancel, solacePath,
+                                                       stamp = buildStamp, save = !diskless] {
       ScopedParallelLimit threadBudget(2);
       ScopedGenerationCancellation cancellation(cancel);
       generationCheckpoint();
       auto candidate = std::make_unique<PrefetchedRegion>();
       candidate->region = wanted; candidate->world = std::make_unique<World>();
-      candidate->world->buildProcedural(wanted, std::string(), std::string(), false);
+      if (wanted.authored) candidate->world->build(solacePath, stamp, save);
+      else candidate->world->buildProcedural(wanted, std::string(), std::string(), false);
       generationCheckpoint();
       candidate->world->repeating = false;
       if (prepareGpu) candidate->upload = Renderer::prepareWorldUpload(*candidate->world);
@@ -1227,9 +1251,11 @@ void Game::slideEarthChart(const regionTravel::Chart& chart) {
       return;
     }
   }
-  // the move: nearer the new chart's centre than this one's by 2 km, and in the air
+  // the move: nearer the new chart's centre than this one's by 2 km, and in the air - out of the islands over open water
+  // (their chart holds them, its neighbours only the sea round them)
   const vec3 centre = chart.local(earthPrefetch->region.origin);
   if (hypotf(plane.pos.x - centre.x, plane.pos.z - centre.z) > out - 2000.f) return;
+  if (flightRegion.authored && std::max(fabsf(plane.pos.x), fabsf(plane.pos.z)) < WORLD_HALF - 10000.f) return;
   if (plane.onGround || crashed || !plane.spec) { earthPromotionDeferred = true; return; }
   if (quoteJob.valid()) {
     if (quoteJob.wait_for(std::chrono::seconds(0)) != std::future_status::ready) { earthPromotionDeferred = true; return; }
@@ -1411,7 +1437,7 @@ void Game::returnToFreeFlight() {
   regionalSurface::clearFlightContext(); earthFacilitiesPending = earthPromotionDeferred = false;
   retireEarthPrefetch();
   if (!flightRegion.id.empty()) chooseFreeRegion(flightRegion);
-  earthFlight = earthCourseHold = false; earthDestination.reset(); freeRegionMap = false;
+  earthFlight = earthCourseHold = false; earthDestination.reset(); freeRegionMap = freeEarthPicker = false; earthRouteIdent.clear();
   freeFlight = isolatedFlight = researchFlight = militaryFlight = false;
   hiveCombat.reset(1, combatWrap());
   paused = showMap = showRadio = settingsFromPause = false;
@@ -5526,9 +5552,11 @@ void Game::update(float dt) {
   if (!achShow.empty() && achShow.front().t > 4.5f) achShow.erase(achShow.begin());
   if (screen == SCR_FLIGHT) {
     if (photo.on) updatePhoto(dt);   // (photo mode: the flight stays paused under it, and the keys are its own)
-    else if (actPressed(ACT_PHOTO) && !settingsFromPause && !freeRegionMap) enterPhoto();
+    else if (actPressed(ACT_PHOTO) && !settingsFromPause && !freeRegionMap && !freeEarthPicker) enterPhoto();
+    else if (freeEarthPicker && in.pressed[K_ESC]) {}   // (the airport picker's own: its query cleared, else it closes)
     else if (in.pressed[K_ESC] || (in.buttonsPressed & PAD_START)) {
       if (freeRegionMap) freeRegionMap = false;
+      else if (freeEarthPicker) freeEarthPicker = false;
       else if (showMap) showMap = false; else if (showRadio) showRadio = false;
       else if (paused && settingsFromPause && !(in.buttonsPressed & PAD_START)) settingsFromPause = false;   // B / Esc: back to the pause menu
       else { paused = !paused; settingsFromPause = false; if (paused && !atcF.lastCall.empty()) atcF.lastBeforePause = true; }

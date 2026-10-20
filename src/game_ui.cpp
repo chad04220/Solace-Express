@@ -1580,14 +1580,17 @@ void Game::drawRegionPicker() {
 void Game::drawEarthAirportPicker() {
   const float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
   const float x = 48 * s, w = W - 96 * s;
+  const bool flying = screen == SCR_FLIGHT && freeFlight;   // (in flight: a route to the airport chosen, not a start there)
   auto pack = earthCharts::pack();
   g_ren.rect(0, 0, W, H, C_PANEL, .97f);
-  g_ren.text(x, 24 * s, 27 * s, "THE REAL EARTH", C_TEXT, 1);
-  if (button(W - 225 * s, 23 * s, 177 * s, 35 * s, "Back to aircraft") || (in.pressed[K_ESC] && earthQuery.empty())) {
+  g_ren.text(x, 24 * s, 27 * s, flying ? "FLY TO A REAL AIRPORT" : "THE REAL EARTH", C_TEXT, 1);
+  if (button(W - 225 * s, 23 * s, 177 * s, 35 * s, flying ? "Back to flight" : "Back to aircraft") || (in.pressed[K_ESC] && earthQuery.empty())) {
     freeEarthPicker = false; in.pressed[K_ESC] = false; return;
   }
   if (!pack) { g_ren.text(x, 70 * s, 14 * s, "No Earth pack: " + earthCharts::packError(), C_WARN, 1); return; }
-  g_ren.text(x, 67 * s, 13 * s, fmt("Real terrain, coasts, land cover, airports, towns and roads from the Earth pack: %zu airports. Type a code or a name.",
+  if (flying) g_ren.text(x, 67 * s, 13 * s, fmt("The autopilot holds the course there; the charts ahead prepare as you fly. %s, %.0f km range at the fuel aboard.",
+                                               plane.spec ? plane.spec->name : "", plane.spec ? plane.nominalRangeKm() : 0.f), C_DIM, 1);
+  else g_ren.text(x, 67 * s, 13 * s, fmt("Real terrain, coasts, land cover, airports, towns and roads from the Earth pack: %zu airports. Type a code or a name.",
                                    pack->airportCount()), C_DIM, 1);
   // the query: typed, Backspace takes a letter off, Esc clears it
   for (char ch : in.text) if (earthQuery.size() < 40 && ch >= 32 && ch < 127) earthQuery += ch;
@@ -1617,12 +1620,19 @@ void Game::drawEarthAirportPicker() {
     g_ren.text(x + 12 * s, ry + 9 * s, 15 * s, a.ident, C_ACCENT, 1);
     g_ren.text(x + 110 * s, ry + 6 * s, 14 * s, ellipsize(a.name, w * .55f, 14 * s), C_TEXT, 1);
     g_ren.text(x + 110 * s, ry + 24 * s, 11 * s, ellipsize(a.municipality + (a.country.empty() ? "" : ", " + a.country), w * .55f, 11 * s), C_DIM, 1);
-    g_ren.text(x + w - 16 * s, ry + 12 * s, 12 * s, fmt("%s / %.0f m", kinds[std::clamp(a.type, 0, 2)], len), C_DIM, 1, 2);
+    if (flying) g_ren.text(x + w - 16 * s, ry + 12 * s, 12 * s, fmt("%s / %.0f m / %.0f km", kinds[std::clamp(a.type, 0, 2)], len,
+                                     geo::surfaceDistance(earthPosition, {a.lat, a.lon, 0}) / 1000.), C_DIM, 1, 2);
+    else g_ren.text(x + w - 16 * s, ry + 12 * s, 12 * s, fmt("%s / %.0f m", kinds[std::clamp(a.type, 0, 2)], len), C_DIM, 1, 2);
   }
   if ((in.pressed[K_ENTER] || (in.buttonsPressed & PAD_A)) && earthPick < n) { in.pressed[K_ENTER] = false; chooseEarthAirport(earthResults[earthPick]); }
 }
 
 void Game::chooseEarthAirport(const earth::AirportRecord& airport) {
+  if (screen == SCR_FLIGHT && freeFlight) {   // (in flight: the route there)
+    g_audio.trigger(SFX_CLICK); freeEarthPicker = false; paused = false;
+    setEarthAirportRoute(airport);
+    return;
+  }
   const auto chart = earthCharts::chartForAirport(airport.ident);
   if (!chart) return;
   g_audio.trigger(SFX_CLICK);
@@ -1651,7 +1661,7 @@ void Game::drawFreeFlightSetup(const FrameParams& fp) {
   g_ren.text(x, 22 * s, 28 * s, "FREE FLIGHT", C_TEXT, 1);
   g_ren.text(x, 61 * s, 14 * s, realEarth ? "Fly Solace, the real Earth or generated destinations. No fees, missions or career changes." :
              "Fly Solace or generated Earth destinations. No fees, missions or career changes. (The real Earth: its pack in an earth folder beside the game.)", C_DIM, 1);
-  const float selectW = std::max(240 * s, W - (realEarth ? 640 : 490) * s);
+  const float selectW = std::max(240 * s, W - (realEarth ? 800 : 490) * s);
   if (button(x, 86 * s, 30 * s, 28 * s, "<")) freeRegion = (freeRegion + (int)freeRegions.size() - 1) % (int)freeRegions.size();
   if (button(x + selectW - 30 * s, 86 * s, 30 * s, 28 * s, ">")) freeRegion = (freeRegion + 1) % (int)freeRegions.size();
   const auto& region = freeRegions[freeRegion];
@@ -1663,6 +1673,11 @@ void Game::drawFreeFlightSetup(const FrameParams& fp) {
   if (button(x + selectW + 174 * s, 86 * s, 180 * s, 28 * s, "Choose on Earth map")) { freeRegionMap = true; uiGlass = false; return; }
   if (realEarth && button(x + selectW + 366 * s, 86 * s, 138 * s, 28 * s, "Real Earth", true, earthCharts::isEarthId(region.id))) {
     freeEarthPicker = true; earthPick = 0; uiGlass = false; return;
+  }
+  // what lies beyond the islands: the real Earth (Bermuda 640 km west, the American coast beyond) or the generated islands
+  if (realEarth && button(x + selectW + 516 * s, 86 * s, 150 * s, 28 * s, freeGeneratedEarth ? "Beyond: generated" : "Beyond: real Earth",
+                          region.id == "solace", region.id == "solace" && !freeGeneratedEarth)) {
+    freeGeneratedEarth = !freeGeneratedEarth; g_audio.trigger(SFX_CLICK);
   }
   if (button(W - 220 * s, 25 * s, 196 * s, 38 * s, "Back to main menu")) { cancelFreeFlightSetup(); uiGlass = false; return; }
   panel(x, y, lw, h); panel(rx, y, rw, h);
@@ -3449,6 +3464,7 @@ void Game::drawGps() {
 // ------------------------------------------------------------------ hidden research menu (U + I on the main menu)
 void Game::drawPause() {
   if (freeFlight && freeRegionMap) { drawRegionPicker(); return; }
+  if (freeFlight && freeEarthPicker) { drawEarthAirportPicker(); return; }
   if (militaryFlight && !settingsFromPause) { drawMilitaryPause(); return; }
   float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
   g_ren.rect(0, 0, W, H, vec3(0, 0, 0), 0.55f);
@@ -3485,7 +3501,9 @@ void Game::drawPause() {
   if (button(x + 30 * s, by, bw, bh, in.pad && !set.padBind[ACT_PHOTO] ? std::string("Photo mode") : "Photo mode   " + actLabel(ACT_PHOTO, in.pad, true))) { enterPhoto(); return; }
   by += bh + 12 * s;
   if (freeFlight) {
-    if (button(x + 30 * s, by, bw, bh, "Earth destinations / Set route")) { openEarthPicker(); return; }
+    if (realEarthPlay()) {   // (the real Earth: a route to any of its airports)
+      if (button(x + 30 * s, by, bw, bh, "Fly to a real airport / Set route")) { freeEarthPicker = true; earthPick = 0; earthQuery.clear(); earthResultsFor = "\x01"; return; }
+    } else if (button(x + 30 * s, by, bw, bh, "Earth destinations / Set route")) { openEarthPicker(); return; }
     by += bh + 12 * s;
   }
   if (arrivalAt >= 0 && !researchFlight) {   // stopped at a field after landing: parking there ends the flight as the brake would

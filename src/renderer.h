@@ -20,6 +20,7 @@
 #include <deque>
 #include "entity_mesh.h"
 #include "bridge_mesh.h"
+namespace earth { class Pack; }   // (earth_data.h: the far terrain's pack, Renderer::earthHorizon)
 #include "ground_vehicle.h"
 #include "feed_cameras.h"
 #include "exhaust.h"
@@ -273,6 +274,10 @@ public:
   }
   void beginRegionUploadFrame();
   void updateRegionHorizon(geo::Position viewer, uint64_t worldSeed);
+  // The Earth pack the far terrain is drawn from when the World isn't a real-Earth chart of its own: Solace in the real
+  // Earth (Game::realEarthPlay; nullptr: the generated regions round it)
+  std::shared_ptr<const earth::Pack> earthHorizon;
+  std::shared_ptr<const earth::Pack> horizonPack() const;   // (a real-Earth chart's own, else earthHorizon)
   size_t horizonUploadBytesThisFrame = 0, horizonUploadBytesTotal = 0, horizonCacheBytes = 0;
   size_t horizonCpuBuildCount = 0;
   size_t horizonCpuGridBytes = 0, horizonPendingGridBytes = 0;

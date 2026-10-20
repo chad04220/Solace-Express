@@ -388,6 +388,37 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
   - **A first global run** and its size.
   - **The far terrain** doesn't read GLO-90 yet.
 
+- **E6:** the first part is in. These pieces work:
+  - **Solace on the real Earth.** A Free Flight out of the islands with the pack there goes on into the real
+    Earth's charts. Free Flight's "Beyond" button chooses the generated islands instead. Career flights and long hauls
+    are as they were until E7.
+  - **The lattice.** Within 110 km of the islands' origin the chart to fly into is theirs
+    (`earthCharts::slideIdAt`). So no real-Earth chart is centred there, and theirs reach only the open sea round
+    the islands.
+  - **The moves.** The flight moves between the islands' chart and the real Earth's as between two real-Earth charts:
+    nearer the new centre by 2 km. It leaves the islands only over open water, in their border or beyond. The islands'
+    chart is read from the launch's cache.
+  - **The far terrain.** From the islands it is the real Earth's patches. From a real-Earth chart in sight of the
+    islands, their own silhouette is drawn first (`horizon::build`), as the generated regions' far pass draws them.
+    `Renderer::earthHorizon` carries the pack when the World isn't a chart of its own.
+  - **Routes.** On the real Earth the pause menu's route goes to any real airport. The picker is the Free Flight one,
+    with the distance to each airport. The autopilot holds the course, and the charts on the way prepare as the
+    flight goes: Solace to Bermuda is 640 km.
+  - **Charts without an airport.** A chart with no airport of its own (the open ocean, the wilds) carries the nearest
+    real one beyond its square. A World keeps an airport, as the flight, the GPS and ATC expect; nothing of it is
+    built there, and the chart that holds it builds it when the flight arrives.
+  - **Tests.** `earth_solace_test` checks:
+    - the lattice;
+    - the islands' silhouette from beside them, and never from their own chart;
+    - a flight west out of the islands into an open-ocean chart, and east back into theirs, where it was on the Earth
+      each time;
+    - that no generated region is ever wanted.
+
+  Still open in E6:
+  - **The sea floor.** The islands' sea floor isn't blended into ETOPO's yet. The sea is opaque, so it doesn't show.
+  - **The real Earth's charts and the islands.** They reach only the islands' open sea, so no chart shows Solace's land
+    at its own detail but the islands' own.
+
 Decisions taken with the defaults (the owner can change them):
 - The generated regions keep working until E6. In real-Earth play the real world replaces them; they stay available
   as a "Generated Earth" choice in Free Flight.

@@ -369,6 +369,10 @@ void Renderer::retainHorizonMesh(FarRegionGpu& mesh) {
   target = std::move(mesh); mesh = FarRegionGpu{};
 }
 
+std::shared_ptr<const earth::Pack> Renderer::horizonPack() const {
+  return g_world.earthChart ? g_world.earthChart->pack : earthHorizon;
+}
+
 void Renderer::updateRegionHorizon(geo::Position viewer, uint64_t worldSeed) {
   using Clock = std::chrono::steady_clock;
   const auto started = Clock::now();
@@ -383,7 +387,7 @@ void Renderer::updateRegionHorizon(geo::Position viewer, uint64_t worldSeed) {
     // Validates even under the project's fast-math compilation policy.
     (void)geo::direction(viewer);
     // (the real Earth's far patches, earth_far.h, or the generated regions: never the one where the other is wanted)
-    const std::shared_ptr<const earth::Pack> earthPack = g_world.earthChart ? g_world.earthChart->pack : nullptr;
+    const std::shared_ptr<const earth::Pack> earthPack = horizonPack();
     const geo::Position chartOrigin = g_world.chartDescriptor().origin;
     if (!horizonContext || horizonSeed != worldSeed || horizonEarth != (earthPack != nullptr)) {
       ++horizonGeneration; horizonSeed = worldSeed; horizonContext = true; horizonHasSelection = false;
@@ -474,7 +478,7 @@ void Renderer::updateRegionHorizon(geo::Position viewer, uint64_t worldSeed) {
         for (const auto& d : regions) {
           if (std::find(pinned.begin(), pinned.end(), d.id) != pinned.end() ||
               std::find(known.begin(), known.end(), horizonKey(d.id, d.worldSeed, d.generatorVersion)) != known.end()) continue;
-          batch.meshes.push_back(earthPack ? earthFar::build(d, earthPack) : horizon::build(d));
+          batch.meshes.push_back(earthPack && !d.authored ? earthFar::build(d, earthPack) : horizon::build(d));
           if (batch.meshes.size() == (earthPack ? 4u : 2u)) break;
         }
         return batch;
@@ -540,7 +544,7 @@ void Renderer::drawFarRegions(const FrameParams& fp, bool warm) {
   const bool stagedPriorDrawable = worldStage.active && compatible(worldStage.farProxy) && worldStage.farProxy.ready &&
     worldStage.farProxy.accepted && worldStage.farProxy.vao && worldStage.farProxy.count > 0 && previousFarRegion.regionId == worldStage.farProxy.regionId;
   if (previousFarRegion.regionId != g_world.regionId && !stagedPriorDrawable && compatible(previousFarRegion)) draw(previousFarRegion);
-  if (!warm && horizonContext && horizonEarth == (g_world.earthChart != nullptr)) {
+  if (!warm && horizonContext && horizonEarth == (horizonPack() != nullptr)) {
     // the generated regions' silhouettes, or on the real Earth its far patches (earth_far.h) - those not drawn inside
     // the chart's own square, where the chart is
     const auto viewer = regionTravel::Chart(activeOrigin).position(fp.camPos);

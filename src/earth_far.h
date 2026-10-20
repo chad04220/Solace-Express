@@ -26,7 +26,8 @@ procedural::Descriptor patch(int level, int i, int j);
 
 // The patches to draw round a viewer: the lattice's cells within the horizon (the viewer's and a 3 km summit's) over
 // the pack's box, finer nearer, none wholly inside the chart square round chartOrigin (WORLD_HALF each way: the chart
-// is drawn there), nearest first and at most maxCount (complete false when more were wanted)
+// is drawn there), nearest first and at most maxCount (complete false when more were wanted). The Solace Islands come
+// first when they are in sight and the chart isn't theirs: their own silhouette (horizon::build), not a patch
 horizon::Selection select(geo::Position viewer, const geo::Position& chartOrigin, const earth::Box& data,
                           size_t maxCount);
 // A patch's mesh from the pack: its vertices in the frame of its origin, as the far pass draws them; its collision
