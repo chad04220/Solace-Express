@@ -1,4 +1,4 @@
-//! kRaytraceDisplays
+//! kDisplays
 // ---------------------------------------------------------------- cockpit displays and gauges
 // Every element is a signed distance anti-aliased over the pixel footprint gAA (in the caller's units, set per
 // pixel from the hit distance), so needles, scales and lettering stay crisp at any display resolution. Lettering

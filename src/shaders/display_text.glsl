@@ -1,4 +1,4 @@
-//! kRaytraceText
+//! kDisplayText
 //! Third part (MSVC limits each concatenated string literal to 64 KB).
 //! Display text for every cockpit screen and HUD, from the game's signed-distance-field UI font (sharp at any size)
 // ---------------------------------------------------------------- display text

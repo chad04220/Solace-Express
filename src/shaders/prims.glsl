@@ -1,4 +1,4 @@
-//! kRtPrims
+//! kPrims
 //! Analytic primitives: boxes, cylinders, convex solids, the debris chunks and the (unused) airport boxes.
 // ---------------------------------------------------------------- analytic primitives
 // slab test against an AABB; returns (tNear, tFar), normal of the entry face

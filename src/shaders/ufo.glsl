@@ -1,4 +1,4 @@
-//! kRaytraceUfo
+//! kUfo
 //! ------------------------------------------------------------------------------------------------
 //! UFO encounter: a saucer with a pressure cabin whose hatch rides open on a carrier over two visitors who dance,
 //! laugh and wave (Codex's visitor crew and craft; own piece: MSVC 64 KB limit). Geometry and pose depend only on

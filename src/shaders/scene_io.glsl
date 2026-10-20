@@ -1,4 +1,4 @@
-//! kRtIO
+//! kSceneIO
 //! Full-screen scene pass I/O: the pixel outputs and the cloud-split switch.
 in vec2 vUV;
 layout(location=0) out vec4 oColor;

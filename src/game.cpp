@@ -343,8 +343,7 @@ void Game::loadSettings() {
   while (fscanf(f, "%63s %f", k, &v) == 2) {
     if (!std::isfinite(v) || fabsf(v) > 1e6f) continue;   // a damaged value keeps the default
     std::string s = k;
-    if (s == "renderScale") continue;   // old setting (the renderer scales itself)
-    else if (s.rfind("rescard.", 0) == 0) { if (v > 0.5f) resDone.insert(s.substr(8)); }
+    if (s.rfind("rescard.", 0) == 0) { if (v > 0.5f) resDone.insert(s.substr(8)); }
     else if (s.rfind("trial.", 0) == 0) {
       size_t dot = s.rfind('.');
       if (dot > 6 && v >= 0.f) {
@@ -376,7 +375,6 @@ void Game::loadSettings() {
     else if (s == "mouseSens") set.mouseSens = clampf(v, 0.2f, 3.f);
     else if (s == "renderRes") set.resMode = std::clamp((int)v, 0, 4);
     else if (s == "fpsTarget") set.fpsTarget = std::clamp((int)v, 0, 240);
-    else if (s == "renderer") {}   // (the old renderer choice: there is one renderer now)
     else if (s == "fov") set.fov = clampf(v, 40.f, 80.f);
     else if (s == "cockpitFocusZoom") set.cockpitFocusZoom = v != 0;
     else if (s == "foveate") set.foveate = v != 0;
@@ -3642,7 +3640,7 @@ void Game::breakUp(vec3 impactVel, bool water, bool air) {
     d.p = p; d.v = v; d.size = size; d.charred = charred; d.rest = false;
     d.w = normalize(vec3(r.range(-1, 1), r.range(-1, 1), r.range(-1, 1))) * spin;
     d.q = quat::axisAngle(normalize(vec3(r.range(-1, 1), r.range(-1, 1), r.range(-1, 1))), r.range(0, 6.f));
-    d.body = debrisPanel(1.2f * size, 2.f * size, sigma);   // (the plate drawn: 2 x 1.2 sizes - rt_prims.glsl traceDebris)
+    d.body = debrisPanel(1.2f * size, 2.f * size, sigma);   // (the plate drawn: 2 x 1.2 sizes - prims.glsl traceDebris)
     debris.push_back(d);
   };
   if (air) {
