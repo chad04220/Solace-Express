@@ -12,7 +12,7 @@ constexpr double kSqrt2 = 1.4142135623730950488;
 constexpr double kDistanceSlack = .001; // one millimetre for angular round-off
 struct Center { geo::Double3 direction; char id[18]{}; };
 static_assert(sizeof(Center) * kCatalogSize < 320 * 1024, "center catalog must stay small");
-static_assert(sizeof(Vertex) == 10 * sizeof(float), "GPU vertex layout changed");
+static_assert(sizeof(Vertex) == 11 * sizeof(float), "GPU vertex layout changed");
 
 bool finite(double x) {
   uint64_t bits; std::memcpy(&bits, &x, sizeof(bits));

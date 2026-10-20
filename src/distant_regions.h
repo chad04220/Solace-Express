@@ -11,7 +11,10 @@ constexpr size_t kMaxMeshVertices = size_t(kMeshResolution - 1) * (kMeshResoluti
 constexpr double kAltitudeLookahead = 3000.0;
 constexpr double kSummitHeight = 3000.0;
 
-struct Vertex { vec3 position, normal, colour; float height; };
+struct Vertex {
+  vec3 position, normal, colour; float height;
+  float lights = 0.f;   // (how lit the ground is after dark, 0..1: the real Earth's far patches, by its towns and cities)
+};
 struct Mesh {
   procedural::Descriptor region;
   regionalSurface::Handle surface;
@@ -37,7 +40,7 @@ Selection select(geo::Position camera, uint64_t worldSeed = procedural::kDefault
 
 // An approximate silhouette, using the pure recipe/raw authored base and five
 // terrain-noise octaves. It deliberately omits full-World smoothing/road grading.
-// Resolution must be in [2,129]. Maximum expanded output is 3.75 MiB, with one
+// Resolution must be in [2,129]. Maximum expanded output is 4.125 MiB, with one
 // additional <= 651 KiB grid while building and a retained <= 261 KiB exact
 // collision grid per mesh. Noncanonical descriptors throw.
 Mesh buildMesh(const procedural::Descriptor& region, int resolution = kMeshResolution);

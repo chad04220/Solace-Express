@@ -158,6 +158,39 @@ horizon::Mesh build(const procedural::Descriptor& descriptor, const std::shared_
       else if (cover == earth::COVER_SNOW) v.colour = vec3(.82f, .85f, .87f);
     }
   }
+  // the lights after dark: how much of the ground about each vertex the cover has built over (a 3 x 3 sampling of its
+  // cell, 5 x 5 on the coarser patches), and a glow about each town by its population - the cover misses small ones
+  {
+    const int S = level == 0 ? 3 : 5;
+    for (int r = 0; r < N; r++) {
+      generationCheckpoint();
+      for (int k = 0; k < N; k++) {
+        horizon::Vertex& v = grid[(size_t)r * N + k];
+        if (v.height < 0.f) continue;
+        const double lat = c.north - r * dLat, lon = c.west + k * dLon;
+        int built = 0;
+        for (int a = 0; a < S; a++) for (int b = 0; b < S; b++)
+          built += sampler.cover(lat + ((a + 0.5) / S - 0.5) * dLat, std::remainder(lon + ((b + 0.5) / S - 0.5) * dLon, 360.0)) == earth::COVER_BUILT;
+        v.lights = std::min(1.f, 1.3f * float(built) / float(S * S));
+      }
+    }
+    const double margin = 0.15;
+    for (const earth::PlaceRecord& p : pack->places({c.south - margin, c.west - margin, c.north + margin, c.west + c.size + margin})) {
+      if (p.population < 2000) continue;
+      const float radius = std::clamp(1100.f * std::sqrt(float(p.population) / 10000.f), 700.f, 16000.f);
+      const float glow = std::clamp((std::log10(float(p.population)) - 3.f) / 3.f, 0.15f, 1.f);
+      const double rLat = radius / 111320.0, rLon = rLat / std::max(std::cos(p.lat * PI / 180.0), 0.05);
+      const int r0 = std::max(0, (int)std::floor((c.north - p.lat - rLat) / dLat)), r1 = std::min(R, (int)std::ceil((c.north - p.lat + rLat) / dLat));
+      const double dx = std::remainder(p.lon - c.west, 360.0);
+      const int k0 = std::max(0, (int)std::floor((dx - rLon) / dLon)), k1 = std::min(R, (int)std::ceil((dx + rLon) / dLon));
+      for (int r = r0; r <= r1; r++) for (int k = k0; k <= k1; k++) {
+        horizon::Vertex& v = grid[(size_t)r * N + k];
+        if (v.height < 0.f) continue;
+        const float dy = float((c.north - r * dLat - p.lat) * 111320.0), dxm = float((k * dLon - dx) * 111320.0 * std::cos(p.lat * PI / 180.0));
+        v.lights = std::max(v.lights, glow * (1.f - smoothstepf(0.f, radius, std::sqrt(dy * dy + dxm * dxm))));
+      }
+    }
+  }
   for (int r = 0; r < N; r++) for (int k = 0; k < N; k++) {
     const vec3 dx = grid[(size_t)r * N + std::min(k + 1, N - 1)].position - grid[(size_t)r * N + std::max(k - 1, 0)].position;
     const vec3 dz = grid[(size_t)std::min(r + 1, N - 1) * N + k].position - grid[(size_t)std::max(r - 1, 0) * N + k].position;
@@ -181,7 +214,7 @@ horizon::Mesh build(const procedural::Descriptor& descriptor, const std::shared_
     triangle(grid[i], grid[i + N], grid[i + 1]); triangle(grid[i + 1], grid[i + N], grid[i + N + 1]);
   }
   const float skirt = 50.f + 0.05f * float(dLat * kMetresPerDegree);
-  auto lowered = [&](const horizon::Vertex& v) { horizon::Vertex w = v; w.height = v.height - skirt; return w; };
+  auto lowered = [&](const horizon::Vertex& v) { horizon::Vertex w = v; w.height = v.height - skirt; w.lights = 0.f; return w; };
   auto edge = [&](size_t a, size_t b) {
     const horizon::Vertex A = grid[a], B = grid[b], A2 = lowered(A), B2 = lowered(B);
     triangle(A, B, A2); triangle(B, B2, A2);

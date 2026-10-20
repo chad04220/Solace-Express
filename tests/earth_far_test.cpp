@@ -102,6 +102,18 @@ int main(int argc, char** argv) {
   for (const auto& v : ma.vertices) finite = finite && std::isfinite(v.height) && std::isfinite(v.position.x + v.position.y + v.position.z) && std::isfinite(v.normal.y);
   check(finite, "every vertex finite");
   check(ma.surface && ma.surface->geographic && ma.surface->resolution == earthFar::kResolution + 1, "its collision surface the grid");
+  {   // its lights after dark: New Bedford's (the city in this patch) lit, none at sea
+    const geo::LocalFrame frame(pa.origin);
+    const vec3 city = frame.toLocal({41.636, -70.934, 0});
+    float atCity = 0.f, nearest = 1e30f; bool seaDark = true; int lit = 0;
+    for (const auto& v : ma.vertices) {
+      seaDark &= v.height >= 0.f || v.lights == 0.f;
+      lit += v.lights > 0.2f;
+      const float d = hypotf(v.position.x - city.x, v.position.z - city.z);
+      if (d < nearest) { nearest = d; atCity = v.lights; }
+    }
+    check(atCity > 0.4f && lit > 0 && seaDark, fmt("its lights: New Bedford's %.2f, %d vertices lit, none at sea", atCity, lit));
+  }
   if (ma.surface && mb.surface) {
     const int N = ma.surface->resolution;
     float worst = 0; int land = 0;

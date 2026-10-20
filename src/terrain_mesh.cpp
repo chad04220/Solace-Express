@@ -159,7 +159,7 @@ void Renderer::warmFarTerrain() {
   distantRegionDraws = 0;
 }
 
-// Lightweight geography survives full region retirement. At this resolution a whole chart is at most 3.75 MiB;
+// Lightweight geography survives full region retirement. At this resolution a whole chart is at most 4.125 MiB;
 // fully underwater triangles are omitted. It is prepared only with the candidate's own immutable World.
 void Renderer::prepareFarTerrain(const World& world, WorldUploadData& data) {
   generationCheckpoint();
@@ -220,6 +220,7 @@ void Renderer::allocateFarRegion(FarRegionGpu& region) {
   glEnableVertexAttribArray(1); glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(FarTerrainVertex), (void*)offsetof(FarTerrainVertex, normal));
   glEnableVertexAttribArray(2); glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(FarTerrainVertex), (void*)offsetof(FarTerrainVertex, colour));
   glEnableVertexAttribArray(3); glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(FarTerrainVertex), (void*)offsetof(FarTerrainVertex, height));
+  glEnableVertexAttribArray(4); glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, sizeof(FarTerrainVertex), (void*)offsetof(FarTerrainVertex, lights));
   glBindVertexArray(0);
 }
 
@@ -440,7 +441,7 @@ void Renderer::updateRegionHorizon(geo::Position viewer, uint64_t worldSeed) {
       }
       gpu.ready = gpu.uploaded == total;
       if (!gpu.ready) break;
-      horizonPending.pop_front(); // release the <=3.75 MiB CPU vector promptly, not an entire neighborhood
+      horizonPending.pop_front(); // release the <=4.125 MiB CPU vector promptly, not an entire neighborhood
     }
     const bool moved = !horizonHasSelection || geo::surfaceDistance(viewer, horizonSelectedViewer) > 5000. ||
       std::abs(viewer.height - horizonSelectedViewer.height) > 500.;
@@ -520,6 +521,7 @@ void Renderer::drawFarRegions(const FrameParams& fp, bool warm) {
   glUniform1f(U(progFarRegion, "uGeoRadius"), float(geo::radius()));
   glUniform1f(U(progFarRegion, "uPlanetR"), fp.pano > 0.f ? 0.f : planetRadius());
   glUniform3f(U(progFarRegion, "uCamPos"), fp.camPos.x, fp.camPos.y, fp.camPos.z);
+  glUniform1f(U(progFarRegion, "uNight"), fp.night);
   auto draw = [&](const FarRegionGpu& mesh, float coverage = 1.f, float clip = 0.f) {
     if (!mesh.ready || !mesh.accepted || !mesh.vao || mesh.count <= 0 || coverage <= 0.f) return;
     glUniform1f(U(progFarRegion, "uRegionCoverage"), coverage);

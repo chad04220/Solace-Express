@@ -507,8 +507,20 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
   - Seen in renders: Boston from 380 m over South Boston, a city of streets and houses to the horizon where open
     grass lay before.
 
+- **E8, second pass: the far terrain's lights after dark.** Each far patch's vertex (`horizon::Vertex::lights`) is lit
+  by two things: the share of its cell the cover has built over (a 3 x 3 sampling at the finest level, 5 x 5 on the
+  coarser ones), and a glow round every place of 2,000 people or more. The glow reaches 0.7 to 16 km, by the square
+  root of the population, and is brighter by its logarithm, so the towns the cover misses still show.
+  - The far pass writes it as sodium-warm emission once the sun is down (`uNight`). It is squared so each glow draws
+    in to its core, and broken into clumps on a hashed 250 m lattice in the patch's own frame. The lattice fades to its
+    mean where a pixel spans several cells, so it never shimmers. The sea and the skirts carry none.
+  - The vertex grows to 11 floats; a coarse mesh's bound is now 4.125 MiB.
+  - `earth_far_test`: New Bedford's patch is lit at the city and dark at sea. In renders from 6 km over Nantucket at
+    22:30, Martha's Vineyard's and the Cape's towns show as faint warm clusters 60 to 100 km off.
+  - `REGION_TOD=<hours>` sets the time of day of a region scene, for review shots.
+
   Still open in E8: secondary runways, airport layouts by size, rivers (GRIP has none; a rivers dataset), regional
-  building styles, night lights by population, and real landmarks.
+  building styles, and real landmarks.
 
 Decisions taken with the defaults (the owner can change them):
 - The generated regions keep working until E6. In real-Earth play the real world replaces them; they stay available

@@ -5897,6 +5897,7 @@ void Game::debugScene(const std::string& name) {
       camYaw = -.5f * PI; camPitch = .15f;
     }
     if (getenv("REGION_ALT")) plane.pos.y = std::max(plane.pos.y, (float)atof(getenv("REGION_ALT")));
+    if (getenv("REGION_TOD")) timeOfDay = (float)atof(getenv("REGION_TOD"));   // (REGION_TOD=<hours>: the time of day there)
     for (int i = 0; i < 8; ++i) updateCamera(.1f);
     // REGION_VIEW="x,y,z,lookx,looky,lookz": a fixed camera over the region (its overview, for a review shot)
     if (const char* view = getenv("REGION_VIEW")) {

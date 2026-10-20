@@ -104,7 +104,7 @@ void checkMesh(const procedural::Descriptor& d) {
   check(mesh.region.id == d.id && mesh.region.seed == d.seed, "mesh preserves region identity");
   check(!mesh.vertices.empty() && mesh.vertices.size() % 3 == 0, "mesh contains complete land triangles");
   check(mesh.vertices.size() <= horizon::kMaxMeshVertices, "mesh vertex count bounded");
-  check(mesh.vertices.capacity() * sizeof(horizon::Vertex) <= 3932160, "expanded allocation bounded to 3.75 MiB");
+  check(mesh.vertices.capacity() * sizeof(horizon::Vertex) <= 4325376, "expanded allocation bounded to 4.125 MiB");
   const geo::LocalFrame frame(d.origin);
   const regionTravel::Chart chart(d.origin);
   std::unique_ptr<procedural::Recipe> recipe;

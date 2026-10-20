@@ -5,13 +5,15 @@ layout(location=0) in vec3 aPosition;
 layout(location=1) in vec3 aNormal;
 layout(location=2) in vec3 aColour;
 layout(location=3) in float aHeight;
+layout(location=4) in float aLights;
 uniform mat4 uRegionTransform, uVP, uPanoView;
 uniform vec3 uCamPos;
 uniform vec2 uJit, uPano;
 uniform float uLogC, uGeoRadius;
 out vec3 vColour, vNormal, vPosition;
-out float vHeight;
+out float vHeight, vLights;
 out vec2 vLocal;   // (where it lies on the active chart: its x and z)
+out vec2 vPatch;   // (and in its own patch's frame: the lights' specks keep to the ground there)
 void main() {
   vec3 q = (uRegionTransform*vec4(aPosition, 1.0)).xyz;
   float horizontal = length(q.xz);
@@ -24,9 +26,9 @@ void main() {
   vec2 across = n.xz - along*bearing;
   vec2 normalXZ = across + bearing*(along*c - n.y*s);
   vNormal = normalize(vec3(normalXZ.x, n.y*c + along*s, normalXZ.y));
-  vLocal = localPosition.xz;
+  vLocal = localPosition.xz; vPatch = aPosition.xz;
   vec3 cp = planetPos(localPosition, uCamPos);
-  vPosition = cp; vColour = aColour; vHeight = localPosition.y; // identical clamped sea-floor interpolation/discard to full terrain
+  vPosition = cp; vColour = aColour; vHeight = localPosition.y; vLights = aLights; // identical clamped sea-floor interpolation/discard to full terrain
   gl_Position = uVP*vec4(cp, 1.0);
   bool behind = false;
   if (uPano.x > 0.0) {

@@ -99,7 +99,7 @@ aircraft is safely clear of both. The fallback has no buildings or airport servi
 The horizon (`distant_regions`) samples the regions' recipes and Solace's base into 129-square silhouette meshes,
 with no heightmaps, roads, trees or towns: an immutable centre catalogue under 320 KiB, selection in every direction
 with 3 km of altitude lookahead, and a hard cap of 64 groups (reported as incomplete when it truncates). A coarse mesh
-is at most 3.75 MiB of GPU triangles, and 64 collision counterparts at most 16.25 MiB. Visual curvature uses the
+is at most 4.125 MiB of GPU triangles, and 64 collision counterparts at most 16.25 MiB. Visual curvature uses the
 same 6,371 km Earth radius as the catalogue.
 
 ## Tests and tools
