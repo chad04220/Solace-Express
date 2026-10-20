@@ -594,6 +594,8 @@ Career::LaunchPlan Game::finalizeLaunchPlan(const Contract& c, int spec, Career:
   return p;
 }
 void Game::beginCareerFlight(const Contract& c, int spec, Career::Source src) {
+  // (a contract of the world loaded, in the career's own region: the campaign's are the islands' alone)
+  if (g_world.regionId != career.region || (c.story && !career.atHome())) { hubMsg = "The campaign is flown in the Solace Islands: travel home to fly it."; hubMsgTime = 5; return; }
   // (the route's plan and the save, then the flight: all behind the loading card - Game::queueLaunch)
   if (!commitBlocked() && queueLaunch(c, spec, LAUNCH_CAREER, [this, c, spec, src] { beginCareerFlight(c, spec, src); })) return;
   const Career::LaunchPlan p = finalizeLaunchPlan(c, spec, src);
@@ -779,6 +781,34 @@ void Game::loadFreeRegion(int index, GameScreen after) {
     });
 }
 
+std::string Game::screenWorld() const { return screenWorldFor(screen); }
+std::string Game::screenWorldFor(GameScreen screen) const {
+  const std::string& here = g_world.regionId;
+  switch (screen) {
+    case SCR_HUB: if (hubTab == TAB_SETTINGS) return std::string();   // (the settings need no world: opened from the menu, none is loaded for them)
+      [[fallthrough]];
+    case SCR_DEBRIEF: return here == career.region ? std::string() : career.region;
+    case SCR_RESEARCH: return here == "solace" ? std::string() : std::string("solace");
+    case SCR_MENU: return here == "solace" || (hasSave && here == career.region) ? std::string() : std::string("solace");
+    default: return std::string();
+  }
+}
+
+std::string Game::careerPlaceName() const {
+  if (g_world.regionId == career.region && career.location >= 0 && career.location < (int)g_world.airports.size()) return g_world.airports[career.location].name;
+  if (career.atHome()) return "the Solace Islands";
+  if (auto d = procedural::find(career.region)) return "the " + d->name;
+  return career.region;
+}
+
+void Game::loadCareerWorld(const std::string& id, GameScreen after) {
+  if (regionJob.valid() || g_world.regionId == id) return;
+  const auto region = procedural::find(id);
+  if (!region) return;
+  chooseFreeRegion(*region);
+  loadFreeRegion(freeRegion, after);
+}
+
 void Game::updateRegionLoading(float dt) {
   regionLoadTime += dt;
   // Cancellation is deferred until the builder joins. No reader may resume in a partial World.
@@ -801,6 +831,7 @@ void Game::updateRegionLoading(float dt) {
       loadFreeRegion(0, SCR_MENU); return;
     }
     screen = regionCancel ? SCR_MENU : regionAfterLoad;
+    if (screen == SCR_HUB && g_world.regionId == career.region) { career.refreshBoard(); selContract = 0; selAircraft = -1; }   // (the career's region: its board)
     if (launchAfterPreparation && screen == SCR_FREE_FLIGHT) { launchFreeFlight(); return; }
     if (screen == SCR_FREE_FLIGHT) toast(loadingRegion.name + " ready. Choose an airport and take flight.", vec3(.6f, 1.f, .8f), false);
   } catch (const std::exception& e) {
@@ -1134,7 +1165,7 @@ void Game::beginFreeFlightSetup() {
 void Game::cancelFreeFlightSetup() {
   if (screen != SCR_FREE_FLIGHT) return;
   freeRegionMap = false;
-  if (g_world.procedural) { loadFreeRegion(0, SCR_MENU); return; }
+  if (!screenWorldFor(SCR_MENU).empty()) { loadFreeRegion(0, SCR_MENU); return; }   // (the menu stands in the islands, or the career's region)
   screen = SCR_MENU;
   // No hub return/save path: opening or closing this mode cannot create a career save.
 }
@@ -1267,7 +1298,7 @@ void Game::init(bool buildWorld, const std::function<void(float, const std::stri
   hasSave = !diskless && career.load(sav);   // (a tool's flights never touch the player's career: a fresh one, in memory)
   if (!hasSave && !diskless && career.load(sav + ".bak")) { hasSave = true; toast("Career save was damaged: restored the previous save"); }
   if (hasSave && career.attemptOpen) {   // the last session ended inside a flight: the career stands as it was before it
-    toast(fmt("Your last flight was interrupted: you are back at %s", g_world.airports[career.location].name), vec3(1.f, 0.8f, 0.4f));
+    toast(fmt("Your last flight was interrupted: you are back at %s", careerPlaceName().c_str()), vec3(1.f, 0.8f, 0.4f));
     // an accepted job whose leg never ended waits where the leg began (the hub's recovery card offers it again)
     commit([](Career& k) { if (k.military.activeAttempt) { k.abandonMilitaryAttempt(); return; } k.attemptOpen = false; if (k.job && k.job->state == Career::JobState::ACTIVE) k.job->state = Career::JobState::RECOVERY; });
   }
@@ -1290,8 +1321,8 @@ void Game::init(bool buildWorld, const std::function<void(float, const std::stri
 void Game::initHeadless() {
   headless = true;
   // Multi-scene diagnostics can start a fresh Game while another generated region
-  // is resident. Career board generation is authored-Solace-only.
-  if (g_world.procedural) { career = Career{}; career.location = 0; }
+  // is resident: a fresh career there (its board drawn when the hub opens).
+  if (g_world.procedural) { career = Career{}; career.region = g_world.regionId; career.location = 0; }
   else career.newGame();
   set.resMode = 0; failuresArmed = false; g_ren.foveation = 0.f; g_ren.prepassAutoOn = false;
 }   // tools and tests render at the full resolution; nothing breaks unless the test breaks it
@@ -1650,6 +1681,7 @@ void Game::saveGhost(int kind) {
   fclose(f);
 }
 void Game::startTrial(int kind, int spec, int src) {
+  if (g_world.procedural) return;   // (the trials' courses are the islands')
   startFlight(trialContract(kind), spec, (Career::Source)src); isolatedFlight = true;   // (a trial: off the books)
   trialResult = TrialResult(); trialResult.kind = -1;
   trialSplits.clear(); ghostRec.clear(); loadGhost(kind);
@@ -4208,8 +4240,8 @@ void Game::menuBackgroundCamera(FrameParams& fp) {
   static Plane demo;
   static bool initd = false;
   if (!initd) { demo.reset(&kAircraft[screen == SCR_MENU ? 1 : 0], vec3(0, 600, 0), 0, 50, 100, true, 60); initd = true; }
-  int ap = career.location;
-  vec3 centre = screen == SCR_MENU ? vec3(-6000, 0, 11000) : g_world.airports[ap].pos();
+  const int ap = g_world.regionId == career.region && career.location < (int)g_world.airports.size() ? career.location : -1;   // (the hub's field, when its world is loaded)
+  vec3 centre = screen == SCR_MENU || ap < 0 ? vec3(-6000, 0, 11000) : g_world.airports[ap].pos();
   float R = 2200.f, t = realTime * 0.035f;
   float alt = (screen == SCR_MENU ? 380.f : 320.f) + std::max(centre.y, 0.f);
   vec3 p = centre + vec3(cosf(t) * R, 0, sinf(t) * R); p.y = std::max(alt, g_world.height(p.x, p.z) + 250.f);
@@ -5214,9 +5246,7 @@ void Game::feedAudio() {
 void Game::update(float dt) {
   g_ren.beginRegionUploadFrame(); // one shared detail + horizon GPU budget per displayed frame
   if (screen != SCR_FLIGHT) { rumbleLo = rumbleHi = 0.f; shakeTrauma = shakeBuffet = 0.f; }   // (the motors and the shake are the flight's)
-  if (screen != SCR_REGION_LOADING && g_world.procedural &&
-      (screen == SCR_MENU || screen == SCR_HUB || screen == SCR_RESEARCH || screen == SCR_DEBRIEF))
-    loadFreeRegion(0, screen);
+  if (screen != SCR_REGION_LOADING) { const std::string want = screenWorld(); if (!want.empty()) loadCareerWorld(want, screen); }
   if (screen == SCR_REGION_LOADING) {
     realTime += std::min(dt, .1f); lastDt = std::min(dt, .05f);
     if (in.pressed[K_F11]) wantFullscreenToggle = true;
@@ -5376,9 +5406,7 @@ void Game::framePresented() {
 }
 
 void Game::render() {
-  if (screen != SCR_REGION_LOADING && g_world.procedural &&
-      (screen == SCR_MENU || screen == SCR_HUB || screen == SCR_RESEARCH || screen == SCR_DEBRIEF))
-    loadFreeRegion(0, screen);
+  if (screen != SCR_REGION_LOADING) { const std::string want = screenWorld(); if (!want.empty()) loadCareerWorld(want, screen); }
   if (screen == SCR_REGION_LOADING) {
     g_ren.clearScreen(); g_ren.uiBegin(); drawRegionLoading(); drawPadCursor(); g_ren.uiEnd();
     return;
@@ -5571,6 +5599,13 @@ void Game::debugScene(const std::string& name) {
     // REGION_GPS=<range m>: the GPS open over the region (its airports and landmarks)
     if (const char* gps = getenv("REGION_GPS")) { showMap = true; uiAnim[0x6e61u] = 1.f; gpsRangeTarget = gpsRange = std::max(2000.f, (float)atof(gps)); }
     toasts.clear(); botControl = true;
+    if (getenv("REGION_HUB")) {   // REGION_HUB=1: the career's hub in the region (a CPL career travelled there, its board drawn)
+      endFlight(false, "Region hub", OUT_ABANDONED);
+      career = Career{}; career.license = LIC_CPL; career.money = 25000; career.storyIndex = 12;
+      career.region = descriptor->id; career.location = procedural::mainAirport(descriptor->id); career.refreshBoard();
+      freeFlight = isolatedFlight = false; screen = SCR_HUB; hubTab = TAB_CONTRACTS; hubList = 0; selContract = std::min(2, (int)career.board.size() + 1);
+      dbgCam = false; realTime = 20; toasts.clear();
+    }
     printf("Region scene: %s / %s / %zu airports / %zu towns / actual Free Flight\n",
       descriptor->id.c_str(), descriptor->name.c_str(), g_world.airports.size(), g_world.towns.size());
     return;
@@ -6364,7 +6399,7 @@ void Game::debugScene(const std::string& name) {
 
 // Military sorties are career-backed loaners; research practice uses the same combat engine off the books.
 void Game::launchMilitary(int kind) {
-  if (launchCardPending() || !military::mission(kind)) return;
+  if (launchCardPending() || !military::mission(kind) || !career.atHome() || g_world.procedural) return;   // (Defense Command is the islands')
   Contract c = career.militaryContract(kind);
   if (career.canFly(c, c.forceAircraft) != Career::SRC_MILITARY) return;
   if (commitBlocked()) { hubMsg = "Your last result isn't saved yet: retry the save first."; hubMsgTime = 5; return; }

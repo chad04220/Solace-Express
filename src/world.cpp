@@ -292,6 +292,11 @@ float airportFunnelCeiling(float x, float z) { return airportFunnelCeilingFor(kA
 float airportFunnelCeiling(const World& world, float x, float z) { return airportFunnelCeilingFor(world.airports.data(), world.airports.size(), x, z); }
 float airportInfluence(float x, float z) { return airportInfluenceFor(kAirports, std::size(kAirports), x, z); }
 int solaceAirportCount() { return (int)std::size(kAirports); }
+const Airport& solaceAirport(int i) { return kAirports[std::clamp(i, 0, (int)std::size(kAirports) - 1)]; }
+float solaceDistanceKm(int a, int b) {
+  const Airport &A = solaceAirport(a), &B = solaceAirport(b);
+  return sqrtf((A.x - B.x) * (A.x - B.x) + (A.z - B.z) * (A.z - B.z)) / 1000.f;
+}
 float airportInfluence(const World& world, float x, float z) { return airportInfluenceFor(world.airports.data(), world.airports.size(), x, z); }
 
 void World::build(const std::string& cachePath, const std::string& stamp, bool save) {

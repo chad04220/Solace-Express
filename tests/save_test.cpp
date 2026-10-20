@@ -150,7 +150,7 @@ int main() {
   const char* bad[] = {
     "somnium_save 1\nlicense 1\nplane dawnlark 999 70\n",                                   // fleet airport out of range
     "somnium_save 1\n",                                                                    // header only
-    "somnium_save 7\nmoney 5\nlicense 0\nlocation 0\nstory 0\n",                           // unknown future version
+    "somnium_save 8\nmoney 5\nlicense 0\nlocation 0\nstory 0\n",                           // unknown future version
     "somnium_save 6\nmoney 5\nlicense 0\nlocation 0\nstory 0\n",                           // current version, missing mandatory records
     "somnium_save 1\nmoney 5\nlicense 9\nlocation 0\nstory 0\n",                           // bad license
     "somnium_save 1\nmoney 5\nlicense 0\nlocation -3\nstory 0\n",                          // bad location

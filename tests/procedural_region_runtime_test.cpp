@@ -137,6 +137,46 @@ struct GameTest {
         fmt("%s: an airport stamped and %s found under the region's id, of its %d landmarks", A.name.c_str(),
           sites.empty() ? "nothing" : sites[0].name.c_str(), (int)sites.size()));
     }
+    {   // a career in the region (career.h): the ticket there, its board, an aircraft bought there, the save, the way home
+      Career k; k.newGame(); k.license = LIC_CPL; k.money = 50000;
+      Career student; student.newGame();
+      const auto list = k.destinations();
+      const Career::Destination* to = nullptr;
+      for (const auto& d : list) if (d.id == A.id) to = &d;
+      std::string why;
+      const bool gated = to && !student.travel(*to, &why) && student.atHome() && !k.destinations().empty() &&
+        std::none_of(list.begin(), list.end(), [](const Career::Destination& d) { return d.home; });   // (a student can't leave; home isn't listed from home)
+      const int before = k.money;
+      const bool went = to && k.travel(*to, &why) && k.region == A.id && k.location == procedural::mainAirport(A.id) && k.money == before - to->fare;
+      k.refreshBoard();
+      bool board = !k.board.empty(); const int jobs = (int)k.board.size();
+      for (const Contract& c : k.board) board &= c.from == k.location && c.to >= 0 && c.to < (int)g_world.airports.size() && !c.story;
+      int rentable = 0;
+      for (const Contract& c : k.board) for (int si : kCareerAircraft) rentable += k.canFly(c, si) == Career::SRC_RENT;
+      std::string m; const bool bought = k.buy(1, &m) && k.fleet.size() == 1 && k.fleet[0].region == A.id && k.here(k.fleet[0]);
+      const fs::path regionSave = root / "region_career.sav";
+      Career back; back.newGame();
+      const bool saved = k.save(regionSave.string()) && bytes(regionSave).rfind("somnium_save 7\nregion " + A.id + "\n", 0) == 0 &&
+        back.load(regionSave.string()) && back.region == A.id && back.location == k.location && back.fleet.size() == 1 && back.fleet[0].region == A.id;
+      const auto away = k.destinations();
+      const bool homeFirst = !away.empty() && away.front().home;
+      k.money = 0;
+      const bool home = homeFirst && k.travel(away.front(), &why) && k.atHome() && k.money == 0 &&
+        k.location == procedural::mainAirport("solace") && !k.here(k.fleet[0]) && k.canFly(Contract{}, 1) != Career::SRC_OWNED;
+      check(gated && went && board && rentable > 0 && bought && saved && homeFirst && home && unchanged(),
+        fmt("a career in %s: the ticket (%s), %d jobs on its board, an aircraft bought and parked there, a v7 save; home on account",
+          A.name.c_str(), to ? fmt("$%d, %.0f km", to->fare, to->km).c_str() : "none", jobs));
+      // the world each screen stands in: the hub in the career's region, the research terminal in the islands
+      const Career kept = game.career; const GameScreen screenWas = game.screen;
+      game.career.region = A.id; game.screen = SCR_HUB; game.hubTab = TAB_CONTRACTS;
+      const bool hubHere = game.screenWorld().empty();
+      game.career.region = "solace";
+      const bool hubHome = game.screenWorld() == "solace";
+      game.hubTab = TAB_SETTINGS; const bool settings = game.screenWorld().empty();
+      game.screen = SCR_RESEARCH; const bool research = game.screenWorld() == "solace";
+      game.career = kept; game.screen = screenWas; game.hubTab = TAB_CONTRACTS;
+      check(hubHere && hubHome && settings && research && unchanged(), "the hub stands in the career's region, the research terminal in the islands, the settings anywhere");
+    }
     game.chooseFreeRegion(B); game.loadFreeRegion(game.freeRegion); drain();
     check(g_world.regionId == B.id && unchanged(), "second Earth destination replaces the first without career mutation");
     game.chooseFreeRegion(A); game.loadFreeRegion(game.freeRegion); drain();

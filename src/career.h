@@ -43,7 +43,9 @@ struct Contract {
   bool courtesy = false;       // the client flies you to the departure (no positioning ticket): the recovery job
 };
 
-struct OwnedPlane { int spec; int location; float fuel; float condition; };
+// (region: the one it is parked in, by id - the islands' "solace" or a generated region's; its location is that
+// region's airport)
+struct OwnedPlane { int spec; int location; float fuel; float condition; std::string region = "solace"; };
 
 // How a flight ended. Only a crash counts against the record and costs repairs; a safe diversion, an off-airport
 // landing, running dry on the ground or abandoning the job just fail the contract.
@@ -114,6 +116,9 @@ public:
   int money = 600;
   int license = LIC_STUDENT;
   int reputation = 0;
+  // Where the career is: a region (procedural_regions.h) and one of its airports. The board, the open job and the
+  // hub are there; the campaign, the trials, the military and the airline are the Solace Islands' alone
+  std::string region = "solace";
   int location = 0;
   int storyIndex = 0;          // next story contract
   int flights = 0, landings = 0, crashes = 0;
@@ -150,6 +155,16 @@ public:
   bool beginMilitary(const Contract& c);     // call inside the normal transactional commit
   void abandonMilitaryAttempt();            // interrupted session: no reward; restart from briefing
   void newGame();
+  bool atHome() const { return region == "solace"; }
+  bool here(const OwnedPlane& p) const { return p.region == region; }   // parked in the career's region
+  // Travel by airline to another region: the regions within reach of this one (nearest first, the islands always
+  // among them when away), each with its fare and the licence it takes. A Private licence reaches the near regions
+  // (up to 450 km), a Commercial one twice as far, the ATP every region listed; the way home needs none. travel()
+  // buys the ticket (free home when the bank can't pay it) and moves the career to the region's main airport; its
+  // world is then loaded and the board drawn there (Game::loadCareerWorld). Never with a job or a flight open
+  struct Destination { std::string id, name; double km = 0; int fare = 0, minLicense = LIC_PPL; bool home = false; };
+  std::vector<Destination> destinations() const;
+  bool travel(const Destination& d, std::string* msg);
   const Contract* nextStory() const;
   void refreshBoard();
   // Which aircraft can fly a contract and how it would be sourced

@@ -1,10 +1,12 @@
 // The career save format is frozen. A fixed career holding every kind of record a save can (the fleet, a loan, the
 // insurance, the airline's pilots and routes, the military record, an open freelance job with its forecast and
 // waypoints) must write exactly the checked-in tests/fixtures/career_v6.sav, and that file must load and write back
-// the same bytes. A change to the writer fails here: bump the version in Career::save, keep loading every older one,
+// the same bytes. A career with something beyond the islands (its region, an aircraft parked in one) writes version 7,
+// frozen the same way in tests/fixtures/career_v7.sav; one that never left them still writes version 6. A change to the writer fails here: bump the version in Career::save, keep loading every older one,
 // and add the new version's fixture beside this one (SOMNIUM_UPDATE_FIXTURES=1 writes it). Players' saves from every
 // released version have to keep working.
 #include "../src/career.h"
+#include "../src/procedural_regions.h"
 #include "test_world.h"
 #include <algorithm>
 #include <cmath>
@@ -62,6 +64,16 @@ static Career fixedCareer() {
   return c;
 }
 
+// the same career away: in the Umber Islands (a large generated archipelago), its job there, one aircraft parked there
+// and the route's still in the islands
+static Career awayCareer() {
+  Career c = fixedCareer();
+  c.region = "pr1-0-0-17"; c.location = 4;
+  c.fleet[0].region = c.region; c.fleet[0].location = 4;
+  c.job->c.from = 4; c.job->c.to = 6; c.job->at = 4; c.job->plan.startAirport = 4;
+  return c;
+}
+
 int main() {
   buildTestWorld(); buildStory();
   const std::string fixture = std::string(SOMNIUM_SOURCE_DIR) + "/tests/fixtures/career_v6.sav";
@@ -84,7 +96,34 @@ int main() {
   check(r.military.rank == 1 && r.military.completedMissions == 0x03u, "its military record");
   check(r.job && r.job->c.id == "F4242_3" && r.job->c.wxShift && r.job->c.wps.size() == 2 && r.job->c.brief == "A crate of spares, needed before dark.", "its open job, forecast and waypoints");
   check(r.save(tmp) && same(readFile(tmp), want), "loaded and saved again, the same bytes");
+  {   // version 7: the career away
+    const std::string fixture7 = std::string(SOMNIUM_SOURCE_DIR) + "/tests/fixtures/career_v7.sav";
+    const Career a = awayCareer();
+    check(a.save(tmp), "the career away writes");
+    const std::string got7 = readFile(tmp);
+    if (getenv("SOMNIUM_UPDATE_FIXTURES")) {
+      if (FILE* f = fopen(fixture7.c_str(), "wb")) { fwrite(got7.data(), 1, got7.size(), f); fclose(f); printf("wrote %s\n", fixture7.c_str()); }
+    }
+    const std::string want7 = readFile(fixture7);
+    check(!want7.empty(), "the fixture is there (tests/fixtures/career_v7.sav)");
+    check(got7.rfind("somnium_save 7\nregion pr1-0-0-17\n", 0) == 0, "a career away writes version 7, its region first");
+    check(same(got7, want7), "the career away writes exactly the frozen v7 bytes");
+    Career b; b.newGame();
+    check(b.load(fixture7), "the frozen v7 save loads");
+    check(b.region == "pr1-0-0-17" && b.location == 4 && b.fleet[0].region == "pr1-0-0-17" && b.fleet[0].location == 4 && b.fleet[1].region == "solace" &&
+          b.airline.routes.size() == 1 && b.job && b.job->at == 4 && b.job->c.to == 6, "its region, its aircraft's regions, the route in the islands, the job there");
+    check(b.save(tmp) && same(readFile(tmp), want7), "loaded and saved again, the same bytes");
+    // a region's airport the save names but its recipe no longer has: the career at its main airport, the job released
+    std::string moved = want7;
+    auto swap = [&](const std::string& from, const std::string& to) { const size_t i = moved.find(from); if (i != std::string::npos) moved.replace(i, from.size(), to); };
+    swap("\nlocation 4\n", "\nlocation 9\n");
+    swap("\ncontract F4242_3 6 4 6 ", "\ncontract F4242_3 6 4 9 ");
+    if (FILE* f = fopen(tmp, "wb")) { fwrite(moved.data(), 1, moved.size(), f); fclose(f); }
+    Career m; m.newGame();
+    check(m.load(tmp) && m.region == "pr1-0-0-17" && m.location == procedural::mainAirport("pr1-0-0-17") && !m.job,
+          "an airport the region no longer has: the career waits at its main airport, the job's released");
+  }
   remove(tmp); remove((std::string(tmp) + ".bak").c_str()); remove((std::string(tmp) + ".tmp").c_str());
-  printf("Save format v6: %s\n", fails ? "FAIL" : "frozen");
+  printf("Save format v6 and v7: %s\n", fails ? "FAIL" : "frozen");
   return fails ? 1 : 0;
 }

@@ -230,6 +230,12 @@ private:
   void initFreeRegions();
   void chooseFreeRegion(const procedural::Descriptor& region);
   void loadFreeRegion(int index, GameScreen after = SCR_FREE_FLIGHT);
+  // The world a screen stands in: the hub and the debrief in the career's region, the research terminal in the
+  // islands, the menu in either ("" when the world loaded will do); loadCareerWorld loads one behind the loading card
+  std::string screenWorld() const;
+  std::string screenWorldFor(GameScreen screen) const;
+  void loadCareerWorld(const std::string& id, GameScreen after);
+  std::string careerPlaceName() const;   // where the career is: its airport when its world is loaded, else its region
   void updateRegionLoading(float dt);
   void drawRegionLoading();
   void drawRegionPicker();
@@ -843,6 +849,7 @@ private:
   void drawFreeFlightSetup(const FrameParams& fp);
   void drawHub();
   void drawHubContracts(float x, float y, float w, float h);
+  void drawTravel(float x, float y, float w, float h);   // the contracts tab's travel card: the regions the airline flies to
   void drawHubHangar(float x, float y, float w, float h);
   void drawHangarPreviewControls(float x, float y, float w);
   void drawHubLogbook(float x, float y, float w, float h);

@@ -7,7 +7,6 @@
 #include <cstdio>
 #include <cstring>
 #include <ctime>
-#include <stdexcept>
 
 const Achievement kAchievements[] = {
   // flying
@@ -137,17 +136,7 @@ int Profile::regionSites(const std::string& region) const { int n = 0; for (auto
 
 std::string airportStamp(const Airport& a) { return g_world.procedural ? g_world.regionId + ":" + a.code : std::string(a.code); }
 
-int regionAirportCount(const std::string& region) {
-  static std::map<std::string, int> counts;
-  auto it = counts.find(region);
-  if (it != counts.end()) return it->second;
-  int n = 0;
-  if (g_world.procedural && region == g_world.regionId) n = (int)g_world.airports.size();
-  else if (auto d = procedural::find(region); d && !d->authored) {
-    try { n = (int)procedural::Recipe(*d).airports.size(); } catch (const std::exception&) { n = 0; }
-  }
-  return counts[region] = n;
-}
+int regionAirportCount(const std::string& region) { return procedural::airportCount(region); }
 
 static std::vector<Site> s_sites;
 static std::string s_sitesWorld;   // (the world the list is of, by its region id: empty when there is none)

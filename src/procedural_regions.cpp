@@ -2,6 +2,8 @@
 #include "airport_layout.h"
 #include <array>
 #include <limits>
+#include <map>
+#include <mutex>
 #include <stdexcept>
 #include <unordered_set>
 
@@ -165,6 +167,32 @@ std::vector<Descriptor> recommendations(uint64_t worldSeed) {
   }
   return result;
 }
+
+namespace {
+struct AirportSummary { int count = 0, main = -1; };
+AirportSummary summary(const std::string& id, uint64_t worldSeed) {
+  static std::mutex lock;
+  static std::map<std::pair<std::string, uint64_t>, AirportSummary> kept;
+  std::lock_guard<std::mutex> guard(lock);
+  auto it = kept.find({id, worldSeed});
+  if (it != kept.end()) return it->second;
+  AirportSummary out;
+  auto pick = [&](const Airport* a, int n) {
+    out.count = n;
+    for (int i = 0; i < n; ++i) if (out.main < 0 || a[i].size > a[out.main].size) out.main = i;
+  };
+  if (id == "solace") {
+    std::vector<Airport> islands;
+    for (int i = 0; i < solaceAirportCount(); ++i) islands.push_back(solaceAirport(i));
+    pick(islands.data(), (int)islands.size());
+  } else if (auto d = find(id, worldSeed); d && !d->authored) {
+    try { const Recipe recipe(*d); pick(recipe.airports.data(), (int)recipe.airports.size()); } catch (const std::exception&) { out = {}; }
+  }
+  return kept[{id, worldSeed}] = out;
+}
+}  // namespace
+int airportCount(const std::string& id, uint64_t worldSeed) { return summary(id, worldSeed).count; }
+int mainAirport(const std::string& id, uint64_t worldSeed) { return summary(id, worldSeed).main; }
 
 Recipe::Recipe(const Descriptor& d) : descriptor(d) {
   const auto canonical = find(d.id, d.worldSeed);

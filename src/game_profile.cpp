@@ -188,7 +188,7 @@ void Game::steamPresence(std::string& token, steam::Pairs& values) const {
     case SCR_RESEARCH: token = "#Status_Research"; return;
     case SCR_FREE_FLIGHT: token = "#Status_FreeFlightSetup"; return;
     case SCR_HUB: case SCR_DEBRIEF: {
-      const std::string at = g_world.procedural ? std::string() : apName(career.location);
+      const std::string at = g_world.regionId == career.region ? apName(career.location) : std::string();   // (the hub's field, in its world)
       if (at.empty()) { token = "#Status_HubPlain"; return; }
       token = "#Status_Hub"; values.push_back({"airport", at}); return;
     }
@@ -207,7 +207,7 @@ void Game::steamPresence(std::string& token, steam::Pairs& values) const {
     token = "#Status_Trial"; values.push_back({"trial", name}); return;
   }
   if (contract.type == CT_LESSON) { token = "#Status_Lesson"; return; }
-  const std::string from = g_world.procedural ? std::string() : apName(contract.from), to = g_world.procedural ? std::string() : apName(contract.to);
+  const std::string from = apName(contract.from), to = apName(contract.to);
   if (isolatedFlight && !to.empty()) { token = "#Status_Practice"; values.push_back({"to", to}); return; }
   if (from.empty() || to.empty()) { token = "#Status_FreeFlight"; return; }
   token = "#Status_Job"; values.push_back({"from", from}); values.push_back({"to", to});

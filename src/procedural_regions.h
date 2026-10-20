@@ -46,6 +46,10 @@ std::optional<Descriptor> find(const std::string& id, uint64_t worldSeed = kDefa
 // distance with ID ties. At most kMaxNearby results; no heightmaps or global list.
 std::vector<Descriptor> nearby(geo::Position p, size_t count = 12, uint64_t worldSeed = kDefaultWorldSeed);
 std::vector<Descriptor> recommendations(uint64_t worldSeed = kDefaultWorldSeed);
+// A region's airports, and its main one (the first of its largest), by id wherever g_world is: the islands' from
+// their table, a generated region's from its recipe (made once, the answer kept). 0 and -1 for an unknown id
+int airportCount(const std::string& id, uint64_t worldSeed = kDefaultWorldSeed);
+int mainAirport(const std::string& id, uint64_t worldSeed = kDefaultWorldSeed);
 
 class Recipe {
 public:

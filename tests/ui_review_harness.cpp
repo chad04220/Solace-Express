@@ -468,6 +468,7 @@ struct GameTest {
     }
     if(sc=="menu_saved"||sc=="menu_overwrite"){g.hasSave=true;g.confirmNew=sc=="menu_overwrite";}
     if(sc=="contracts"){g.screen=SCR_HUB;g.hubTab=TAB_CONTRACTS;}
+    if(sc=="travel"){g.screen=SCR_HUB;g.hubTab=TAB_CONTRACTS;g.career.license=LIC_CPL;g.career.money=5000;g.career.storyIndex=12;g.selContract=2;}   // (the travel card: after the campaign's and Free Flight's)
     if(sc.rfind("airline",0)==0){g.screen=SCR_HUB;g.hubTab=TAB_AIRLINE;}
     if(sc=="settings"||sc=="controls"){g.screen=SCR_HUB;g.hubTab=TAB_SETTINGS;g.settingsPage=sc=="controls"?1:0;}
     if(sc.rfind("loading",0)==0){

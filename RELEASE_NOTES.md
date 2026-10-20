@@ -26,6 +26,13 @@
 - **They count in your passport.** Fly near a landmark, low enough to make it out, and it's found. Land at a region's airport and it's stamped. The passport shows the region you're in and lists every region you've explored, with how many of its airports you've landed at and how many landmarks you've found. The hub map and the GPS mark every landmark with a diamond, gold once it's found.
 - **Four new achievements:** Beyond the Horizon (land at an airport beyond the Solace Islands), Wayfarer (land in five regions), Charted (land at every airport in one region) and Cartographer (find 20 landmarks beyond the islands). Every Field and Grand Tour still count the islands alone.
 
+### A career beyond the islands
+- **Take your career to another region.** With a Private licence, the contracts board has a **Travel** card: an airline ticket to any region within 450 km, from about $200. A Commercial licence reaches twice as far, and the Airline Transport licence every region listed. You arrive at the region's main airport, and its board is there: cargo, passengers, medevacs, VIP charters, night freight, low-vis runs, surveys and photo flights over its own landmarks, all paying 15% more than in the islands.
+- **Your aircraft stay where you park them.** One you buy in a region is based there, and rentals wait at every field. The hangar shows where each of your aircraft is parked; away from one, you rent its type instead.
+- **Home is always a ticket away.** Away from the islands, the Travel card lists the Solace Islands first, and if the bank can't pay the fare, the airline flies you home on account. The campaign, the trials, Defense Command and your airline stay in the islands. Your routes keep flying and paying while you're away.
+- **Continue career takes you back to the region you were working in.**
+- A career that never leaves the islands saves exactly as before. One with something beyond them saves in a new format (version 7), which earlier versions of the game can't read.
+
 ### Worldwide trial boards on Steam
 - **Every trial now has a worldwide leaderboard on Steam,** one for each trial and aircraft, plus one for each day's daily trial. Your best time is uploaded when you finish, and the results card shows your place in the world under your place on the local board.
 

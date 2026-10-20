@@ -585,8 +585,10 @@ void Game::drawMenu() {
   panel(x, y, cw, (hasSave ? 114 : 86) * s);
   g_ren.text(x + 24 * s, y + 16 * s, 11 * s, hasSave ? (profile.name.empty() ? std::string("CAREER READY") : ellipsize("WELCOME BACK, CAPTAIN " + [&] { std::string u; for (char ch : profile.name) u += (char)toupper((unsigned char)ch); return u; }(), bw, 11 * s)) : std::string("WELCOME ABOARD"), C_ACCENT, 1, 0, false);
   if (hasSave) {
-    const Airport& ap = g_world.airports[career.location];
-    g_ren.text(x + 24 * s, y + 36 * s, 15 * s, ellipsize(std::string(licenseName(career.license)) + " / " + ap.code, bw, 15 * s), C_TEXT, 1);
+    // (where the career is: its field's code when its world is loaded, else its region)
+    const bool loaded = g_world.regionId == career.region && career.location < (int)g_world.airports.size();
+    const std::string at = loaded ? std::string(g_world.airports[career.location].code) : careerPlaceName();
+    g_ren.text(x + 24 * s, y + 36 * s, 15 * s, ellipsize(std::string(licenseName(career.license)) + " / " + at, bw, 15 * s), C_TEXT, 1);
     if (button(x + 24 * s, y + 64 * s, bw, 34 * s, "Continue career", true, true)) { enterCareerHub(); career.refreshBoard(); }
   } else g_ren.text(x + 24 * s, y + 40 * s, 15 * s, "Start small. Build your airline.", C_TEXT, 1);
   y += (hasSave ? 130 : 102) * s;
@@ -660,7 +662,7 @@ void Game::drawHub() {
   g_ren.rect(hx + 2 * s, 44 * s, 54 * s, 2 * s, C_ACCENT, 1);
   g_ren.rect(hx + 60 * s, 44.5f * s, std::max(tw - 60 * s, 20 * s), 1 * s, C_ACCENT, 0.35f);
   g_ren.text(hx + 2 * s, 50 * s, 12 * s, std::string("CAREER  //  ") + licenseName(career.license), C_ACCENT, 1, 0, false);
-  const Airport& loc = g_world.airports[career.location];
+  const bool loaded = g_world.regionId == career.region && career.location < (int)g_world.airports.size();   // (the settings, opened from the menu, may stand in another world)
   float rx = W - 24 * s;   // stat chips, laid out from the right edge
   auto chip = [&](const char* k, const std::string& v, vec3 c, float maxW) {
     float vs = 19 * s;
@@ -672,7 +674,11 @@ void Game::drawHub() {
     g_ren.rect(x0 - 18 * s, 18 * s, 1 * s, 34 * s, C_ACCENT, 0.25f);
     rx = x0 - 36 * s;
   };
-  chip("LOCATION", fmt("%s  %s", loc.code, loc.name), C_TEXT, std::max(140 * s, W * 0.26f));
+  {   // the field, and the region when it isn't the islands
+    std::string label = "LOCATION";
+    if (!career.atHome()) if (auto d = procedural::find(career.region)) label += "  /  " + upperS(d->name);
+    chip(label.c_str(), loaded ? fmt("%s  %s", g_world.airports[career.location].code, g_world.airports[career.location].name) : careerPlaceName(), C_TEXT, std::max(140 * s, W * 0.26f));
+  }
   chip("REPUTATION", fmt("%d", career.reputation), C_ACCENT, 120 * s);
   chip("BANK", fmtMoney(career.money), career.money < 0 ? C_BAD : C_GOOD, 160 * s);
   // tabs: numbered labels over a hairline, a glowing bar glides under the active one
@@ -767,18 +773,19 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   float lw = std::min(w * 0.29f, 370 * s);
   panel(x, y, lw, h);
   // build card list: story, free flight, freelance
-  struct Card { const Contract* c; bool story; bool free; bool job = false; int trial = -1; bool legend = false; };
+  struct Card { const Contract* c; bool story; bool free; bool job = false; int trial = -1; bool legend = false; bool travel = false; };
   std::vector<Card> cards;
   static Contract jobCont;   // the open job's next leg (pinned on top while the job waits for it)
   const bool openJob = career.job && career.job->state == Career::JobState::RECOVERY;
   if (hubList == 1) { for (int k = 0; k < TR_COUNT; k++) cards.push_back({nullptr, false, false, false, k}); }
   else {
     if (openJob) { jobCont = career.job->continuation(); cards.push_back({&jobCont, false, false, true}); }
-    const Contract* st = career.nextStory();
+    const Contract* st = career.atHome() ? career.nextStory() : nullptr;   // (the campaign is flown in the islands)
     if (st) cards.push_back({st, true, false});
     cards.push_back({nullptr, false, true});
+    if (career.license >= LIC_PPL || !career.atHome()) cards.push_back({nullptr, false, false, false, -1, false, true});   // the airline to another region
     static const std::vector<Contract> legends = Career::legendaryContracts();   // (after the campaign: the hardest flying in the islands)
-    if (career.finished) for (auto& c : legends) cards.push_back({&c, false, false, false, -1, true});
+    if (career.finished && career.atHome()) for (auto& c : legends) cards.push_back({&c, false, false, false, -1, true});
     for (auto& c : career.board) cards.push_back({&c, false, false});
   }
   selContract = std::clamp(selContract, 0, (int)cards.size() - 1);
@@ -787,8 +794,14 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
     float sw = (lw - 48 * s) / 3.f;
     // (one style for the three: the selected one lit - "WORK", "trials" and "Military" were cased three ways)
     if (button(x + 16 * s, cy - 4 * s, sw, 26 * s, "WORK", true, hubList == 0) && hubList != 0) { hubList = 0; selContract = 0; selAircraft = -1; }
-    if (button(x + 24 * s + sw, cy - 4 * s, sw, 26 * s, "TRIALS", true, hubList == 1) && hubList != 1) { hubList = 1; selContract = 0; selAircraft = -1; }
-    if(button(x+32*s+sw*2,cy-4*s,sw,26*s,"MILITARY")) { hubList=2; selContract=0; return; }
+    // (the trials' courses and Defense Command are the islands': away from them, the buttons say so)
+    if (button(x + 24 * s + sw, cy - 4 * s, sw, 26 * s, "TRIALS", true, hubList == 1) && hubList != 1) {
+      if (career.atHome()) { hubList = 1; selContract = 0; selAircraft = -1; } else { hubMsg = "The trials are flown in the Solace Islands: travel home to fly them."; hubMsgTime = 5; }
+    }
+    if(button(x+32*s+sw*2,cy-4*s,sw,26*s,"MILITARY")) {
+      if (career.atHome()) { hubList=2; selContract=0; return; }
+      hubMsg = "Defense Command is in the Solace Islands: travel home for its board."; hubMsgTime = 5;
+    }
     cy += 32 * s;
   }
   if (hubList == 0) { header(x + 16 * s, cy, lw - 32 * s, ellipsize(career.finished ? "CAMPAIGN COMPLETE - FREELANCE JOBS CONTINUE" : "AVAILABLE WORK", lw - 60 * s, 13 * s)); cy += 28 * s; }
@@ -836,6 +849,9 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
     } else if (cards[i].free) {
       fitText(x + 24 * s, cy + 9 * s, lw - 48 * s, 18 * s, 13 * s, "Free Flight / Ferry", C_TEXT);
       g_ren.text(x + 24 * s, cy + 36 * s, 14 * s, ellipsize("Fly anywhere for fun or to reposition. No pay.", lw - 48 * s, 14 * s), C_DIM, 1);
+    } else if (cards[i].travel) {
+      fitText(x + 24 * s, cy + 9 * s, lw - 48 * s, 18 * s, 13 * s, career.atHome() ? "Travel / Beyond the islands" : "Travel / On, or home", C_TEXT);
+      g_ren.text(x + 24 * s, cy + 36 * s, 14 * s, ellipsize(career.atHome() ? "Take the airline to another region and work there." : "Fly on to another region, or home to the Solace Islands.", lw - 48 * s, 14 * s), C_DIM, 1);
     } else {
       const Contract& c = *cards[i].c;
       const bool legendDone = cards[i].legend && profile.count("legend." + c.id) > 0.f;
@@ -855,6 +871,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   float dx = x + lw + 16 * s, dw = w - lw - 16 * s;
   panel(dx, y, dw, h);
   Card cd = cards[selContract];
+  if (cd.travel) { drawTravel(dx, y, dw, h); return; }
   Contract free;
   if (cd.free) {
     free.id = "FREE"; free.title = "Free Flight"; free.type = CT_FERRY; free.from = career.location;
@@ -1212,8 +1229,70 @@ void Game::drawHangarPreviewControls(float x,float y,float w) {
   drawMenuPreviewControls(hangarView,0x7E6F0030u,x,y,w,s,C_PANEL,C_ACCENT,C_TEXT,C_DIM,4*s);
 }
 
+// The travel card (Career::destinations): the regions the airline flies to from where the career is - the islands
+// first when away, then the nearest - each with its fare and the licence it takes. A click buys the ticket
+// (Career::travel); the hub then waits behind the loading card while the region is prepared (Game::screenWorld)
+void Game::drawTravel(float x, float y, float w, float h) {
+  float s = S();
+  const float px = x + 22 * s, iw = w - 44 * s;
+  float py = y + 18 * s;
+  g_ren.text(px, py, 24 * s, career.atHome() ? "Beyond the islands" : "Travel on, or home", C_TEXT, 1); py += 40 * s;
+  const std::string brief = career.atHome()
+    ? "Fly with the airline to another region and work there: its own airports, its own board, and pay 15% above the islands'. Your own aircraft stay parked where they are; rentals wait at every field. The campaign, the trials, Defense Command and your airline stay in the Solace Islands."
+    : "Fly on to another region, or home to the Solace Islands for the campaign, the trials, Defense Command and your airline. Your own aircraft stay parked where they are.";
+  for (auto& l : wrap(brief, iw, 15 * s)) { g_ren.text(px, py, 15 * s, l, C_TEXT, 0.92f); py += 21 * s; }
+  py += 8 * s;
+  const bool busy = career.job.has_value() || career.attemptOpen;
+  if (busy) { g_ren.text(px, py, 14 * s, "Finish or release the open job before you travel.", C_WARN, 1); py += 26 * s; }
+  static std::string listFor; static int listLic = -1; static std::vector<Career::Destination> list;
+  if (listFor != career.region || listLic != career.license) { list = career.destinations(); listFor = career.region; listLic = career.license; }
+  header(px, py, iw, "DESTINATIONS"); py += 30 * s;
+  const float top = py, bottom = y + h - 16 * s, rowH = 56 * s;
+  static float scroll = 0.f;
+  const float limit = std::max(0.f, list.size() * rowH - (bottom - top));
+  bool wheeled = false;
+  if (hovered(px, top, iw, bottom - top) && in.wheel != 0) { scroll -= in.wheel * 48 * s; in.wheel = 0; wheeled = true; }
+  scroll = std::clamp(scroll, 0.f, limit);
+  const size_t focus0 = focusList.size();
+  g_ren.uiClip(px - 4 * s, top, px + iw + 4 * s, bottom);
+  float ry = top - scroll;
+  for (const Career::Destination& d : list) {
+    const auto region = procedural::find(d.id);
+    const int needs = d.home ? LIC_STUDENT : std::max(d.minLicense, (int)LIC_PPL);
+    const bool licensed = career.license >= needs, credit = d.home && career.money < d.fare;
+    const bool can = !busy && licensed && (credit || career.money >= d.fare) && !commitBlocked();
+    if (ry + rowH > top && ry < bottom) {
+      g_ren.rect(px, ry, iw, rowH - 6 * s, d.home ? C_ACCENT * 0.12f : C_PANEL2, d.home ? 0.8f : 0.45f, 4 * s);
+      g_ren.text(px + 12 * s, ry + 7 * s, 15 * s, ellipsize(d.name, iw - 210 * s, 15 * s), licensed ? C_TEXT : C_DIM, 1);
+      std::string sub = d.home ? std::string("Home: the campaign, the trials, Defense Command, your airline")
+                               : region ? fmt("%s %s", procedural::scaleName(region->scale), lowerS(procedural::archetypeName(region->archetype)).c_str()) : std::string();
+      sub += fmt("  /  %.0f km", d.km);
+      if (!licensed) sub += std::string("  /  needs a ") + licenseName(needs);
+      g_ren.text(px + 12 * s, ry + 29 * s, 12 * s, ellipsize(sub, iw - 210 * s, 12 * s), licensed ? C_DIM : C_WARN, 0.9f);
+      if (ry >= top && ry + 44 * s <= bottom &&
+          button(px + iw - 180 * s, ry + 8 * s, 170 * s, 34 * s, credit ? std::string("Fly home on account") : "Fly / " + fmtMoney(d.fare), can, d.home)) {
+        std::string m; bool ok = false;
+        commit([&](Career& k) { ok = k.travel(d, &m); });
+        hubMsg = m; hubMsgTime = 6;
+        if (ok) g_audio.trigger(SFX_CASH);
+      }
+    }
+    ry += rowH;
+  }
+  g_ren.uiClipOff();
+  focusScrollPixels(focus0, uid(0, 0, "travel-scroll"), px, top, iw, bottom, scroll, wheeled, limit > 0);
+}
+
 void Game::drawHubHangar(float x, float y, float w, float h) {
   const float s = S();
+  // where an owned aircraft is parked: its field here (its name, or its code), or the region it is in
+  auto parkedAt = [&](const OwnedPlane& p, bool name) -> std::string {
+    if (career.here(p) && g_world.regionId == career.region && p.location < (int)g_world.airports.size())
+      return name ? g_world.airports[p.location].name : g_world.airports[p.location].code;
+    if (p.region == "solace") return "the Solace Islands";
+    if (auto d = procedural::find(p.region)) return "the " + d->name;
+    return p.region;
+  };
   const HangarLayout layout = hangarLayout(x, y, w, h, s);
   const float lw = layout.leftWidth, rw = layout.rightWidth;
   const float rx = layout.rightX, vx = layout.previewX, vw = layout.previewWidth;
@@ -1332,7 +1411,7 @@ void Game::drawHubHangar(float x, float y, float w, float h) {
     if (button(px, py, iw, 36 * s, "Buy used / " + fmtMoney(career.usedPrice(selHangar)), lic && career.money >= career.usedPrice(selHangar))) { std::string m; bool ok = false; commit([&](Career& k) { ok = k.buyUsed(selHangar, &m); }); result(m, ok); }
     py += 46 * s; note("Two thirds condition, half tanks. Lower purchase price, more upkeep.");
   } else {
-    note(std::string("Parked at ") + g_world.airports[career.fleet[oi].location].name, C_GOOD);
+    note(std::string("Parked at ") + parkedAt(career.fleet[oi], true), career.here(career.fleet[oi]) ? C_GOOD : C_WARN);
     const int saleVal = career.saleValue(oi);
     if (career.loan.open() && career.loan.spec == career.fleet[oi].spec) note(fmt("Loan settlement %s. Net proceeds %s.", fmtMoney(career.loan.balance).c_str(), fmtMoney(saleVal - career.loan.balance).c_str()), C_WARN);
     if (button(px, py, iw, 38 * s, "Sell / " + fmtMoney(saleVal), !commitBlocked())) { std::string m; bool ok = false; commit([&](Career& k) { ok = k.sell(oi, &m); }); result(m, ok); }
@@ -1352,12 +1431,13 @@ void Game::drawHubHangar(float x, float y, float w, float h) {
   for (size_t fi = 0; fi < career.fleet.size(); ++fi) {
     const OwnedPlane f = career.fleet[fi]; const AircraftSpec& fs = kAircraft[f.spec];
     g_ren.text(px, py, 16 * s, ellipsize(fs.name, iw, 16 * s), C_TEXT, 1); py += 25 * s;
-    note(fmt("%s / %.0f%% fuel / %.0f%% condition%s", g_world.airports[f.location].code, 100 * f.fuel / std::max(fs.maxFuel, 1.f), 100 * f.condition, career.routeOf((int)fi) >= 0 ? " / on route" : ""));
-    if (f.location == career.location && f.fuel < fs.maxFuel - 1) {
+    note(fmt("%s / %.0f%% fuel / %.0f%% condition%s", parkedAt(f, false).c_str(), 100 * f.fuel / std::max(fs.maxFuel, 1.f), 100 * f.condition, career.routeOf((int)fi) >= 0 ? " / on route" : ""));
+    const bool atHand = career.here(f) && f.location == career.location;
+    if (atHand && f.fuel < fs.maxFuel - 1) {
       const int cost = (int)((fs.maxFuel - f.fuel) * career.fuelPrice(career.location, f.spec));
       if (button(px, py, iw, 32 * s, "Fill up / " + fmtMoney(cost), !commitBlocked() && career.money >= cost)) { std::string m; bool ok = false; commit([&](Career& k) { ok = k.refuel((int)fi, &m); }); result(m, ok); } py += 42 * s;
     }
-    if (f.location == career.location && f.condition < 0.97f) {
+    if (atHand && f.condition < 0.97f) {
       const int cost = career.serviceCost((int)fi);
       if (button(px, py, iw, 32 * s, "Service / " + fmtMoney(cost), !commitBlocked() && career.money >= cost)) { std::string m; bool ok = false; commit([&](Career& k) { ok = k.service((int)fi, &m); }); result(m, ok); } py += 42 * s;
     }
@@ -1596,6 +1676,18 @@ void Game::drawFreeFlightSetup(const FrameParams& fp) {
 // ------------------------------------------------------------------ the airline tab (C11)
 void Game::drawHubAirline(float x, float y, float w, float h) {
   float s = S();
+  if (!career.atHome()) {   // (the airline is the islands': away, its routes fly on and pay as you fly)
+    const float pw = std::min(w, 760 * s);
+    panel(x, y, pw, 190 * s);
+    g_ren.text(x + 24 * s, y + 20 * s, 22 * s, "Your airline flies in the Solace Islands", C_TEXT, 1);
+    float py = y + 62 * s;
+    const std::string t = career.airline.routes.empty()
+      ? "The airline opens with your Airline Transport licence, from the islands. Travel home to put your aircraft on routes and hire their pilots."
+      : fmt("Its %d route%s keep%s flying while you are away, and pay into your bank as you fly here. Travel home to change them, hire pilots or recall an aircraft.",
+            (int)career.airline.routes.size(), career.airline.routes.size() == 1 ? "" : "s", career.airline.routes.size() == 1 ? "s" : "");
+    for (auto& l : wrap(t, pw - 48 * s, 15 * s)) { g_ren.text(x + 24 * s, py, 15 * s, l, C_DIM, 1); py += 21 * s; }
+    return;
+  }
   float lw = std::min(w * 0.5f, 620 * s);
   panel(x, y, lw, h); panel(x + lw + 16 * s, y, w - lw - 16 * s, h);
   static float airScroll[2] = {0, 0}, airContent[2] = {0, 0};
@@ -3855,7 +3947,7 @@ void Game::drawDebrief() {
   const bool campaignEnd = career.finished && lastSuccess && contract.story && contract.id == g_story.back().id;
   const auto campaignLines = campaignEnd ? wrap("You've completed the Somnium Volandi campaign. Congratulations, Captain!", pw - 60 * s, 18 * s) : std::vector<std::string>();
   const bool newLic = career.license > licenseBefore;
-  const Contract* upNext = lastSuccess && !campaignEnd && !commitBlocked() ? career.nextStory() : nullptr;
+  const Contract* upNext = lastSuccess && !campaignEnd && !commitBlocked() && career.atHome() ? career.nextStory() : nullptr;   // (the campaign: in the islands)
   const float campY = (commitBlocked() ? y + ph - 108 * s : y + ph - 76 * s) - campaignLines.size() * 24 * s - (upNext ? 26 * s : 0.f);
   const float licY = campY - (newLic ? 34 * s : 0.f), totalY = licY - 34 * s;
   int total = 0;
