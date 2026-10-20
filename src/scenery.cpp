@@ -117,16 +117,17 @@ static float roadDistanceIn(const std::vector<RoadSeg>& roads, float x, float z,
 
 // (measured as the old roads were: from the centreline of a country road 12 m across - so from the platform's edge, plus
 // 6 m - whatever the class; the scenery's clearances were tuned to that)
-float roadDistance(float x, float z, int* segOut) { return roadEdgeDistance(g_world.roadGrid, x, z, segOut) + 6.f; }
+float roadDistance(float x, float z, int* segOut) { return roadEdgeDistance(sceneryWorld().roadGrid, x, z, segOut) + 6.f; }
 
 int communityAt(float x, float z) {
-  if (!g_world.settlements.empty()) {   // (the settlements' own extents, once they're grown)
-    int town = -1; const float share = settlementShare(g_world.settlements, x, z, &town);
+  const World& W = sceneryWorld();
+  if (!W.settlements.empty()) {   // (the settlements' own extents, once they're grown)
+    int town = -1; const float share = settlementShare(W.settlements, x, z, &town);
     return share < 1.f ? town : -1;
   }
   int best = -1; float distance = 1.f;
-  for (int i = 0; i < (int)g_world.towns.size(); i++) {
-    const Town& t = g_world.towns[i];
+  for (int i = 0; i < (int)W.towns.size(); i++) {
+    const Town& t = W.towns[i];
     float d = hypotf(x - t.x, z - t.z) / t.r;
     if (d < distance) { best = i; distance = d; }
   }
@@ -362,11 +363,11 @@ const std::vector<PlacedEnt>& civicLandmarks(const World& world) { return scener
 const std::vector<TreeSpot>& settlementTrees(const World& world) { return sceneryState(world).trees; }
 void lotsIn(const World& world, float x0, float z0, float x1, float z1, std::vector<int>& out) { cellsIn(sceneryState(world).lotCells, x0, z0, x1, z1, out); }
 void treesIn(const World& world, float x0, float z0, float x1, float z1, std::vector<int>& out) { cellsIn(sceneryState(world).treeCells, x0, z0, x1, z1, out); }
-const std::vector<Lot>& settlementLots() { return settlementLots(g_world); }
-const std::vector<PlacedEnt>& civicLandmarks() { return civicLandmarks(g_world); }
-const std::vector<TreeSpot>& settlementTrees() { return settlementTrees(g_world); }
-void lotsIn(float x0, float z0, float x1, float z1, std::vector<int>& out) { lotsIn(g_world, x0, z0, x1, z1, out); }
-void treesIn(float x0, float z0, float x1, float z1, std::vector<int>& out) { treesIn(g_world, x0, z0, x1, z1, out); }
+const std::vector<Lot>& settlementLots() { return settlementLots(sceneryWorld()); }
+const std::vector<PlacedEnt>& civicLandmarks() { return civicLandmarks(sceneryWorld()); }
+const std::vector<TreeSpot>& settlementTrees() { return settlementTrees(sceneryWorld()); }
+void lotsIn(float x0, float z0, float x1, float z1, std::vector<int>& out) { lotsIn(sceneryWorld(), x0, z0, x1, z1, out); }
+void treesIn(float x0, float z0, float x1, float z1, std::vector<int>& out) { treesIn(sceneryWorld(), x0, z0, x1, z1, out); }
 
 void sceneryBakeCommunityLots(World& world) {
   generationPhase(GenerationPhase::CommunityLots);

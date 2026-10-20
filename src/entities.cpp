@@ -12,6 +12,26 @@ void Scenery::Chunk::markChanged() { revision=entityChunkRevision.fetch_add(1,st
 
 Scenery g_scenery;
 
+// A region's immutable, lazily populated geometry. Reset only after all scenery workers have finished, before
+// replacing the world they refer to (a staged chart's travels with its chunks: Scenery::adopt)
+struct Scenery::RegionCache {
+  std::once_flag lighthouseOnce, airportOnce, padOnce;
+  bool lighthouseFound = false;
+  float lighthouseX = 0.f, lighthouseZ = 0.f, lighthouseYaw = 0.f, pad = 20.f;
+  struct Bounds { float x0, z0, x1, z1; };
+  std::vector<std::vector<AptItem>> airportItems;
+  std::vector<Bounds> airportBounds;
+};
+using EntityRegionCache = Scenery::RegionCache;
+
+namespace {
+// The World a chunk is being made from on this thread, and its cache (Scenery::generate sets both)
+thread_local const World* tlWorld = nullptr;
+thread_local EntityRegionCache* tlCache = nullptr;
+std::unique_ptr<EntityRegionCache>& regionCache();   // (the region's: g_scenery's chunks read it)
+}
+const World& sceneryWorld() { return tlWorld ? *tlWorld : g_world; }
+
 // ---------------------------------------------------------------- worker pool for chunk generation
 struct Scenery::Async {
   struct Job { int cx, cz, level, epoch; Chunk c; };
@@ -27,9 +47,10 @@ struct Scenery::Async {
   int active = 0;                      // workers reading the active world outside the queue lock
 };
 
-Scenery::Scenery() : async(new Async()) {
+Scenery::Scenery(int workerCount, const World* src) : async(new Async()), source(src) {
   int hw = (int)std::thread::hardware_concurrency();
-  int n = std::clamp(hw - 1, 0, 6);    // leave the main / GL thread its own core
+  int n = workerCount >= 0 ? workerCount : std::clamp(hw - 1, 0, 6);    // leave the main / GL thread its own core
+  if (source) ownCache.reset(new RegionCache());
   for (int t = 0; t < n; t++)
     async->threads.emplace_back([this] {
       Async& A = *async;
@@ -122,6 +143,47 @@ void Scenery::pump(std::vector<int>& installed) {
     p->markChanged();  // publication gets a fresh identity even after an older worker job
     installed.push_back(idx);
   }
+}
+
+int Scenery::stage(vec3 at, float farDetail, float farAll, float ready) {
+  std::vector<int> got;
+  pump(got);
+  struct Need { float d; int cx, cz, level; };
+  std::vector<Need> need;
+  int missing = 0;
+  const int rad = (int)ceilf(farAll / CH) + 1, acx = chunkOf(at.x), acz = chunkOf(at.z);
+  for (int cz = std::max(acz - rad, 0); cz <= std::min(acz + rad, NC - 1); cz++)
+    for (int cx = std::max(acx - rad, 0); cx <= std::min(acx + rad, NC - 1); cx++) {
+      const float x0 = chunkX0(cx), z0 = chunkX0(cz);   // (the chunk's nearest point, as the renderer measures it)
+      const float ex = std::max(std::max(x0 - at.x, at.x - x0 - CH), 0.f), ez = std::max(std::max(z0 - at.z, at.z - z0 - CH), 0.f);
+      const float d = sqrtf(ex * ex + ez * ez);
+      const int want = d < farDetail ? 2 : d < farAll ? 1 : 0;
+      const Chunk* c = want ? get(cx, cz) : nullptr;
+      if (!want || (c && c->level >= want)) continue;
+      need.push_back({d, cx, cz, want});
+      missing += d < ready;
+    }
+  std::sort(need.begin(), need.end(), [](const Need& a, const Need& b) { return a.d < b.d; });
+  for (const Need& n : need) if (!request(n.cx, n.cz, n.level)) break;   // (the queue full: the rest on later calls)
+  if (++stageFrame % 120 == 0 && !chunks.empty())   // (what the place has left behind as it moved)
+    for (int cz = 0; cz < NC; cz++)
+      for (int cx = 0; cx < NC; cx++) {
+        auto& p = chunks[(size_t)cz * NC + cx];
+        if (p && hypotf(chunkX0(cx) + CH * 0.5f - at.x, chunkX0(cz) + CH * 0.5f - at.z) > farAll + 2500.f) p.reset();
+      }
+  return missing;
+}
+
+void Scenery::adopt(Scenery& staged) {
+  std::vector<int> got;
+  staged.pump(got);   // (any finished since its last call; its workers are idle)
+  {
+    std::lock_guard<std::mutex> lk(async->m);
+    async->todo.clear(); async->done.clear(); async->busy.clear(); async->epoch++;
+  }
+  chunks = std::move(staged.chunks);
+  for (auto& p : chunks) if (p) { p->lastUse = 0; p->markChanged(); }
+  if (staged.ownCache) regionCache().reset(staged.ownCache.release());
 }
 
 const EntKindInfo kEntInfo[EK_COUNT] = {
@@ -246,6 +308,7 @@ bool findLighthouseSite(const World& world, float& lx, float& lz, float& yaw) {
   return best < 1e8f;
 }
 
+
 namespace {
 struct Ctx {
   std::vector<Ent>* out[EK_COUNT];
@@ -253,7 +316,7 @@ struct Ctx {
   bool inside(float x, float z) const { return x >= x0 && x < x1 && z >= z0 && z < z1; }
 };
 
-float ground(float x, float z) { return g_world.groundHeight(x, z, 7); }
+float ground(float x, float z) { return sceneryWorld().groundHeight(x, z, 7); }
 
 // lowest ground under a footprint (rotated half extents), so a building's plinth never floats on a slope
 float footprintGround(float x, float z, float yaw, float hx, float hz) {
@@ -278,26 +341,18 @@ void putBuilding(Ctx& C, int kind, float x, float z, float yaw, float hw, float 
   put(C, kind, x, g, z, yaw, sx, sy, sz, seed);
 }
 
-// The active region's immutable, lazily populated geometry. Reset only after all
-// scenery workers have finished, before replacing the world they refer to.
-struct EntityRegionCache {
-  std::once_flag lighthouseOnce, airportOnce, padOnce;
-  bool lighthouseFound = false;
-  float lighthouseX = 0.f, lighthouseZ = 0.f, lighthouseYaw = 0.f, pad = 20.f;
-  struct Bounds { float x0, z0, x1, z1; };
-  std::vector<std::vector<AptItem>> airportItems;
-  std::vector<Bounds> airportBounds;
-};
 std::unique_ptr<EntityRegionCache>& regionCache() {
   static std::unique_ptr<EntityRegionCache> cache(new EntityRegionCache());
   return cache;
 }
+// (the cache of the World this thread is making chunks from: a staged chart's own, else the region's)
+EntityRegionCache& currentCache() { return tlCache ? *tlCache : *regionCache(); }
 
 // The lighthouse stands on the shore of Lighthouse Key: the low land point nearest the sea around the village
 bool lighthouseSite(float& lx, float& lz, float& yaw) {
-  EntityRegionCache& cache = *regionCache();
+  EntityRegionCache& cache = currentCache();
   std::call_once(cache.lighthouseOnce, [&] {
-    cache.lighthouseFound = findLighthouseSite(g_world, cache.lighthouseX, cache.lighthouseZ, cache.lighthouseYaw);
+    cache.lighthouseFound = findLighthouseSite(sceneryWorld(), cache.lighthouseX, cache.lighthouseZ, cache.lighthouseYaw);
   });
   lx = cache.lighthouseX; lz = cache.lighthouseZ; yaw = cache.lighthouseYaw;
   return cache.lighthouseFound;
@@ -320,11 +375,12 @@ void sceneryResetWorldCaches() {
 }
 
 bool seaStackShore(float x, float z) {
+  const World& W = sceneryWorld();
   for (int k = 0; k < 12; k++) {
     const float ca = cosf(k * 0.5236f), sa = sinf(k * 0.5236f);
     for (float d = 30.f; d <= 220.f; d += 30.f)
-      if (g_world.naturalHeight(x + ca * d, z + sa * d) > 0.f) {   // (the shore this way: steep behind it?)
-        if (g_world.naturalHeight(x + ca * (d + 40.f), z + sa * (d + 40.f)) > 14.f || g_world.naturalHeight(x + ca * (d + 100.f), z + sa * (d + 100.f)) > 26.f) return true;
+      if (W.naturalHeight(x + ca * d, z + sa * d) > 0.f) {   // (the shore this way: steep behind it?)
+        if (W.naturalHeight(x + ca * (d + 40.f), z + sa * (d + 40.f)) > 14.f || W.naturalHeight(x + ca * (d + 100.f), z + sa * (d + 100.f)) > 26.f) return true;
         break;
       }
   }
@@ -333,6 +389,13 @@ bool seaStackShore(float x, float z) {
 
 // ------------------------------------------------------------------ chunk generation
 void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
+  // (made from this one's World, its cache with it, whatever thread this is: a staged chart's while g_world is another)
+  struct Bind {
+    const World* world; EntityRegionCache* cache;
+    Bind(const World* w, EntityRegionCache* c) : world(tlWorld), cache(tlCache) { tlWorld = w; tlCache = c; }
+    ~Bind() { tlWorld = world; tlCache = cache; }
+  } bind(source ? source : &g_world, ownCache ? ownCache.get() : regionCache().get());
+  const World& W = *tlWorld;   // (every read below of the World the chunk is made from)
   std::vector<Ent> lists[EK_COUNT];
   // keep what the chunk already has
   for (int k = 0; k < EK_COUNT; k++) lists[k].assign(ch.ents.begin() + ch.off[k], ch.ents.begin() + ch.off[k + 1]);
@@ -345,13 +408,13 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
     // ---------------------------------------------------------------- airport lighting fixtures (L1): runway edge
     // lights every 60 m (amber over the last 600 m of a paved runway), green / red threshold bars, approach lights
     if (L == 1)
-      for (const Airport& a : g_world.airports) {
+      for (const Airport& a : W.airports) {
         vec3 c = a.pos(), dir = a.dir(), rt(-dir.z, 0, dir.x);
         float ext = a.length * 0.5f + 420.f;
         if (c.x + ext < C.x0 || c.x - ext > C.x1 || c.z + ext < C.z0 || c.z - ext > C.z1) continue;
         auto put = [&](vec3 p, int col) {
           if (!C.inside(p.x, p.z)) return;
-          float y = std::max(g_world.height(p.x, p.z), a.elev - 0.5f);
+          float y = std::max(W.height(p.x, p.z), a.elev - 0.5f);
           C.out[EK_RWYLIGHT]->push_back({p.x, y, p.z, 0.f, 1.f, 1.f, 1.f, (float)col + 0.5f});
         };
         for (float u = -a.length * 0.5f; u <= a.length * 0.5f + 0.1f; u += 60.f)
@@ -364,7 +427,7 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
             for (int i = 0; i < 4; i++) {
               vec3 p = base - lrt * (i * 9.f);
               if (!C.inside(p.x, p.z)) continue;
-              float y = std::max(g_world.height(p.x, p.z), a.elev - 0.5f);
+              float y = std::max(W.height(p.x, p.z), a.elev - 0.5f);
               C.out[EK_PAPI]->push_back({p.x, y, p.z, atan2f(-ld.x, -ld.z), 1.f, 1.f, 1.f, 3.5f - i * 0.333f});
             }
           }
@@ -378,12 +441,12 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
       }
     // ---------------------------------------------------------------- airport buildings, aircraft, vehicles (L1)
     if (L == 1) {
-      EntityRegionCache& cache = *regionCache();
+      EntityRegionCache& cache = currentCache();
       auto& items = cache.airportItems;
       auto& boxes = cache.airportBounds;
       using Bounds = EntityRegionCache::Bounds;
       std::call_once(cache.airportOnce, [&] {
-        items.resize(g_world.airports.size()); boxes.resize(g_world.airports.size());
+        items.resize(W.airports.size()); boxes.resize(W.airports.size());
         for (size_t i = 0; i < items.size(); i++) {
           airportItems((int)i, items[i]);
           Bounds b{1e9f, 1e9f, -1e9f, -1e9f};
@@ -428,7 +491,7 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
             if (t == 3) at((h2(si + t, sj - 9) < 0.5f ? -1.f : 1.f) * (lot.hw + 1.5f), lot.hd + 2.5f, x, z);   // (the front garden)
             else at((h2(si + t, sj - 9) - 0.5f) * 2.f * (lot.hw + 2.f), -(lot.hd + 3.f + 7.f * h2(si - t, sj + 3)), x, z);
             if (!C.inside(x, z) || roadDistance(x, z) < 9.f || ground(x, z) < 2.5f) continue;
-            float base[4]; g_world.sampleBase(x, z, base);
+            float base[4]; W.sampleBase(x, z, base);
             const int sp = base[3] > .45f ? EK_SPRUCE : base[2] > .85f && ground(x, z) < 70.f ? EK_PALM : ht < .3f ? EK_BIRCH : EK_OAK;
             const float sc = .55f + .25f * h2(si - t * 7, sj + 41);
             put(C, sp, x, ground(x, z) - .15f, z, ht * 40.f, sc, sc, sc, h2(si * 3 + t, sj * 7));
@@ -451,7 +514,7 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
       // the farmhouse by the way in, facing the yard; the barn across its far end; a machine shed along one side; the
       // silos by the barn; often a second shed; a lorry or a car in the yard. Each building faces the yard and stands
       // clear of its platform and of every road
-      for (const Farmstead& F : g_world.farms) {
+      for (const Farmstead& F : W.farms) {
         if (F.x < C.x0 - 90.f || F.x > C.x1 + 90.f || F.z < C.z0 - 90.f || F.z > C.z1 + 90.f) continue;
         const vec2 in(F.dx, F.dz), across(-F.dz, F.dx);
         const float seed = F.seed, mirror = h2((int)F.x, (int)F.z + 7) < 0.5f ? 1.f : -1.f;   // (the house on one side or the other)
@@ -489,7 +552,7 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
           if (!C.inside(x, z)) continue;
           float g = ground(x, z);
           if (g > 0.3f) continue;
-          float m[4]; g_world.sampleMask(x, z, m);
+          float m[4]; W.sampleMask(x, z, m);
           if (m[3] < 0.5f) continue;
           float depthOk = smoothstepf(-16.f, -4.f, g) * smoothstepf(-0.5f, -2.5f, g);
           if (h2(si * 7 + 3, sj * 11 - 5) > 0.18f * depthOk) continue;
@@ -504,13 +567,13 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
           float hp = h2(oi * 5 + 9, oj * 7 - 1);
           if (hp > 0.4f) continue;
           float x = (oi + 0.5f + (h2(oi + 3, oj - 8) - 0.5f) * 0.7f) * OC, z = (oj + 0.5f + (h2(oi - 6, oj + 2) - 0.5f) * 0.7f) * OC;
-          if (!C.inside(x, z) || g_world.underLake(x, z)) continue;
-          float b[4]; g_world.sampleBase(x, z, b);
+          if (!C.inside(x, z) || W.underLake(x, z)) continue;
+          float b[4]; W.sampleBase(x, z, b);
           if (b[1] < 0.01f) continue;
           float g = ground(x, z);
           if (g < 6.f) continue;
           float slope = (fabsf(ground(x + 10, z) - ground(x - 10, z)) + fabsf(ground(x, z + 10) - ground(x, z - 10))) / 20.f;
-          float m[4]; g_world.sampleMask(x, z, m);
+          float m[4]; W.sampleMask(x, z, m);
           float p = smoothstepf(70.f, 220.f, b[1]) * 0.22f + smoothstepf(1000.f, 1500.f, g) * 0.12f + smoothstepf(0.35f, 0.8f, slope) * 0.2f;
           p *= smoothstepf(12.f, 24.f, m[0] * ROAD_RANGE) * (1.f - smoothstepf(0.02f, 0.1f, m[1])) * (1.f - 0.8f * m[3]);
           if (hp > p) continue;
@@ -524,11 +587,11 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
           float hp = h2(pi * 3 - 11, pj * 13 + 4);
           if (hp > 0.3f) continue;
           float x = (pi + 0.5f + (h2(pi + 9, pj) - 0.5f) * 0.7f) * SPC, z = (pj + 0.5f + (h2(pi, pj + 9) - 0.5f) * 0.7f) * SPC;
-          if (!C.inside(x, z) || g_world.underLake(x, z)) continue;
-          float b[4]; g_world.sampleBase(x, z, b);
+          if (!C.inside(x, z) || W.underLake(x, z)) continue;
+          float b[4]; W.sampleBase(x, z, b);
           float g = ground(x, z);
           float p = 0.3f * smoothstepf(110.f, 260.f, b[1]) * smoothstepf(0.45f, 0.75f, b[2]) * smoothstepf(40.f, 80.f, g) * smoothstepf(950.f, 700.f, g);
-          float m[4]; g_world.sampleMask(x, z, m);
+          float m[4]; W.sampleMask(x, z, m);
           p *= (1.f - smoothstepf(0.02f, 0.1f, m[1])) * smoothstepf(15.f, 30.f, m[0] * ROAD_RANGE);
           if (hp > p) continue;
           float sc = 0.55f + 0.75f * h2(pi * 7, pj * 7);
@@ -539,7 +602,7 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
       // (each farm's compound - its yard and the buildings round it - and each landmark's clearing are kept clear of
       // trees, bushes and boulders)
       std::vector<vec3> clearings;   // (x, z, radius)
-      for (const Farmstead& F : g_world.farms)
+      for (const Farmstead& F : W.farms)
         if (F.x > C.x0 - 60.f && F.x < C.x1 + 60.f && F.z > C.z0 - 60.f && F.z < C.z1 + 60.f) clearings.push_back(vec3(F.x, F.z, 48.f));
       for (const vec3& c : landmarkClearings())
         if (c.x > C.x0 - c.z && c.x < C.x1 + c.z && c.y > C.z0 - c.z && c.y < C.z1 + c.z) clearings.push_back(vec3(c.x, c.y, c.z));
@@ -551,15 +614,15 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
           float hp = h2(ti * 3 + 11, tj * 5 - 7);
           if (hp > 0.62f) continue;   // the most a cell can be planted
           float x = (ti + 0.5f + (h2(ti + 101, tj - 31) - 0.5f) * 0.7f) * TC, z = (tj + 0.5f + (h2(ti - 57, tj + 77) - 0.5f) * 0.7f) * TC;
-          if (!C.inside(x, z) || inFarmstead(x, z) || g_world.underLake(x, z)) continue;
-          float b[4]; g_world.sampleBase(x, z, b);
+          if (!C.inside(x, z) || inFarmstead(x, z) || W.underLake(x, z)) continue;
+          float b[4]; W.sampleBase(x, z, b);
           if (b[1] < 2.5f) continue;   // airport grounds and flattened land
           float g = ground(x, z);
           if (g < 4.f) continue;
           float lush = b[2], cold = b[3], amp = b[1];
-          float m[4]; g_world.sampleMask(x, z, m);
+          float m[4]; W.sampleMask(x, z, m);
           float roadD = m[0] * ROAD_RANGE, town = m[1], farm = m[3];
-          float fn = g_world.forestAt(x, z);
+          float fn = W.forestAt(x, z);
           float treeline = smoothstepf(1500.f - cold * 900.f, 1100.f - cold * 700.f, g);
           float fd = smoothstepf(0.42f - 0.1f * lush, 0.5f - 0.1f * lush, fn) * treeline;
           fd = std::max(fd, 0.022f * treeline);
@@ -586,14 +649,14 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
           float hp = h2(bi * 9 - 4, bj * 7 + 13);
           if (hp > 0.9f) continue;   // (the most a cell can be planted: a hedgerow's; elsewhere at most 0.3, as before)
           float x = (bi + 0.5f + (h2(bi + 41, bj - 3) - 0.5f) * 0.8f) * BC, z = (bj + 0.5f + (h2(bi - 8, bj + 33) - 0.5f) * 0.8f) * BC;
-          if (!C.inside(x, z) || inFarmstead(x, z) || g_world.underLake(x, z)) continue;
-          float b[4]; g_world.sampleBase(x, z, b);
+          if (!C.inside(x, z) || inFarmstead(x, z) || W.underLake(x, z)) continue;
+          float b[4]; W.sampleBase(x, z, b);
           if (b[1] < 2.5f) continue;
           float g = ground(x, z);
           if (g < 3.f) continue;
-          float m[4]; g_world.sampleMask(x, z, m);
+          float m[4]; W.sampleMask(x, z, m);
           float treeline = smoothstepf(1700.f - b[3] * 900.f, 1200.f - b[3] * 700.f, g);
-          float fn = g_world.forestAt(x, z);
+          float fn = W.forestAt(x, z);
           float edge = smoothstepf(0.3f, 0.42f, fn) * smoothstepf(0.6f, 0.46f, fn);   // forest margins are scrubby
           float p = (0.05f + 0.25f * edge) * (0.5f + 0.5f * b[2]);
           if (m[3] > 0.05f) {   // (farmland: the hedgerows are thick with them, the fields clear)
@@ -611,12 +674,12 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
           float hp = h2(ri * 5 - 13, rj * 3 + 29);
           if (hp > 0.3f) continue;
           float x = (ri + 0.5f + (h2(ri + 41, rj - 9) - 0.5f) * 0.6f) * ROCK_CELL, z = (rj + 0.5f + (h2(ri - 21, rj + 63) - 0.5f) * 0.6f) * ROCK_CELL;
-          if (!C.inside(x, z) || inFarmstead(x, z) || g_world.underLake(x, z)) continue;
-          float b[4]; g_world.sampleBase(x, z, b);
+          if (!C.inside(x, z) || inFarmstead(x, z) || W.underLake(x, z)) continue;
+          float b[4]; W.sampleBase(x, z, b);
           if (b[1] < 0.01f) continue;
           float g = ground(x, z);
           if (g < 0.4f) continue;
-          float m[4]; g_world.sampleMask(x, z, m);
+          float m[4]; W.sampleMask(x, z, m);
           float farm = m[3];
           float rdn = smoothstepf(60.f, 200.f, b[1]) * 0.25f + smoothstepf(900.f, 1400.f, g) * 0.12f + smoothstepf(3.f, 0.6f, g) * 0.06f * (1.f - farm);
           rdn *= smoothstepf(10.f, 20.f, m[0] * ROAD_RANGE) * (1.f - smoothstepf(0.03f, 0.2f, m[1]));
@@ -634,13 +697,13 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
   }
   // nothing grows or stands up into a bridge: what is under a deck's footprint and would reach its girders goes (the
   // ground under a bridge is left as it was, so the masks keep nothing off it)
-  if (!g_world.bridges.empty())
+  if (!W.bridges.empty())
     for (int k = 0; k < EK_COUNT; k++)
       lists[k].erase(std::remove_if(lists[k].begin(), lists[k].end(), [&](const Ent& e) {
         if (k == EK_GUARDRAIL) return false;   // (laid up to a deck's joint, at the road's height: the parapets carry on)
         float under;
         const float R = std::max(kEntInfo[k].hx * e.sx, kEntInfo[k].hz * e.sz);
-        return bridgeOver(g_world.bridges, e.x, e.z, R, &under) && e.y + kEntInfo[k].h * e.sy > under - 0.5f;
+        return bridgeOver(W.bridges, e.x, e.z, R, &under) && e.y + kEntInfo[k].h * e.sy > under - 0.5f;
       }), lists[k].end());
   ch.ents.clear();
   // The per-kind lists already know the final size. Reserve once before concatenation so streaming a dense

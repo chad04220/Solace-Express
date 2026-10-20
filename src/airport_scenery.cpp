@@ -10,7 +10,7 @@ struct Placer {
   const Airport& a; const AptLayout& L; std::vector<AptItem>& out; uint32_t rs;
   float rnd() { rs ^= rs << 13; rs ^= rs >> 17; rs ^= rs << 5; return (rs & 0xFFFFFF) / 16777216.f; }
   float rnd(float lo, float hi) { return lo + (hi - lo) * rnd(); }
-  float gnd(float x, float z) { return g_world.groundHeight(x, z, 7); }
+  float gnd(float x, float z) { return sceneryWorld().groundHeight(x, z, 7); }
   // an item at runway-local (u, vv) where vv is measured towards the facility side; its front faces (fu, fvv)
   void put(int kind, float u, float vv, float fu, float fvv, float sx, float sy, float sz, bool footprint = true, float seed = -1) {
     vec3 p = aptWorld(a, u, L.side * vv, 0);
@@ -203,7 +203,7 @@ void strip(Placer& P, const Airport& a, const AptLayout& L) {
   float hl = a.length * 0.5f, hw = a.width * 0.5f, pu = L.termU;
   // Generated airport codes may collide with the original three-letter identifiers.
   // Place-specific fixtures belong only to the authored Solace region.
-  const std::string code = g_world.procedural ? "" : a.code;
+  const std::string code = sceneryWorld().procedural ? "" : a.code;
   bool farm = code == "HFS" || code == "ORC", polar = code == "GLS", volcano = code == "VCF", mountain = code == "SMP", beach = code == "PMB";
   // hangars along the back of the parking area
   P.facing(EK_ARCH_HANGAR, pu - 34.f, L.bldV, 1, 1, 1);
@@ -281,7 +281,7 @@ void groundLife(Placer& P, const Airport& a, const AptLayout& L) {
     // Fence-backed fuel delivery bays: trucks remain outside the tank footprints.
     P.detail(EK_TRUCK, L.apU0 + (big ? 78.f : 45.f), L.bldV + (big ? 80.f : 52.f), 0, 1, .85f, .85f, .85f);
   } else {
-    const char* code = g_world.procedural ? "" : a.code;
+    const char* code = sceneryWorld().procedural ? "" : a.code;
     const bool polar = !strcmp(code, "GLS"), volcano = !strcmp(code, "VCF");
     const bool farm = !strcmp(code, "HFS") || !strcmp(code, "ORC");
     float officeU = L.termU + (!strcmp(code, "GLR") ? 88.f : 56.f);
@@ -307,7 +307,7 @@ void groundLife(Placer& P, const Airport& a, const AptLayout& L) {
 
 void airportItems(int ai, std::vector<AptItem>& out) {
   out.clear();
-  const Airport& a = g_world.airports[ai];
+  const Airport& a = sceneryWorld().airports[ai];
   AptLayout L = aptLayout(a, ai);
   Placer P{a, L, out, 0x9E3779B9u ^ (uint32_t)(ai * 2654435761u)};
   if (L.paved) paved(P, a, L); else strip(P, a, L);

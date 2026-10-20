@@ -246,5 +246,5 @@ std::pair<const PlacedEnt*, const PlacedEnt*> PlacedByChunk::in(int cx, int cz) 
 
 const std::vector<RoadFurniture>& roadFurniture(const World& world) { return sceneryState(world).furniture.items; }
 std::pair<const RoadFurniture*, const RoadFurniture*> roadFurnitureIn(const World& world, int cx, int cz) { return sceneryState(world).furniture.in(cx, cz); }
-const std::vector<RoadFurniture>& roadFurniture() { return roadFurniture(g_world); }
-std::pair<const RoadFurniture*, const RoadFurniture*> roadFurnitureIn(int cx, int cz) { return roadFurnitureIn(g_world, cx, cz); }
+const std::vector<RoadFurniture>& roadFurniture() { return roadFurniture(sceneryWorld()); }
+std::pair<const RoadFurniture*, const RoadFurniture*> roadFurnitureIn(int cx, int cz) { return roadFurnitureIn(sceneryWorld(), cx, cz); }

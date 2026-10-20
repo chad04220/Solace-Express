@@ -131,17 +131,31 @@ public:
   void resumeStreaming();
   void clear();
   size_t generated() const;
-  // Background generation on worker threads (generate() only reads g_world). request() queues a chunk and returns
-  // false when there are no workers or the queue is full; pump() installs finished chunks on the calling (main)
+  // Background generation on worker threads (generate() only reads its source World). request() queues a chunk and
+  // returns false when there are no workers or the queue is full; pump() installs finished chunks on the calling (main)
   // thread and appends their indices (cz * NC + cx) to `installed`.
   bool request(int cx, int cz, int level);
   void pump(std::vector<int>& installed);
   int workers() const;
-  Scenery();
+  // The real Earth's next chart (Game::slideEarthChart): its scenery staged before the move, on workers of its own, from
+  // its World while g_world is still the chart flown - streamed as the renderer streams (out to farAll, the trees to
+  // farDetail) about where the aircraft will be in it. Returns how many chunks within `ready` m of there aren't made yet
+  int stage(vec3 at, float farDetail, float farAll, float ready);
+  // At the move, g_world now the staged one's source and this drained (sceneryResetWorldCaches): its chunks and what
+  // they cached of their World taken over whole, so the new chart's buildings and trees are there at once. The staged
+  // one's workers must be idle (it drained too)
+  void adopt(Scenery& staged);
+  // workerCount: -1 the machine's cores less one (up to 6); source: the World its chunks are made from (nullptr:
+  // g_world, as it is when each chunk is made)
+  explicit Scenery(int workerCount = -1, const World* source = nullptr);
   ~Scenery();
+  struct RegionCache;   // (what chunks read of their World once: its lighthouse, airport furniture; entities.cpp)
 private:
   struct Async;
   std::unique_ptr<Async> async;
+  const World* source = nullptr;
+  std::unique_ptr<RegionCache> ownCache;   // (a staged one's: g_scenery's is the region's, reset with it)
+  int stageFrame = 0;
   std::vector<std::unique_ptr<Chunk>> chunks;
   std::unordered_map<int, std::vector<uint64_t>> wrecked;   // chunk index -> keys of destroyed entities
   std::unordered_map<uint64_t, int> hits;                   // damage taken so far

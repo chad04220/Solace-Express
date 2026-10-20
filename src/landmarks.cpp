@@ -601,9 +601,9 @@ void sceneryBakeLandmarks(World& world) {
 const std::vector<vec3>& landmarkClearings(const World& world) { return sceneryState(world).clearings; }
 const std::vector<PlacedEnt>& landmarks(const World& world) { return sceneryState(world).landmarks.items; }
 std::pair<const PlacedEnt*, const PlacedEnt*> landmarksIn(const World& world, int cx, int cz) { return sceneryState(world).landmarks.in(cx, cz); }
-const std::vector<vec3>& landmarkClearings() { return landmarkClearings(g_world); }
-const std::vector<PlacedEnt>& landmarks() { return landmarks(g_world); }
-std::pair<const PlacedEnt*, const PlacedEnt*> landmarksIn(int cx, int cz) { return landmarksIn(g_world, cx, cz); }
+const std::vector<vec3>& landmarkClearings() { return landmarkClearings(sceneryWorld()); }
+const std::vector<PlacedEnt>& landmarks() { return landmarks(sceneryWorld()); }
+std::pair<const PlacedEnt*, const PlacedEnt*> landmarksIn(int cx, int cz) { return landmarksIn(sceneryWorld(), cx, cz); }
 
 // ---------------------------------------------------------------- the Fjordhaven reservoir
 vec2 Reservoir::crown() const { return vec2(x, z) + vec2(vx, vz) * (archR() * (1.f - sqrtf(1.f - 0.6944f))); }   // (sin of its half-angle: 150/180)

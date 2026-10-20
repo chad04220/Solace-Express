@@ -2,10 +2,13 @@
 // docs/REAL_EARTH_PLAN.md section 5), over the test fixture: out from Martha's Vineyard's chart the next is prepared
 // ahead along the track, on the lattice (never a generated region); past the line between the two centres the flight
 // moves into it - the aircraft where it was on the Earth, on its heading, at its height, still flying - and a low one
-// keeps its height over the ground.
+// keeps its height over the ground. The new chart's scenery is staged before the move (Scenery::stage): what stands
+// within 1.5 km of the aircraft is there the moment it moves, each chunk as the new chart's World makes it.
 #include "../src/game.h"
 #include "../src/earth_charts.h"
+#include "../src/entity_lod.h"
 #include <chrono>
+#include <cstring>
 #include <thread>
 
 struct GameTest {
@@ -50,12 +53,47 @@ struct GameTest {
       check(earthCharts::isEarthId(next) && centre.x > startX + 12000.f && std::fabs(centre.z) < 8000.f,
             what + ": a chart of the lattice, along the track (" + next + fmt(" at %.0f %.0f)", centre.x, centre.z));
       check(g_world.regionId == from, what + ": not moved into before it is nearer");
+      {   // (as the flight would fly on to the move: its scenery staged meanwhile, out to the island's east end)
+        const auto staging = std::chrono::steady_clock::now() + std::chrono::seconds(60);
+        while (game.earthPrefetch && (!game.earthPrefetch->scenery || game.earthPrefetch->scenery->generated() < 1500) &&
+               std::chrono::steady_clock::now() < staging) {
+          game.updateEarthFlight(); std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+        check(game.earthPrefetch && game.earthPrefetch->scenery && g_world.regionId == from,
+              fmt("%s: its scenery staged ahead (%zu chunks)", what.c_str(), game.earthPrefetch && game.earthPrefetch->scenery ? game.earthPrefetch->scenery->generated() : 0));
+      }
       place(moveX);
       const geo::Position where = before.position(game.plane.pos);
       const float y = game.plane.pos.y, ground = g_world.height(game.plane.pos.x, game.plane.pos.z);
       const double bearing = *geo::initialBearing(where, before.position(game.plane.pos + game.plane.vel * 100.f));   // (true: the charts' grids turn)
-      for (int i = 0; i < 200 && g_world.regionId == from; i++) { game.updateEarthFlight(); std::this_thread::sleep_for(std::chrono::milliseconds(2)); }
-      check(g_world.regionId == next && game.flightRegion.id == next && game.screen == SCR_FLIGHT, what + ": moved into it, still flying");
+      const auto waited = std::chrono::steady_clock::now();
+      while (g_world.regionId == from && std::chrono::steady_clock::now() - waited < std::chrono::minutes(2)) {
+        game.updateEarthFlight(); std::this_thread::sleep_for(std::chrono::milliseconds(2));
+      }
+      const double staging = std::chrono::duration<double>(std::chrono::steady_clock::now() - waited).count();
+      check(g_world.regionId == next && game.flightRegion.id == next && game.screen == SCR_FLIGHT, fmt("%s: moved into it, still flying (its scenery staged in %.1f s)", what.c_str(), staging));
+      {   // the scenery there at once: within 1.5 km of the aircraft every chunk made as far as it is drawn, and those
+          // taken over the new chart's own - a chunk made now from g_world the same, entity for entity
+        const EntRanges R = entRangesFor(g_ren.quality);
+        const float farDetail = std::max(std::max(R.tree, R.rock), R.bush) + 300.f;
+        const vec3 p = game.plane.pos;
+        int missing = 0, compared = 0, same = 0, held = 0;
+        for (int cz = 0; cz < Scenery::NC; cz++)
+          for (int cx = 0; cx < Scenery::NC; cx++) {
+            const Scenery::Chunk* c = g_scenery.get(cx, cz);
+            held += c != nullptr;
+            const float x0 = Scenery::chunkX0(cx), z0 = Scenery::chunkX0(cz);
+            const float ex = std::max(std::max(x0 - p.x, p.x - x0 - Scenery::CH), 0.f), ez = std::max(std::max(z0 - p.z, p.z - z0 - Scenery::CH), 0.f);
+            if (hypotf(ex, ez) < 1500.f && (!c || c->level < (hypotf(ex, ez) < farDetail ? 2 : 1))) missing++;
+            if (!c || c->ents.empty() || compared >= 12) continue;
+            Scenery fresh(0);
+            const Scenery::Chunk* f = fresh.ensure(cx, cz, c->level);
+            compared++;
+            same += f->ents.size() == c->ents.size() && !memcmp(f->ents.data(), c->ents.data(), c->ents.size() * sizeof(Ent));
+          }
+        check(missing == 0, fmt("%s: the scenery within 1.5 km there at the move (%d chunks taken over, %d missing near)", what.c_str(), held, missing));
+        check(compared > 0 && same == compared, fmt("%s: made from the new chart (%d of %d chunks as g_world makes them)", what.c_str(), same, compared));
+      }
       const regionTravel::Chart after(game.flightRegion.origin);
       check(geo::surfaceDistance(after.position(game.plane.pos), where) < 1.0, what + ": where it was on the Earth");
       const double now = *geo::initialBearing(after.position(game.plane.pos), after.position(game.plane.pos + game.plane.vel * 100.f));

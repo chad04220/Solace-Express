@@ -235,6 +235,9 @@ private:
     std::unique_ptr<World> world;
     Renderer::WorldUploadData upload;
     bool gpuStarted = false;
+    // (the real Earth: its scenery staged about where the move will be, Scenery::stage. Declared after the world its
+    // workers read, so it goes first)
+    std::unique_ptr<Scenery> scenery;
   };
   std::future<std::unique_ptr<PrefetchedRegion>> earthPrefetchJob;
   std::shared_ptr<GenerationCancelState> earthPrefetchCancel;

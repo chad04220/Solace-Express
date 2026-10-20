@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include "airport_layout.h"
 #include "entities.h"
+#include "entity_lod.h"
 #include "hive_world_collision.h"
 #include "scenery.h"
 #include "regional_surface.h"
@@ -1135,6 +1136,7 @@ void Game::updateEarthFlight() {
   loadingRegion = earthPrefetch->region; regionResumePaused = paused;
   regionPoseChange = promotionChange;
   auto retired = std::make_unique<World>(std::move(g_world));
+  earthPrefetch->scenery.reset();   // (a real-Earth chart's staged scenery, were one here: its workers done with the world first)
   g_world = std::move(*earthPrefetch->world);
   Renderer::WorldUploadData retiredGpu;
   if (g_ren.ok) g_ren.commitWorldUpload(&retiredGpu); // staged resources only; no bulk upload
@@ -1282,16 +1284,36 @@ void Game::slideEarthChart(const regionTravel::Chart& chart) {
   // the move: nearer the new chart's centre than this one's by 2 km, and in the air - out of the islands over open water
   // (their chart holds them, its neighbours only the sea round them)
   const vec3 centre = chart.local(earthPrefetch->region.origin);
-  if (hypotf(plane.pos.x - centre.x, plane.pos.z - centre.z) > out - 2000.f) return;
-  if (flightRegion.authored && std::max(fabsf(plane.pos.x), fabsf(plane.pos.z)) < WORLD_HALF - 10000.f) return;
+  auto moves = [&](vec3 p) {
+    return hypotf(p.x - centre.x, p.z - centre.z) <= hypotf(p.x, p.z) - 2000.f &&
+           (!flightRegion.authored || std::max(fabsf(p.x), fabsf(p.z)) >= WORLD_HALF - 10000.f);
+  };
+  // the new chart's scenery staged first, on workers of its own (Scenery::stage), about where the move will put the
+  // aircraft: where the track first meets it, ten minutes on at most, else where the aircraft is. The move waits for what
+  // stands within 1.5 km of it, so the land comes across with its buildings and trees rather than emptied and filling in
+  // round the aircraft - unless the flight is 20 km out already, when it moves regardless
+  int unstaged = 0;
+  {
+    auto& staged = earthPrefetch->scenery;
+    if (!staged) staged = std::make_unique<Scenery>(2, earthPrefetch->world.get());
+    if (!earthSceneryDraining) staged->resumeStreaming();   // (a move begun and put off: streaming again)
+    vec3 at = plane.pos;
+    const vec3 track(plane.vel.x, 0.f, plane.vel.z);
+    for (int t = 0; t <= 600; t += 2) if (moves(plane.pos + track * (float)t)) { at = plane.pos + track * (float)t; break; }
+    const EntRanges R = entRangesFor(g_ren.quality);
+    const float farAll = std::max(R.big, R.build) + 300.f, farDetail = std::max(std::max(R.tree, R.rock), R.bush) + 300.f;
+    unstaged = staged->stage(regionTravel::Chart(earthPrefetch->region.origin).local(chart.position(at)), farDetail, farAll, 1500.f);
+  }
+  if (!moves(plane.pos)) return;
+  if (unstaged > 0 && out < 20000.f) return;
   if (plane.onGround || crashed || !plane.spec) { earthPromotionDeferred = true; return; }
   if (quoteJob.valid()) {
     if (quoteJob.wait_for(std::chrono::seconds(0)) != std::future_status::ready) { earthPromotionDeferred = true; return; }
     try { quoteJob.get(); } catch (...) {}
     quoteFlown.clear(); menuPlanCache = menuPlan::Cache{};
   }
-  if (!earthSceneryDraining) { g_scenery.beginDrain(); earthSceneryDraining = true; }
-  if (!g_scenery.isDrained()) return;
+  if (!earthSceneryDraining) { g_scenery.beginDrain(); earthPrefetch->scenery->beginDrain(); earthSceneryDraining = true; }
+  if (!g_scenery.isDrained() || !earthPrefetch->scenery->isDrained()) return;
   const float above = plane.pos.y - g_world.height(plane.pos.x, plane.pos.z);
   const std::string wasNamed = flightRegion.name;
   sceneryResetWorldCaches();
@@ -1300,6 +1322,7 @@ void Game::slideEarthChart(const regionTravel::Chart& chart) {
   regionPoseChange = regionTravel::Change(chart, regionTravel::Chart(earthPrefetch->region.origin), plane.pos);
   auto retired = std::make_unique<World>(std::move(g_world));
   g_world = std::move(*earthPrefetch->world);
+  g_scenery.adopt(*earthPrefetch->scenery);   // (its chunks, made from the world now g_world)
   Renderer::WorldUploadData retiredGpu;
   if (g_ren.ok) g_ren.commitWorldUpload(&retiredGpu);
   earthPrefetch.reset(); earthPrefetchId.clear(); earthPrefetchFailedId.clear();

@@ -345,10 +345,24 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
   - **Tests.** `earth_slide_test` flies two slides over the fixture. `earth_gpu_test` holds the GPU's ground to the
     C++'s on a real-Earth chart, with its noise frame, lakes and roads (0.4 mm).
   - **A fix.** A real-Earth flight no longer looks for a generated region to hand over to.
+  - **Scenery staged before the move** (`Scenery::stage`, `Scenery::adopt`). Once the next chart is built, its
+    buildings and trees are made on two workers of their own, from its World, while the flight is still in the old
+    chart.
+    - Chunk generation reads the World it was given (`sceneryWorld()`, set per thread), with its own cache of the
+      lighthouse and the airport furniture. g_scenery's workers read g_world as before.
+    - The staged set is streamed as the renderer streams: out to the buildings' range, the trees to theirs. It is
+      centred where the track first meets the move, else where the aircraft is.
+    - The move waits until everything within 1.5 km of the aircraft is made, unless the flight is already 20 km out.
+      The staged chunks and their cache are then taken over whole, so the new chart's land comes across with its
+      scenery, rather than emptied and filling in round the aircraft. Nothing near is generated on the frame of the
+      move.
+    - `earth_slide_test`: about 1,500 chunks staged and taken over at each slide, none missing within 1.5 km. Each one
+      compared is the same, entity for entity, as a chunk made afterwards from g_world. Staged from the old chart's
+      World instead, none match.
 
   Still open in E4:
-  - **Scenery.** The scenery is drained and streamed again at each move, so trees and houses pop in round the
-    aircraft. It isn't placed by geographic position yet, and no chunks are prepared near the move.
+  - **Scenery agreement.** The two charts' scenery isn't placed by geographic position, so the trees and houses
+    near the aircraft change at the move: the same land, laid out afresh.
   - **Base agreement.** The bases still differ by up to a metre or so where the ground is rough: bilinear texels on
     two grids.
 

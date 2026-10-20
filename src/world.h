@@ -213,6 +213,9 @@ void noised(float px, float pz, float& v, float& dx, float& dz);
 float terrainFbm(float px, float pz, int octaves);
 
 extern World g_world;
+// The World scenery is being made from on this thread: g_world, or the real Earth's next chart while its scenery is
+// staged before the move (entities.h Scenery::stage)
+const World& sceneryWorld();
 // The ground the game has dug this flight - the crash crater, the pieces' pits, plasma craters, laser scorches: what the
 // renderer draws (common.glsl craterH) - x, z, radius, depth (its sign the shader's flag). The main thread's: what touches
 // the ground in play (the aircraft, its weapons, the wreckage) comes down into them; the background quote flights, on
