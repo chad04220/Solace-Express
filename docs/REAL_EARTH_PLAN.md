@@ -1,323 +1,310 @@
-# The real Earth: plan for Codex
+# The real Earth: continental plan (option C)
 
-The owner (chad04220) wants this:
+The owner chose the full real Earth on 2026-10-20, after the feasibility study:
 
-> "itd actually be really neat if we had the solace islands be off the east coast of america in the middle of the
-> atlantic ocean and had the rest of the real world simulated as realistically as possible"
+> "lets go for a full C implementation"
 
-They have pointed at two datasets: NOAA's **ETOPO 2022** global relief model for the land and sea floor, and
-**GLOBIO GRIP** for the world's roads. They chose the **full-size planet** (Earth's radius) over a small one.
+That means real terrain, coastlines, airports, roads, towns and land cover everywhere. A flight can go anywhere, over
+land or sea, without a break. The Solace Islands stay authored, at their place in the real Atlantic (32.5° N, 58.0° W).
 
-This document is the brief for that work: what exists today, the target architecture, the data, and the phases.
-Each phase comes with deliverables and tests you can run headless, without a GPU. It follows
-`docs/COLLABORATION.md`:
-- Work on `codex/...` branches.
-- Hand over plain source.
-- Send large data as download links to the owner.
-- Post each phase in issue #2 with the usual heading lines.
-
-Claude reviews and merges each phase.
-
-Tracking: Claude's task #187. The owner has chosen the real Earth over generated landmasses: everything outside Solace
-comes from real data, with the game's procedural detail only on top of it where the data is coarser than the eye.
+This document is the design, the data, the stages and the contracts. Claude's task list tracks the stages (#274 on).
+The history before it (Codex's Phase 0 tools, the procedural regions) is summarised in section 9.
 
 ---
 
-## 0. Status and notes for Codex (2026-10-12, after v3.49.2)
+## 1. The idea: real data, sliding charts
 
-**Update (2026-10-13): the owner changed course after Phase 0.** The global data packs and their size measurement
-were stopped; instead Codex built seeded *procedural* regions round the planet for Free Flight
-(`codex/procedural-earth-regions-20261012`, merged into `claude/compassionate-davinci-4cfo20` at d829de5, for
-v3.49.5): `src/geo.*` (this plan's Phase 1 geodesy, on the sphere), 6,143 generated regions plus authored Solace,
-background generation with bounded GPU staging, distant terrain with a paired collision fallback, and ocean-crossing
-handoffs between nonrepeating charts. Its design note is `docs/PROCEDURAL_EARTH.md`. Phases 2 to 5 below (the real
-ground, roads, airports and land cover from the data) are on hold unless the owner asks for them again. Since v3.52.0
-the career travels to the procedural regions (airline tickets and long hauls), so Phase 6's career half is done on
-generated ground rather than real ground.
-What the merge kept from the game's side: the ground's depth prepass (`prepass_auto.h`) never runs while a region's
-far blend dithers the near terrain out, and the loading screen's progress follows only the active world.
+The engine's world unit stays what it is today: a **chart**.
+- A chart is a `World`: an 80 km square, 2048² terrain texels of 39 m, its own roads, settlements, airports, scenery
+  mask and envelope.
+- It is laid out on an azimuthal equidistant projection about the chart's origin (`regionTravel::Chart`): x east,
+  z south, y altitude.
+- Physics, the renderer, the scenery streaming, collision, the GPS and ATC all keep working inside one chart, as they
+  do now.
 
-**Phase 0 is merged** (`codex/earth-data-phase0-20261011`, `codex/usgs-global-source-prep`), and so is the NumPy
-sampler (`codex/earth-sampling-performance-review-20261012`). One Phase 0 deliverable is still open:
+The change is where a chart's content comes from. **Everything in a real-Earth chart is a pure function of
+geography**, never of the chart:
+- heights from the elevation data;
+- coasts and lakes from the data;
+- the land cover;
+- airports, towns and roads from their tables, by real position;
+- the procedural detail seeded by geographic position, not by chart coordinates.
 
-- **The measured size table for whole packs.** Only two- and twenty-tile samples have been built. With the NumPy sampler
-  a whole L6 level is about half an hour of sampling at N2 (your own projection), so build a real global pack now and
-  report its compressed size per level, at 60″ and at 30″. Choose N per level by your quality study's policy (N16 at
-  the coarse levels, with the difficult-probe checks), not N2 everywhere. The owner needs these numbers for decision 2
-  in section 7.
-
-**Phase 1 may start: the owner has placed Solace** (decision 1 in section 7, 2026-10-12): east of Bermuda, centred at
-**32.5° N, 58.0° W**, in deep water about 600 km east of the island. The islands' square is laid true to north: the
-game's −z (heading 0) is true north at that centre and +x is east. Decisions 2 to 4 are needed by Phases 2 and 3, not
-by Phase 1.
-
-What changed on the game's side since this plan was written, and matters to the later phases:
-
-- **The road grid's code word** (v3.49.2): each entry's second texel's w is `cls + 8·flags + 128·banksOnly + 256·path`.
-  Each texel lists the entries whose platform comes within 1.5 m of it first (`buildRoadGrid`), and `roadEntryRows`
-  sets the 128 bit on every entry after the last of those. The paint and the roads' own normal (`roads.glsl`
-  `roadQuery`) stop at the first 128; `roadGrade` reads every entry. A per-tile road grid (Phase 3) must keep both
-  the order and the bit. `road_grade_gpu` checks both against the C++.
-- **The terrain is drawn nearest first** (`Renderer::selectTerrainChunks`, v3.49.1). Drawn far to near, the islands'
-  copies out to the horizon were shaded and then hidden: 40% of the night runway scene's world pass. Whatever
-  replaces the copies in Phase 2 must keep a near-to-far order.
-- **Shared GLSL and structs.** The pruner drops unused functions but keeps every struct. A struct in a shared snippet
-  lands in every program built with it, the aircraft's included, and each recompiles after the update for nothing.
-  Gate world-only structs and the functions using them behind a define that only their programs set
-  (`GROUND_ROADS`: the terrain's and the GPS map's programs). This is in addition to the bake rule in section 5.
-- **Profiling switches.** The shaders' `uDbg` bits must not share a bit with `Renderer::kProbe*` (1 << 12 to 1 << 15),
-  which leave whole draws out. The ground's parts use `kDbg*` (1 << 16 to 1 << 20); `terrain_material_test` enforces it.
-- **Saves are format 6** (the military record). If Phase 1 changes what a position means, that is format 7. The save
-  tests' unknown-version case currently uses 7, so move it to 8 in the same change.
-- **The world cache is `WLD6`** (`src/world.cpp` `kWorldMagic`). Bump it if the cached arrays change shape or meaning.
-
----
-
-## 1. Where things stand (v3.47, commit bdd896c on `claude/compassionate-davinci-4cfo20`)
-
-**The world is flat and small.**
-- `World` (`src/world.h`) holds one hand-designed archipelago.
-- It is a 2048² heightmap `hm`: 39 m texels covering [-40 km, 40 km]. Each texel holds base height, detail amplitude, lushness and coldness.
-- It is ringed by 10 km of sea, and the whole square repeats every 100 km (`WRAP_HALF`, `wrapCoord`, `nearCopy`).
-- The ground's height is `World::height(x, z, octaves)` on the CPU and `terrainH(p, oct)` in `src/shaders/common.glsl` on the GPU. Each is the base plus `terrainFbm` detail plus the graded roads, and the two match exactly.
-- The generated arrays are cached on disk under a stamp (`World::build`, `loadCache`). The tests share one generated world through the `test_world` fixture.
-
-**Coordinates are floats in metres.**
-- x is east, y is up, z is south; heading 0 looks along −z.
-- The aircraft is brought back inside the square when it crosses the seam: `Plane::step` adds `seamShift`, and `Game::followSeam` moves what the flight has placed in the world. This is the only re-basing the game has.
-
-**The round world is drawn, not simulated** (`src/planet.h`, `src/shaders/planet.glsl`, commit bdd896c).
-- The renderer lays the flat world over a sphere of 6,371 km about the camera's nadir (an azimuthal equidistant wrap).
-- The physics and scenery stay flat. The lighting pass maps each drawn point back to the flat world.
-- The terrain draws every copy of the islands out to the horizon, at any height up to orbit.
-- `tests/planet_gpu_test.cpp` holds the GLSL and the C++ in step.
-- This is a stand-in for a real globe. It is exact near the camera and good to a fraction of a percent at the horizon.
-
-**The roads, settlements and scenery are generated** from the heightmap (`docs/LIVING_ISLANDS_PLAN.md`):
-- `road_network.cpp`:
-  - A* routing at each class's grade;
-  - `layRoad()` for a given polyline;
-  - `profile()` vertical curves;
-  - `roadGrade` building the bed into the ground (CPU and `roads.glsl` in step; `tests/road_grade_gpu_test.cpp`).
-- `bridges.cpp`.
-- `settlements.cpp`: settlement extents grown over an effort field, streets as network roads.
-- `scenery.cpp`: lots, trees, the mask (2048² RGBA8: road distance, building density, urbanness, farmland).
-- `entities.cpp`: the instanced buildings and trees, streamed in 400 m chunks.
-
-**Airports** are the 16 hand-placed entries of `kAirports` (`src/world.cpp`): code, name, x/z, elevation, heading, length, width, surface and size. Each one's ground is flattened in `World::build`, and its layout comes from `airport_layout.cpp`.
-
-**The career** (`career.cpp`) runs between those 16 airports.
-
----
-
-## 2. What we're building
+So two charts that overlap agree wherever they both reach. That is what lets a flight **slide** from one chart to the
+next anywhere, over land too. Today's handoffs need open ocean, because each generated region is its own invented world.
 
 ```
-            offline (tools/earth/, Python, run once per data release)
-  ETOPO 2022 ──► elevation tiles  ─┐
-  GRIP roads ──► road tiles        ├─► world pack (tiles + manifest with SHA-256) ──► download link / CI artifact
-  OurAirports ─► airport table     │
-  land cover ──► surface tiles    ─┘
-            in game
-  geodesy (doubles: lat, lon, height) ── floating origin (floats near the camera, re-based like the seam)
-  tile streamer (worker threads, budgeted) ── CPU height queries (physics) == GPU height sampling (rendering)
-  Solace patch: the islands' own heightmap, roads and scenery, placed at one lat/lon, blended into ETOPO's sea floor
-  per-tile road grading (layRoad) ── per-tile mask ── the existing ground material, scenery and entity streaming
+offline (tools/earth, Python + NumPy, in CI)                 at run time (src/earth_*.cpp)
+  ETOPO 2022 30" ─► elev bundles (1° tiles, int16) ─┐        pack reader (bundles, inflate, LRU tile cache)
+  CGLS-LC100 ─────► cover bundles (1° tiles, uint8) ├─ pack ─►  height(lat, lon) / cover(lat, lon) / airports /
+  OurAirports ────► airports.bin                    │          places / roads by area
+  GeoNames ───────► places.bin                      │        GLO-90 fetcher (AWS open data, cached COGs)
+  GRIP4 ──────────► roads bundles (edges, nodes)   ─┘        World::buildEarth(chart) ── the usual World pipeline
+                                                              far terrain from the pack ── the horizon to orbit
+                                                              sliding charts ── background build, prewarm, swap
 ```
-
-These are the rules everything else follows:
-- The real globe replaces the copies of the islands. There is **one** Solace.
-- The islands' own content stays exactly as it is today, inside its patch.
-- Everything outside the patch comes from the data, plus the game's procedural detail where the data is coarser than the eye.
 
 ---
 
-## 3. The data
+## 2. The data
 
-| Dataset | Used for | Resolution | Raw size (approx.) | Licence and credit |
+| Layer | Source | Licence | Resolution in game | Where it lives |
 |---|---|---|---|---|
-| **ETOPO 2022** (NOAA NCEI), <https://www.ncei.noaa.gov/products/etopo-global-relief-model> | land height and sea floor, one seamless grid; the coastline at its 0 m contour | 15″, 30″, 60″ (≈ 460 m, 0.9 km, 1.8 km) | 60″ ≈ 0.5 GB, 30″ ≈ 1.9 GB, 15″ ≈ 7.5 GB (int16/float) | NOAA data, generally public domain. **Read the product page's terms before shipping**, and credit NOAA NCEI with the dataset's DOI in `THIRD_PARTY_NOTICES.md`. |
-| **GRIP global roads** (GLOBIO; Meijer et al. 2018), <https://www.globio.info/download-grip-dataset> | every real road, classed highway / primary / secondary / tertiary / local | vector | several GB as published | **Not yet checked.** Read its licence and attribution terms before anything derived from it is shipped. If they don't allow redistribution in a game, fall back to OpenStreetMap (ODbL: attribution plus share-alike on the derived database) or Natural Earth's roads (public domain, major roads only). |
-| **OurAirports**, <https://ourairports.com/data/> | airports and runways (`airports.csv`, `runways.csv`) | points, runway ends, headings, lengths, widths, surfaces, elevations | ≈ 15 MB CSV | Released to the public domain by its authors. Confirm on the site and credit it anyway. |
-| **Land cover** (pick one): ESA WorldCover 10 m (CC BY 4.0), Copernicus Global Land Cover 100 m, or MODIS MCD12Q1 500 m | forest, cropland, desert, snow and ice, urban: drives the ground material and the scenery | 10 m to 500 m | WorldCover is very large; resample to ~250-500 m | Each needs credit. Check the terms of the one chosen. |
-| Optional, later: **Copernicus GLO-30 / GLO-90 DEM** | finer height near airports and mountains | 30 m / 90 m | very large | Free with credit; check the terms. |
+| Base elevation, land and sea floor | NOAA ETOPO 2022 30″ surface | CC0 | 30″ (≈ 0.9 km), 1° tiles | the base pack |
+| Fine elevation, land | Copernicus DEM GLO-90 (3″) | free, any use, with attribution | 3″ (≈ 90 m) | fetched on demand from the AWS open data bucket (`copernicus-dem-90m`), cached |
+| Land cover | Copernicus Global Land Service LC100 2019 (discrete map) | CC BY 4.0 | 1/336° (≈ 330 m) by majority, 1° tiles | the base pack |
+| Airports, runways | OurAirports | public domain | points, runway ends | the base pack |
+| Towns and cities | GeoNames `cities500` | CC BY 4.0 | points, population | the base pack |
+| Roads | GRIP4 (GLOBIO) | CC BY 4.0 working assumption (see `EARTH_DATA_SOURCES.md`) | polylines, simplified to 15-30 m | the base pack |
 
-These rules apply to all of it:
-- **No raw dataset is committed.** The tools take the raw files as input and record where each came from: URL, version, SHA-256.
-- The outputs are a **world pack**: a directory of tiles plus `manifest.json`, with each tile's SHA-256, the source versions, and the tool's version.
-- The owner downloads or builds the pack. The game verifies it like the voice packs (`tools/voice_import.py`) and the prebuilt aircraft meshes (`docs/PREBUILT_AIRCRAFT_SAFETY.md`).
-- Licences go in `THIRD_PARTY_NOTICES.md`, plus a `licenses/` folder inside the pack.
-- **Every size above is an estimate. Measure, and report the real numbers in issue #2.**
+Notes:
+- **Measured sizes (feasibility study).**
+  - ETOPO packed: about 1.4 GB at 60″; about 0.44 GB with the sea floor clamped to −50 m; about 1.6 GB at 30″.
+  - The game clamps the sea floor to −200 m. The sea is opaque, and that keeps the shelves for the water's colour.
+  - GLO-90 source tiles total 66 GiB. A ready-made global GLO-90 pack would be about 15 GB, which is why it streams
+    instead: a 1° tile is 2.6 MB on average.
+- **Copernicus DEM tiles** are Cloud Optimized GeoTIFFs: Float32, Deflate, floating-point predictor (3), one internal
+  tile, with overviews. The game reads them with its own small TIFF reader and stb_image's inflate. Ocean has no tile.
+  The base pack carries the bitmap of which 1° cells exist (26,475 of them).
+- **CGLS-LC100** is one 362,880 × 141,120 uint8 BigTIFF (80° N to 60° S, 1/1008°), Deflate, in 256² tiles with the index
+  at the end. Ranged requests pull a region's tiles for development. CI downloads the whole 1.7 GB file to build the
+  global layer. Classes:
+  - 20 shrubs, 30 herbaceous, 40 cropland, 50 built-up, 60 bare;
+  - 70 snow and ice, 80 permanent water, 90 wetland, 100 moss and lichen;
+  - 111-116 closed forest, 121-126 open forest (evergreen needle, evergreen broad, deciduous needle, deciduous broad,
+    mixed, unknown);
+  - 200 open sea.
+- **No raw dataset is committed.** Every tool records its sources: URL, version, size and SHA-256.
+- **Attribution** goes in `THIRD_PARTY_NOTICES.md`, the credits screen and `licenses/` inside the pack:
+  - "© DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union
+    and ESA; all rights reserved" for the DEM;
+  - "Copernicus Global Land Service, LC100 v3.0.1 2019, CC BY 4.0";
+  - GeoNames (CC BY 4.0);
+  - GRIP4 (the citation in `EARTH_DATA_SOURCES.md`);
+  - NOAA NCEI ETOPO 2022 (CC0);
+  - OurAirports.
 
----
+### 2.1 The pack format (version 2)
 
-## 4. Phases
+The pack is a directory, `earth/`, with `manifest.json` and one file per layer per 10° × 10° block. For example,
+`elev/N40W080.svb` covers 40° N to 50° N and 80° W to 70° W.
 
-Each phase ends with a branch that builds and passes the full `ctest`, its own new tests, and the Windows cross-build. It is posted in issue #2 with numbers.
+A bundle file has a fixed layout:
+- a 64-byte header:
+  - the magic `SVB2`;
+  - the layer;
+  - the tile's samples per degree and its apron;
+  - the block's south-west corner;
+- an index of 100 entries, one per 1° tile: offset, compressed size, raw size, CRC-32, and flags (absent, constant,
+  stored);
+- the tiles' zlib streams.
 
-Keep each phase reviewable: one subsystem per branch, with no reformatting of files you don't need to change.
+A tile is a square grid of cell-centred samples over its 1°, plus a one-sample apron that copies its neighbours, so
+sampling never crosses a tile:
+- **Elevation:** int16 metres, with row deltas before deflate. 120 + 2 samples a side.
+- **Cover:** uint8 classes. 336 + 2 samples a side.
+- **Constant tiles** (all ocean, all one class) store one value and no stream.
 
-### Phase 0: the data pipeline (`tools/earth/`, Python, offline)
+Airports, places and roads are each a sorted binary table with a 1° cell index:
+- `airports.bin` holds, per airport, its ident, name, type, position, elevation, and its runways (both ends, length,
+  width, surface, lighting).
+- `places.bin` holds name, position, population and feature code.
+- `roads/*.svb` hold, per 1° tile, **edges between global nodes**:
+  - each edge is a whole polyline from junction to junction, its points quantised to 1/2²⁰ of a degree;
+  - an edge is filed in every tile its bounding box touches, so a chart reads each edge whole;
+  - node ids are global, so a junction is one node in every chart.
 
-**Tile scheme.** Use a **quadrilateralised cube sphere**: six faces, and a quadtree on each.
-- A tile at level L covers 1/4^L of a face. Each tile is a 256 × 256 grid of samples, plus a one-sample apron on each side so neighbours meet.
-- Level 6 has texels of ≈ 0.6 km, close to ETOPO's 30″.
-- This avoids the poles' crush of a lat/lon grid.
-- Each face's (u, v) maps to a direction on the sphere through the standard tangent-adjusted cube map.
-
-**Elevation.** Resample ETOPO into those tiles, bilinear and area-weighted when going down.
-- Store int16 decimetres, or int16 metres with a per-tile offset, then delta + zstd.
-- Ocean-only tiles at the coarse levels compress to almost nothing.
-
-**Roads.** Clip GRIP's polylines to tiles.
-- Keep the class.
-- Simplify (Douglas-Peucker, about 15-30 m at the finest level).
-- Quantise each tile's points to its own 16-bit grid.
-- Keep junctions as shared vertices so the network stays connected across tiles: give each node a global ID.
-
-**Airports.** Filter OurAirports to open fields with at least one runway (types small, medium and large airport; seaplane bases optional).
-- Keep the ICAO/IATA ident, name, position, elevation, and each runway's ends, heading, length, width and surface.
-- Write one table: CSV or a small binary in the pack.
-
-**Determinism.** The same inputs and the same tool version must give byte-identical tiles.
-
-**Tests:**
-- A **small fixture region** checked into `tests/fixtures/earth/`, under about 1 MB: for example a 600 km box round Bermuda at a coarse level. Unit tests run on it: tiles round-trip, aprons agree with their neighbours, road nodes keep their connectivity across tile edges, and the airport rows parse.
-- A determinism test: build the fixture twice and compare the hashes.
-
-**Deliverables:**
-- `tools/earth/*.py`, with a README: the exact download URLs, versions, checksums and commands.
-- The fixture.
-- The tests.
-- A measured size table for the full packs at 60″ and 30″.
-
-### Phase 1: geodesy and a floating origin (C++, no rendering)
-
-- `src/geo.h/.cpp`: a position is **doubles**, latitude, longitude and height. The world is the **sphere of `PLANET_RADIUS`** (`src/planet.h`): latitude and longitude map straight onto it. That puts distances off WGS84 by under 0.5%, which is fine for a game. Keep the ellipsoid out unless the owner asks for it.
-- A **local frame**: an origin (lat, lon) with east-up-south axes matching the game's x-y-z, and float metres within it.
-  - Re-base when the aircraft is more than ~20 km from the origin.
-  - Generalise today's seam re-base: `seamShift` and `Game::followSeam` already move the aircraft, the flight's craters and pits, the traffic and the route by an offset.
-  - Re-basing must change nothing the physics can feel, so test it the way the seam is tested: `tests/flight_test.cpp` part 2 flies an aircraft across the seam and checks it flies on as it was.
-- Conversions: tile ↔ direction ↔ local frame. Bearings and great-circle distances: the career's distances, the GPS, ATC.
-- **The Solace patch's placement.**
-  - A constant lat/lon for the islands' centre, plus the rotation of their square to north. **Decided (2026-10-12): 32.5° N, 58.0° W**, roughly 600 km east of Bermuda (32.3° N, 64.8° W) in deep water, the square laid true to north (−z north, +x east at the centre).
-  - Inside the patch, local coordinates are exactly today's x and z, so all of Solace's content and tests stay as they are.
-- **Tests:**
-  - lat/lon ↔ local round trips (to a millimetre near the origin);
-  - re-basing invariance (a flight crossing a re-base flies the same path);
-  - the patch's corners land where they should.
-
-### Phase 2: the ground from the tiles
-
-- A **tile streamer**:
-  - Load tiles round the camera by level, using distance and screen error like the terrain quadtree's split rule in `terrain_mesh.cpp`.
-  - Read them on worker threads, with a per-frame budget like the scenery's.
-  - Keep a fixed cache.
-  - The physics needs the finest level under the aircraft **before** it gets there; prefetch along the velocity.
-- **CPU height:** the replacement for `World::height` outside the patch.
-  - The tile's bilinear sample, plus the existing procedural detail (`terrainFbm`).
-  - Its amplitude comes from the tile's local relief, as `hm`'s detail amplitude does today.
-  - Inside the patch it **is** today's `World::height`.
-  - Across the patch's border, blend the islands' 10 km sea apron (−80 m, `SEA_DEPTH`) into ETOPO's sea floor over 20-40 km. The real floor there is about −5,000 m: a slope like a continental shelf's.
-- **GPU height:** a clipmap or virtual texture of the same tiles, sampled by `terrain_vs.glsl` and `terrain_fs.glsl` in place of `uHM` and `baseAt`.
-  - It must give **the same numbers as the CPU**. Write a GPU test like `tests/road_grade_gpu_test.cpp`: thousands of places across tile edges and levels, the shader against the C++, to a centimetre.
-- **The renderer's planet** becomes real geometry.
-  - Today `planetPos` wraps the flat world round the camera.
-  - With tiles, each vertex's direction comes from its tile, and its position is (radius + height) × direction relative to the camera's origin, computed in the local frame so floats stay small.
-  - Keep `planet_gpu_test`'s properties: near the camera nothing moves; the horizon and limb match `planetHorizon`.
-- **Drop the island copies** (`selectTerrainChunks`' `kx/kz` loop, the entity copies near the seam) once the globe draws.
-- **Tests:**
-  - CPU/GPU parity;
-  - height continuity across tile edges and level changes;
-  - the patch blend has no step;
-  - Solace's own tests unchanged (`airport_layouts`, `roads`, `bridges`, `community_layout`, the flight model, the gameplay loop).
-- Probe the far view on llvmpipe with the render harness (§6).
-
-### Phase 3: the real roads
-
-- Each tile's GRIP polylines become network roads.
-  - Map the classes: highway → `RC_HIGHWAY`, primary → `RC_ROAD`, secondary → `RC_ROAD` or `RC_LANE`, tertiary → `RC_LANE`, local → `RC_TRACK` or `RC_STREET` in towns.
-  - Lay each out with `layRoad(world, cls, line, h0, h1, pins)`. It rounds the alignment, resamples it, and profiles it to the class's grade and vertical curves.
-  - Pin the junctions to shared heights so tiles agree at their edges.
-- The real alignment is given, so don't re-route it.
-  - Where the real road is steeper than the class allows (mountain passes), let the profile follow the ground. Record it as a real road: an exception list, not a failure.
-  - Bridges follow `bridges.cpp`'s rules where the profile leaves the ground over water or a gully.
-- Grade per tile: build a per-tile **road grid** with `RoadGrid`'s encoding (`roadEntryRows`, the `cls + 8·flags + 128·banksOnly + 256·path` code word, each texel's paving entries first: section 0), so `roads.glsl` and `terrain_material.glsl` paint and grade as they do now. `roadGrade` must stay identical on the CPU and the GPU.
-- **Tests:**
-  - per tile, `tests/roads_test.cpp`'s checks (grades, bed tilt, banks, conflicts), with the exception list;
-  - continuity across tile edges;
-  - the road-grade GPU test on real tiles.
-
-### Phase 4: the real airports
-
-- OurAirports' rows become `Airport` records, with each runway placed from its ends.
-- The ground under each runway and apron is flattened as `World::build` does for Solace's fields: an airport's grounds are a flat pad blended into the terrain.
-- Each airport's layout comes from `airport_layout.cpp`, sized by runway length and type. Major airports can get hand-tuned layouts later.
-- Roads must not cross runways: `roadByAirfield` and the funnel ceiling (`airportFunnelCeiling`) already keep Solace's roads out of the approaches.
-- ATC, the GPS, the map and the career's search need a **spatial index** of airports, because 40,000 won't fit a linear scan per frame.
-- **Tests:**
-  - runway geometry against the data (heading, length, thresholds);
-  - flat pads;
-  - no road on a runway;
-  - every airport within its tile;
-  - the existing airport tests on Solace unchanged.
-
-### Phase 5: land cover, towns and scenery
-
-- Land cover drives the ground material (`terrain_material.glsl` takes lushness, coldness, farmland and urbanness today) and the scenery's mask.
-- Towns and cities come from the land cover's urban class, plus population or settlement data if a suitable openly licensed set is chosen. Grow them with `settlements.cpp`'s effort field from their real centres, with streets from the real road data where it has them.
-- Forests and fields come from the land cover's classes through the existing tree and field generators.
-- **Tests:** like `community_layout_test` per tile; deterministic per tile; scenery chunk streaming stays within its budget.
-
-### Phase 6: the career on a planet
-
-This is design work with the owner first:
-- the contracts between real airports;
-- the aircraft's ranges;
-- fuel prices;
-- time zones and the sun's position by longitude (the renderer's local-sun shading is ready for it);
-- weather by region;
-- the Solace career staying as the start.
+The pack is built by `python3 -m tools.earth2 build --box SOUTH WEST NORTH EAST ...`: a box for development, or the
+globe in CI. The test fixture comes from `python3 -m tools.earth2.fixture`, and `python3 -m tools.earth2 verify PACK`
+checks a pack. The same inputs and tool version give byte-identical bundles. The game verifies the CRC of every tile it
+reads, and the manifest's SHA-256 of every bundle when it opens the pack.
 
 ---
 
-## 5. Contracts to keep (they have tests)
+## 3. Charts on the real Earth
 
-- **CPU and GPU agree** on everything both compute:
-  - the terrain height (`World::height` / `terrainH`);
-  - the road bed (`roadGrade`, `road_grade_gpu_test`);
-  - the planet (`planet_gpu_test`).
-  New samplers get the same kind of test.
-- **The aircraft bodies' bake is untouched by world work.**
-  - `tests/shader_prune_test.cpp` hashes the bake's pruned shader source (`tests/fixtures/aircraft_bake.fnv`).
-  - A world-only edit to a shared GLSL snippet must not change it. Gate world code behind a define the bake doesn't set, as `ROUND_WORLD` and `LOCAL_SUN` do (`planet.glsl`, `common.glsl`).
-  - Also note that `tools/aircraft_geometry_inputs.cmake` hashes `world.h`, `renderer.cpp/h` and `shaders.h` into the shipped meshes' identity: editing them makes CI bake a fresh set (that's fine, but expect it).
-- **Determinism.** The world is generated the same everywhere, cached under a stamp, and the tests read one generated world (`test_world`).
-- **Floats stay near the origin.** Nothing simulated may sit more than a few tens of km from the current origin in float coordinates.
-- **Solace is unchanged** inside its patch: its heights, roads, bridges, settlements, airports and all of their tests.
-- **Saves.** A career save written before this work must still load: Solace's local coordinates plus the patch's origin. Version the save format if positions change meaning (`save_test`).
+### 3.1 Placement
+
+- A chart's origin snaps to a lattice of 1/32° in latitude and 1/32° in longitude (about 3.5 km). The same start or
+  route gives the same charts, so the disk cache can hold them.
+- Its id is `earth:<lat index>:<lon index>`.
+- Free Flight starts a chart on the lattice point nearest the chosen airport.
+- In flight, the next chart is centred about 20 km ahead of the aircraft along its track (section 5).
+
+### 3.2 `World::buildEarth(origin)`
+
+The usual `buildConfigured` pipeline, with Earth inputs:
+
+1. **Terrain** (`earth::sampleChart`).
+   - Every texel's geographic position comes from the chart (in double).
+   - Its height is bicubic from GLO-90 where that is loaded, otherwise from ETOPO.
+   - **Geographic detail:** octaves of 3D noise on the sphere, in double, evaluated at the texel's position and added
+     to the base. Their amplitude comes from the source's resolution and the local relief: a few metres on GLO-90,
+     tens of metres on ETOPO-only mountains. The shader's chart-local `terrainFbm` keeps only a metre or two of
+     sub-texel roughness, so a chart swap moves the ground by centimetres, not metres.
+   - **No grid smoothing.** The 1-2-1 filter depends on the grid; bicubic sampling removes the creases it was there for.
+   - **Canopy and roofs.** GLO-90 is a surface model: it includes tree canopy and buildings. The base takes off an
+     estimate where the cover says forest (closed about 12 m, open about 5 m) or built-up (about 4 m), blurred across
+     the class edges, so the scenery's own trees and houses stand on the ground rather than on top of a canopy.
+2. **Water.**
+   - The sea is the cover's class 200, plus the elevation's ≤ 0 m that touches it.
+   - The sea floor is ETOPO's, clamped to −200 m and shaped up to the coast.
+   - Land below sea level that the sea doesn't reach (the Netherlands' polders, the Dead Sea, Death Valley) stays
+     land.
+   - Lakes are class 80. Each lake's level is the median DEM height over its connected cells (the Copernicus DEM's
+     water surfaces are flattened).
+   - `LakeMask` and `World::lakeGround` generalise from Fjordhaven's one reservoir to a chart-wide mask with a level
+     per texel. The terrain paints water there as it does for the reservoir.
+3. **Land cover into the ground.**
+   - Lushness comes from the class: forest and crops high, shrubs mid, bare low.
+   - Coldness comes from latitude, height and the snow class.
+   - The mask's farmland channel is cropland. Its urbanness is built-up, together with the towns below.
+   - The forest density follows closed and open forest.
+   - Tree species follow the forest type: needleleaf to firs, spruce and pines; broadleaf to oaks and birches;
+     tropical evergreen broadleaf to palms.
+4. **Airports.**
+   - OurAirports' large, medium and small airports in the square, open, with a runway at least 300 m long.
+   - The main runway is the longest one with a hard surface, else the longest. It is placed from its two ends:
+     heading, length, width, surface and threshold elevation.
+   - Size: large → international (2), medium → regional (1), small → strip (0).
+   - The grounds are flattened to the runway's own height and blended into the terrain, as Solace's are
+     (`airportGroundsCap`, `airportFunnelCeiling`).
+   - The layout comes from `airport_layout.cpp`.
+   - Codes are the real idents (KBOS, EGLL). Names are the real names.
+   - Secondary runways come in stage E8.
+5. **Roads.**
+   - Every GRIP edge the square reaches, whole, with these classes:
+     - 1 highway → `RC_HIGHWAY`;
+     - 2 primary → `RC_ROAD`;
+     - 3 secondary → `RC_ROAD`;
+     - 4 tertiary → `RC_LANE`;
+     - 5 local → `RC_TRACK`, or none inside a town, where the settlement's own streets take over.
+   - Each edge is laid with `layRoad`. Its ends are pinned at the node heights, which are the ground's height at the
+     node, the same in every chart.
+   - Edges that leave the square are cut 2 km inside it. The swap distance (section 5) keeps every cut far from the
+     aircraft.
+   - Real alignments are never re-routed. Where a real road is steeper than its class allows, its profile follows the
+     ground; that is an exception, not a failure.
+6. **Towns.**
+   - GeoNames places in the square:
+     - village under 5,000 people;
+     - town under 100,000;
+     - city above that.
+   - The radius comes from the population, shaped by the built-up cover.
+   - Then `buildSettlementFields` and the settlements' own streets, as today, and farmsteads where the cover is
+     cropland.
+7. **The rest unchanged:**
+   - road grid;
+   - mask bake;
+   - height bounds;
+   - envelope;
+   - bridges;
+   - road furniture.
+
+   No invented landmarks.
+
+The cache key is the chart id, the pack's content hash, the GLO-90 tiles used and the build stamp. Budget: a chart builds
+in under 10 s on two background threads (a generated region takes about 6 s today).
 
 ---
 
-## 6. How to test headless (no GPU)
+## 4. The far terrain
 
-- `ctest` in a Release build. The GPU tests (`road_grade_gpu`, `planet_gpu`, `terrain_shadow_bake`) run on Mesa's llvmpipe through EGL, and skip where there's no EGL.
-- **Pictures.** `render_harness` on Xvfb.
-  - Start it once as a render server: `SHADERCACHE=<dir> build/render_harness serve 960 540`.
-  - Send it shots with `tools/render_client.sh at AT=x,z,height,heading CAMPITCH=deg WX=cover,base,precip,storm,wind,from,gust,turb,hour out=/path.ppm`.
-  - Each shot takes a second or two once loaded. Add `bench=4` for per-pass times.
-  - Post before/after pictures in issue #2.
-- The MinGW cross-build (`cmake-mingw.cmake`) before anything Windows-facing.
+Beyond the chart, out to the horizon, everything is drawn from the pack and never from a `World`:
+- patches of 129² vertices in rings of growing size round the camera: 40 km patches to 150 km, 160 km patches to 600 km,
+  640 km patches beyond that, out to the horizon from orbit;
+- each patch is sampled from ETOPO (and GLO-90 where it is cached), coloured from the land cover in the same palette
+  as the near ground's material, with the sea clipped as today;
+- the existing far pass (`far_region_vs.glsl`, the dithered near/far blend, the coarse collision fallback in
+  `regional_surface`) carries them.
+
+This replaces `distant_regions`' silhouettes of the generated regions in a real-Earth flight.
 
 ---
 
-## 7. Decisions for the owner (ask in issue #2 before Phase 1)
+## 5. Sliding charts
 
-1. **Where Solace sits. Decided (2026-10-12):** 32.5° N, 58.0° W, east of Bermuda in deep water, laid true to north.
-2. **How much data ships with the game.**
-   - A 60″ global base: small, maybe a few hundred MB.
-   - A 30″ base, ≈ 1 km: around a gigabyte or more.
-   - Optional regional high-detail packs.
-   Measure in Phase 0 and propose numbers.
-3. **Roads.** GRIP if its terms allow; otherwise OpenStreetMap (ODbL obligations) or Natural Earth (major roads only).
-4. **Scope of the first release.** The North Atlantic region first (the US east coast, Bermuda, Solace), then grow outwards.
+- **Prepare.**
+  - While flying, the next chart is built in the background, centred 20 km ahead along the track and snapped to the
+    lattice.
+  - Then come its GPU upload, staged at 2 MiB a frame as today, and **its scenery near the swap point**: the chunks the
+    current chart has loaded within 10 km of where the swap will be, generated from the new chart.
+- **Swap.**
+  - The swap happens once the aircraft is nearer the new chart's centre than the old one's by 2 km.
+  - Over land too. It needs no ocean and no altitude.
+  - When the aircraft is within 30 m of the ground, the swap keeps its height above the ground rather than its
+    altitude, so a few centimetres of resampling never become a bump.
+  - The whole flight state carries over through `regionTravel::Change`, as today.
+- **Seamless.**
+  - Scenery is placed by geographic position (section 3), so the prewarmed chunks hold the same trees, houses and
+    lamps where the old ones stood.
+  - The scenery table swaps whole, with no drain-and-restream.
+  - Traffic, ATC and the route carry across by real airport ident, not by index.
+- **Late detail.** When the next chart isn't ready, the far terrain's paired collision surface carries the flight,
+  as today.
+
+---
+
+## 6. Stages
+
+Each stage builds and passes the full `ctest` and the MinGW build, adds its own tests, and is pushed on its own.
+
+| Stage | What | Shows |
+|---|---|---|
+| **E1** data | `tools/earth` v2 builders, dev pack (New England, 40-45° N, 75-69° W), test fixture (Martha's Vineyard and Nantucket, under 3 MB) | a pack that verifies; Python tests |
+| **E1b** reader | `src/earth_data.*`: bundles, inflate, LRU cache, sampling, tables by area, the GLO-90 COG reader; C++ against Python parity tests | `earth_data_test` |
+| **E2** charts | `World::buildEarth`; Free Flight "Real Earth" from any airport in the pack (search by ident or name) | flying out of KBOS over real ground |
+| **E3** far terrain | section 4 | real coasts and mountains to the horizon |
+| **E4** sliding charts | section 5 | Boston to Maine without a stop |
+| **E5** global data | a CI workflow that builds the global pack and attaches it to a release; the game finds and installs it; the GLO-90 download cache with offline fallback | anywhere on Earth |
+| **E6** Solace in the Atlantic | the authored chart in the real ocean, its sea floor blended into ETOPO's, Bermuda and the US coast reachable; the generated regions leave real-Earth play | Solace to Bermuda to New York |
+| **E7** career | real airports' boards, travel and long hauls between them, a spatial index for ATC, the GPS and the board; the career keeps Solace as its start | jobs anywhere |
+| **E8** realism | secondary runways, airport layouts by size, rivers, regional building styles, night lights by population, landmarks | polish |
+
+Decisions taken with the defaults (the owner can change them):
+- The generated regions keep working until E6. In real-Earth play the real world replaces them; they stay available
+  as a "Generated Earth" choice in Free Flight.
+- The data isn't in the game's zip. The game looks for `earth/` beside the executable and in its data folder, and says
+  how to get it.
+
+---
+
+## 7. Contracts to keep (they have tests)
+
+- **CPU and GPU agree** on the terrain height (`World::height` / `terrainH`), the road bed (`road_grade_gpu_test`) and
+  the planet (`planet_gpu_test`). New samplers get the same kind of test.
+- **Charts agree.** Two overlapping real-Earth charts give the same ground within 0.3 m at a point 20 km from both
+  centres, and the same airports, road nodes and town centres there within 0.3 m (`earth_chart_test`).
+- **The aircraft bodies' bake is untouched by world work.** Gate world-only GLSL behind defines the bake doesn't set
+  (`tests/shader_prune_test.cpp`, `tests/fixtures/aircraft_bake.fnv`).
+- **Determinism.** The same pack and build give byte-identical charts. The tests read the fixture, never the network.
+- **Floats stay near the origin.** Nothing simulated sits more than a few tens of km from the chart origin.
+- **Solace is unchanged** inside its own chart, with all of its tests.
+- **Saves.**
+  - A career save written before this work still loads.
+  - A real-Earth position is saved geographically (save version 8, when E7 needs it).
+  - The unknown-version case in the save tests moves on accordingly.
+- **Shared GLSL and structs.** World-only structs and functions stay behind `GROUND_ROADS` and the like.
+- **Profiling bits.** `uDbg` bits never share a bit with `Renderer::kProbe*`.
+
+---
+
+## 8. Testing headless
+
+- `ctest` (Release). The GPU tests run on llvmpipe through EGL.
+- **Pictures:** `render_harness serve` on Xvfb, `tools/render_client.sh`. Real-Earth scenes take `EARTH=<pack dir>`
+  and `AT=lat,lon,height,heading` for geographic placement.
+- The MinGW cross-build before anything Windows-facing.
+
+---
+
+## 9. History
+
+- 2026-10-11/12: Codex's Phase 0 (`tools/earth` v1: cube tiles, zstd, the source and terms review in
+  `EARTH_DATA_SOURCES.md` and `EARTH_LANDCOVER_REVIEW.md`, the sampling studies). The cube contract and `geo.h`'s
+  tiles stay for the generated regions' addresses. The v2 pack uses 1° geographic tiles because the elevation and
+  land-cover sources are already on that grid.
+- 2026-10-13: the owner moved to procedural regions (`PROCEDURAL_EARTH.md`): 6,143 generated regions, ocean handoffs,
+  the far silhouettes and the coarse collision fallback. All of that is reused here.
+- 2026-10-20: the feasibility study measured the packs (section 2) and built a Madeira prototype with GLO-90 in the
+  regions' sampler. The owner chose option C.

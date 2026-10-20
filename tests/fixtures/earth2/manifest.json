@@ -1,0 +1,137 @@
+{
+ "box": [
+  41,
+  -72,
+  42,
+  -69
+ ],
+ "files": {
+  "airports.bin": {
+   "bytes": 523950,
+   "sha256": "00211dd91fa5a8fec99b2b05356812cf7c986752ad3cf1d23de6206338d42490"
+  },
+  "cover/N40W070.svb": {
+   "bytes": 3910,
+   "sha256": "b24b6925f9170ea0b2d4e826b8647c484a18ec9f915a0cdffea726ad88a4689f"
+  },
+  "cover/N40W080.svb": {
+   "bytes": 35033,
+   "sha256": "78fac50c435957944d08a9fdeedca53d474c5c55eda7cbdb23e56b186a5a1517"
+  },
+  "elev/N40W070.svb": {
+   "bytes": 10874,
+   "sha256": "d425fdb638bd104d93fc90f940557fdcd1a50942f8660ba5f5b80dc474f8c2ef"
+  },
+  "elev/N40W080.svb": {
+   "bytes": 24625,
+   "sha256": "b4d9be0f53ffed6772d88837fd22b0155dedfd3e6db699d44f821c0d347f9451"
+  },
+  "glo90.bits": {
+   "bytes": 8100,
+   "sha256": "16394f8f6d5e7a9bda3b4c6aca2594866c1470146a2872f7e6da715dfc33afba"
+  },
+  "glo90/Copernicus_DSM_COG_30_N41_00_W070_00_DEM.tif": {
+   "bytes": 185903,
+   "sha256": "64adf9a1e2d60c31806d9547a5c6cddb516cdc3f3d238a967fc17ce2a52f6120"
+  },
+  "glo90/Copernicus_DSM_COG_30_N41_00_W071_00_DEM.tif": {
+   "bytes": 224616,
+   "sha256": "fa4c562674e74404c7e9b40fc2d50ac1b9d28a54c24c7a4c748be43f13e650f4"
+  },
+  "inflate.bin": {
+   "bytes": 236114,
+   "sha256": "c43a6418845deac1d14ce672fc37d53a02c4857c81d1868c2813d797c5330be8"
+  },
+  "licenses/ATTRIBUTION.txt": {
+   "bytes": 1891,
+   "sha256": "7a738a7d4c32f13bae1496d134a877e3d3664a08a45a2ef6db96b375b45595c2"
+  },
+  "lroads/N40W080.svb": {
+   "bytes": 38163,
+   "sha256": "9e6d9578c6f1478d152b865d371382430c55bcf54c7606010d46072255a11baa"
+  },
+  "places.bin": {
+   "bytes": 524459,
+   "sha256": "70d50aa5fbd47c3bf704b72558fa540471895fce99fe0a6d0099eb209f88a3b3"
+  },
+  "roads/N40W070.svb": {
+   "bytes": 6651,
+   "sha256": "ddb499b6788c232f43cb54fb930fb217c02b9a7b72793bee505e5e8930294d04"
+  },
+  "roads/N40W080.svb": {
+   "bytes": 164678,
+   "sha256": "0521cc563f0090464d17125ad5f8d4e3879f90cbf9175f8cefb683c894ef1f0c"
+  }
+ },
+ "format": "somnium-earth",
+ "layers": {
+  "cover": {
+   "apron": 1,
+   "classes": "CGLS-LC100",
+   "samplesPerDegree": 336,
+   "type": "uint8"
+  },
+  "elev": {
+   "apron": 1,
+   "samplesPerDegree": 120,
+   "seaFloorClamp": -200,
+   "type": "int16",
+   "units": "m"
+  },
+  "lroads": {
+   "optional": true,
+   "type": "edges"
+  },
+  "roads": {
+   "type": "edges"
+  }
+ },
+ "sources": [
+  {
+   "bytes": 3732480000,
+   "file": "etopo30.bin",
+   "licence": "CC0-1.0",
+   "name": "ETOPO 2022 30s surface",
+   "sha256": "8cbb3ad86ff406e359aa8c4d05df04ec7754e3880e69708da493e1ecc26ad837"
+  },
+  {
+   "licence": "CC-BY-4.0",
+   "name": "CGLS-LC100 2019 discrete classification",
+   "url": "https://zenodo.org/records/3939050/files/PROBAV_LC100_global_v3.0.1_2019-nrt_Discrete-Classification-map_EPSG-4326.tif?download=1"
+  },
+  {
+   "bytes": 12748669,
+   "file": "airports.csv",
+   "licence": "public domain",
+   "name": "OurAirports airports.csv",
+   "sha256": "0499dbd88de2fc735ac5c09f59796ccc3af544e17ffda807f793c0c6fe6c3d75"
+  },
+  {
+   "bytes": 3969714,
+   "file": "runways.csv",
+   "licence": "public domain",
+   "name": "OurAirports runways.csv",
+   "sha256": "eff294dc5c055e7bb48ef43cb3b564399f2741bbfbba0c18c085aea7b9ab988b"
+  },
+  {
+   "bytes": 13891231,
+   "file": "cities500.zip",
+   "licence": "CC-BY-4.0",
+   "name": "GeoNames cities500",
+   "sha256": "2b80cc4a7d9a7c784ba4892f7fdc1900ffff73ab9780bc064ffe5c539a6fabac"
+  },
+  {
+   "bytes": 909111290,
+   "file": "GRIP4_Region1_vector_shp.zip",
+   "licence": "CC-BY-4.0 (working assumption)",
+   "name": "GRIP4 GRIP4_Region1_vector_shp.zip",
+   "sha256": "fa3958e36a8a9bd8f0a3a14c0e5aadb6ae48942cad6d06916b4bad17c15e1db1"
+  },
+  {
+   "licence": "Copernicus DEM licence",
+   "name": "Copernicus DEM GLO-90 N41W071 (cropped 41.20-41.55 N) and N41W070"
+  }
+ ],
+ "tool": 1,
+ "version": 2
+}

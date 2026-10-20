@@ -1,0 +1,25 @@
+Somnium Volandi Earth pack: sources and licences
+
+Elevation (base): NOAA National Centers for Environmental Information (2022), ETOPO 2022 15 Arc-Second Global Relief
+Model, 30 arc-second surface, https://doi.org/10.25921/fd45-gt74. CC0 1.0. Not for navigation. Changes: tiled to
+1-degree tiles, rounded to metres, the sea floor clamped at -200 m.
+
+Elevation (fine, fetched or included per tile): Copernicus DEM GLO-90. (c) DLR e.V. 2010-2014 and (c) Airbus Defence
+and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved. Available on a
+free basis for the general public under the Copernicus DEM licence. Source: s3://copernicus-dem-90m (AWS open data).
+
+Land cover: Copernicus Global Land Service, Land Cover 100 m, collection 3, epoch 2019 (Buchhorn et al. 2020),
+https://doi.org/10.5281/zenodo.3939050, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changes: reduced
+3 x 3 by majority to 1/336 degree, tiled; outside 80 N - 60 S filled from the elevation.
+
+Airports: OurAirports (https://ourairports.com/data/), public domain. Changes: open small, medium and large airports
+with a runway of 300 m or more; feet to metres.
+
+Places: GeoNames (https://www.geonames.org/), cities500, CC BY 4.0. Changes: populated places, binary table.
+
+Roads: GRIP4 (Version 4, 2018), J. R. Meijer, M. A. J. Huijbregts, C. G. J. Schotten and A. M. Schipper, Global
+patterns of current and future road infrastructure, Environmental Research Letters 13, 064006 (2018),
+https://doi.org/10.1088/1748-9326/aabd42, dataset https://doi.org/10.5281/zenodo.6420961, used under CC BY 4.0
+(https://creativecommons.org/licenses/by/4.0/). Supplied without warranties and not suitable for navigation; no
+endorsement implied. Changes: noded at junctions, chained, simplified (6 m), cut into pieces of at most 5 km,
+quantised to 1e-7 degree, filed by 1-degree tile.
