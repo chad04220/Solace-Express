@@ -220,6 +220,8 @@ private:
   bool earthSceneryDraining = false, earthFacilitiesPending = false, earthPromotionDeferred = false;
   void retireEarthPrefetch(); // never joins a running job on the flight thread
   void updateEarthSurfaceContext();
+  procedural::Descriptor chartRegion() const;
+  void updateHorizon();
   bool earthPromotionSafe(const World& candidate, const regionTravel::Change& change) const;
   void updateEarthFlight();
   void continueEarthFlight();

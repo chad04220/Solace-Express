@@ -7,21 +7,16 @@
     auto near = [](float a, float b) { return fabsf(a - b) < 0.001f; };
     auto bytes = [](const fs::path& path) { std::ifstream f(path, std::ios::binary); return std::string(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>()); };
     auto snapshot = [&](const Career& c) { const auto path = root / "snapshot.sav"; if (!c.save(path.string())) return std::string("SAVE FAILED"); return bytes(path); };
-    // Live Free Flight unwraps Solace. Returning to the menu restores the authored
-    // chart asynchronously; use a private cache and leave it alive until all Games
-    // (and their loader/retirement jobs) have been destroyed below.
+    // Free Flight flies the islands as they are (they no longer wrap: world.h), so going back to the menu from a flight
+    // that stayed over them reloads nothing - the menu is back at once over the same islands. (A flight that travelled on
+    // into a generated region reloads them, region_runtime.) The private cache is kept for any load all the same.
     g_world.saveCache((root / "world.bin").string(), kTestWorldStamp);
     auto restoreMenu = [&](Game& q, const std::string& label) {
-      check(q.screen == SCR_REGION_LOADING && q.regionJob.valid(), label + ": menu return gates readers during Solace restoration");
-      const auto deadline = std::chrono::steady_clock::now() + std::chrono::minutes(5);
-      while (q.screen == SCR_REGION_LOADING && q.regionJob.valid() && std::chrono::steady_clock::now() < deadline) {
-        q.update(1.f / 60.f); q.in.endFrame();
-        if (q.regionJob.valid()) q.regionJob.wait_for(std::chrono::milliseconds(2));
-      }
+      check(q.screen == SCR_MENU && !q.regionJob.valid(), label + ": the menu is back at once, nothing to reload");
       const bool ready = q.screen == SCR_MENU && !q.regionJob.valid() && q.regionError.empty() &&
-        !g_world.procedural && g_world.repeating && g_world.regionId == "solace";
+        !g_world.procedural && !g_world.repeating && g_world.regionId == "solace";
       check(ready,
-        label + ": authored Solace is ready before menu assertions or another launch");
+        label + ": the islands are ready before menu assertions or another launch");
       return ready;
     };
 

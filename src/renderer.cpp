@@ -1292,17 +1292,6 @@ bool Renderer::commitWorldUpload(WorldUploadData* retired) {
   return true;
 }
 
-void Renderer::setWorldTopology() {
-  if (!ok) return;
-  glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, minimapTex);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, g_world.repeating ? GL_REPEAT : GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, g_world.repeating ? GL_REPEAT : GL_CLAMP_TO_EDGE);
-  const int priorShadow = tshFront;
-  resetTemporal(true);
-  // The terrain itself is unchanged when Solace joins Earth; keep its existing map while replacing it in bands.
-  if (priorShadow >= 0) { tshFront = priorShadow; tshSun = vec3(); }
-}
-
 void Renderer::reloadWorld(const std::vector<uint8_t>& minimap) {
   if (!ok) return;
   cancelWorldUpload();

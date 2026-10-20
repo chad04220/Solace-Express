@@ -460,7 +460,7 @@ struct GameTest {
     game.endFlight(false, "End Earth route", OUT_ABANDONED);
     game.cancelFreeFlightSetup();
     check(game.screen == SCR_REGION_LOADING, "main menu waits for authored Solace restoration"); drain();
-    bool original = !g_world.procedural && g_world.repeating && g_world.regionId == "solace" && g_world.airports.size() == originalCodes.size();
+    bool original = !g_world.procedural && !g_world.repeating && g_world.regionId == "solace" && g_world.airports.size() == originalCodes.size();
     for (size_t i = 0; original && i < originalCodes.size(); ++i) original &= originalCodes[i] == g_world.airports[i].code;
     check(original && originalHeight == g_world.height(1000, -3000) && game.screen == SCR_MENU && unchanged(),
       "Solace terrain and every legacy airport index restored before main menu");
@@ -479,8 +479,8 @@ struct GameTest {
     check(!g_world.procedural && game.screen == SCR_MENU && unchanged() && game.pendingCareer &&
       game.pendingCareer->money == game.career.money + 101 && game.saveWhy == "Existing pending transaction",
       "cancel joins loading, restores Solace and preserves the pending career transaction");
-    // Switching the original Solace flight to Earth topology must drain old
-    // quote/scenery readers too, even though the region ID does not change.
+    // An Earth route from the islands while a quote still reads them: the flight goes on, and nothing moves the
+    // islands from under the reader (the chart changes only past their sea, once the reader is done).
     game.beginFreeFlightSetup(); game.freeAirport = 1; game.freeAirborne = true;
     std::promise<void> releaseLaunchQuote;
     auto launchQuoteGate = releaseLaunchQuote.get_future();
@@ -502,21 +502,23 @@ struct GameTest {
     });
     game.setEarthDestination(A);
     game.updateEarthFlight();
-    check(game.screen == SCR_FLIGHT && g_world.repeating,
-      "same-Solace Earth route waits for background quote readers while keeping the flight screen active");
+    check(game.screen == SCR_FLIGHT && !g_world.repeating && !g_world.procedural && game.quoteJob.valid(),
+      "an Earth route from Solace keeps flying while a background quote still reads the islands");
     game.focusLost();
     check(game.paused, "focus loss while a region prepares pauses the active flight normally");
     releaseTopology.set_value();
     const auto topologyDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
-    while (g_world.repeating && std::chrono::steady_clock::now() < topologyDeadline) {
+    while (game.quoteJob.valid() && game.quoteJob.wait_for(std::chrono::seconds(0)) != std::future_status::ready &&
+           std::chrono::steady_clock::now() < topologyDeadline) {
       game.updateEarthFlight(); std::this_thread::sleep_for(std::chrono::milliseconds(2));
     }
+    game.updateEarthFlight();
     check(game.screen == SCR_FLIGHT && game.paused && !g_world.procedural && !g_world.repeating &&
       length(game.plane.pos - solaceDeparture) < .01f && unchanged(),
-      "authored Solace can join Earth travel without moving the plane or resuming after focus loss");
+      "Solace's Earth route goes on without moving the plane or resuming after focus loss");
     game.endFlight(false, "End Solace Earth route", OUT_ABANDONED); game.cancelFreeFlightSetup(); drain();
-    check(game.screen == SCR_MENU && g_world.repeating && !g_world.procedural && unchanged(),
-      "leaving an unwrapped authored Solace flight restores legacy topology before main menu");
+    check(game.screen == SCR_MENU && !g_world.repeating && !g_world.procedural && g_world.regionId == "solace" && unchanged(),
+      "leaving a Solace Earth flight goes straight back to the menu over the same islands");
     game.beginFreeFlightSetup(); game.freeAirborne = true; game.launchFreeFlight();
     game.updateEarthFlight();
     check(game.screen == SCR_FLIGHT && game.earthFlight && !g_world.repeating && !game.earthDestination && unchanged(),
@@ -524,8 +526,8 @@ struct GameTest {
     game.returnToFreeFlight();
     check(game.screen == SCR_FREE_FLIGHT && !game.freeFlight && unchanged(), "ordinary Solace Earth flight returns safely to setup");
     game.cancelFreeFlightSetup(); drain();
-    check(game.screen == SCR_MENU && g_world.repeating && !g_world.procedural && !regionalSurface::flightContextEnabled() && unchanged(),
-      "quitting relaunched Solace Free Flight restores authored career topology without saving");
+    check(game.screen == SCR_MENU && !g_world.repeating && !g_world.procedural && !regionalSurface::flightContextEnabled() && unchanged(),
+      "quitting relaunched Solace Free Flight returns to the islands without saving");
     game.retireEarthPrefetch();
     if (game.earthRetireJob.valid()) game.earthRetireJob.get();
     std::error_code error; fs::remove_all(root, error);

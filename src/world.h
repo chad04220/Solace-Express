@@ -11,9 +11,10 @@ namespace procedural { struct Descriptor; class Recipe; }
 struct WorldSceneryState;
 
 static const float WORLD_HALF = 40000.0f;  // the islands span [-40km, 40km] on x and z
-// ...in 10 km of open sea all round, and there the map wraps: [-50 km, 50 km) repeats every 100 km on both axes, so
-// flying on in one direction comes round to where it began. What the world holds is looked up at the wrapped place
-// (wrapCoord); the aircraft is brought back inside when it crosses the seam (Game::wrapAcrossSeam)
+// ...in 10 km of open sea all round, and past it the open ocean, out to the generated regions around them on the Earth
+// (procedural_regions.h: the nearest some 200 km away, drawn on the horizon and solid to fly into). The islands used
+// to repeat every 100 km both ways - [-50 km, 50 km) wrapped (wrapCoord) - so the horizon was the islands again in
+// every direction; a World can still be made repeating (World::repeating), but none is
 static const float WRAP_HALF = 50000.0f;
 static const float WRAP_SPAN = 2.0f * WRAP_HALF;
 static const float SEA_DEPTH = 80.0f;      // the open sea's depth round the islands' square (the band fades to it)
@@ -97,7 +98,7 @@ public:
   std::vector<Airport> airports;
   std::vector<Town> towns;
   bool procedural = false;
-  bool repeating = true; // authored career chart wraps; Earth free-flight charts do not
+  bool repeating = false; // the old wrapping chart (above): no World built repeats
   float wrap(float v) const { return repeating ? wrapCoord(v) : v; }
   float nearPoint(float v, float ref) const { return repeating ? nearCopy(v, ref) : v; }
   std::string regionId = "solace";

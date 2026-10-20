@@ -295,7 +295,7 @@ float airportInfluence(const World& world, float x, float z) { return airportInf
 
 void World::build(const std::string& cachePath, const std::string& stamp, bool save) {
   generationCheckpoint();
-  procedural = false; repeating = true; regionId = "solace"; regionRecipe.reset();
+  procedural = false; repeating = false; regionId = "solace"; regionRecipe.reset();   // (one place on the Earth: world.h)
   airports.assign(std::begin(kAirports), std::end(kAirports));
   towns.assign(kTowns, kTowns + kNumTowns);
   for (auto& a : airports) a.hospital = !strcmp(a.code, "CAP") || !strcmp(a.code, "NPT") || !strcmp(a.code, "PVI");

@@ -56,14 +56,13 @@ int main() {
     writeAll(bad, t);
     World d; CHECK(!d.loadCache(bad, "stampA") && d.hm.empty(), "an empty height-bound array is rejected, nothing published");
   }
-  {   // the map wraps (world.h WRAP_HALF): the islands in 10 km of open sea all round, the whole repeating every 100 km
-      // both ways - the same ground a period on in any direction, the sea settled to its depth 3 km out, and no step
-      // where the islands' square ends
-    bool periodic = true, sea = true; float step = 0.f;
+  {   // the islands in 10 km of open sea all round, and past it the open ocean (world.h): no copy of them a period on
+      // (the map no longer wraps every 100 km), the sea settled to its depth 3 km out, and no step where their square ends
+    bool once = true, sea = true; float step = 0.f; int land = 0;
     for (int i = 0; i < 2000; i++) {
-      const float x = -50000.f + (float)((i * 7919) % 1000) * 100.f, z = -50000.f + (float)((i * 104729) % 1000) * 100.f;   // (whole metres: a period on is exact)
+      const float x = -50000.f + (float)((i * 7919) % 1000) * 100.f, z = -50000.f + (float)((i * 104729) % 1000) * 100.f;
       const float h = a.height(x, z);
-      periodic = periodic && h == a.height(x + WRAP_SPAN, z) && h == a.height(x, z - WRAP_SPAN) && h == a.height(x - 2.f * WRAP_SPAN, z + WRAP_SPAN);
+      if (h > 0.f) { land++; once = once && a.height(x + WRAP_SPAN, z) == -SEA_DEPTH && a.height(x, z - WRAP_SPAN) == -SEA_DEPTH; }
       if (std::max(fabsf(x), fabsf(z)) >= WORLD_HALF + 3000.f) sea = sea && h == -SEA_DEPTH;
     }
     for (float t = -WORLD_HALF; t <= WORLD_HALF; t += 500.f)
@@ -72,7 +71,7 @@ int main() {
         auto at = [&](float off) { return side < 2 ? a.height(e + (side & 1 ? off : -off), t) : a.height(t, e + (side & 1 ? off : -off)); };
         for (float o = -400.f; o < 3400.f; o += 50.f) step = std::max(step, fabsf(at(o + 50.f) - at(o)));
       }
-    CHECK(periodic, "the map repeats every 100 km both ways");
+    CHECK(land > 100 && once, "the islands are there once: a period on, open ocean");
     CHECK(sea, "past the islands' square, the open sea at its depth");
     printf("  (steepest 50 m step from the islands' edge out to the open sea: %.1f m)\n", step);
     CHECK(step < 15.f, "no cliff where the islands' square ends");

@@ -1,4 +1,5 @@
 #include <chrono>
+#include <thread>
 #include <sys/stat.h>
 #include <unistd.h>
 // Development harness: renders test frames on Linux (Xvfb + Mesa) to validate shaders and visuals.
@@ -120,6 +121,18 @@ struct GameTest {
     while (game.screen == SCR_LOADING && game.loadReadyT < 0 && frames < 2000) { game.update(1.f / 30.f); game.render(); if (pend0 < 0) pend0 = g_ren.entPending; frames++; }
     printf("loading from %s: first frame pending %d, ready after %d frames (%.1f s of game time), meshes built %d\n", g_world.airports[c.from].code, pend0, frames, game.loadT, g_ren.bakeBuilt - b0);
     return 0;
+  }
+  // HORIZON=<seconds>: the generated regions round the flight built and uploaded before the shot (Renderer::
+  // updateRegionHorizon runs on a worker; a scene's few frames would otherwise show the sea without them)
+  static void waitHorizon(Game& g, float seconds) {
+    const auto until = std::chrono::steady_clock::now() + std::chrono::milliseconds((int)(seconds * 1000.f));
+    while (std::chrono::steady_clock::now() < until) {
+      g_ren.beginRegionUploadFrame(); g.updateHorizon();
+      if (g_ren.horizonWantedMeshes > 0 && g_ren.horizonReadyMeshes >= g_ren.horizonWantedMeshes && !g_ren.horizonCpuPending && g_ren.horizonPendingMeshes == 0) break;
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    printf("horizon: %d of %d regions ready, %d resident, %u jobs%s%s\n", g_ren.horizonReadyMeshes, g_ren.horizonWantedMeshes, g_ren.horizonResidentMeshes,
+           g_ren.horizonJobsStarted, g_ren.horizonError.empty() ? "" : ", error: ", g_ren.horizonError.c_str());
   }
   static void drawUI(Game& g, const std::string& what) {
     g.realTime = 5; g.uiDt = 1.f;
@@ -490,6 +503,7 @@ void main(){
     const int seq = getenv("SEQ") ? atoi(getenv("SEQ")) : 0;   // (the last SEQ of them saved too: frame-to-frame flicker)
     if (seq > 0 && i >= n - seq) { char b[256]; snprintf(b, sizeof b, "/tmp/claude-0/sp/seq_%s_%d.ppm", scene.c_str(), i - (n - seq)); glFinish(); g_ren.screenshot(b); }
   }
+  if (getenv("HORIZON")) { GameTest::waitHorizon(game, (float)atof(getenv("HORIZON"))); for (int i = 0; i < 3; i++) game.render(); }
   if (getenv("TAAF")) for (int i = 0, n = atoi(getenv("TAAF")); i < n; i++) game.render();   // extra static frames: let TAA converge
   if (getenv("SIMFRAMES")) {   // the scene flown on first, simulated but not drawn (a timing scene should hold still)
     for (int i = 0, n = atoi(getenv("SIMFRAMES")); i < n; i++) game.update(1.f / 60.f);

@@ -421,37 +421,30 @@ int main(int argc, char** argv) {
     for (int i = 0; i < 480 && !p.ev.crashed; i++) { p.step(1 / 240.f, calm, 0); mg = std::max(mg, p.gLoad); }
     ok = !p.ev.crashed && mg > 60.f; printf("XR-40 full pull at 600 m/s: %.0f g %s\n", mg, ok ? "ok" : "FAIL"); fails += !ok;
   }
-  // ---------------- the map wraps (world.h WRAP_HALF): the islands in 10 km of open sea, repeating every 100 km. Over its
-  // seam an aircraft comes back in from the other side and flies on as it was - the same flight whichever copy of the
-  // map it is reckoned in (its air comes with it: the eddies and gusts go on as they were) - and the autopilot takes the
-  // short way across it
+  // ---------------- the islands are one place on the Earth (world.h): past their 10 km of sea the open ocean goes on (the
+  // map no longer wraps at 50 km to bring the islands round again). An aircraft flown east over where the seam was flies
+  // on out over the ocean, as it was; and the autopilot, out there, sent to the field furthest west turns back the direct
+  // way, over the islands
   if (in(2)) {
     const AircraftSpec& s = kAircraft[1];
     Weather wx; wx.windSpeed = 7; wx.windFrom = 250; wx.turbulence = 0.3f; wx.gust = 3;
     Plane a; a.reset(&s, vec3(WRAP_HALF - 400.f, 700.f, 3000.f), 90, s.maxFuel * 0.5f, 85, true, s.cruise * 0.9f);
     a.ctl.throttle = 0.7f;
-    Plane b = a; b.pos.x -= WRAP_SPAN; b.wxAir.x -= WRAP_SPAN;   // (the same aircraft a period west: its first step brings it in)
-    float crossT = -1.f;
-    for (int i = 0; i < 60 * 20; i++) {
-      const float x0 = a.pos.x;
-      a.step(1 / 60.f, wx, i / 60.f); b.step(1 / 60.f, wx, i / 60.f);
-      if (crossT < 0.f && a.pos.x < x0 - WRAP_HALF) crossT = i / 60.f;
-    }
-    const float dp = length(a.pos - b.pos), dv = length(a.vel - b.vel);
-    bool ok = crossT > 0.f && !a.ev.crashed && a.seamShift.x == -WRAP_SPAN && b.seamShift.x == 0.f && dp < 0.5f && dv < 0.05f;
-    printf("Map seam: crossed at %.1f s, the same flight reckoned a period away (%.3f m, %.4f m/s apart) %s\n", crossT, dp, dv, ok ? "ok" : "FAIL"); fails += !ok;
-    // the autopilot, out over the sea east of the islands, sent to the field furthest west: on east, across the seam
+    float jump = 0.f;
+    for (int i = 0; i < 60 * 20; i++) { const float x0 = a.pos.x; a.step(1 / 60.f, wx, i / 60.f); jump = std::max(jump, fabsf(a.pos.x - x0)); }
+    bool ok = !a.ev.crashed && a.seamShift.x == 0.f && a.pos.x > WRAP_HALF + 500.f && jump < 5.f && g_world.height(a.pos.x, a.pos.z) == -SEA_DEPTH;
+    printf("No seam: flown on east to %.1f km over the open sea (largest step %.2f m, shifted %.0f m) %s\n", a.pos.x / 1000.f, jump, a.seamShift.x, ok ? "ok" : "FAIL"); fails += !ok;
     Weather calm; calm.windSpeed = 0; calm.turbulence = 0; calm.gust = 0;
     int west = 0; for (int i = 1; i < (int)g_world.airports.size(); i++) if (g_world.airports[i].x < g_world.airports[west].x) west = i;
     const Airport& W = g_world.airports[west];
     Plane c; c.reset(&s, vec3(WORLD_HALF + 4000.f, 900.f, W.z), 90, s.maxFuel * 0.8f, 85, true, s.cruise);
     c.ctl.throttle = 0.7f; c.apEngage(Plane::AP_APPR, west, calm);
-    auto far = [&]() { return length(vec3(wrapCoord(W.x - c.pos.x), 0.f, wrapCoord(W.z - c.pos.z))); };
-    const float d0 = far(); float dev = 0.f;
-    for (int i = 0; i < 60 * 180 && !c.ev.crashed; i++) { c.step(1 / 60.f, calm, i / 60.f); dev = std::max(dev, fabsf(wrapAngle((c.heading() - 90.f) * DEG) / DEG)); }
-    ok = c.apOn && !c.ev.crashed && c.seamShift.x == -WRAP_SPAN && dev < 60.f && far() < d0 - 5000.f;
-    printf("Map seam: autopilot to %s (%.0f km the short way) crossed it east %d, turned at most %.0f deg off, %.0f km to go %s\n",
-           W.code, d0 / 1000.f, c.seamShift.x == -WRAP_SPAN, dev, far() / 1000.f, ok ? "ok" : "FAIL"); fails += !ok;
+    auto far = [&]() { return length(vec3(W.x - c.pos.x, 0.f, W.z - c.pos.z)); };
+    const float d0 = far(); float east = c.pos.x;
+    for (int i = 0; i < 60 * 240 && !c.ev.crashed; i++) { c.step(1 / 60.f, calm, i / 60.f); east = std::max(east, c.pos.x); }
+    ok = c.apOn && !c.ev.crashed && c.seamShift.x == 0.f && east < WRAP_HALF && far() < d0 - 5000.f && fabsf(wrapAngle((c.heading() - 270.f) * DEG) / DEG) < 45.f;
+    printf("No seam: autopilot to %s (%.0f km west) turned back west, furthest east %.1f km, heading %.0f, %.0f km to go %s\n",
+           W.code, d0 / 1000.f, east / 1000.f, c.heading(), far() / 1000.f, ok ? "ok" : "FAIL"); fails += !ok;
   }
   // ---------------- autopilot: stable holds in turbulence, and autoland at Solace Capital for every aircraft. The
   // autopilot flies each type to its own envelope (steep banks, hard pulls): what's checked is that it gets there, settles,

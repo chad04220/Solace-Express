@@ -312,7 +312,6 @@ public:
   }
   bool streamingShadowPending() const { return tshStreaming; }
   void reloadWorld(const std::vector<uint8_t>& minimap);
-  void setWorldTopology();
   GLuint makeTexture(const uint8_t* rgba, int w, int h);
   void renderMap(float cx, float cz, float half, int N);   // GPS aerial image into mapTex()
   GLuint mapTex() const { return texMap; }

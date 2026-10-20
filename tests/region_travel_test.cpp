@@ -318,10 +318,10 @@ void transport(Plane& p, const regionTravel::Change& change) {
 void flightTests() {
   seaWorld();
   World authored;
-  expect(authored.repeating && authored.wrap(50001) == -49999, "authored world keeps existing torus semantics");
+  expect(!authored.repeating && authored.wrap(50001) == 50001, "the authored islands no longer repeat: one place on the Earth");
   expect(g_world.wrap(50001) == 50001 && g_world.wrap(-50001) == -50001, "procedural world disables both wrap directions");
-  expect(authored.nearPoint(-49000, 49000) == 51000 && g_world.nearPoint(-49000, 49000) == -49000,
-    "procedural navigation never chooses a repeated nearby copy");
+  expect(authored.nearPoint(-49000, 49000) == -49000 && g_world.nearPoint(-49000, 49000) == -49000,
+    "navigation never chooses a repeated copy, over the islands or a generated region");
   Weather wx; wx.windSpeed = wx.gust = wx.turbulence = wx.cloudCover = 0; wx.timeOfDay = 0;
   // (the Emissary, at a jet's speed: the Ambler flew this at 180 m/s, nearly three times its cruise, until its structure
   // became a normal-category +3.8 g one and failed there at once)

@@ -12,6 +12,11 @@
 - **Space (or X on a gamepad) takes the photo.** It's saved as a PNG at full resolution, without the HUD or the panel, to **Pictures\Somnium Volandi**. On Steam it's added to your Steam screenshots too.
 - F2 again, Esc or B goes back to where you were. Steam friends see that you're framing a photo.
 
+### Beyond the islands
+- **The Solace Islands no longer repeat.** The map used to wrap every 100 km, so whichever way you looked from the edge, the land on the horizon was Solace again, and flying on brought you back round to it. Now the open ocean goes on past the islands' sea, out to the island regions the game generates around Solace on the Earth: the Tern Islands about 200 km south, Willow Continental Isles to the west-southwest, the Rowan and Peregrine volcanic chains, and more beyond.
+- **They're there on every flight.** Jobs, lessons, trials, sorties and research flights all show the neighbouring regions rising over the horizon as you head toward them, and their ground is solid if you fly into it.
+- **In Free Flight you can keep going.** Fly out over the ocean and the next region is prepared while you cross. You arrive over its islands, with its own airports, without a loading screen.
+
 ### Worldwide trial boards on Steam
 - **Every trial now has a worldwide leaderboard on Steam,** one for each trial and aircraft, plus one for each day's daily trial. Your best time is uploaded when you finish, and the results card shows your place in the world under your place on the local board.
 

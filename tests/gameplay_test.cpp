@@ -407,8 +407,8 @@ struct GameTest {
         printf("Craters and wrecks: crater dug into the ground %d, aircraft rests on its floor %d (rose %.1f m), the first bomb's damage kept after eight %d, a seam wreck in both chunks %d: %s\n",
                dug, rests, rise, kept, seam, ok ? "ok" : "FAIL"); fails += !ok;
       }
-      {   // the map wraps (world.h WRAP_HALF): flown east over its seam, the aircraft comes in from the west with what is round
-          // it - the camera, its smoke - and the flight goes on (past 48 km it used to be lost)
+      {   // the islands are one place on the Earth (world.h): flown east past where the map used to wrap, the aircraft
+          // flies on out over the ocean with what is round it - the camera, its smoke - and the flight goes on
         Game q; q.initHeadless(); q.botControl = true; q.set.traffic = false;
         q.resCraft = 1; q.resAirborne = true; q.launchResearch();
         Plane& pl = q.plane;
@@ -416,16 +416,16 @@ struct GameTest {
         pl.ctl.throttle = 0.7f;
         for (int i = 0; i < 30; i++) q.update(dt);   // (the camera behind it)
         q.spawn(pl.pos - pl.forward() * 20.f, vec3(), 60.f, 2.f, 0.f, vec3(0.6f, 0.6f, 0.6f), 0.5f, SPR_SMOKE);
-        float camFar = 0.f, smokeFar = 0.f; bool crossed = false;
+        float camFar = 0.f, smokeFar = 0.f; bool past = false;
         for (int i = 0; i < 60 * 8 && q.screen == SCR_FLIGHT; i++) {
           q.update(dt);
-          crossed = crossed || pl.pos.x < 0.f;
+          past = past || pl.pos.x > WRAP_HALF;
           camFar = std::max(camFar, length(q.camPos - pl.pos));
           if (!q.particles.empty()) smokeFar = std::max(smokeFar, length(q.particles.front().p - pl.pos));
         }
-        const bool ok = crossed && q.screen == SCR_FLIGHT && !q.crashed && pl.seamShift.x == 0.f && camFar < 150.f && smokeFar < 1000.f;
-        printf("Map seam: crossed %d, still flying %d, camera within %.0f m of the aircraft, its smoke within %.0f m: %s\n",
-               crossed, q.screen == SCR_FLIGHT && !q.crashed, camFar, smokeFar, ok ? "ok" : "FAIL"); fails += !ok;
+        const bool ok = past && q.screen == SCR_FLIGHT && !q.crashed && pl.seamShift.x == 0.f && camFar < 150.f && smokeFar < 1000.f;
+        printf("No seam: on east past 50 km %d, still flying %d, camera within %.0f m of the aircraft, its smoke within %.0f m: %s\n",
+               past, q.screen == SCR_FLIGHT && !q.crashed, camFar, smokeFar, ok ? "ok" : "FAIL"); fails += !ok;
       }
       if (voices) {   // FLT-3 (the v3.44.0 review): the same, on the autopilot's autoland - the tower's go-around is flown (it
                       // landed anyway, and the player was fined $500 for it); and an aircraft that can't climb away lands unfined
