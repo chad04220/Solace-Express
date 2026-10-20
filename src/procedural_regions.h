@@ -50,6 +50,9 @@ std::vector<Descriptor> recommendations(uint64_t worldSeed = kDefaultWorldSeed);
 // their table, a generated region's from its recipe (made once, the answer kept). 0 and -1 for an unknown id
 int airportCount(const std::string& id, uint64_t worldSeed = kDefaultWorldSeed);
 int mainAirport(const std::string& id, uint64_t worldSeed = kDefaultWorldSeed);
+// ... and one of them by index (nullptr for an unknown id or index): it stays where it is for the process, so a long
+// haul's destination can be named and flown to before its region is reached
+const Airport* airportOf(const std::string& id, int index, uint64_t worldSeed = kDefaultWorldSeed);
 
 class Recipe {
 public:

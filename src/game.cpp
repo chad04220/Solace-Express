@@ -248,6 +248,7 @@ std::string Game::expandHint(const std::string& raw, bool pad, bool glyph) const
 // The flown time for a job's plan when it's in; else (start) a background flight is begun for it if none is running
 void Game::applyQuote(const Contract& c, Career::LaunchPlan& e, bool start) {
   if (quoteJob.valid() && quoteJob.wait_for(std::chrono::seconds(0)) == std::future_status::ready) quoteFlown[quoteJobKey] = quoteJob.get();
+  if (c.longHaul()) return;   // (across the ocean, beyond this world: the quick estimate is the quote)
   // An ID alone is not a route: FREE, a continued job, or a changed forecast
   // can keep its ID while its estimated time and fuel change.
   std::string key = menuPlan::quoteInputs(c, e.spec);
@@ -605,7 +606,32 @@ void Game::beginCareerFlight(const Contract& c, int spec, Career::Source src) {
     if (Career::resumable(c)) k.accept(c, spec, src, p);
     else if (!(k.job && k.job->state == Career::JobState::RECOVERY)) k.job.reset();
   })) return;
-  startFlight(c, spec, src, &p);
+  earthFlight = earthCourseHold = false; earthDestination.reset();   // (a career flight's chart is its region's, unless it is a long haul)
+  if (!c.longHaul()) { startFlight(c, spec, src, &p); return; }
+  Contract local = c; local.to = c.from;   // (until the destination's region is reached: the departure stands in for it)
+  startFlight(local, spec, src, &p);
+  beginHaul(c);
+}
+// A long haul under way: its state, the destination on this chart, and the Earth route the regions ahead are prepared on
+void Game::beginHaul(const Contract& c) {
+  const auto to = procedural::find(c.toRegion);
+  const Airport* target = procedural::airportOf(c.toRegion, c.to);
+  if (!to || !target) return;
+  haul = Haul{}; haul.on = true; haul.job = c; haul.to = *to; haul.target = *target;
+  haul.place = airportPlace(c.toRegion, *target);
+  if (auto here = procedural::find(career.region)) flightRegion = *here; else flightRegion = procedural::solaceDescriptor();
+  earthFlight = true; earthDestination = *to; earthCourseHold = false;
+  earthPosition = regionTravel::Chart(flightRegion.origin).position(plane.pos);
+  chartHaul();
+  toast(fmt("Long haul: %.0f km to %s %s in the %s", c.haulKm, target->code, target->name, to->name.c_str()), vec3(0.6f, 1.f, 0.8f), false);
+  toast("The GPS shows the way: the regions ahead are made ready as you cross", vec3(0.8f, 0.9f, 1.f), false);
+}
+void Game::chartHaul() {
+  if (!haul.on) return;
+  const vec3 at = regionTravel::Chart(flightRegion.origin).local(haul.place);
+  const Airport* real = procedural::airportOf(haul.job.toRegion, haul.job.to);
+  if (real) haul.target = *real;
+  haul.target.x = at.x; haul.target.z = at.z;
 }
 void Game::continueJob(int spec, Career::Source src) {
   if (!career.job || career.job->state != Career::JobState::RECOVERY) return;
@@ -650,6 +676,7 @@ void Game::continuationWaivers(Career::LaunchPlan& p, const Contract& c, int spe
 // flights, and reset a job leg's clock and comfort)
 void Game::restartFlight() {
   if (freeFlight) { launchFreeFlight(); return; }
+  if (haul.on) { toast("A long haul can't be restarted in flight: end the flight to call it off", vec3(1.f, 0.75f, 0.35f)); return; }
   if (researchFlight) { launchResearch(); return; }
   if (queueLaunch(contract, specIdx, LAUNCH_CAREER, [this] { restartFlight(); })) return;
   if (militaryFlight) { Contract c=contract; auto p=launchPlan; startFlight(c,specIdx,source,&p); return; }
@@ -664,6 +691,7 @@ void Game::restartFlight() {
 // the hub's Continue does); anything else (a lesson, a checkride, a job that ended) is flown again from the start
 void Game::retryFromDebrief() {
   if (isMilitaryContract(contract.type)) { launchMilitary(contract.type-CT_MIL_RECON); return; }
+  if (contract.longHaul()) { screen = SCR_HUB; hubTab = TAB_CONTRACTS; selContract = 0; selAircraft = -1; return; }   // (a long haul: the board offers it again, or another)
   // the aircraft must still be one the job can be flown in: if it is gone (repossessed, sold) or no longer suits, the
   // hub's chooser offers the ones that can, with the reason (the review of v3.31.0, C2: a repossessed aircraft flew)
   std::string why;
@@ -706,7 +734,7 @@ static float combatWrap() { return g_world.repeating ? WRAP_SPAN : 0.f; }
 // The region the flight's chart is drawn about: the one Earth free flight has reached, else the World's own (Solace,
 // for a career flight, a lesson, a sortie)
 procedural::Descriptor Game::chartRegion() const {
-  if (freeFlight && earthFlight && !flightRegion.id.empty()) return flightRegion;
+  if ((freeFlight || haul.on) && earthFlight && !flightRegion.id.empty()) return flightRegion;
   if (auto region = procedural::find(g_world.regionId)) return *region;
   return procedural::solaceDescriptor();
 }
@@ -966,16 +994,18 @@ bool Game::earthPromotionSafe(const World& candidate, const regionTravel::Change
 
 void Game::updateEarthFlight() {
   updateEarthSurfaceContext();
-  if (!freeFlight || !earthFlight || crashed || screen != SCR_FLIGHT) { updateHorizon(); return; }
+  if (!(freeFlight || haul.on) || !earthFlight || crashed || screen != SCR_FLIGHT) { updateHorizon(); return; }
   const regionTravel::Chart chart(flightRegion.origin);
   earthPosition = chart.position(plane.pos);
   if (earthDestination && earthCourseHold) {
+    const geo::Position goal = haul.on ? haul.place : earthDestination->origin;   // (a long haul's: its airport itself)
     if (!plane.apOn || plane.apMode != Plane::AP_HOLD) earthCourseHold = false;
-    else if (geo::surfaceDistance(earthPosition, earthDestination->origin) < 2500.) {
+    else if (geo::surfaceDistance(earthPosition, goal) < (haul.on ? 9000. : 2500.)) {
       earthCourseHold = false; plane.apDisengage();
-      toast(earthDestination->id == g_world.regionId ? "Destination region reached. Choose a local airport on the GPS map." :
+      if (haul.on) toast(fmt("The %s ahead: land at %s %s", haul.to.name.c_str(), haul.target.code, haul.target.name), vec3(.6f, 1.f, .8f));
+      else toast(earthDestination->id == g_world.regionId ? "Destination region reached. Choose a local airport on the GPS map." :
         "Destination region reached. Local airports remain unavailable while detailed terrain prepares.", vec3(.6f, 1.f, .8f));
-    } else if (auto heading = chart.bearing(plane.pos, earthDestination->origin)) plane.apHeading = (float)*heading;
+    } else if (auto heading = chart.bearing(plane.pos, goal)) plane.apHeading = (float)*heading;
   }
   updateHorizon();
   auto owner = procedural::describe(earthPosition, flightRegion.worldSeed);
@@ -1132,6 +1162,23 @@ void Game::continueEarthFlight() {
   cloudDet = change.vector(cloudDet); wx.cloudDrift = cloudOff; wx.cloudDetail = cloudDet;
   flightRegion = loadingRegion; earthFlight = true;
   earthPosition = regionTravel::Chart(flightRegion.origin).position(plane.pos);
+  if (haul.on) {   // a long haul: on toward its destination, or there - the job's own airport the flight lands at
+    const int near = std::max(0, g_world.nearestAirport(plane.pos.x, plane.pos.z));
+    haul.arrived = flightRegion.id == haul.job.toRegion && haul.job.to < (int)g_world.airports.size();
+    contract.from = near; contract.to = haul.arrived ? haul.job.to : near;
+    chartHaul();
+    attemptFrom = near; wpIndex = 0; apDest = -1; tdRunway = -2;
+    atcF = AtcFlight{}; atcF.dep = near; atcF.arr = contract.to; atcF.phase = plane.onGround ? 0 : 3;
+    somnus = SomnusState{}; ufo = Ufo{}; ufo.next = 180.f;
+    tipOn = false; trailT = 0; wakeGap = true; wakeOdo = 0;
+    craterR = craterD = 0; boomT = -1;
+    regionPoseChange.reset();
+    paused = regionResumePaused; screen = SCR_FLIGHT;
+    earthFacilitiesPending = earthPromotionDeferred = false; updateEarthSurfaceContext();
+    if (haul.arrived) toast(fmt("Entering the %s: land at %s %s", flightRegion.name.c_str(), dest().code, dest().name), vec3(.6f, 1.f, .8f));
+    else toast(fmt("Entering the %s: on to the %s", flightRegion.name.c_str(), haul.to.name.c_str()), vec3(.6f, 1.f, .8f));
+    return;
+  }
   freeAirport = std::max(0, g_world.nearestAirport(plane.pos.x, plane.pos.z));
   contract.from = contract.to = freeAirport; contract.wps.clear();
   contract.title = "Free Flight / " + flightRegion.name;
@@ -1872,6 +1919,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
   static bool dispWarned = false;   // say once if the cockpit display shader could not be built on this GPU
   if (!g_ren.dispError.empty() && !dispWarned && !headless) { dispWarned = true; toast("Cockpit display shader failed on this GPU (details in startup.log)", vec3(1.f, 0.45f, 0.35f)); }
   regionalSurface::clearFlightContext(); earthFacilitiesPending = earthPromotionDeferred = false;
+  haul = Haul{};   // (a long haul's own state follows its start: beginHaul)
   contract = c; specIdx = spec; source = src;
   launchPlan = finalized ? *finalized : finalizeLaunchPlan(c, spec, src);   // accepted quote, tank load and bill agree
   militaryFlight=isMilitaryContract(c.type); militarySettled=false; militaryHull=100; militarySiteLabels={};
@@ -2024,7 +2072,8 @@ void Game::endFlight(bool success, const std::string& reason, FlightOutcome outc
     announceFlightEnd(success?"Practice flight complete":"Practice flight over");
     return;
   }
-  Contract c = contract;
+  Contract c = haul.on ? haul.job : contract;   // (a long haul settles as it was accepted)
+  haul = Haul{};
   if (c.type == CT_FERRY) { c.story = false; }
   // the settlement is one transaction: the career only changes when the save succeeds; a failed save keeps the
   // settled copy pending (the debrief shows it, and offers the retry), and a retry can never pay twice
@@ -2127,7 +2176,7 @@ void Game::cycleApDest(int dir) {
   for (int i = 0; i < n; i++) order[i] = i;
   auto d2 = [&](int i) { float dx = g_world.wrap(g_world.airports[i].x - plane.pos.x), dz = g_world.wrap(g_world.airports[i].z - plane.pos.z); return dx * dx + dz * dz; };   // (the short way round the map)
   std::sort(order.begin(), order.end(), [&](int a, int b) { return d2(a) < d2(b); });
-  if (apDest < 0) apDest = (int)(&dest() - &g_world.airports[0]);   // first pick: the contract's destination
+  if (apDest < 0) apDest = haulPending() ? std::max(0, g_world.nearestAirport(plane.pos.x, plane.pos.z)) : (int)(&dest() - &g_world.airports[0]);   // first pick: the contract's destination (a long haul's not yet on this chart: the nearest)
   else {
     int k = (int)(std::find(order.begin(), order.end(), apDest) - order.begin());
     apDest = order[((k + dir) % n + n) % n];
@@ -2179,8 +2228,15 @@ void Game::engageAutopilot() {
     toast("Any stick input hands control back", vec3(0.8f, 0.8f, 0.8f));
   } else {
     plane.apEngage(Plane::AP_HOLD, -1, wx);
-    toast("Autopilot ON: the stick trims heading and altitude, throttle sets speed", vec3(0.6f, 1, 0.6f));
-    toast("Pick an AUTOLAND airport on the GPS map to fly there", vec3(0.8f, 0.8f, 0.8f));
+    if (haulPending() && plane.apOn && earthDestination) {   // a long haul: the autopilot holds the course for its destination
+      earthCourseHold = true;
+      if (auto heading = regionTravel::Chart(flightRegion.origin).bearing(plane.pos, haul.place)) plane.apHeading = (float)*heading;
+      toast(fmt("Autopilot ON: the course for %s, %.0f km - it hands back 9 km out", haul.target.code,
+        geo::surfaceDistance(earthPosition, haul.place) / 1000.), vec3(0.6f, 1, 0.6f));
+    } else {
+      toast("Autopilot ON: the stick trims heading and altitude, throttle sets speed", vec3(0.6f, 1, 0.6f));
+      toast("Pick an AUTOLAND airport on the GPS map to fly there", vec3(0.8f, 0.8f, 0.8f));
+    }
   }
   g_audio.trigger(SFX_CLICK);
 }
@@ -2803,13 +2859,13 @@ void Game::updateFlight(float dt) {
       } else if (waits) {
         if (!arrivalTold) {
           arrivalTold = true;
-          if (ap == contract.to) {
+          if (arrivedAt(ap)) {
             toast(fmt("Welcome to %s", g_world.airports[ap].name), vec3(0.6f, 1, 0.7f), false);
             toast(expandHint("Taxi clear of the runway, then set the parking brake ({parkingBrake}) to finish", padPrompts(), true), vec3(0.85f, 0.95f, 1.f), false);
             if (contract.payout > 0 && !engineShutDown) toast(expandHint("Shut down first (hold {engine}) for the airmanship bonus", padPrompts(), true), vec3(0.85f, 0.95f, 1.f), false);
           } else toast(expandHint(fmt("Landed at %s: set the parking brake ({parkingBrake}) to end the flight here, or take off again", g_world.airports[ap].name), padPrompts(), true), vec3(1, 0.8f, 0.4f), false);
         }
-      } else if (onField && ap == contract.to && !wpsLeft) { endFlight(true, ""); return; }
+      } else if (onField && arrivedAt(ap) && !wpsLeft) { endFlight(true, ""); return; }
       else if (onField) { result.divertedTo = ap; endFlight(false, fmt(wpsLeft ? "Leg ended at %s with checkpoints remaining" : "Diverted to %s", g_world.airports[ap].name), OUT_DIVERTED); return; }
       else if (stillTimer > 3.f) { endFlight(false, atField ? "Landed off the runway" : "Landed off-airport", OUT_OFF_AIRPORT); return; }
     }
@@ -2822,7 +2878,7 @@ void Game::updateFlight(float dt) {
     float dA; int ap = g_world.nearestAirport(plane.pos.x, plane.pos.z, &dA);
     bool wpsLeft = wpIndex < (int)contract.wps.size();
     if (wpsLeft) { endFlight(false, "Out of fuel with checkpoints remaining", OUT_OUT_OF_FUEL); return; }
-    if (!(ap == contract.to && dA < 2000)) { endFlight(false, "Out of fuel", OUT_OUT_OF_FUEL); return; }
+    if (!(arrivedAt(ap) && dA < 2000)) { endFlight(false, "Out of fuel", OUT_OUT_OF_FUEL); return; }
   }
   (void)prevPos;
   // tutorial hints
@@ -6380,6 +6436,21 @@ void Game::debugScene(const std::string& name) {
   }
   if (name == "at" && getenv("CAMPITCH")) { camPitch = (float)atof(getenv("CAMPITCH")) * DEG; camZoom = 2.5f; for (int i = 0; i < 30; i++) updateCamera(0.1f); }
   if (name == "seamgps") { showMap = true; uiAnim[0x6e61u] = 1.f; gpsRangeTarget = gpsRange = 25000.f; }
+  if (name == "longhaul" || name == "longhaulgps") {   // a long haul under way: an ATP's Emissary 20 km out of Port Verde
+    int jet = -1; for (int t : kCareerAircraft) if (!strcmp(kAircraft[t].id, "emissary")) jet = t;
+    career = Career{}; career.newGame(); career.license = LIC_ATP; career.money = 400000; career.location = g_world.findAirport("PVI");
+    career.fleet = {{jet, career.location, kAircraft[jet].maxFuel, 1.f}}; career.refreshBoard();
+    for (const Contract& c : career.board) if (c.longHaul() && career.canFly(c, jet) == Career::SRC_OWNED) { botControl = false; beginCareerFlight(c, jet, Career::SRC_OWNED); break; }
+    if (haul.on) {
+      const Airport& a = g_world.airports[contract.from];
+      vec3 to(dest().x - a.x, 0, dest().z - a.z); to = to * (1.f / std::max(length(to), 1.f));
+      plane.reset(plane.spec, a.pos() + to * 20000.f + vec3(0, 3000, 0), atan2f(to.x, -to.z) / DEG, plane.spec->maxFuel * 0.8f, 100, true, plane.spec->cruise);
+      settleAirborneStart(); takeoffAnnounced = true; camQ = plane.q; hint.clear(); toasts.clear();
+      if (name == "longhaulgps") { showMap = true; uiAnim[0x6e61u] = 1.f; gpsRangeTarget = gpsRange = 120000.f; }
+      for (int i = 0; i < 30; i++) updateCamera(0.1f);
+      printf("Long haul scene: %s, %.0f km to %s %s\n", contract.title.c_str(), haul.job.haulKm, dest().code, dest().name);
+    }
+  }
   if (name == "gpsap" || name == "apfinal" || name == "apvtol") {   // autopilot: GPS autoland pick, then the approach
     int sp = name == "apvtol" ? 8 : 4;   // (the XR-40: the research jet that lands vertically)
     plane.reset(&kAircraft[sp], vec3(-4000, 900, 9000), 40, kAircraft[sp].maxFuel, 100, true, kAircraft[sp].cruise * 0.8f);

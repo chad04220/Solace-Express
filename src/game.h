@@ -202,6 +202,21 @@ private:
   float regionLoadTime = 0;
   bool regionCancel = false, regionResumePaused = false;
   bool earthFlight = false, earthCourseHold = false;
+  // A long haul in flight (Contract::longHaul): the contract as accepted, its destination region and airport, and the
+  // airport where it lies on the Earth - re-expressed on each chart the flight crosses (target), so the HUD, the GPS
+  // and the bearings point at it before its region is reached. The flight's own contract names the chart's nearest
+  // field meanwhile; arrived, it names the destination itself and the flight lands there as any job does
+  struct Haul {
+    bool on = false, arrived = false;
+    Contract job;
+    procedural::Descriptor to;
+    Airport target{};
+    geo::Position place;
+  } haul;
+  bool haulPending() const { return haul.on && !haul.arrived; }
+  bool arrivedAt(int airport) const { return airport == contract.to && !haulPending(); }   // (the destination's own runway)
+  void beginHaul(const Contract& c);   // (startFlight has the plane at the departure: the haul's state, the Earth route)
+  void chartHaul();                    // the destination on the chart flown now (dest())
   procedural::Descriptor flightRegion;
   geo::Position earthPosition;
   std::optional<procedural::Descriptor> earthDestination;
@@ -755,7 +770,7 @@ private:
   void menuTour(FrameParams& fp);   // main menu: a tour of the islands
   int computePhase() const;
   std::string landingCoaching() const;
-  const Airport& dest() const { return g_world.airports[contract.to]; }
+  const Airport& dest() const { return haulPending() ? haul.target : g_world.airports[contract.to]; }
 
   // UI (game_ui.cpp)
   float S() const;  // UI scale

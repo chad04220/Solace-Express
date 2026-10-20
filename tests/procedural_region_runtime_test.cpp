@@ -592,6 +592,65 @@ struct GameTest {
     game.cancelFreeFlightSetup(); drain();
     check(game.screen == SCR_MENU && !g_world.repeating && !g_world.procedural && !regionalSurface::flightContextEnabled() && unchanged(),
       "quitting relaunched Solace Free Flight returns to the islands without saving");
+    {   // a long haul (career.h, C13): from the islands' board to the nearest region's main airport, flown across the
+        // boundary into it, delivered there - the career goes on from there; then one called off, the career where it was
+      // (an ATP with an Emissary at Port Verde: the islands' types haven't the range to cross)
+      int jet = -1; for (int t : kCareerAircraft) if (!strcmp(kAircraft[t].id, "emissary")) jet = t;
+      game.pendingCareer.reset();   // (the earlier test's unsaved transaction: this career is its own)
+      game.career = Career{}; game.career.newGame(); game.career.license = LIC_ATP; game.career.money = 400000;
+      game.career.location = g_world.findAirport("PVI");
+      game.career.fleet = {{jet, game.career.location, kAircraft[jet].maxFuel, 1.f}};
+      game.career.refreshBoard();
+      Contract job; int si = -1;
+      for (const Contract& c : game.career.board) if (c.longHaul() && c.toRegion == A.id && job.id.empty()) job = c;
+      if (!job.id.empty() && game.career.canFly(job, jet) == Career::SRC_OWNED) si = jet;
+      bool launched = false, charted = false, arrived = false, delivered = false, calledOff = false;
+      std::string story = "no long haul to " + A.name + " on the islands' board";
+      if (si >= 0) {
+        game.beginCareerFlight(job, si, Career::SRC_OWNED);
+        launched = game.screen == SCR_FLIGHT && game.haulPending() && game.contract.to == game.contract.from && g_world.regionId == "solace";
+        const Airport& from = g_world.airports[job.from];
+        const float far = length(vec3(game.dest().x - from.x, 0, game.dest().z - from.z)) / 1000.f;   // (the destination charted from here)
+        charted = std::abs(far - job.haulKm) < 15.f && !strcmp(game.dest().code, procedural::airportOf(A.id, job.to)->code);
+        const geo::Position home = geo::solaceOrigin();
+        const double bearing = *geo::initialBearing(home, A.origin);
+        double low = 0, high = geo::surfaceDistance(home, A.origin);
+        for (int i = 0; i < 48; ++i) { const double mid = (low + high) * .5; if (procedural::describe(geo::destination(home, bearing, mid)).id != A.id) low = mid; else high = mid; }
+        // (inside the destination's tile, and far enough out over the ocean for the chart to move: 60 km past the
+        // islands' square)
+        geo::Position across = geo::destination(home, bearing, std::max(high + 25000., 150000.)); across.height = 1800.;
+        game.plane.pos = regionTravel::Chart(home).local(across);
+        game.plane.vel = vec3(sinf(float(bearing) * DEG) * 95.f, 0.f, -cosf(float(bearing) * DEG) * 95.f);
+        game.plane.onGround = false; game.takeoffAnnounced = true;   // (placed aloft over the ocean, as if flown there)
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(300);
+        while (g_world.regionId != A.id && std::chrono::steady_clock::now() < deadline) { game.updateEarthFlight(); std::this_thread::sleep_for(std::chrono::milliseconds(5)); }
+        arrived = g_world.regionId == A.id && game.haul.on && game.haul.arrived && game.contract.to == job.to && &game.dest() == &g_world.airports[job.to] && !game.freeFlight;
+        if (!arrived) printf("  long haul: world %s flight region %s haul %d/%d to %d/%d prefetch '%s' error '%s' deferred %d screen %d earth %d\n",
+          g_world.regionId.c_str(), game.flightRegion.id.c_str(), game.haul.on, game.haul.arrived, game.contract.to, job.to, game.earthPrefetchId.c_str(),
+          game.earthPrefetchError.c_str(), game.earthPromotionDeferred, (int)game.screen, game.earthFlight);
+        const int money = game.career.money;
+        game.endFlight(true, "");
+        delivered = game.career.region == A.id && game.career.location == job.to && game.career.money > money && !game.haul.on &&
+          game.career.fleet[0].region == A.id && game.career.fleet[0].location == job.to && game.screen == SCR_DEBRIEF && game.screenWorld().empty();
+        // from there, one called off: the career stays where it set out, the hire paid
+        game.screen = SCR_HUB; game.career.refreshBoard();
+        Contract back; int bs = -1;
+        for (const Contract& c : game.career.board) if (c.longHaul() && back.id.empty()) back = c;
+        if (!back.id.empty() && game.career.canFly(back, jet) == Career::SRC_OWNED) bs = jet;
+        if (bs >= 0) {
+          const int at = game.career.location;
+          game.beginCareerFlight(back, bs, Career::SRC_OWNED);
+          const bool flying = game.haul.on && game.screen == SCR_FLIGHT;
+          game.endFlight(false, "Called off", OUT_ABANDONED);
+          calledOff = flying && game.career.region == A.id && game.career.location == at && game.career.fleet[0].region == A.id &&
+            game.career.fleet[0].location == at && !game.haul.on;
+        }
+        story = fmt("%s, %.0f km to %s in the %s: flown across, delivered (the career there), and one called off from there"
+          " (launched %d, charted %d, arrived %d, delivered %d, called off %d)",
+          job.title.c_str(), job.haulKm, job.toRegion.c_str(), A.name.c_str(), launched, charted, arrived, delivered, calledOff);
+      }
+      check(launched && charted && arrived && delivered && calledOff, story);
+    }
     game.retireEarthPrefetch();
     if (game.earthRetireJob.valid()) game.earthRetireJob.get();
     std::error_code error; fs::remove_all(root, error);

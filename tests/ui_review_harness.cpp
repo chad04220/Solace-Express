@@ -468,6 +468,13 @@ struct GameTest {
     }
     if(sc=="menu_saved"||sc=="menu_overwrite"){g.hasSave=true;g.confirmNew=sc=="menu_overwrite";}
     if(sc=="contracts"){g.screen=SCR_HUB;g.hubTab=TAB_CONTRACTS;}
+    if(sc=="longhaul_card"){   // a long haul on the board: an ATP's Emissary at Port Verde (the card after Free Flight's and Travel's)
+      int jet=-1; for(int t:kCareerAircraft) if(!strcmp(kAircraft[t].id,"emissary")) jet=t;
+      g.screen=SCR_HUB;g.hubTab=TAB_CONTRACTS;g.career.license=LIC_ATP;g.career.money=400000;g.career.storyIndex=(int)g_story.size();
+      g.career.location=g_world.findAirport("PVI");g.career.fleet={{jet,g.career.location,kAircraft[jet].maxFuel,1.f}};g.career.refreshBoard();
+      for(size_t i=0;i<g.career.board.size();i++) if(g.career.board[i].longHaul()){g.selContract=2+(int)i;break;}
+      g.selAircraft=jet;
+    }
     if(sc=="travel"){g.screen=SCR_HUB;g.hubTab=TAB_CONTRACTS;g.career.license=LIC_CPL;g.career.money=5000;g.career.storyIndex=12;g.selContract=2;}   // (the travel card: after the campaign's and Free Flight's)
     if(sc.rfind("airline",0)==0){g.screen=SCR_HUB;g.hubTab=TAB_AIRLINE;}
     if(sc=="settings"||sc=="controls"){g.screen=SCR_HUB;g.hubTab=TAB_SETTINGS;g.settingsPage=sc=="controls"?1:0;}

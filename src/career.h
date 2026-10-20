@@ -3,6 +3,7 @@
 #include "common.h"
 #include "world.h"
 #include "aircraft.h"
+#include "geo.h"
 #include <optional>
 
 // C6: the freelance board posts medevacs (a patient who must be flown gently and fast), VIP charters (a live comfort
@@ -41,7 +42,17 @@ struct Contract {
   bool story = false;
   int repBonusPct = 0;         // freelance: the reputation bonus already in the payout
   bool courtesy = false;       // the client flies you to the departure (no positioning ticket): the recovery job
+  // A long haul (C13): to an airport of another region (toRegion; to is that region's airport), flown on across the
+  // ocean and the regions between (the Earth regions' handoff carries the flight), haulKm along the great circle.
+  // Flown whole, never a job that waits at a stop: delivered, the career goes on from there; anything else, the flight
+  // is called off and the career is back where it set out. Board contracts only: never saved
+  std::string toRegion; float haulKm = 0;
+  bool longHaul() const { return !toRegion.empty(); }
 };
+// A contract's arrival: its own region's airport (a long haul's, from that region's recipe), else g_world's
+const Airport& arrivalAirport(const Contract& c);
+// Where an airport of a region is on the Earth (the region's chart about its origin)
+geo::Position airportPlace(const std::string& region, const Airport& a);
 
 // (region: the one it is parked in, by id - the islands' "solace" or a generated region's; its location is that
 // region's airport)

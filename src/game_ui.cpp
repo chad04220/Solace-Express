@@ -433,7 +433,7 @@ void Game::drawLoading() {
   const vec3 ink = military ? svui::field : research ? svui::codeInk : C_INK;
   const vec3 dim = military ? vec3(.69f,.73f,.64f) : research ? svui::codeDim : C_DIM;
   bool air = pending ? flight.startAirborne : !plane.onGround;
-  const Airport& ap = g_world.airports[air ? flight.to : flight.from];
+  const Airport& ap = g_world.airports[air && !flight.longHaul() ? flight.to : flight.from];
   // a picture rendered by render_loading.bat - the airport, or the aircraft in flight - when there is one on disk
   std::string key = g_world.procedural ? g_world.regionId + "/" + ap.code :
     (military || air) ? fmt("air_%d", pendingService ? flight.forceAircraft : queued ? queued->spec : (int)(plane.spec - kAircraft)) : std::string(ap.code);
@@ -491,11 +491,11 @@ void Game::drawLoading() {
     g_ren.rectOutline(L.x,cy,L.width,L.height,accent,.28f,5*s,s);
   }
   const Airport& from = g_world.airports[flight.from];
-  const Airport& to = g_world.airports[flight.to];
+  const Airport& to = arrivalAirport(flight);   // (a long haul's: in its own region)
   const float aircraftX=cx+cw*.32f, weatherX=cx+cw*.60f;
   g_ren.text(cx,cy+12*s,fs(10,9),air?"IN FLIGHT / INBOUND":"DEPARTURE",dim,1,0,false);
   g_ren.text(cx,cy+29*s,fs(19,13),fitLoading(std::string(ap.code)+"  "+ap.name,cw*.32f-18*s,fs(19,13)),C_TEXT,1);
-  g_ren.text(cx,cy+53*s,fs(10,9),military?"Equipment and fuel included":flight.from!=flight.to?fmt("ROUTE  %s > %s",from.code,to.code):"Local flight / same departure and arrival",dim,1,0,false);
+  g_ren.text(cx,cy+53*s,fs(10,9),military?"Equipment and fuel included":flight.longHaul()?fmt("LONG HAUL  %s > %s  %.0f km",from.code,to.code,flight.haulKm):flight.from!=flight.to?fmt("ROUTE  %s > %s",from.code,to.code):"Local flight / same departure and arrival",dim,1,0,false);
   g_ren.text(aircraftX,cy+12*s,fs(10,9),military?"SERVICE AIRCRAFT":"AIRCRAFT",dim,1,0,false);
   g_ren.text(aircraftX,cy+29*s,fs(16,12),fitLoading(aircraft.name,cw*.28f-18*s,fs(16,12)),C_TEXT,1);
   if(military&&flight.from!=flight.to)g_ren.text(aircraftX,cy+53*s,fs(10,9),fmt("ROUTE  %s > %s",from.code,to.code),dim,1,0,false);
@@ -855,12 +855,13 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
     } else {
       const Contract& c = *cards[i].c;
       const bool legendDone = cards[i].legend && profile.count("legend." + c.id) > 0.f;
-      std::string tag = cards[i].job ? fmt("CONTINUING JOB / LEG %d", career.job->legs + 1) : cards[i].story ? fmt("CAREER / CHAPTER %02d", c.chapter + 1) : cards[i].legend ? (legendDone ? "LEGENDARY CONTRACT / FLOWN" : "LEGENDARY CONTRACT") : "FREELANCE CONTRACT";
+      std::string tag = cards[i].job ? fmt("CONTINUING JOB / LEG %d", career.job->legs + 1) : cards[i].story ? fmt("CAREER / CHAPTER %02d", c.chapter + 1) : cards[i].legend ? (legendDone ? "LEGENDARY CONTRACT / FLOWN" : "LEGENDARY CONTRACT") : c.longHaul() ? "LONG HAUL / ACROSS THE OCEAN" : "FREELANCE CONTRACT";
       float cardW = lw - 48 * s;
       g_ren.text(x + 24 * s, cy + 9 * s, 10 * s, tag, cards[i].legend ? vec3(1.f, 0.82f, 0.35f) : cards[i].story ? C_WARN : C_DIM, 1, 0, false);
       fitText(x + 24 * s, cy + 28 * s, cardW, 17 * s, 12 * s, c.title, C_TEXT);
       // (a flight that starts and ends at one field - a lesson's rings, a checkpoint course - is a local flight, not "0 km")
-      std::string sub = c.from == c.to ? fmt("%s  %s  local flight", contractTypeName(c.type), g_world.airports[c.from].code)
+      std::string sub = c.longHaul() ? fmt("%s  %s > %s  %.0f km", contractTypeName(c.type), g_world.airports[c.from].code, arrivalAirport(c).code, c.haulKm)
+                      : c.from == c.to ? fmt("%s  %s  local flight", contractTypeName(c.type), g_world.airports[c.from].code)
                                        : fmt("%s  %s > %s  %.0f km", contractTypeName(c.type), g_world.airports[c.from].code, g_world.airports[c.to].code, g_world.distanceKm(c.from, c.to));
       float payW = g_ren.text(x + lw - 24 * s, cy + 58 * s, 16 * s, fmtMoney(c.payout), C_GOOD, 1, 2);
       g_ren.text(x + 24 * s, cy + 58 * s, 14 * s, ellipsize(sub, cardW - payW - 12 * s, 14 * s), C_DIM, 1);
@@ -930,9 +931,10 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
     if (inView(py - 4 * s, 28 * s) && button(px + textW - 40 * s, py - 4 * s, 34 * s, 28 * s, ">")) { do freeDest = (freeDest + 1) % g_world.airports.size(); while (freeDest == career.location); }
     py += 30 * s;
   }
-  const Airport& A = g_world.airports[c.from]; const Airport& B = g_world.airports[c.to];
+  const Airport& A = g_world.airports[c.from]; const Airport& B = arrivalAirport(c);
   row("Route", fmt("%s %s  >  %s %s", A.code, A.name, B.code, B.name));
-  row("Distance", c.from == c.to ? (c.wps.empty() ? std::string("Local flight") : fmt("Local flight, %d checkpoint%s", (int)c.wps.size(), c.wps.size() == 1 ? "" : "s"))
+  if (c.longHaul()) { const auto to = procedural::find(c.toRegion); row("Distance", fmt("%.0f km across the open ocean, to the %s", c.haulKm, to ? to->name.c_str() : "next region")); }
+  else row("Distance", c.from == c.to ? (c.wps.empty() ? std::string("Local flight") : fmt("Local flight, %d checkpoint%s", (int)c.wps.size(), c.wps.size() == 1 ? "" : "s"))
                                  : fmt("%.1f km", g_world.distanceKm(c.from, c.to)));
   row("Destination", fmt("Rwy %02d/%02d, %.0f m %s, elev %s", B.rwyNumber(false), B.rwyNumber(true), B.length, surfaceName(B.surface), fmtAlt(B.elev).c_str()));
   if (c.cargoKg || c.pax) row("Load", c.pax ? fmt("%d passenger%s, %d kg", c.pax, c.pax == 1 ? "" : "s", c.cargoKg) : fmt("%d kg cargo%s", c.cargoKg, c.fragile ? " (FRAGILE)" : ""));
@@ -1020,10 +1022,23 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   {   // the route map in a hairline frame with corner ticks and a caption
     float mx = dx + dw - mapW - 22 * s, my = y + 60 * s;
     const std::vector<Waypoint> rest(c.wps.begin() + std::clamp(c.wpStart, 0, (int)c.wps.size()), c.wps.end());   // (a job's next leg: the checkpoints still to fly)
-    drawMapView(mx, my, mapW, mapW, c.from, c.to, &rest);
+    drawMapView(mx, my, mapW, mapW, c.from, c.longHaul() ? c.from : c.to, &rest);
+    if (c.longHaul()) {   // a long haul: its way off the map, toward the destination beyond it
+      const auto here = procedural::find(career.region);
+      const vec3 far = regionTravel::Chart(here ? here->origin : geo::solaceOrigin()).local(airportPlace(c.toRegion, arrivalAirport(c)));
+      const Airport& a = g_world.airports[c.from];
+      vec2 d(far.x - a.x, far.z - a.z); d = d * (1.f / std::max(length(d), 1.f));
+      const vec2 p0(mx + (a.x + WORLD_HALF) / (2 * WORLD_HALF) * mapW, my + (a.z + WORLD_HALF) / (2 * WORLD_HALF) * mapW);
+      float t = 1e9f;   // (to the square's edge)
+      if (d.x > 1e-4f) t = std::min(t, (mx + mapW - p0.x) / d.x); if (d.x < -1e-4f) t = std::min(t, (mx - p0.x) / d.x);
+      if (d.y > 1e-4f) t = std::min(t, (my + mapW - p0.y) / d.y); if (d.y < -1e-4f) t = std::min(t, (my - p0.y) / d.y);
+      const vec2 p1 = p0 + d * std::max(t - 4 * s, 0.f);
+      g_ren.line(p0.x, p0.y, p1.x, p1.y, 3 * s, C_ACCENT, 0.9f);
+      g_ren.rect(p1.x - 5 * s, p1.y - 5 * s, 10 * s, 10 * s, C_WARN, 1, 5 * s);
+    }
     g_ren.rectOutline(mx - 4 * s, my - 4 * s, mapW + 8 * s, mapW + 8 * s, C_ACCENT, 0.2f, 2 * s, 1 * s);
 
-    g_ren.text(mx - 4 * s, my - 22 * s, 11.5f * s, ellipsize(fmt("%s > %s", g_world.airports[c.from].code, g_world.airports[c.to].code), mapW, 11.5f * s), C_ACCENT, 0.9f, 0, false);
+    g_ren.text(mx - 4 * s, my - 22 * s, 11.5f * s, ellipsize(fmt(c.longHaul() ? "%s > %s  %.0f km" : "%s > %s", g_world.airports[c.from].code, arrivalAirport(c).code, c.haulKm), mapW, 11.5f * s), C_ACCENT, 0.9f, 0, false);
   }
   // aircraft selection
   py = chooserTop;

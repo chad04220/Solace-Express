@@ -169,14 +169,15 @@ std::vector<Descriptor> recommendations(uint64_t worldSeed) {
 }
 
 namespace {
-struct AirportSummary { int count = 0, main = -1; };
-AirportSummary summary(const std::string& id, uint64_t worldSeed) {
+// Each region asked about: its recipe (kept, so its airports' names stay put) and its main airport
+struct AirportSummary { std::shared_ptr<const Recipe> recipe; int count = 0, main = -1; };
+const AirportSummary& summary(const std::string& id, uint64_t worldSeed) {
   static std::mutex lock;
   static std::map<std::pair<std::string, uint64_t>, AirportSummary> kept;
   std::lock_guard<std::mutex> guard(lock);
   auto it = kept.find({id, worldSeed});
   if (it != kept.end()) return it->second;
-  AirportSummary out;
+  AirportSummary& out = kept[{id, worldSeed}];
   auto pick = [&](const Airport* a, int n) {
     out.count = n;
     for (int i = 0; i < n; ++i) if (out.main < 0 || a[i].size > a[out.main].size) out.main = i;
@@ -186,13 +187,19 @@ AirportSummary summary(const std::string& id, uint64_t worldSeed) {
     for (int i = 0; i < solaceAirportCount(); ++i) islands.push_back(solaceAirport(i));
     pick(islands.data(), (int)islands.size());
   } else if (auto d = find(id, worldSeed); d && !d->authored) {
-    try { const Recipe recipe(*d); pick(recipe.airports.data(), (int)recipe.airports.size()); } catch (const std::exception&) { out = {}; }
+    try { out.recipe = std::make_shared<const Recipe>(*d); pick(out.recipe->airports.data(), (int)out.recipe->airports.size()); }
+    catch (const std::exception&) { out = AirportSummary{}; }
   }
-  return kept[{id, worldSeed}] = out;
+  return out;
 }
 }  // namespace
 int airportCount(const std::string& id, uint64_t worldSeed) { return summary(id, worldSeed).count; }
 int mainAirport(const std::string& id, uint64_t worldSeed) { return summary(id, worldSeed).main; }
+const Airport* airportOf(const std::string& id, int index, uint64_t worldSeed) {
+  const AirportSummary& s = summary(id, worldSeed);
+  if (index < 0 || index >= s.count) return nullptr;
+  return s.recipe ? &s.recipe->airports[index] : &solaceAirport(index);
+}
 
 Recipe::Recipe(const Descriptor& d) : descriptor(d) {
   const auto canonical = find(d.id, d.worldSeed);
