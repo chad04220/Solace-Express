@@ -5874,6 +5874,7 @@ void Game::debugScene(const std::string& name) {
   if (name == "jet") { c = g_story[g_story.size() - 4]; spec = 6; }
   if (name == "night") { c = g_story[11]; c.wx.timeOfDay = 21.5f; spec = 1; }
   if (name == "snow") { c = g_story[20]; spec = 2; }
+  if (const char* sp = getenv("SPEC")) for (int t : kCareerAircraft) if (t == atoi(sp)) spec = t;   // (SPEC=<career aircraft>: that one flies the scene)
   startFlight(c, spec, Career::SRC_OWNED);
   if (const char* w = !s_wxScene.empty() ? s_wxScene.c_str() : getenv("WX")) {   // weather checks: WX="cover,base m,precip,storm,wind kt,from deg,gust kt,turbulence,time of day"
     float v[9] = {wx.cloudCover, wx.cloudBase, (float)wx.precip, wx.storm ? 1.f : 0.f, wx.windSpeed * MS_TO_KT, wx.windFrom, wx.gust * MS_TO_KT, wx.turbulence, wx.timeOfDay};
@@ -6433,6 +6434,10 @@ void Game::debugScene(const std::string& name) {
     for (int i = 0; i < 30; i++) updateCamera(0.1f);
   }
   if (name == "at" && getenv("CAMPITCH")) { camPitch = (float)atof(getenv("CAMPITCH")) * DEG; camZoom = 2.5f; for (int i = 0; i < 30; i++) updateCamera(0.1f); }
+  if (name == "at" && getenv("CAMYAW")) {   // CAMYAW=<deg>: the orbit camera that far round from dead astern (CAMZOOM: its distance)
+    camMode = 2; camYaw = (float)atof(getenv("CAMYAW")) * DEG; camPitch = getenv("CAMPITCH") ? (float)atof(getenv("CAMPITCH")) * DEG : .12f;
+    camZoom = getenv("CAMZOOM") ? (float)atof(getenv("CAMZOOM")) : .5f; for (int i = 0; i < 30; i++) updateCamera(0.1f);
+  }
   if (name == "seamgps") { showMap = true; uiAnim[0x6e61u] = 1.f; gpsRangeTarget = gpsRange = 25000.f; }
   if (name == "longhaul" || name == "longhaulgps") {   // a long haul under way: an ATP's Emissary 20 km out of Port Verde
     int jet = -1; for (int t : kCareerAircraft) if (!strcmp(kAircraft[t].id, "emissary")) jet = t;

@@ -23,6 +23,7 @@ static PFNGETPROC s_getProc;
 static void* getProc(const char* n) { void* p = s_getProc((const unsigned char*)n); if (!p) p = dlsym(s_lib, n); return p; }
 
 struct GameTest {
+  static void clean(Game& g) { g.hudOn = false; g.toasts.clear(); g.hint.clear(); }   // (a picture without the HUD)
   static int researchWarm(Game& game) {   // the research terminal opened from the menu after the launch's prewarm: its warm-up, its bar and the boot sequence, frame by frame on the real clock
     game.debugScene("menu");
     if (getenv("PREWARM")) game.prewarm([](float, const std::string&) {}, true);   // (as the launch does; without it the warm-up bakes the research craft itself)
@@ -371,7 +372,7 @@ void main(){
   // ---- a render server: everything loaded once (the context, the shaders, the islands, the textures, the aircraft
   // meshes, and the scenery as it is generated), then one shot per request. Requests are lines on a named pipe
   // (SERVE_REQ, default /tmp/claude-0/sp/rs.req): "<scene> [frames=N] [taam=N] [bench=N] [dbgoff=N] [out=path] [NAME=value]"
-  // (NAME=value: an environment setting for this shot and the ones after it - AT, CAMPITCH, WX, TOD ...);
+  // (NAME=value: an environment setting for this shot and the ones after it - AT, CAMPITCH, WX, TOD ...; NAME= clears it);
   // (settle=N: N frames a 240th of a second apart, the anti-aliasing settling as for the loading pictures)
   // each reply ("ok <path> <seconds>") goes to SERVE_REP (/tmp/claude-0/sp/rs.rep). tools/render_client.sh sends one.
   if (scene == "serve") {
@@ -401,13 +402,18 @@ void main(){
           std::string key = tok[k].substr(0, e), v = tok[k].substr(e + 1);
           if (key == "frames") frames = atoi(v.c_str()); else if (key == "taam") taam = atoi(v.c_str()); else if (key == "bench") bench = atoi(v.c_str()); else if (key == "settle") settle = atoi(v.c_str());
           else if (key == "dbgoff") g_ren.dbgOff = atoi(v.c_str()); else if (key == "out") out = v;
-          else if (!key.empty() && isupper((unsigned char)key[0])) setenv(key.c_str(), v.c_str(), 1);   // (AT=..., CAMPITCH=..., WX=...: the scene's own settings)
+          else if (!key.empty() && isupper((unsigned char)key[0])) {   // (AT=..., CAMPITCH=..., WX=...: the scene's own settings; NAME= clears one)
+            if (v.empty()) unsetenv(key.c_str()); else setenv(key.c_str(), v.c_str(), 1);
+          }
         }
         g_ren.resetTemporal();
         Game* g = new Game();
         g->initHeadless(); g->debugScene(sc);
-        for (int i = 0; i < 3; i++) { g->update(1.f / 30.f); g->render(); }
-        for (int i = 0; i < taam; i++) { g->update(1.f / 60.f); g->render(); }
+        const bool clean = getenv("HUDOFF") && atoi(getenv("HUDOFF"));   // (HUDOFF=1: no HUD, messages or hints - a clean picture)
+        auto tidy = [&] { if (clean) GameTest::clean(*g); };
+        tidy();
+        for (int i = 0; i < 3; i++) { g->update(1.f / 30.f); tidy(); g->render(); }
+        for (int i = 0; i < taam; i++) { g->update(1.f / 60.f); tidy(); g->render(); }
         for (int i = 0; i < frames; i++) g->render();
         for (int i = 0; i < settle; i++) { g->update(1.f / 240.f); g->render(); }   // (the loading pictures: the TAA settles, barely moving)
         glFinish();

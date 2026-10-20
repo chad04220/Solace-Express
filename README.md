@@ -1,240 +1,285 @@
-# Somnium Volandi
+<p align="center">
+  <img src="docs/media/hero.jpg" alt="An Emissary 500 over the forest outside Port Verde, the city's towers behind" width="100%">
+</p>
 
-## The new name: Somnium Volandi
+<h1 align="center">Somnium Volandi</h1>
 
-Solace Express is now **Somnium Volandi** ("the dream of flying"). The game is `SomniumVolandi.exe`, released as `SomniumVolandi-windows-x64.zip`, and it starts fresh: saves, settings and radio stations live in `%APPDATA%\SomniumVolandi`, and the shader cache and other rebuildable data in `%LOCALAPPDATA%\SomniumVolandi`. Nothing is carried over from the old `SolaceExpress` folders, and the first launch compiles its shaders again. To keep a career, copy the files from `%APPDATA%\SolaceExpress` into `%APPDATA%\SomniumVolandi` before the first launch; the old folders can then be deleted. The islands keep their names.
+<p align="center">
+  <b>A pilot-career flight game for Windows.</b><br>
+  Start with a student permit in a two-seat trainer and work up to an airline transport licence, a fleet of your own
+  and an airline, over a hand-built archipelago and thousands of generated island regions on a full-size Earth.
+</p>
 
-The game identity, icon, startup page and civilian screens use midnight blue, platinum and brass. NIGHTGLASS Research uses electric-blue code on deep blue-black panels that falls and crosses the display, periodically resolving a face, wing or helix. Military Career uses matte field panels, recessed fasteners and amber deployment controls. Loading shows the current operation, measured stage/batch progress, a subsystem checklist and completed-work progress. Settings → General → Menu animation offers reduced motion. See [the review handoff](docs/CLAUDE_SOMNIUM_VOLANDI_UI_REVIEW.md) for implementation details, screenshots and validation.
+<p align="center">
+  <a href="../../releases/latest"><b>Download</b></a> ·
+  <a href="RELEASE_NOTES.md">What's new</a> ·
+  <a href="#controls">Controls</a> ·
+  <a href="#building-from-source">Build from source</a> ·
+  <a href="#documentation">Docs</a>
+</p>
 
-## Hive military review: back up careers before testing
+<p align="center">
+  <a href="../../actions/workflows/build.yml"><img src="../../actions/workflows/build.yml/badge.svg" alt="Build Windows"></a>
+</p>
 
-This experimental branch writes **save format 6 whenever a career is saved**, including civilian-only play. Older releases cannot read that format. Before launching this build, keep an independent copy of your existing career saves from `%APPDATA%\SomniumVolandi` outside that folder. Do not rely on the rotating `.bak` file: subsequent saves can replace it with a format-6 backup. Restore your independent pre-test copy if returning to an older release.
+---
 
-The military service review adds a clean olive terminal with assigned-aircraft previews, nine funded XR sorties, and aircraft-specific loading screens. XR-10/20/30 carry reconnaissance work; XR-40 adds precision hover work and armed interception, defense and strike. See `docs/CLAUDE_MILITARY_CAREER_REVIEW.md` for the new catalogue, controls, finite-ammunition tests and validation limits. Missions unlock in board order after successful extraction; completed sorties remain replayable, and locked cards show a classified aircraft silhouette. Existing mission IDs remain stable. Saves migrate forward to v6 with explicit per-mission completion; old aggregate service records are preserved without guessing prior mission identities. Older builds cannot read v6 saves; keep your independent backup when switching builds.
+## The game
 
-Research XR-40 equipment choices now live in the terminal side rail, and research, career Hangar and Free Flight previews have style-matched Rotate/Zoom/Reset controls. See `docs/CLAUDE_PREVIEW_CONTROLS_REVIEW.md` for input, compact-layout and native-render evidence. The newer [unified-preview review](docs/MENU_PREVIEW_STANDARDIZATION_REVIEW.md) standardizes these controls with Military Career, restores metric hangar props with measured floor dimensions, and presents the military loading card before mission setup.
+You learn to fly at Meadowbrook's flight school, then work. You rent small planes to haul cargo and bigger ones to fly
+passengers, earn your Private, Commercial and Airline Transport licences, and buy aircraft of your own for longer,
+harder contracts: mountain strips, glacier runways, volcano fields, medevacs against the clock and night freight in
+the rain. In the end you run your own airline while you fly your own work.
 
-Military missions, enemy combat and XR-40 loadouts are review features. Native Windows/RTX 3070 gameplay and frame-time validation are still required. See `docs/CLAUDE_HIVE_MILITARY_REVIEW.md` in the source for coverage and limitations.
+Everything is simulated rather than scripted. The aerodynamics come from each airframe's shape, the weather is a wind
+field you fly through, the tower talks to you from what is actually happening, and the autopilot learns each type by
+flying it. The islands are a lived-in place, with towns and traffic. Past their horizon the ocean goes on to 6,143
+generated regions, each with its own airports, towns and sights, and the career can follow you there.
 
-*Formerly Solace Express, and before that Air Xpress.*
-
-A pilot-career flight game for Windows with a detailed real-time 3D world drawn on the GPU. You start as a student with a permit, earn your licences, rent small planes to haul cargo, rent bigger ones to fly passengers, then buy your own aircraft for longer, harder contracts: mountain strips, glaciers, volcano fields, night storms and finally your own airline (the AIRLINE tab: hired pilots fly your aircraft on routes while you fly your own work, and their flights pass you as traffic in your livery).
-
-![Sunset over Port Verde](docs/sunset.jpg)
-
-| | |
-|---|---|
-| ![Main menu](docs/menu.jpg) | ![Mountains](docs/mountain.jpg) |
-| ![Storm run](docs/storm.jpg) | ![Business jet over Kaleo](docs/jet.jpg) |
-| ![Scrubrunner STOL](docs/scrubrunner.jpg) | ![Skerry cockpit](docs/cockpit.jpg) |
-| ![Archipel 400](docs/archipel.jpg) | ![Emissary 500](docs/emissary.jpg) |
-| ![Port Verde city](docs/city.jpg) | ![Farmland and forest](docs/farmland.jpg) |
-| ![Kaleo coast with palms and a sea stack](docs/kaleo_coast.jpg) | |
+<table>
+  <tr>
+    <td width="50%"><img src="docs/media/scrubrunner.jpg" alt="The Scrubrunner STOL over the Spine mountains"></td>
+    <td width="50%"><img src="docs/media/cockpit.jpg" alt="The Ambler 180 cockpit, the volcano ahead"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/media/region_map.jpg" alt="The GPS map over the Aster Islands, a large generated region: its airports and sights"></td>
+    <td><img src="docs/media/volcano.jpg" alt="The Rowan Volcanic Chain, a generated region"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/media/longhaul.jpg" alt="A long haul across the open ocean, the HUD pointing at the destination 162 km out"></td>
+    <td><img src="docs/media/night.jpg" alt="A night departure under the landing lights"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/media/village.jpg" alt="An Ambler 180 over a village on the islands"></td>
+    <td><img src="docs/media/galleon.jpg" alt="The Galleon 180 over the coast, the volcano behind"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/media/xr30.jpg" alt="The XR-30 Nocturne research jet in reheat"></td>
+    <td><img src="docs/media/xr40.jpg" alt="The XR-40 Somnus over Solace Capital"></td>
+  </tr>
+</table>
 
 ## Features
 
-- **Renderer.** A deferred rasterizer: the world is drawn as meshes into a G-buffer and lit once per pixel. The terrain is a continuous level-of-detail mesh over an eroded 80 × 80 km heightfield in 10 km of open sea all round, and past it the open ocean, out to the generated island regions around Solace on the Earth (the nearest about 200 km away), which rise over the horizon as you fly toward them and are solid ground when you reach them. It has an ocean with Fresnel reflections, an analytic sky with golden hour and night, and soft terrain shadows. Each aircraft is a mesh built at startup from its own shape, with moving flaps, ailerons, elevator, rudder, gear and props; in the cockpit the yokes, pedals, throttles and levers are separate meshes that move with your inputs, and the cabin is drawn first, so nothing behind its walls is drawn at all. The trees, rocks and buildings are instanced meshes that get the same sun, sky, terrain-shadow, cloud-shadow, fog and TAA treatment as everything else. They cast sun shadows of their own through two cached shadow cascades, which fade smoothly with distance around the camera, so shadows never pop in as the maps update. The aircraft casts its shadow from shadow maps for the sun and the three brightest lights, and each traffic aircraft casts its sun shadow from a map of its own. Every light but the sun and moon is a point or spot light, and each sits in a modelled fixture with a housing and a domed lens. This covers the nav lights in the wingtips and tail cone, strobes flashing through the wingtip lenses, a red beacon on top, landing lights in the wing leading edges and the exhaust flames, on your aircraft and on all traffic. Airports have real lighting fixtures too: runway edge lights (amber over the last 600 m), green and red threshold bars and approach lights, each a stalk with a glass globe that casts a small pool of light on the pavement, and PAPI units whose lenses turn from red to white as you climb through each unit's glide-slope angle (worked out per pixel from your actual eye height). From further out they're pixel-sized glints that the bloom spreads. A physically based mip-chain bloom gives every bright source a soft, lens-like halo without washing the image out, and light shafts fan out from a low sun through gaps in clouds, terrain and the airframe. The clouds are volumetric cumulus: flat bases, billowing tops eroded into wisps at the edges, self-shadowed towards the sun, with silver linings, multiple scattering inside and the powder darkening of thin edges. They drift with the wind, their tops lean downwind, wisps stream off their downwind edges and the billows boil slowly upwards, and an aircraft flying through or over one stirs it the way its own surfaces move the air. The vortices come from the flight model's lift, strip by strip: the wing trails one from near each tip, and flaps add a stronger pair at their outer edges that winds into them. An aileron moves the load and its vortex across, the tailplane trails a weaker pair the other way round, and the fin trails one in a sideslip. Propeller slipstreams twist the cloud and a jet's hot exhaust clears it. The cloud winds round the vortex cores, and the pair sinks under its own downwash (faster for a heavy aircraft, or one pulling g, and towards the bank in a turn), carrying the air in its oval with it, so the channel reaches down below the path. Skim a cloud top and it presses a trench into it. The channel's walls are ragged and churning, and as it widens and fills in again it pinches into a chain of bulges as the vortices link up into rings. Wisps of cloud flowing past are lifted ahead of the wing, pushed aside by the nose and caught by the vortices behind, and the wingtip vapour curls inboard and down round the cores. Aerial perspective gives the scene depth: Rayleigh scattering turns distant hills blue and drains their contrast, and a low haze layer (following the weather's visibility) thickens near the ground and glows around the sun.
-- **Detailed aircraft.** Each of the 11 career aircraft is hand-built, down to riveted skin panels, door outlines and handles, fuel caps, a pitot tube, static wicks and antennas. Fuselages are shaped from 8 cross-sections, and wings and tails are tapered airfoil sections with sweep, dihedral and winglets. Flaps (with rearward Fowler travel), ailerons, elevators and rudders are separate hinged parts. You'll also see wing struts, STOL slats, engine cowls, exhaust stacks, turboprop and jet nacelles with fan faces, a cargo pod, wheel fairings, tundra tyres, twin-wheel retracting gear, main legs that fold sideways into fairings under thin wings, a steerable nose wheel, antennas, nav lights and liveries with window frames.
-- **3D cockpits.** You sit in a detailed cockpit with live gauges (airspeed, attitude, altimeter, turn coordinator, heading, VSI, RPM/N1, fuel) in raised bezels, or glass PFD/ND screens and a centre engine display on the jet and airliner. There's a lit radio stack, eyeball vents, a centre pedestal with trim wheel and fuel selector, throttle, mixture and flap levers, metal yokes with rubber grips, toe-brake pedals, bolstered seats with harnesses on seat rails, trim panels with armrests and door handles, and an overhead console. Every frame the gauges and display pages are drawn into a high-resolution texture (each research-jet page at 512 px; the light-aircraft panel at about 3,500 px per metre) that the cockpit samples with mipmapped filtering, so the screens stay crisp and stable at any size or angle, and the gauge code stays out of the scene shaders. They are drawn as anti-aliased vector art, supersampled, with a proper font for every numeral and label: airspeed arcs (flap, normal, caution, never-exceed), an altimeter with three hands and a digital drum, a numbered pitch ladder and bank scale, a rotating compass card, a turn coordinator with its slip ball, and a radio stack with lit LCD frequencies. The glass cockpits get scrolling speed, altitude and heading tapes with readout windows. The research jets' display pages (engines, power, map, attitude, thrust vectoring, g / AoA, nav) are drawn the same way, so they stay sharp at 1080p and above. Strokes never get thinner than a pixel and a half, and the image sharpening skips display glass. In the cockpit view the mouse wheel (or holding **U**, rebindable) zooms in, so you can lean in and read any display. Everything moves with your inputs and uses PBR materials (brushed metal, rubber, leather or cloth, carpet, fabric headliner). Sunlight falls through the windows; at night a glareshield LED strip floods the panel and a dim amber dome light glows overhead, all from modelled light fixtures. In the cockpit view the cabin is drawn first, so the outside world is only drawn where the windows show it.
-- **Correct control movement.** Every control surface, plus the nose or tail wheel, moves in the same direction as the input and the aircraft's actual response. A test (`tests/flight_test.cpp`) checks this for every aircraft.
-- **Living world.** The terrain is a smooth heightfield (39 m base grid, filtered so big landforms have no faceted creases) with detailed ground textures (grass, leaf-litter forest floor, rock, sand, snow, farmland, roads). Everything standing on it is a separate entity: 7 kinds of tree (fir, spruce, Scots-style pine with tufted branch whorls, oak, birch, palm and bush) picked by climate and altitude, with bark, leafy crowns of alpha-cut leaf sprays that sway in the wind, and needles that take snow. Rocks come as boulders, blocks, slabs, mountain outcrops, sandstone spires and stratified sea stacks. 17 kinds of building fill 18 hand-placed settlements, from two cities with glass towers, setback towers and apartment blocks, to towns of shops, townhouses, churches, water towers and gas stations, and villages of gabled, hip-roofed and L-shaped houses with gardens. Farmsteads with barns, silos and machine sheds sit in the fields, and a lighthouse with a turning lamp stands on Lighthouse Key. Patchwork farmland has crop rows, wheat, ploughed soil, rapeseed, vineyards, wildflower meadows and hedgerows. Windows, shop fronts, signs and canopies light up at night, and a hand-drawn road network with lane markings links the towns. All of it is solid: fly into a tree, a rock or a building and you'll crash. Plasma blasts flatten whatever stands in them.
-- **Airports.** Every airport is laid out like the real thing, to its size. International hubs have a parallel taxiway with exits, a big concrete apron with gates where airliners sit nosed in to a glass terminal on jet bridges, freighters at the cargo sheds, GA tie-down rows, maintenance hangars, a tall control tower, a fuel farm, a radar dome, floodlight masts, car parks full of cars, and a perimeter fence around it all. Regional airports scale that down: a terminal with a turboprop or regional jet on the apron, T-hangar rows, a flight centre, a fuel farm and bowser. The small strips each have their own character: a farm strip with its barn and silo, a mountain rescue strip, a volcano observatory with a radome, a polar research station, an island club field, each with a Quonset or steel hangar, a club house, a fuel pump, parked aircraft and windsocks that stream with the wind. Navigation aids stand where they belong (ILS localizer arrays beyond the runway ends, glide-slope masts beside the touchdown zones, rotating green-and-white aerodrome beacons). Runways get concrete slabs or grooved asphalt, painted runway numbers and blast-pad chevrons; taxiways get yellow centre lines, edge lines and holding-position markings at every exit, blue edge lights at night, and aprons get stand lead-in lines, stop bars, tie-down markings and floodlit pools of light. AI traffic parks on those stands and taxis on those taxiways.
-- **PBR materials.** 30 tileable PBR texture sets (albedo, roughness, normal, height, AO): 23 are photo scans (CC0, from Poly Haven and ambientCG, matched to the world's palette by `tools/pack_materials.py`) and the rest are generated at startup. They cover terrain (including leaf-litter forest floor), buildings (concrete, clay tiles, slate, asphalt shingles, plaster, brick, lap siding, wood planks, corrugated metal), vegetation (bark, leaves, needles, crops, wheat) and aircraft (paint, brushed metal, tyre rubber, cockpit plastic, seat fabric, leather, carpet). They're lit with GGX/Cook-Torrance shading, triplanar on cliffs, and darken and get glossier in the rain. The sea is built from a real wave spectrum (swell, wind waves and ripples) that moves down the actual wind: glassy in a calm, choppy with whitecaps in a gale, with light through the wave crests.
-- **Air traffic.** The sky is busy. At the airports around you, aircraft park on the apron stands, taxi along the yellow lines with spacing, hold short, take off, fly a full circuit (crosswind, downwind, base, final), land on a glideslope, roll out, taxi back to their stand and go again. Arrivals join the downwind leg and are sequenced behind each other, some departures leave the area, and everyone holds or goes around if you're on the runway. Cruising traffic crosses the map at altitude. Every couple of minutes a formation of two or three XR-30 Nocturnes rips past at 400 m/s in reheat, sonic booms and all, before pulling up into a climbing roll. A two-ship Dawnlark display team flies loops, rolls, barrel rolls, Immelmanns, split-S, Cuban eights, four-point rolls and hammerheads with white and red smoke over the nearest airport. All traffic is drawn with the full aircraft models, casts soft shadows, shows nav lights, beacons, strobes and landing lights at night, and can be switched off in Settings (*Air traffic*). Watch out: a mid-air is fatal.
-- **Close encounters.** Every so often, when you're well clear of the ground, something swoops in from behind and settles alongside. Watch the hatch.
-- **Crashes.** Explosions are layered: a white-hot flash that lights the scene, a fireball whose flames cool from yellow to deep red as they billow and rise, a smoke column that keeps climbing and spreading, arcing sparks, burning fragments trailing fire and smoke, and a shock ring, with secondary blasts as the fuel goes up. On impact the aircraft comes apart by its own components (the nose, the cabin, each wing and its flaps and ailerons, the tail surfaces, the engines and nacelles, the gear legs), each where its joints give. Each piece is a separately simulated rigid body that tumbles, bounces and comes to rest, blackened and burning with glowing embers at the breaks. Skin fragments scatter around the site. The impact blows a crater into the terrain with a scorched blast ring and smouldering embers, flattening the trees and buildings around it, and the camera orbits the wreck. You see it coming: past 80% of the airframe's limit load (either way) a dark red iris closes in from the edges of the view, HUD and all, its veins creeping in after it and tightening with each beat of your racing pulse, until only a pinhole is left as the airframe lets go. Overstress an airframe in flight and it rips apart in the air: the tanks flash into a fireball smeared along the flight path, torn skin and fuel mist stream away, and the pieces go off again one after another, each falling piece streaming a flame jet and a continuous smoke trail. They keep their momentum, tumble out of the sky trailing fire and black smoke, and each one smashes into the ground (or the sea) where it falls, with the centre section digging the crater. Crashing into water throws spray; the pieces float for a moment, then sink to the seabed trailing bubbles, and the skin fragments flutter down after them.
-- **Effects.** Tyre smoke, dust and snow spray from unpaved strips, prop-wash dust, wingtip vapour that streams off every aircraft's tips in continuous ribbons (widening and thinning as it ages), engine-start smoke puffs, crash fire and smoke, rain streaks (as many as it is raining hard where you are, lit by the landing lights at night), snowfall, rain shafts hanging under the heavier clouds, raindrops on the windscreen (beaded when still, swept back over the glass in the airflow), cloud wisps streaming past in cloud, lightning, bloom and lens flare. Lighting includes runway edge, threshold and approach lights, working **PAPI** lights, plus nav, strobe, beacon and landing lights that light the terrain.
-- **Spatial audio.** Engines, traffic, wind, rain, crash debris, weapons, speech, alerts, UI and radio music share a binaural stereo mixer. Sources follow the camera's position and head direction, with distance falloff, air absorption, relative Doppler, head shadow and cross-ear delay. All four engine mounts have separate voices; canopy airflow responds to speed, sideslip and turbulence. Crashes combine varied material impacts, splashes and fuel blasts at the actual part locations. Thunder is delayed by distance, and external sonic booms follow the observer's Mach-cone crossing. Cockpit filtering and headset ANR keep the mix comfortable, and a linked limiter controls peaks. See [the audio pass](docs/AUDIO_PASS.md) for coverage, tests and the remaining native listening check.
-- **GPS moving map (N).** An animated, north-up moving map centred on your aircraft, over aerial imagery rendered on the GPU from the real terrain (the same materials you fly over: forest canopy, fields, beaches, rock, snow, roads, runways and shallow-water colour, hill-shaded like a satellite photo). It shows the route with flowing dashes, checkpoint markers, runways drawn to scale, your breadcrumb trail, predicted position at 1, 2 and 5 minutes, a fuel-range ring and a radar sweep. A side panel lists next waypoint, distance, bearing, ETE, ETA, route remaining, ground speed and track, fuel range against the remaining route, destination runway and wind, and the nearest airport.
-- **Checkpoint gates.** Animated holographic gates with counter-rotating segmented rims, sweeping highlights, inward pulses and sparks drifting around the rim. A trail of moving lights leads to the next gate, and flying through one sets off a shockwave and a shower of sparks.
-- **Clean glass UI.** Menus and HUD panels use a consistent glass style with cyan accents and corner brackets. Buttons, cards, tabs and sliders respond to the mouse with animated glow, sheen and press feedback.
-- **Voices.** A cast of eight speaks over your headset: Cal Morgan, your instructor in the first lessons; examiner Rosa Vance on the checkride; Ellis Park with the airport and weather information; Finn Mercer of the Nocturne display pair; Aster, the cockpit assistant, with checkpoints, lever settings, landing ratings, warnings (stall, pull up, gear, engine off), the failures as they come on (engine failure with your glide ratio and best glide speed, alternator, pitot, gear, flaps, icing), weather changes and outcomes; and Nyx, the research computer, with each test card's steps and sign-off; plus flight operations and military control, with distinct new voices for navigation, combat and sortie outcomes. Each line plays when the game shows its message, from one comms channel: the most important call first, warnings cutting in, a newer lever setting replacing one still waiting, each lesson hint once, and nothing stale after a pause, a crash or the end of a flight. One explicit flight outcome can finish on the results screen. Lesson instructions are independent of the current keyboard/gamepad bindings.
-- **Tower controllers.** Recorded voices on the radio, with a squelch click before each call and a squelch tail after it. Each airport with a tower keeps one of three controllers (North, Coast and Valley Tower); the small strips (farm, island, mountain and glacier strips) are uncontrolled and silent. They speak only from what is actually happening: a greeting when you start at an airport, your takeoff clearance for the runway you're on with the real wind, a handoff to departure once you're clear of the field ("remain in the pattern" on circuits), straight-in or left-downwind joining instructions as you come into your destination, the landing clearance once you're established on final, and "exit the runway when able" on the landing roll. Climb away after the clearance and you get a fresh approach call. They call you by the registration painted on your aircraft (SX- and three letters, one per aircraft type): in full on first contact with each tower ("Sierra X-ray Alfa Bravo Charlie"), then abbreviated ("Sierra Bravo Charlie"). The AI traffic at the field is part of the exchange: you hold for an aircraft on final or on the runway before your takeoff clearance, you're told you're number two behind an aircraft ahead on final (with a wake turbulence caution behind a much heavier one), the landing clearance waits while the runway is occupied, and an aircraft still on the runway as you reach short final means a go-around. Each call is also shown on screen, and calls never play after a pause, a crash or the end of the flight. Settings has a voice volume, and the radio music and engine dip while someone is talking.
-- **Muffle button (M).** A headset-style noise filter that turns down engine, wind and rolling noise for relaxed cruising.
-- **Live internet radio (R).** Streams MP3/AAC stations through Windows Media Foundation. You can add your own stations.
-- **Flight model.** Six degrees of freedom with stall and wing drop, flaps, ground effect, prop wash, density altitude, wind shear near the ground and veer aloft, gusts that come through in bursts, turbulence carried by the air (small and choppy near the ground, long and smooth aloft; a gust under one wing rolls you), ridge lift and lee sink and rotors, thermals under fair-weather cumulus, bumps inside cumulus and storm cells' downdrafts (`src/weather.cpp`), spring-damper gear with steering and brakes, and taildragger handling. The aerodynamics come from each airframe's shape (`src/aero.cpp`): the drag is built up part by part (fuselage from its length and width, wing and tails from their area and thickness, nacelles, struts, landing gear sized by weight, engine cooling, rivets and antennas), with skin friction that changes with speed, altitude and size the way a real aircraft's does; the lift slope and span efficiency come from the wing's aspect ratio; weight sets the induced drag; the wing's drag rises near its critical Mach number, and a sideslip or high angle of attack pushes the fuselage broadside through the air. Cruise speed and climb rate come out of that, nothing is tuned to hit them. Includes Time Warp up to ×16 and a full autopilot (see below).
-- **Autopilot and autoland.** Press **Z** for heading, altitude and speed hold: rolling turns the heading bug, pitching moves the altitude target and the throttle sets the speed (a number key hands the throttle back to you). Pick an airport on the GPS map (click it, or Tab / D-pad, then **ENGAGE AUTOLAND** or Enter) and the autopilot flies you there and lands. It picks the runway end from the wind and the terrain, cruises above the high ground, descends in an orbit over the lowest ground near the approach, intercepts the localizer and a glidepath that steepens where hills demand it, sets flaps and gear, flares, brakes to a stop and sets the parking brake. If it isn't stable on final it goes around and tries again. The research craft come down the final fast and, a few kilometres out, close the throttle and rear up belly-first into the airflow (the fly-by-wire XR-30 and XR-40 snap to 60-70 degrees nose-up) to shed the speed, then drop the nose back onto the glidepath; the XR-40 Somnus then comes to a hover over the runway and lands vertically. It is one autopilot for every aircraft, with nothing written for any one type: it learns each type's envelope by flying it (stall speeds, climb, idle sink, roll rate, how hard and how fast the airframe answers the controls), then reads what the aircraft can do right now, many times a second, and flies to that. Heavy, it comes in faster and pulls the stick further for the same g. In thin air, iced or with an engine out it plans a weaker climb. If it can't climb at all, it lands from what it has instead of going around. Its descents, glidepaths and flare follow how fast that airframe sinks and how slowly its wing builds lift. It turns at up to 75-85 degrees of bank and pulls as hard as the structure takes, less a margin for gusts, with no other limiter. Only with passengers or a fragile load aboard does it fly gently instead: up to 25 degrees of bank, 0.8-1.3 g, gentle roll and climb rates, wider turns to match, and a stabilized final with no dives onto the glidepath (your own stick is never limited). Before committing it checks the field: a surface or a runway length the type isn't cleared for (the same rule the career dispatches by), a runway it can't stop on at its weight, in that air and with any tailwind, ground that keeps the approach too high, high ground where it would turn in, or an approach that would leave the chart. Then it refuses, says why and circles where it is, clear of the ground, trying the field again every 20 seconds in case the wind has changed, until you take over. Down the final it checks the stop again as the wind changes: with too much tailwind now it goes around and plans afresh rather than land long (inside the last 800 m it lands). A stop past the runway's end is reported as an overrun, not a landing. The GPS draws the planned approach, the HUD shows an autopilot banner, and Time Warp stays available while it's en route. Any stick input hands control back (on a refused autoland's hold too).
-- **Hand-designed world.** "The Solace Islands" has 16 airports on 5 islands: a flight-school field, grass farm strips, a rock in the sea, international hubs, a 5,400 ft gravel mountain pass, a volcano research strip, a glacier snow runway, a fjord town and a remote resort isle. Every approach has a cleared glide corridor.
-- **Career.** There are 4 lessons and 30 story contracts in 5 chapters (Student → PPL → CPL → Owner-operator → ATP), plus endless freelance jobs. Work includes cargo, passengers, fragile loads, medevac with deadlines and a patient to keep comfortable, VIP charters with a live comfort meter, night freight, low-visibility runs flown to minimums, altitude surveys and a scenic tour. You're scored on landing softness, passenger comfort (bank and G), deadlines and fragile-cargo handling, and on airmanship from what the flight recorded: a touchdown in the first third of the runway, the centreline, a stable approach over the threshold, a fuel reserve kept (landing on fumes costs money and reputation), taxiing clear and shutting down. The tower's instructions count too: taking off against a hold, or landing after being told to go around, costs pay and reputation; a go-around you needed costs nothing. You can rent at any airport, buy and sell 9 aircraft (new, used at two thirds condition, or financed: a quarter down and a payment out of each settlement, with repossession after three missed), and pay for ferry flights and positioning tickets. The job board quotes each job for the aircraft you pick: it flies the job on the autopilot in the background and shows that time and fuel (with its uncertainty), the payment, the operating costs and the net, the deductions that apply and the main challenge, and the debrief charges exactly the fees it quoted; an owned aircraft buys its fuel at the departure (hubs are cheapest, strips and snow and gravel fields dearer) and keeps what is left in its tanks between flights, and the job card lets you choose the fuel for the flight against the take-off weight limit and the roll it needs at that field (overweight can't dispatch; the hangar fills the tanks); clients pay a reliable pilot more (up to +15% with reputation). Some jobs carry a forecast: the weather moves during the flight, the tower reads the wind as it is, and the autopilot re-plans for the other runway end when the wind has swung. Owned aircraft wear with the hours and hard landings, and something can break on a flight (an engine, the alternator, the pitot, the gear, a flap, ice in cold cloud), more often the worse the condition; the hangar services them and sells hull insurance, and a belly landing on a paved runway is survivable. The debrief gives one coaching point from your arrival: speed and height over the threshold, where you touched down and how much runway was left. A job survives a diversion: landing short of the destination closes a leg (that leg's hire and fuel are charged, the clock and the load's treatment carry over, nothing is paid yet) and the job waits where the load is, pinned at the top of the contracts tab, until you fly it on (with the same aircraft or a newly hired one), release it, or fly a practice approach to its destination first. Lessons and checkrides are flown whole. The payment comes once, on delivery; every settlement and purchase is saved before it counts, so a save that fails is simply retried, never lost or paid twice. During a flight the latest tower instruction stays readable beside the navigation card.
-- **Trials.** Off the books, against your own best: a spot landing scored on the metres from the mark and the touchdown rate, the STOL contest at Summit Pass on the landing roll, and gate runs (eight low rings out of your home field, plus a course that changes every day) on the clock from the first gate to the last. Pick them from the TRIALS list in the contracts tab; each keeps its five best.
-- **No softlocks.** The campaign is checked automatically (`tests/progression_test.cpp`). Every contract is flown with an aircraft you can rent or afford, fuel range (with reserve), runway length (corrected for elevation), surface type and deadlines all fit, and the money curve needs only light freelancing or selling an old plane. Rentals never require cash up front, and if you're broke you get free courtesy rides.
+### A career from student to airline owner
 
-## Aircraft
+- **Licences and a story.** 4 lessons and 30 story contracts in 5 chapters (Student, Private, Commercial,
+  owner-operator, Airline Transport), plus an endless freelance board.
+- **Real work.** Cargo, passengers, fragile loads, medevacs with a deadline and a patient to keep comfortable, VIP
+  charters with a live comfort meter, night freight, low-visibility runs flown to minimums, altitude surveys, scenic
+  tours and photo flights over landmarks.
+- **Every flight scored.** You're graded on the touchdown, the zone, the centreline and the approach, on passenger
+  comfort and deadlines, and on airmanship from what the flight recorder saw, including whether you followed the
+  tower's instructions.
+- **An economy that holds together.** Rent at any airport, or buy and sell aircraft (new, used or financed), pay for
+  ferry flights and positioning tickets, and buy fuel at the departure. The job board quotes each job for the
+  aircraft you pick: it flies the job on the autopilot in the background, then shows the time, the fuel, the costs
+  and your net. Owned aircraft wear, need servicing and can fail in flight; the hangar sells insurance.
+- **Jobs survive a diversion.** Land short and the leg closes; the job waits where the load is until you fly it on.
+- **Your airline.** Hired pilots fly your aircraft on routes and pay into your account, and their flights pass you
+  as traffic in your livery.
+- **After the campaign:** legendary contracts, trials (spot landings, a STOL contest, gate runs with medals and a
+  ghost of your best run), the Defense Command board with its XR sorties, and Project NIGHTGLASS, the research
+  terminal.
+- **No softlocks.** Every contract can be flown with an aircraft you can rent or afford, and that is checked
+  automatically (`tests/progression_test.cpp`).
 
-| Aircraft | Type | Seats / Cargo | Range | Cruise | Take-off roll | Landing distance | Runway | Licence |
-|---|---|---|---|---|---|---|---|---|
-| Dawnlark T2 | Two-seat trainer | 1 / 120 kg | 45 km | 118 kt | 99 m | 357 m | 410 m paved | Student |
-| Ambler 180 | Four-seat tourer | 3 / 320 kg | 70 km | 130 kt | 144 m | 384 m | 442 m paved | PPL |
-| Scrubrunner STOL | Backcountry taildragger | 4 / 480 kg | 72 km | 133 kt | 98 m | 218 m | 251 m, gravel/snow | CPL |
-| Skerry Twin | Nine-seat utility twin | 9 / 900 kg | 90 km | 130 kt | 225 m | 408 m | 469 m, gravel/snow | CPL |
-| Longshore Hauler | Single turboprop hauler | 12 / 1400 kg | 130 km | 150 kt | 379 m | 457 m | 525 m, gravel/snow | CPL |
-| Archipel 400 | Regional turboprop airliner | 40 / 4500 kg | 170 km | 265 kt | 678 m | 623 m | 780 m paved | ATP |
-| Emissary 500 | Light business jet | 7 / 700 kg | 4350 km | 466 kt | 462 m | 527 m | 607 m paved | ATP |
-| Cutwater S6 | Retractable low-wing tourer | 3 / 420 kg | 140 km | 173 kt | 165 m | 392 m | 451 m paved | PPL |
-| Wavecrest C6 | Six-seat coastal charter twin | 5 / 270 kg | 110 km | 160 kt | 149 m | 389 m | 447 m paved | CPL |
-| Thistledown L4 | Four-seat shoulder-wing tourer | 3 / 130 kg | 115 km | 133 kt | 220 m | 384 m | 600 m paved | PPL |
-| Galleon 180 | 180-seat twin-engine transport | 180 / 6500 kg | 5800 km | 513 kt | 1280 m | 779 m | 1900 m paved | ATP |
+<table>
+  <tr>
+    <td width="50%"><img src="docs/media/hub.jpg" alt="The career hub: the first lesson, the islands' map and the aircraft to fly it in"></td>
+    <td width="50%"><img src="docs/media/hangar.jpg" alt="The hangar: the Emissary 500, to buy new, used or financed"></td>
+  </tr>
+</table>
 
-Cruise, take-off roll and landing distance are what each aircraft actually does in the flight model (learned by flying it: `flight_test --table`); the runway it needs is the longer of the two at full weight, 15% to spare, longer at high fields. Each type's structure is its certification category's limit load, flaps up: the normal-category Ambler, Skerry, Longshore, Wavecrest and Thistledown +3.8 / -1.52 g, the utility-category Scrubrunner and Cutwater +4.4 / -1.76 g, the aerobatic Dawnlark +6 / -3 g, the Emissary (a light transport-category jet) +3.0 / -1.2 g, and the Archipel and Galleon airliners +2.5 / -1.0 g.
+### The Solace Islands, and the world beyond
+
+- **A hand-built archipelago.** 16 airports on 5 islands: a flight-school field, grass farm strips, a rock in the
+  sea, international hubs at Port Verde and Solace Capital, a gravel strip high on a mountain pass, a volcano research strip, a glacier snow
+  runway, a fjord town and a resort isle. There are 26 settlements, from three cities to small villages, joined by a
+  graded road network with bridges, traffic and ferries. Add farms, a container port, a stadium, a racetrack, a dam,
+  a wind farm, a cable-stayed bridge and a lighthouse that turns.
+- **6,143 generated regions.** Around the islands, regions at stable addresses on the globe, each worked out from
+  its address: archipelagos, volcanic chains, fjords, atolls and continental fragments. They come in three sizes.
+  A small one has a few islands and two or three fields. A large one is on Solace's own scale, with a city round an
+  international airport and up to ten fields. They rise over the horizon as you fly toward them and are solid
+  ground when you arrive.
+- **Worth exploring.** Each region has its own sights (craters, summits, capes, islets, sounds, lagoons, fjord
+  heads, straits), named for that region and marked on the maps. Your passport keeps a page for every region:
+  the airports you've landed at and the sights you've found.
+- **The career goes too.** Fly to another region by airline ticket and work its own job board. Your aircraft stay
+  where you park them. With a jet that has the range, take a **long haul** and fly a load there yourself, across
+  the open ocean.
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/media/travel.jpg" alt="The Travel card: airline tickets to the regions, with their size, form and distance"></td>
+    <td width="50%"><img src="docs/media/passport.jpg" alt="The passport: the islands' landmarks and the regions visited"></td>
+  </tr>
+</table>
+
+### Aircraft
+
+Eleven career aircraft, each hand-built down to the rivets, door handles, static wicks and antennas, with moving
+control surfaces, gear and props. Each has a 3D cockpit with live gauges or glass displays and controls that move
+with your inputs.
+
+| Aircraft | Type | Seats / Cargo | Range | Cruise | Runway | Licence |
+|---|---|---|---|---|---|---|
+| Dawnlark T2 | Two-seat aerobatic trainer | 1 / 120 kg | 45 km | 118 kt | 410 m paved | Student |
+| Ambler 180 | Four-seat tourer | 3 / 320 kg | 70 km | 130 kt | 442 m paved | PPL |
+| Cutwater S6 | Retractable low-wing tourer | 3 / 420 kg | 140 km | 173 kt | 451 m paved | PPL |
+| Thistledown L4 | Shoulder-wing tourer | 3 / 130 kg | 115 km | 133 kt | 600 m paved | PPL |
+| Scrubrunner STOL | Backcountry taildragger | 4 / 480 kg | 72 km | 133 kt | 251 m, gravel / snow | CPL |
+| Skerry Twin | Nine-seat utility twin | 9 / 900 kg | 90 km | 130 kt | 469 m, gravel / snow | CPL |
+| Wavecrest C6 | Coastal charter twin | 5 / 270 kg | 110 km | 160 kt | 447 m paved | CPL |
+| Longshore Hauler | Single turboprop hauler | 12 / 1,400 kg | 130 km | 150 kt | 525 m, gravel / snow | CPL |
+| Archipel 400 | Regional turboprop airliner | 40 / 4,500 kg | 170 km | 265 kt | 780 m paved | ATP |
+| Emissary 500 | Light business jet | 7 / 700 kg | 4,350 km | 466 kt | 607 m paved | ATP |
+| Galleon 180 | 180-seat twin-engine transport | 180 / 6,500 kg | 5,800 km | 513 kt | 1,900 m paved | ATP |
+
+The numbers are what each aircraft actually does in the flight model, measured by flying it (`flight_test --table`).
+Ranges are scaled to the islands; only the jets reach the other regions. Four research craft sit beyond the career:
+the XR-10 Vigil, the XR-20 Reverie, the XR-30 Nocturne (Mach 2.85, thrust vectoring) and the XR-40 Somnus (Mach 4.4,
+four tilting thruster pods, a cloak, lasers and plasma bombs).
+
+### Flying
+
+- **A flight model built from the airframe.** Six degrees of freedom. Drag is built up part by part from each
+  shape, lift and span efficiency come from the wing, and drag rises near the critical Mach number. Cruise speed and
+  climb rate come out of that; nothing is tuned to hit a number. It models stalls and wing drop, ground effect, prop
+  wash, density altitude, spring-damper gear and taildragger handling.
+- **Weather you fly through.** Gusts, turbulence carried by the air, wind shear and veer, ridge lift and lee
+  rotors, thermals under cumulus and the downdrafts of storm cells. Some jobs come with a forecast, and the weather
+  changes during the flight.
+- **An autopilot that flies like a pilot.** Heading, altitude and speed hold, and autoland at any airport you pick
+  on the GPS map. It picks the runway from the wind, plans round the terrain, flies the approach, flares, stops and
+  sets the brake, and goes around when it isn't stable. It learns each aircraft's envelope by flying it, and refuses
+  a field it can't land on, saying why.
+- **Air traffic and towers.** Traffic parks, taxis, flies full circuits and lands around you. Tower controllers
+  speak from what is actually happening (clearances, sequencing, wake turbulence cautions, go-arounds) and call you
+  by your registration.
+- **A GPS moving map** over aerial imagery rendered from the real terrain, with the route, a fuel-range ring and the
+  predicted track. Time Warp goes up to ×16.
+- **Keyboard, gamepad, joystick.** Xbox-style gamepads and any DirectInput stick, throttle, HOTAS or rudder pedals,
+  with axis binding, dead zones and curves. Assists are on by default for keys and pads and can be turned off.
+
+### Looks and sound
+
+- **A deferred renderer on OpenGL 3.3.** Continuous level-of-detail terrain, an ocean built from a wave spectrum
+  that follows the wind, volumetric clouds that drift, boil and part round your wingtip vortices, aerial
+  perspective, soft shadows from cascaded maps, bloom, light shafts and temporal anti-aliasing. 30 tileable PBR
+  material sets (23 photo scans) cover the terrain, buildings, vegetation and aircraft.
+- **Lights that are fixtures.** Every runway edge light, PAPI unit, nav light, strobe and landing light is a
+  modelled fixture that lights its surroundings. PAPI lenses change from red to white per pixel with your eye height.
+- **Crashes.** Aircraft come apart along their own joints into simulated pieces that burn, sink or scatter, with
+  fireballs, craters and smoke columns. An overstressed airframe breaks up in the air.
+- **Binaural audio.** Engines, wind, rain, impacts and voices are placed in 3D, with distance falloff, Doppler,
+  head shadow and a headset filter. A cast of eight voices (an instructor, an examiner, the cockpit assistant, the
+  research computer and more) speaks from one comms channel, and tower calls come with squelch.
+- **Music and radio.** A generative soundtrack with stingers for licences, achievements and medals, and live
+  internet radio from your own station list.
+
+### And also
+
+- **Photo mode** (F2): freeze the flight, take a free camera up to 600 m out, grade the shot and save it without the
+  HUD.
+- **A pilot profile** across careers: 41 achievements, a stamp for every airport you land at, the landmarks you've
+  found, and your softest touchdown in each aircraft.
+- **Steam ready.** With Valve's `steam_api64.dll` beside the exe it adds achievements, trial leaderboards, rich
+  presence, screenshots, the overlay pause and Steam Deck support (with a Deck graphics preset). Without the DLL
+  nothing changes. There is no DRM.
+- **Crash reports** stay on your PC (`%APPDATA%\SomniumVolandi\crash`), and the next launch tells you where they are.
+  Nothing is ever uploaded.
+
+## Getting started
+
+1. Download `SomniumVolandi-windows-x64.zip` from the [latest release](../../releases/latest) and unzip it anywhere.
+2. Run `SomniumVolandi.exe`. The first launch compiles the shaders for your GPU and builds the islands; later
+   launches load them in moments.
+3. Start a **New Career** for the lessons, or pick **Free Flight** to fly any career aircraft from any airport, in the
+   islands or in a generated region.
+
+**System requirements.** Windows 10 or 11, 64-bit, and a graphics driver with OpenGL 3.3 (core profile). If the
+driver falls short, the game says so and names the fix. About 0.5 GB of disk. A verified minimum and recommended PC
+will come from the playtest's [hardware matrix](docs/HARDWARE_MATRIX.md); `diagnostics.bat` benchmarks your own PC.
+On a laptop with two GPUs, set the game to *High performance* in Windows' graphics settings if it starts on the
+integrated one.
+
+**Where things are kept.** Saves, settings and the radio list are in `%APPDATA%\SomniumVolandi`. The compiled
+shaders, the islands and other data rebuilt per machine are in `%LOCALAPPDATA%\SomniumVolandi`; deleting that folder
+only means the next launch builds it again.
+
+**Internet radio.** Press **R** in flight. No stations ship with the game. Add one per line to
+`%APPDATA%\SomniumVolandi\radio_stations.txt` as `Name|https://example.com/stream.mp3`. Any MP3 or AAC stream that
+Windows Media Foundation plays will work; press **Reload** in the radio panel.
 
 ## Controls
 
-The game shows no key prompts during flight. Open **Controls** from the main menu, the pause menu or the Settings tab to see every binding. To remap one, click its keyboard, controller or joystick cell and press the new key or button (Esc / Menu cancels, right-click clears the binding). A key that's already used in the same group swaps over, and **Reset to defaults** restores the table below. Bindings are saved in `settings.cfg`. The arrow keys, PgUp / PgDn, the number keys, the sticks and the triggers are fixed.
+Open **Controls** from the main menu, the pause menu or Settings to see and remap every binding: click a keyboard,
+gamepad or joystick cell and press the new key or button. **Settings → Joystick** binds the flight axes (pitch,
+roll, yaw, throttle, toe brakes) with reversal, dead zones and response curves.
 
-**Joysticks, throttles and pedals.** Any DirectInput flight stick, throttle quadrant, HOTAS or rudder pedals works next to the keyboard and gamepad. The first joystick you plug in flies pitch and roll straight away. **Settings → Joystick** lists the connected devices and binds the five flight axes: pitch, roll, yaw (rudder), throttle and wheel brakes (toe brakes). Click an axis's binding and move the control as it asks (pull the stick back, push the lever to full): that binds it and sets its direction. Each axis can also be reversed by hand, and has its own dead zone (a stick's centre, or each end of a lever) and response curve, with a live meter of what the aircraft gets. A throttle lever takes the throttle once it moves; a throttle key, trigger or number key takes it back until the lever moves again, so the two never fight. Any action in the Controls table can also have a joystick button or hat direction. Joystick bindings are saved in `joystick.cfg`, and a device moved to another USB port is found again by name. A bound joystick unplugged in flight pauses the game, as a gamepad does. Xbox-style gamepads stay on the gamepad column.
-
-**XR-40 manual VTOL (90-degree pod notch):** hold throttle-up (default **Shift**, **PgUp** or **+**) for full power, or hold **1–9** for a partial-power target. **RT** commands power proportionally; **LT** reduces it, and throttle-down or **0** commands idle. Releasing the power control commands idle and the engines wind down at their normal spool rate. Held controls must be released after pausing or changing input context before they can apply power again. Forward flight, the intermediate pod notches, and engaged autopilot retain their existing throttle controls.
-
-| Key (default) | Action | Gamepad (default) |
+| Key | Action | Gamepad |
 |---|---|---|
-| W / S or ↑ / ↓ | Pitch down / up | Left stick |
+| W / S or ↑ / ↓ | Pitch | Left stick |
 | A / D or ← / → | Roll | Left stick |
-| Q / E | Rudder / nosewheel | LB / RB |
+| Q / E | Rudder and nosewheel | LB / RB |
 | Shift / Ctrl, PgUp / PgDn, 1–9, 0 | Throttle | RT / LT |
 | F / V | Flaps down / up | B / X |
-| G | Landing gear (retractable aircraft) | Y or D-pad → |
-| B | Parking brake (set / release) | D-pad ← |
+| G | Landing gear | Y or D-pad → |
+| B | Parking brake | D-pad ← |
 | Space | Wheel brakes | A |
 | [ / ] | Elevator trim | D-pad ↑ / ↓ |
-| Z | Autopilot: hold, or autoland at the airport picked on the GPS | Right-stick click |
-| ; | Aerobatics: the autopilot flies the next figure (loop, aileron roll, barrel roll, Immelmann, split-S, Cuban eight, wingover); press again to stop and level off | (bind one in Controls) |
-| T | Time Warp ×2 / ×4 / ×8 / ×16 / off, by hand or on the autopilot (above ×4 slower PCs may stutter) | |
-| C | Camera: chase, cockpit, orbit, flyby (orbit stays where you swing it; chase eases back behind the aircraft after 4 s, unless Settings → Flying → Chase view says otherwise) | Back |
+| Z | Autopilot hold, or autoland at the airport picked on the GPS | Right-stick click |
+| ; | Aerobatics: the autopilot flies the next figure | (bind in Controls) |
+| T | Time Warp ×2 / ×4 / ×8 / ×16 / off | |
+| C | Camera: chase, cockpit, orbit, flyby | Back |
 | Right mouse drag, wheel | Look around, zoom | Right stick |
+| N | GPS moving map | |
+| Tab | Minimap; with the GPS open, pick the autoland airport | D-pad on the GPS |
 | L | Landing lights | |
-| I | Engine start; hold for a second, stopped on the ground, to shut down | |
-| **M** | **Muffle engine noise** | Left-stick click |
-| Tab | Toggle minimap (hidden by default); with the GPS open, pick the autoland airport | D-pad ← / → on the GPS |
-| **R** | **Internet radio** | |
-| **N** | **GPS moving map** (mouse wheel or the on-map buttons zoom) | |
-| H | Toggle HUD | |
-| F2 | Photo mode (also in the pause menu): the flight frozen, a free camera, Space takes the photo | |
-| Esc | Pause menu (restart, settings, abandon) | Start |
+| I | Engine start; hold to shut down | |
+| M | Muffle engine noise | Left-stick click |
+| R | Internet radio | |
+| H | HUD on / off | LB + RB held |
+| F2 | Photo mode | |
+| F3 | Performance readout | |
 | F11 / Alt+Enter | Fullscreen | |
-| F3 | Performance readout (fps, GPU time, resolution) | |
-| Enter / Space (after a crash) | Skip the crash sequence | A |
+| Esc | Pause menu | Start |
 
-Pull hard enough and the g-lens closes in: past 80% of the airframe's limit load (either way) a red, bloodshot lens creeps over the view from the edges, its clear middle shrinking and its veins reaching in with your pulse, until it covers nearly everything as the airframe lets go. The XR-30's damped cell starts it at 4 g and only closes it near 50 g.
-
-On a gamepad, holding both bumpers (LB + RB) for a second hides the whole flight UI for a clean view; do it again to bring it back.
-
-Menus work with the mouse or a gamepad. On a gamepad, the left stick (or D-pad) moves an on-screen cursor, **A** clicks, **B** backs out (like Esc), and the right stick scrolls lists. Moving the real mouse hands control straight back to it.
+Menus work with the mouse or a gamepad (the left stick moves a cursor, **A** clicks, **B** backs out).
 
 <details>
-<summary>Classified (spoiler)</summary>
+<summary><b>Flying tips</b></summary>
 
-Can't wait for a close encounter? Hold **J** and **K** together for a second while flying and they'll come to you.
-
-Bored on a long leg? Hold **O** and **P** together for a second while flying and the **Nocturne display pair** joins you: two XR-30 Nocturnes in red-and-gold and blue-and-white livery, trailing coloured smoke. They fly a show around you all the way to your destination: synchronised rolls in formation, a double helix around your flight path, a head-on knife-edge crossover with a fly-by roar, synchronised loops off your nose, and a split-and-cross with one high and one low. The radio calls each act. Hold O + P again to send them home; they also rock their wings and pull away in reheat when you settle onto an approach.
-
-Hold **U** and **I** together on the main menu, or click in **both sticks** on a gamepad, to open the Project NIGHTGLASS research terminal (it gets a menu entry once you hold the Airline Transport licence or finish the campaign; nothing flown there counts for the career). Its boot screen comes up at once. Its biometric scans and loading bar move as the research craft and their launch site load, and access is granted when everything is ready.
-
-- **Performance:** full reheat doubles the thrust, for a thrust-to-weight ratio of about 4.4 and Mach 2.5 at 3,000 m. Just below Mach 1 in humid air a volumetric vapour cone forms around the airframe: a sharp edge at the shock and a streaky, sunlit shell that fades aft. Breaking Mach 1 sets off a sonic boom.
-- **Take-off and landing:** a conventional runway jet with no flaps, landing fast on its cranked delta wing at about 140 kt.
-- **Handling:** the 2D nozzles vector ±29° for pitch. There are no g or angle-of-attack limiters: the stick commands rotation directly, around 230°/s of pitch at Mach 1 and 315°/s of roll. The airframe fails beyond +50 / −25 g, and a full pull much above Mach 1.5 will tear it apart.
-- **Exhaust:** ray-marched plumes. In dry thrust a blue core grows longer and brighter with the throttle, an orange-tipped flame shows from mid power, and pale shock cells form near full military power. From about 70% spool, reheat phases in and lights a translucent blue-violet shell at the nozzle, a train of white-yellow shock diamonds spaced wider as Mach climbs, and an orange flame that flares, flickers and reddens downstream, dense enough to dim what's behind it. Reheat sheds a few motion-blurred embers, and lighting it flares a shock ring. Each nozzle holds a shadow-casting light, so the flames light the nozzle rims and the ground, and the nozzle walls throw a shadow across the fuselage between them.
-- **Nozzle internals:** behind each 2D nozzle's convergent-divergent flaps sit afterburner spray bars, two flame-holder rings, a ribbed soot-black liner and the last turbine stage with its tail cone. They glow dull red at idle and orange-white in reheat.
-- **Cockpit:** a sealed pod with no windows. You fly on a panoramic display fed by three cameras in the nose, with a full HUD (pitch ladder, flight-path marker, heading tape, speed, altitude, Mach, G, thrust-vector angle and throttle), with annunciator lights above it. A curved instrument console holds five displays: engine gauges, power bars, a live heading-up terrain map, an attitude indicator and the thrust-vectoring page (nozzle angle, gear and reheat). Side consoles carry a G-meter and angle-of-attack page, a compass page and backlit keypads, with an overhead switch panel above. Side displays show the left and right cameras. The pod is kept low-lit, only by its own modelled fixtures: the displays, two warm recessed ceiling light bars, cyan LED strips and an amber footwell light. Its carbon, composite, leather, rubber and webbing surfaces use PBR materials.
-- **Sound:** a layered voice with a warm harmonic core whose pitch rises with power, fan whine, deep sub-bass, an exhaust roar that opens up with thrust, a crackling afterburner and a deep, low double-thump sonic boom with a long rolling rumble.
-- **Career:** these flights don't count towards the career or the logbook.
-
-The same terminal has the **XR-40 Somnus** (click its card, press Tab to cycle the register, or gamepad X): a stealth aerobatic research craft built for insane speed and g.
-
-Two more airframes round out the register. The **XR-10 Vigil** is the programme's supersonic twin-jet testbed on conventional controls: reheat above 85% throttle, no fly-by-wire or vectoring, usable jet-fuel tanks, and a two-seat glass cockpit. The **XR-20 Reverie** is a forward-swept demonstrator with cropped canards, twin canted fins and one large centreline engine fed by a dorsal intake, flown from a single-seat centreline cockpit with live displays, a side stick on the right and the throttle on the left. Both have flaps and retractable gear. The register climbs in tiers, measured in fixed-weight level-flight tests at 8,000 m with 70% fuel: the XR-10 reaches about Mach 1.44 (+45/-28 g), the XR-20 Mach 2.06 (+34/-34 g), the XR-30 Mach 2.85 (+180/-180 g) and the XR-40 Mach 4.4 (+300/-300 g); none has a speed limiter, so the numbers move with height, fuel and configuration. All jets now carry finite usable fuel and burn it according to thrust, spool, air density and reheat. Vigil carries 2,200 kg and Reverie 3,200 kg; Nocturne and Somnus each carry 6,000 kg. Their efficient dry-cruise range is very different from their short boost or hover endurance; see [jet fuel calibration](docs/JET_FUEL.md). Past its limit an airframe takes a short overstress before it lets go (about 20% over for five seconds, or double for one; twice the limit snaps it at once). The research structures are sized to what each can pull, so they can be flown as wildly as you like: no stick input breaks the XR-30 or XR-40 at any speed or height (full stick peaks near 160 g and 265 g at their fastest), and the XR-10 and XR-20 give way only to a sustained full push at top speed near the sea. Each craft has **test cards** in the terminal, picked under its airframe card: step-by-step sorties that push it to those numbers and exercise what is unique to it (the Vigil's transonic dash and slow flight, the Reverie's reheat and high alpha, the Nocturne's vectored pull and zoom climb, the Somnus's Mach 4 dash, hover and vertical landing, cloak, lasers and bombs). The HUD shows the step and its reading; a finished card is signed off and remembered. Neither is for sale in the career; both are reached only through the terminal.
-
-- **Airframe:** an angular, faceted stealth body with sharp chines, caret intakes, a faceted gold canopy, a diamond wing with a forward-swept trailing edge and elevons, and canted all-moving ruddervators. The skin is a PBR radar-absorbent coating with sawtooth panel seams. Its two landing lights sit under the chin, ahead of the pods, turrets and gear, so nothing blocks their beams.
-- **Cockpit:** a faceted sealed cabin of hex-tiled composite panels between titanium ribs, wrapped in angular camera displays: each pane shows the picture of its own camera on the airframe, looking out the way the pane faces. There's a three-pane front wrap with an angular cyan HUD, tall side displays with aft displays behind them, an overhead pane, a sloped chin pane under the dash, and a glass floor in the footwell crossed by a titanium grid, with the rudder pedals over it. Two more floor panes sit beside the seat. Look down and the belly cameras show the ground below, with trees, buildings and the bombs going off. Every display brackets the UFO in violet with its range when the visitors arrive. They swoop in from the rear quarter, in view of the aft displays. The HUD shows a laser pipper at the turrets' convergence point (red when they're out), a violet cloak arc, speed, altitude, heading, Mach and g. The floor and chin panes show where a bomb released now would land, with its blast ring and range. When a bomb drops, a separate bomb camera is spawned: it chases the bomb down from just behind, then flies out to a vantage point about 400 m away to watch the blast from a three-quarter angle, slowly orbiting it, and is removed once the blast has burnt out. While it exists the floor screens show its picture instead of the belly cameras'. The angular dash carries two displays, a row of weapon and system annunciators and a projector with a spinning holographic globe. Side consoles have touch glass and displays, an angular throttle and a side stick with lit triggers; there's a fighter seat in hex-quilted hide with glowing headrest slits, an overhead switch rail, emitter strips along the cabin edges and glowing bulkhead vents. The displays light the cabin with whatever they're showing.
-- **Camera displays (both research jets):** every display is a monitor for a real camera, an object fixed to the airframe at the point where its line of sight leaves the skin. Each camera renders the full scene from where it sits (terrain, trees and buildings, traffic, weapons, clouds, smoke, fire, sparks and the other particle effects, light shafts, and your own aircraft when it's in shot) into its own picture. The front display and the bomb camera render a new picture every frame (you fly by them); the other cameras whose displays you can see take turns, oldest picture first, within a fixed pixel budget each frame. One turned out of view keeps its last picture and is updated the moment it comes back into view. The HUD symbology is drawn conformal to each camera's view.
-- **Four thruster pods:** two on short pylons beside the nose and two in nacelle wells at the wing roots. Each turns on a rotating mount: a bearing housing on the pylon or on both walls of the well, a trunnion shaft and a flanged hub with a bolt circle that turns with the tilt. The pods swing clear of the airframe at every angle, and the canted tail fins root into the fuselage. Each pod is modelled in detail: a faceted nacelle with a sawtooth intake lip, a spinning 14-blade intake fan, a glowing turbine core, an iris nozzle whose petals open with thrust, three pitch vanes and two yaw vanes in the jet, the tilt trunnion, and a hydraulic actuator whose rod extends as the pod tilts. **F / V** tilts all four pods from thrust-aft (forward flight) to straight down (hover). Each pod's thrust is applied where the pod actually is, so the hover is held up by four real jets.
-- **Flight control:** the fly-by-wire turns stick input into the rotation it wants, then works out how to make it. It uses the elevons and ruddervators first (their authority grows with airspeed), then the pods: thrust front against rear and left against right, the pitch and yaw vanes, and tilting the left and right pods differently. Whatever it can't make simply doesn't happen, so slow and low on power the controls go soft, just as they would on a real tilt-jet.
-- **Performance:** about 2.2:1 thrust-to-weight dry and 4.6:1 with boost (above 85% throttle), Mach 3.6 at 4 km, a 400°/s roll, and up to about 265 g at full stick at its fastest (the fly-by-wire's pitch-rate cap holds it there, pulling or pushing). The airframe holds +300 / -300 g, more than it can pull either way.
-- **Cloak (X, or double-tap gamepad A):** the cloaking field spreads from the nose to the tail in a violet wavefront. Once it has, the craft is almost invisible: you see the terrain and sky through it, slightly distorted, with only a faint glassy rim and a shimmer of the emitter lattice. Its shadow fades and its lights go dark. Inside cloud or haze the field blends into the murk around it too.
-- **Weapons hot (Y, keyboard or gamepad):** the laser turrets drop out of hatches in the forward chines and the bomb bay doors open. Each flight starts with the weapons stowed. Press Y again for weapons safe: the bay closes and the lasers stow. While weapons are hot on a gamepad, **RB fires the lasers** and **LB drops a bomb**, and the rudder is frozen until you go safe again. On the keyboard, hold left mouse or Enter to fire (this goes weapons hot by itself) and press Backspace or middle mouse to bomb.
-- **Lasers:** alternating crimson pulse bolts that leave the turret tips at 2,000 m/s on top of the Somnus's own speed (so they always streak away from the lenses, even at Mach 3) and converge 650 m ahead. They fly out to 4.5 km and bring down any aircraft they hit. Each bolt that strikes the ground digs a small scorched crater. Trees, bushes and boulders go up in one hit; buildings and big rock formations take more the bigger they are (a house takes about 3, a skyscraper 12) before they're destroyed in fire, sparks and a column of smoke, leaving a scorched pit where they stood.
-- **Plasma bombs:** unlimited. The belly bay's clamshell doors open, the dark-energy bomb drops from its cradle and a new one condenses in its place. Each bomb is a black sphere crawling with violet plasma. On impact it goes off in a blinding white-violet flash, with a condensation dome racing outward and a shock ring tearing across the ground. A turbulent white-hot fireball laced with cyan filaments swells, lifts off and rolls up into a violet mushroom cap on a glowing stem, then slowly cools into a towering column of dark smoke. Glassed fragments and clods of earth arc out of the blast, a ring of dust rolls out along the ground beneath the cloud, and the boom is deep and imploding. The bomb camera pulls back as the cloud climbs. It leaves a crater of fused black glass with violet embers in the cracks, and nothing nearby survives it.
+- Fly the green rings in the lessons. The navigation card shows the distance, bearing, climb or descent and time to
+  the target; the magenta diamond sits on the objective itself.
+- On approach the HUD shows a glidepath and localiser guide. The PAPI shows **two white and two red** on a 3° path.
+- Touchdowns are graded: **butter** under 150 fpm, **smooth** under 250, **good** to 350, **firm** to 600, and
+  **hard** above that (over about 900 fpm the gear gives way).
+- After landing on a job, taxi clear and set the parking brake (**B**) to finish. Shut the engine down first (hold
+  **I**) for the airmanship bonus.
+- High, hot fields need more runway. Summit Pass (5,400 ft) only works in a STOL aircraft.
 
 </details>
 
-## Your profile, the music
+<details>
+<summary><b>Classified (spoilers)</b></summary>
 
-Every landing gets a grade from S to D in the debrief. It's scored on the touchdown, the zone, the centreline and the approach; three stars and an S together make a **Flawless flight**. Your pilot profile collects 41 achievements, an airport stamp for each airport you land at, and the twelve landmarks you can find from the air in the islands. The regions beyond them have their own airports to stamp and their own landmarks, from a volcano's crater to a fjord's head, marked on the maps with a diamond. It also keeps your softest touchdown in each aircraft. It covers all your careers and is saved in `profile.cfg` beside the settings; **Logbook → Achievements** and **Logbook → Passport** show it.
+- Hold **J + K** for a second in flight, well clear of the ground, and the visitors come to you.
+- Hold **O + P** for a second and the Nocturne display pair joins you for a show all the way to your destination.
+- Hold **U + I** on the main menu (or click both sticks) to open the Project NIGHTGLASS research terminal. It gets a
+  menu entry once you hold the Airline Transport licence. The XR-40 Somnus: **F / V** tilt the pods, **X** cloaks,
+  **Y** arms the lasers and the bomb bay.
 
-The job board also has **photo flights** over the landmarks, and passengers sometimes ask to see a landmark on the way, for a tip. With a Private licence the board's **Travel** card takes your career to another region by airline: its own airports, its own board, and work that pays 15% more than the islands'. A Commercial licence reaches twice as far, the Airline Transport licence every region listed, and the way home is always open. Your aircraft stay where you park them. With a jet that has the range, **long hauls** fly you there yourself: a load for another region's main airport, across the open ocean, the region ahead prepared as you cross. The campaign, the trials, the Military board and your airline stay in the islands. After the campaign, five **legendary contracts** join the board. The Military board opens after ten flights in your logbook, and the research terminal appears on the main menu as **Project NIGHTGLASS** once you hold the Airline Transport licence.
+</details>
 
-Trials award gold, silver and bronze, with marks set for the aircraft you fly. After each one, a results card shows the medal, your place on the local board and, on gate runs, every gate's split against your best run; **Retry** flies it again. On a gate run, a marker shows where your best run was at the same moment.
+## Building from source
 
-**Photo mode** (F2 in flight, or the pause menu) freezes the flight and hands you a free camera, up to 600 m from the aircraft. Its panel sets the field of view, the exposure and the vignette, the colour (saturation, contrast, warmth), a frame (full, 2.39 : 1, 1.85 : 1 or square) and five looks; the gates and the route are hidden unless you want them. Space (or X on a gamepad) saves the shot without the HUD as a PNG in `Pictures\Somnium Volandi`, and on Steam in your Steam screenshots too.
+There are no third-party dependencies to install: the game uses only what Windows provides (Win32, OpenGL, WinMM,
+XInput, DirectInput and Media Foundation).
 
-**Credits** are on the main menu.
-
-The game has its own generative soundtrack: a theme on the main menu, a lighter groove in the hub, a finale theme, and stingers for jobs, licences, achievements and medals. Its volume is in **Settings**, along with an optional quiet ambience for the cruise. The score steps aside whenever the internet radio plays.
-
-## Flying tips
-
-- Fly the green rings in the lessons. The navigation card at the top shows distance, bearing, how far to climb or descend and time en route; the heading tape below it has a magenta caret on your target's bearing with a turn cue. The magenta diamond sits on the objective itself in 3D, with a dashed stalk down to the ground so you can read its height. It goes behind your aircraft and the cockpit like anything else in the world, sits under every HUD panel, and turns into an arrow at the screen edge when the target is out of view. A neon lane with flowing chevrons runs from gate to gate, from the one you just passed through the next two.
-- The wind dial (left) shows the wind at your aircraft relative to your nose, its direction, speed and gusts, and the headwind / crosswind components (amber when the crosswind is strong).
-- On approach the HUD shows a glidepath (G/S) and localiser guide. The PAPI lights by the runway show **two white and two red** when you're on a 3° glidepath.
-- Every touchdown is graded on one scale: **butter** under 150 fpm (a bonus), **smooth** under 250, **good** up to 350, **firm** up to 600, and **hard** over 600 (it costs you, and over about 900 fpm the gear collapses). The grade is stamped in the middle of the screen as you touch down.
-- After landing on a job, taxi clear of the runway and set the parking brake (**B**) to finish. Shut the engine down first (hold **I**) for the airmanship bonus. **Finish flight here** in the pause menu ends the job where you are.
-- Keys and gamepads fly with assists by default: let go and the aircraft holds its bank and its climb or descent, and a shallow bank rolls back to wings level. **Settings → Flying** sets the assists, camera shake, rumble, random failures, calm or forecast air, and a full or essentials-only HUD.
-- High and hot airfields need more runway. Summit Pass (5,400 ft) only works in a STOL aircraft.
-- Check the range shown on the engine panel before long crossings.
-
-## Internet radio
-
-Press **R** in flight, or use the **Radio** button in the hub. No stations come with the game: add your own to `%APPDATA%\SomniumVolandi\radio_stations.txt`, which is created on first run (the radio panel's **Edit station list** opens it). Add one line per station:
-
-```
-My Station|https://example.com/stream.mp3
-```
-
-Any MP3 or AAC stream over HTTP or HTTPS that Windows Media Foundation can play will work. Press **Reload** in the radio panel after editing; there's no need to restart. A list an earlier version filled with its presets is kept as your own. The list scrolls with the mouse wheel.
-
-## Steam
-
-The same build runs on Steam: when Valve's `steam_api64.dll` is beside the exe (the Steam version has it), the game
-mirrors its achievements to Steam, puts each trial on a worldwide leaderboard (your place is on the results card),
-adds photo mode's shots to your Steam screenshots, shows friends what you're flying, pauses a flight when the Steam
-overlay opens and, on a Steam Deck, brings up the on-screen keyboard for your pilot's name and sets the graphics for
-the Deck on the first start. Without the DLL none of that happens and nothing else changes. Each PC keeps its own
-graphics settings (`display.cfg` in `%LOCALAPPDATA%\SomniumVolandi`), so Steam Cloud carries your career and settings
-between PCs without changing one PC's graphics to suit another's. There's no DRM: started outside Steam, the game runs as it always has. `steam/README.md` covers
-the Steamworks settings, the achievement table and icons, and the upload; `startup.log` says whether Steam is on.
-
-## Crash reports
-
-If the game crashes, it writes a crash report to `%APPDATA%\SomniumVolandi\crash`: a minidump, a short summary of what failed and where, and a copy of `startup.log`. The next launch says so on the main menu, with a button that opens the folder. Nothing is uploaded; send the report with a note of what you were doing if you'd like the crash fixed. The newest 10 reports are kept. `SomniumVolandi.exe --test-crash` crashes on purpose, to check that reports are written.
-
-## System requirements
-
-What the game checks, and what has been measured. A verified minimum and recommended PC will follow from the playtest's hardware matrix (`docs/HARDWARE_MATRIX.md`); until then there are no claims beyond these:
-
-- **Checked at start:** Windows 10 or 11, 64-bit, and a graphics driver with OpenGL 3.3 (core profile) and at least 22 texture units per shader. If the driver falls short, the game says so and names the fix: update the driver, or run on the dedicated GPU.
-- **Disk use:** about 0.5 GB unpacked, estimated from this build's files. Of that, the voices take 44 MB, the material textures 74 MB, the loading pictures 4 MB, and the ready-built aircraft bodies most of the rest. The first launch also builds a cache of compiled shaders and the islands in `%LOCALAPPDATA%\SomniumVolandi`; `diagnostics.bat` reports its size.
-- **Measured memory:** a long headless session (the `soak` test: every career type and the XR-40, with the tower voices; 200 legs before a release) settles at about 225 MB. It rises over the first 30 or so legs, as each tower voice line is kept once it has been played, then holds. The rendered game uses more, and its figure for your PC is in `diagnostics.bat soak`.
-- **Not yet measured:** frame rates on a range of GPUs. The benchmark (`diagnostics.bat`) measures them on your PC, every scene at 1920x1080.
-
-### How it runs
-
-- **Frame rate.** By default the game paces to your display's refresh rate (vsync; adaptive where the driver supports it, so a late frame tears once instead of stuttering). Settings → *Frame rate* can instead cap it at 30 / 60 / 90 / 120 / 144 / 240 fps with a precise limiter. The automatic resolution scaler aims for whichever rate is in effect.
-- **Scenery streaming.** Scenery is generated deterministically in 256 m chunks as you fly (about half a millisecond per chunk, nearest first). Chunks within 700 m are built immediately; the rest are built on background worker threads (one per spare CPU core) and handed to the renderer when ready, so streaming costs the frame almost nothing. Each object has three levels of detail picked by distance. Chunks are frustum-culled, trees thin out towards the draw distance where the ground's canopy texture takes over, and the shadow cascades only re-render when the camera has moved far enough or new scenery appears where their shadows show. In cockpit views, the area the cabin covered last frame is masked out before the scenery is drawn, so trees and buildings behind the cabin walls are never shaded, and the terrain's shadow on the aircraft is computed once per frame on the CPU rather than for every pixel of the cabin. The Low/Medium/High quality setting scales the tree, rock and building draw distances (trees out to 2.9 / 5 / 7.8 km, buildings to 9 / 13 / 18 km, scenery shadows reach about 2 / 3.2 / 4.4 km ahead) and the shadow-map size. Trees retain their closest mesh to 210 / 290 / 400 m and their middle mesh to 1 / 1.45 / 2 km; bushes have proportionally shorter detail ranges and reach 0.9 / 1.45 / 2 km. Auxiliary camera feeds and shadow detail retain their original budgets. See [foliage ranges and validation limits](docs/FOLIAGE_DRAW_RANGES.md).
-- **Resolution.** By default (*Auto 60*) the render resolution drops automatically, down to 50%, only while the GPU can't hold the target frame rate, and climbs back in 5% steps when it can. Settings → *Render resolution* can instead fix it at 100 / 85 / 75 / 67%. Changing the resolution, by hand or automatically, never reallocates anything, so it causes no hitch. The temporal AA upscales back to the display either way. Temporal anti-aliasing smooths edges, and a light contrast-adaptive sharpening pass keeps the image crisp. Press **F3** for a frame-rate / GPU-time / resolution readout with the GPU time of every rendering pass. An FPS counter is always shown at the top right. `diagnostics.bat` (next to the exe) writes a system report, times the first-run shader compile, benchmarks the scenes full screen at 1920x1080 with the GPU time of every pass, runs the pass-by-pass analysis and takes screenshots, all into a `diagnostics` folder. The pre-flight loading screen shows a picture of the airport (or of your aircraft in flight) from the set that ships in the `loading` folder, and the main menu renders its aircraft flybys and island scenery live in the game engine. Its cinematic flight paths and camera moves are scripted; no prerecorded menu video is played, and old `menu.mp4` files are ignored. Low/Medium/High quality is in Settings.
-
-**Before each flight** a loading screen shows an aerial image of the departure airport (or, when you start in the air, the airport you're heading for) with the mission, route, aircraft and weather, while the scenery around the start is generated. Once everything is in, it fades into a live shot of your aircraft on the runway or in flight, and you start when ready, so nothing pops in when the flight begins.
-
-**Main menu.** Behind the menu the game tours the islands live: every 16 seconds a different place, aircraft, time of day and camera (Port Verde's coast in the morning, an XR-30 past the volcano at sunset, the Palm Bay lagoon, the Spine mountains, Solace Capital at dusk, the fjord, Lighthouse Key at dawn with the XR-40, Meadowbrook's farmland).
-
-**Startup.** The first thing on screen is the intro: the game's icon in a rotating ring, the title and a progress bar. The intro animates on its own thread with its own OpenGL context, separate from everything else, so loading never freezes it. The first time a new version starts, the shaders are compiled by a hidden helper copy of the game (graphics drivers can stall every other drawing call of the process doing a big compile), which writes them to the shader cache; the game then loads them from there. Each aircraft type's own programs, which take the longest, are compiled at the same time by several more helpers side by side (about half the CPU's threads) while the rest of the launch loads, and the launch waits for whatever they have left before it loads the aircraft. While it plays, the shaders load on a worker thread with another context and the world is generated on another thread (its heightmap, scenery masks and the terrain textures are split across every CPU core), so the screen keeps animating at 60 Hz. When both are done, the menu tour's first place is loaded (every tree and building in range, the shadows) and every aircraft's hull is built, rendered offscreen while the intro still plays, so the menu opens complete. During the menu tour the next place loads in the background while the current one plays.
-
-Save data, settings and the radio list live in `%APPDATA%\SomniumVolandi` (Roaming: they're yours, and go with your profile). What the game builds for this machine - the compiled shaders, the islands, each aircraft's learned performance and its body meshes - is cached in `%LOCALAPPDATA%\SomniumVolandi` (Local: the shaders are your GPU's and driver's own, and none of it needs to travel). The first launch builds it, later ones load it in a moment, and deleting the folder only means the next launch builds it again. A game update, driver update or different GPU simply rebuilds what changed. (Versions before 3.42 kept it in a `shadercache` folder next to `SomniumVolandi.exe`; the first launch moves it over.)
-
-**Performance.** The cloud and terrain noise fields are baked at startup into tileable textures (a 1024² coverage map and a 128³ noise volume), so the GPU samples them with its texture hardware instead of evaluating hashed noise per sample; the cloud march takes long strides through clear air and half the steps for water reflections. Scenery chunks that lie wholly in one level of detail are handed to the GPU in one block, and the vertex shader does the distance thinning per instance.
-
-**Laptops with two GPUs.** The game asks NVIDIA Optimus and AMD switchable graphics for the dedicated GPU. If it still starts on the integrated one (very slow loading, or a shader error at startup), set `SomniumVolandi.exe` to *High performance* in Windows Settings → System → Display → Graphics. The intro screen shows the loading progress. Each launch writes that GPU's name to `%APPDATA%\SomniumVolandi\startup.log`.
-
-## Building
-
-### Visual Studio 2022 or newer (MSVC)
+**Visual Studio 2022 or newer (MSVC):**
 
 ```
 cmake -S . -B build -A x64
@@ -242,66 +287,85 @@ cmake --build build --config Release
 build\Release\SomniumVolandi.exe
 ```
 
-### MinGW-w64 (on Windows, or cross-compiling from Linux)
+**MinGW-w64** (on Windows, or cross-compiling from Linux):
 
 ```
 cmake -S . -B build-win -DCMAKE_TOOLCHAIN_FILE=cmake-mingw.cmake   # omit the toolchain file on Windows
 cmake --build build-win -j
 ```
 
-The Steam demo (`steam/README.md`, "The demo") is its own target, not built by default: `cmake --build build --config Release --target SomniumVolandiDemo`.
-
-The GitHub Actions workflow (`.github/workflows/build.yml`) builds with MSVC, runs the tests, and uploads `SomniumVolandi-windows-x64` as an artifact on every push. A second job runs the headless tests under AddressSanitizer and UBSan. The sanitizers slow the tests down about tenfold, so this job is split across three runners. The selector deals the tests out by their measured cost (their ctest `COST`). The longest tests, the flight model, the campaign and the game loop, are registered in parts (`--part N`), so no runner waits on a single long test. The tests that fly over the islands don't each generate them: ctest generates them once per run (`tests/test_world.cpp`), and those tests load that copy. Run on its own outside ctest, a test generates its own.
-
-A push to a branch builds and runs only the tests that the change can affect. It compares against the last commit that passed CI on that branch. `tools/ci/select_tests.py` works the selection out from CMake's description of the build: each test's sources, the libraries it links, their `#include`s, the files they read by name, and the shaders. The job summary says which tests ran and why. Several cases run everything:
-- a change to the build itself (`CMakeLists.txt`, the workflow, the selector);
-- a first push to a branch, or a tag;
-- a manual run, which is how releases are made;
-- the nightly run.
-
-Documentation-only pushes run no tests. Pushing a `v*` tag attaches a zip to a GitHub Release.
-
-There are no third-party dependencies to install. The game only uses Win32, OpenGL, WinMM, XInput (loaded at runtime) and Media Foundation.
+The Steam demo is its own target: `cmake --build build --config Release --target SomniumVolandiDemo`.
 
 ### Tests
 
 ```
-ctest --test-dir build -C Release      # flight model + campaign progression
+ctest --test-dir build -C Release
 ```
 
-`tests/envelope_test.cpp` checks the terrain bounds the terrain mesh culls with never dip below the ground at any detail level, and `tests/hull_test.cpp` that the aircraft hull meshes are closed and consistently wound (a ray can't slip through). `tests/aero_wake_test.cpp` checks each type's wake against the theory: the wing's vortex pair is as strong and as far apart as its lift says, flaps shed vortices at their edges, an aileron moves the load across, the fin trails one in a sideslip, the air goes down between the tips and up outside them, and a propeller's slipstream blows aft. `tests/gameplay_test.cpp` (Linux dev build) flies Lesson 1 and a full approach and landing through the real game loop. `tests/render_harness.cpp` renders test frames headlessly with Mesa so you can check the shaders. On Mesa's software renderer (llvmpipe) nearly all of a test render's time is compiling the scene shaders, so run it with `GALLIVM_PERF=nopt` (fast code generation: minutes instead of tens of minutes, near-identical images) and a roomy shader cache (`MESA_SHADER_CACHE_DIR=<dir> MESA_SHADER_CACHE_MAX_SIZE=8G`; once warm, a frame takes seconds). Pass several scenes as `multi:a,b,c` to share one compile, and add `~hulloff` to a scene name to render it without the aircraft hulls in the same run, for side-by-side comparisons.
+About 160 tests cover the flight model and every aircraft's controls, the campaign's progression, the career, saves
+(frozen formats included), the autopilot's approaches, the world and its generated regions, the renderer's shaders
+and meshes, the audio and the UI. `tests/gameplay_test.cpp` flies lessons and approaches through the real game loop
+on Linux, and `tests/render_harness.cpp` and `tests/ui_review_harness.cpp` render real frames headlessly with Mesa.
+
+CI (`.github/workflows/build.yml`) builds with MSVC, runs the tests, uploads the game as an artifact on every push,
+and runs the headless tests again under AddressSanitizer and UBSan. A push runs only the tests its change can affect,
+worked out from CMake's description of the build (`tools/ci/select_tests.py`); a change to the build, a manual run,
+a tag and the nightly run test everything. Releases are made by a manual run with a release tag.
 
 ## Project layout
 
 ```
-src/world.*        hand-designed archipelago, terrain function shared by CPU and GPU, airports
-src/weather.*      the wind field (gusts, eddies, terrain lift and sink, thermals, storm drafts) and the clouds and rain on the CPU
-src/aircraft.*     aircraft specs + 6-DOF flight model, gear contacts, autopilot
-src/aircraft_perf.cpp   each type's envelope, learned by flying it (the autopilot flies to it)
-src/aircraft_stunt.cpp  aerobatic figures on the autopilot
-src/aero.*         aerodynamics from the airframe's geometry (drag build-up, lift slope, span efficiency)
-src/career.*       licences, story campaign, freelance generator, economy, save/load
-src/shaders/*.glsl GLSL modules, embedded at build time: scene uniforms, aircraft distance fields and materials, terrain,
-                   water, clouds, lighting, sprites, TAA, post, UI; src/shaders.h assembles the programs.
-                   The renderer's: gbuffer / gb_write (the G-buffer layout), terrain_vs / terrain_fs (the CDLOD terrain
-                   mesh), water_vs / water_fs, objects_fs (aircraft, traffic, debris, UFO into the G-buffer), shadow_proxy_fs
-                   (the airframes' shadows for the lighting pass), light_fs, effects_fs (plumes, props, weapons, cloak, hologram)
-src/raster_renderer.cpp, src/terrain_mesh.cpp   the renderer's passes and the terrain mesh (docs/RENDERER_REBUILD.md)
-src/entities.*     environment entities: tree/rock/building placement in streamed chunks, collisions
-src/entity_mesh.*  procedural tree, rock and building meshes (3 LODs each)
-src/entity_render.cpp, src/entity_shaders.h   instanced G-buffer + shadow-cascade passes, culling, LOD
-src/aircraft_mesh.cpp   the aircraft meshes baked from their shapes, the cockpit's moving parts, the mesh cache
-src/aircraft_hull.cpp, src/hull_mesh.h   the moving parts' hulls: where the per-pixel pass for the moving surfaces starts
-src/renderer.*     GL pipeline, the material texture array (scans + procedural, src/materials.cpp), sea wave bands, bloom/tonemap, SDF text UI
-src/audio.*        procedural audio engine (engines, environment, effects, UI)
-src/game*.cpp      game flow, flight session, cameras, particles, lights, HUD and menus
-src/platform_win32.cpp, src/radio_win.cpp   Win32 window/input/audio output, Media Foundation radio
-src/steam.*        Steam's achievements, rich presence, overlay pause and Deck keyboard (runtime-loaded; steam/ has the Steamworks assets)
-tools/gen_font.py  regenerates the embedded SDF font atlas
+src/
+  aircraft.*, aero*.cpp             aircraft specs, the 6-DOF flight model, aerodynamics from the airframe
+  aircraft_perf.cpp                 each type's envelope, learned by flying it
+  aircraft_stunt.cpp                aerobatic figures on the autopilot
+  career.*, profile.*               licences, story, board, economy, travel, saves; the pilot's profile
+  world.*, scenery.*                the islands' terrain, airports and scenery masks
+  settlements.*, road_*, bridges.*  towns, the road network, its bridges, furniture and traffic
+  procedural_regions.*              the generated regions: descriptors, recipes, sights
+  geo.*, region_travel.*            geodesy on the sphere; charts and handoffs between regions
+  distant_regions.*                 far region silhouettes for the horizon
+  regional_surface.*                their collision counterparts
+  weather.*, sky.*                  the wind field, clouds and rain; the sun, moon and stars
+  traffic.*, atc.*                  AI air traffic; the tower controllers
+  renderer.*, raster_renderer.cpp   the deferred renderer and its passes
+  terrain_mesh.cpp                  the continuous level-of-detail terrain mesh
+  entities.*, entity_*              trees, rocks and buildings: placement, meshes, instancing
+  aircraft_mesh*                    aircraft meshes baked from their shapes, cockpit parts, mesh cache
+  shaders/*.glsl, shaders.h         GLSL modules embedded at build time; the programs built from them
+  audio.*, music.*                  the procedural audio engine and the generative score
+  game*.cpp, game.h                 game flow, flight sessions, cameras, effects, HUD and menus
+  hive_*, military_missions.h       the military board and enemy combat
+  platform_win32.cpp, *_win.cpp     the Windows window, input, joysticks, radio and crash reports
+  steam.*                           Steamworks, loaded at runtime
+tests/                              CTest suites, the render and UI harnesses, fixtures
+tools/                              shader embedding, material packing, CI test selection, mesh, voice, Steam
+assets/                             materials, voices, cockpit layouts, loading pictures, icons
+steam/                              Steamworks configuration, store assets, upload scripts
+docs/                               design notes (below) and the README's pictures (docs/media)
 ```
+
+## Documentation
+
+| Document | What it covers |
+|---|---|
+| [RELEASE_NOTES.md](RELEASE_NOTES.md) | What changed in each version |
+| [docs/PROCEDURAL_EARTH.md](docs/PROCEDURAL_EARTH.md) | The generated regions: recipes, sizes, sights, the career's travel and long hauls |
+| [docs/LIVING_ISLANDS_PLAN.md](docs/LIVING_ISLANDS_PLAN.md) | The islands' towns, roads, bridges, landmarks and traffic |
+| [docs/PILOT.md](docs/PILOT.md) | The autopilot: how it learns an aircraft and flies it |
+| [docs/RENDERER_REBUILD.md](docs/RENDERER_REBUILD.md) | The deferred renderer and its passes |
+| [docs/AIRCRAFT_AUTHORING.md](docs/AIRCRAFT_AUTHORING.md) | Adding an aircraft, from its numbers to its cockpit and tests |
+| [docs/COCKPIT_INTERIORS.md](docs/COCKPIT_INTERIORS.md) | Cockpit layouts and crew-station fit |
+| [docs/JET_FUEL.md](docs/JET_FUEL.md) | Jet fuel burn and endurance calibration |
+| [docs/HIVE_COMBAT_DESIGN.md](docs/HIVE_COMBAT_DESIGN.md) | The military enemies' combat simulation |
+| [docs/AUDIO_PASS.md](docs/AUDIO_PASS.md) | The spatial audio mix and its tests |
+| [steam/README.md](steam/README.md) | Steamworks settings, achievements, the demo and the upload |
+| [docs/PLAYTEST_KIT.md](docs/PLAYTEST_KIT.md), [docs/HARDWARE_MATRIX.md](docs/HARDWARE_MATRIX.md) | Running a closed playtest and measuring PCs |
+| [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md) | Signing the release executable |
+| [docs/REAL_EARTH_PLAN.md](docs/REAL_EARTH_PLAN.md) | The on-hold plan for real-world terrain data |
 
 ## Copyright
 
-Copyright (c) 2026 CDAIII. All rights reserved. See `LICENSE`; third-party components are listed in `THIRD_PARTY_NOTICES.md`.
-
-Playing the game is covered by the end user licence agreement in `EULA.md`. How the game handles data (in short: it keeps everything on your computer and sends nothing to us) is in `PRIVACY.md`. Both ship in the release zip.
+Copyright (c) 2026 CDAIII. All rights reserved. See [LICENSE](LICENSE); third-party components are listed in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Playing the game is covered by the [EULA](EULA.md), and how it
+handles data (it keeps everything on your computer and sends nothing) is in the [privacy notice](PRIVACY.md).
