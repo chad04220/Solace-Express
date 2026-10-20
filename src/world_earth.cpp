@@ -256,8 +256,10 @@ void World::buildEarth(const procedural::Descriptor& chartDesc, const std::strin
     airports.push_back(a);
   }
 
-  // ---- the towns: GeoNames' places in the square, the biggest first, a smaller one close by taken in by it
-  struct Place { std::string name; float x, z, r; int kind; uint32_t pop; };
+  // ---- the towns: GeoNames' places in the square, the most telling first - the bigger and the nearer the chart's
+  // centre, where the flight starts (a place's people over 1 + (its distance / 15 km)^2: a city counts from anywhere in
+  // the square, a village by the field before a town at its edge) - a smaller one close by taken in by it
+  struct Place { std::string name; float x, z, r; int kind; uint32_t pop; float score; };
   std::vector<Place> places;
   for (const auto& p : pack->places(box)) {
     const vec3 at = chart.local({p.lat, p.lon, 0});
@@ -266,9 +268,11 @@ void World::buildEarth(const procedural::Descriptor& chartDesc, const std::strin
     Place pl; pl.name = p.name; pl.x = at.x; pl.z = at.z; pl.pop = p.population;
     pl.kind = p.population >= 100000 ? 2 : p.population >= 5000 ? 1 : 0;
     pl.r = std::clamp(12.f * powf((float)std::max<uint32_t>(p.population, 300), 0.45f), 150.f, 1800.f);
+    const float d = hypotf(at.x, at.z) / 15000.f;
+    pl.score = (float)p.population / (1.f + d * d);
     places.push_back(pl);
   }
-  std::sort(places.begin(), places.end(), [](const Place& a, const Place& b) { return a.pop != b.pop ? a.pop > b.pop : a.name < b.name; });
+  std::sort(places.begin(), places.end(), [](const Place& a, const Place& b) { return a.score != b.score ? a.score > b.score : a.name < b.name; });
   std::vector<Place> kept;
   for (const auto& p : places) {
     if (kept.size() >= kMaxTowns) break;

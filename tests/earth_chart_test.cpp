@@ -120,6 +120,9 @@ int main(int argc, char** argv) {
   if (dir == "tests/fixtures/earth2" || dir.find("fixtures/earth2") != std::string::npos) {
     check(seaN > landN, "the islands' chart is mostly sea");
     check(w.towns.size() >= 3, "towns on the islands");
+    size_t nearStart = 0;
+    if (at >= 0) for (const Town& t : w.towns) nearStart += hypotf(t.x - w.airports[at].x, t.z - w.airports[at].z) < 10000.f;
+    check(nearStart >= 3, fmt("the towns by the start, not only the biggest in the square (%zu within 10 km)", nearStart));
     check(!w.roads.paths.empty(), "roads on the islands");
   }
   printf("earth_chart_test: %d checks, %d failures\n", checks, failures);

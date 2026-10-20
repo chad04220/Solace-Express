@@ -290,14 +290,17 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
     ETOPO is loaded. Boston's chart finds 75 lakes (38 over 30 ha). The fixture's crop now reaches 41.68° N, so the
     test chart holds the upper Cape's ponds.
   - GRIP edges are cut 1.5 km inside the square. Local roads (GRIP class 5) come from a separate `lroads` layer.
-  - Towns: the 24 largest places, merged where they overlap.
+  - Towns: 24 places, merged where they overlap, ranked by population over 1 + (distance from the chart's centre /
+    15 km)². Cities count from anywhere in the square, and the villages by the start come before small towns at the
+    edge.
   - The road grid's GPU data is an index list plus a segment table: 40 MB for Boston, down from 136 MB. The forest
     noise moved to the road grid's second channel, so a texel's first entry has 26 bits.
 
   Still open in E2:
-  - Boston's build time, against the 10 s budget (the mask bake ~12 s, the settlements' streets ~5 s, the road grid
-    ~5 s);
-  - towns chosen nearer the start, not only by population;
+  - Boston's build time against the 10 s budget: about 25 s, down from 34. The road grid and the community lots now
+    run in parallel. What remains is mostly the settlements' streets (~5 s) and the farm tracks (~3 s), each laid
+    against the ones before it. E4's real fix is to carry the overlapping three quarters of a chart's content into the
+    next chart, not to build each chart from nothing;
   - the overlap-agreement test in section 7. It waits for E4's geographic detail: the chart-local noise still
     differs between overlapping charts by up to a few metres.
 
