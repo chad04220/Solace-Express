@@ -1,8 +1,9 @@
 name: Earth pack
 
 # The global Earth pack (docs/REAL_EARTH_PLAN.md section 2, stage E5), built only when asked. The sources are fetched
-# once into the Actions cache. The world is built in parts of 10 degrees by the width asked, on a matrix, with the
-# global tables beside them. One job then indexes the parts into a pack that verifies, puts it in zips under 2 GB
+# once into the Actions cache, GRIP's roads filed by 10-degree block (tools/earth2 split-grip: a part reads its blocks'
+# files alone, and the cache stays well under its 10 GB). The world is built in parts of 10 degrees by the width asked,
+# on a matrix, with the global tables beside them. One job then indexes the parts into a pack that verifies, puts it in zips under 2 GB
 # (tools/earth2 package), keeps them as the run's artifacts and, when a release is named, attaches them to it.
 on:
   workflow_dispatch:
@@ -41,7 +42,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: key   # (a refresh makes an entry of its own; the old one ages out of the cache)
-        run: echo "key=earth-sources-v1${{ inputs.refresh_sources && format('-{0}', github.run_id) || '' }}" >> "$GITHUB_OUTPUT"
+        run: echo "key=earth-sources-v2${{ inputs.refresh_sources && format('-{0}', github.run_id) || '' }}" >> "$GITHUB_OUTPUT"
       - id: plan
         run: |
           python3 - <<'EOF' >> "$GITHUB_OUTPUT"
@@ -57,6 +58,9 @@ jobs:
           path: sources
           key: ${{ steps.key.outputs.key }}
           lookup-only: true
+      - name: Room for the sources   # (the runner's preinstalled SDKs the build never uses)
+        if: steps.have.outputs.cache-hit != 'true'
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h /
       - name: Fetch the sources
         if: steps.have.outputs.cache-hit != 'true'
         run: |
@@ -70,7 +74,12 @@ jobs:
           get cities500.zip https://download.geonames.org/export/dump/cities500.zip
           python3 -c "from tools.earth2 import glo90; glo90.write_listing('sources/glo90_listing.txt', glo90.list_bucket())"
           wc -l sources/glo90_listing.txt
-          du -sh sources
+      - name: File GRIP's roads by block
+        if: steps.have.outputs.cache-hit != 'true'
+        run: |
+          python3 -m tools.earth2 split-grip --out sources/grip-blocks sources/GRIP4_Region*_vector_shp.zip
+          rm sources/GRIP4_Region*_vector_shp.zip
+          du -sh sources sources/*
       - if: steps.have.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
@@ -105,7 +114,7 @@ jobs:
     timeout-minutes: 300
     strategy:
       fail-fast: false
-      max-parallel: 20
+      max-parallel: 16   # (the rest of the account's runners left to the pushes' builds)
       matrix:
         part: ${{ fromJSON(needs.sources.outputs.parts) }}
     steps:
@@ -123,9 +132,8 @@ jobs:
           fail-on-cache-miss: true
       - name: Build ${{ matrix.part.name }}
         run: |
-          grip=(); for z in sources/GRIP4_Region*_vector_shp.zip; do grip+=(--grip "$z"); done
           python3 -m tools.earth2 build --out part --box ${{ matrix.part.box }} --part ${{ matrix.part.name }} --only rasters,roads \
-            --etopo "sources/$ETOPO" --cover "sources/$CGLS" "${grip[@]}" --local-roads
+            --etopo "sources/$ETOPO" --cover "sources/$CGLS" --grip-blocks sources/grip-blocks --local-roads
       - uses: actions/upload-artifact@v4
         with:
           name: earth-part-${{ matrix.part.name }}

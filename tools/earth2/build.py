@@ -4,6 +4,7 @@
       --etopo ETOPO_30s(.bin with .hdr, or GeoTIFF) --cover CGLS_LC100(.tif or URL) \\
       --airports airports.csv --runways runways.csv --places cities500.zip --grip GRIP4_RegionN_vector_shp.zip ... \\
       [--glo90-listing listing.txt] [--glo90-dir DIR] [--local-roads] [--only rasters,tables,roads,glo90] [--part NAME]
+  python3 -m tools.earth2 split-grip --out DIR GRIP4_RegionN_vector_shp.zip ...
   python3 -m tools.earth2 index PACK
   python3 -m tools.earth2 package PACK DIST [--max-bytes N]
   python3 -m tools.earth2 verify PACK
@@ -165,7 +166,27 @@ def _tables(args, box, out, files, sources, log):
 BLOCK_MARGIN = 0.5   # (degrees: the lines a block's roads are noded from, past its edges)
 
 
+def split_grip(zips, out_dir, log):
+    """GRIP's regions filed by 10-degree block (roads.split_grip), with their source records (sources.json) for the
+    parts that read them (build --grip-blocks)"""
+    if os.path.isdir(out_dir):
+        shutil.rmtree(out_dir)
+    written = roads.split_grip(zips, out_dir, BLOCK_MARGIN, log=log)
+    with open(os.path.join(out_dir, "sources.json"), "w") as f:
+        json.dump([source_record("GRIP4 " + os.path.basename(z), z, "CC-BY-4.0 (working assumption)") for z in zips], f, indent=1)
+    return written
+
+
 def _roads(args, box, out, files, sources, log, t0):
+    if getattr(args, "grip_blocks", None):   # (the parts' way: each block from its own file, split_grip)
+        if not getattr(args, "part", None):
+            raise SystemExit("--grip-blocks: for a part (--part), its box on the 10-degree blocks")
+        sources.extend(json.load(open(os.path.join(args.grip_blocks, "sources.json"))))
+        for south in range(box[0], box[2], 10):
+            for west in range(box[1], box[3], 10):
+                _roads_of(args, (south, west, south + 10, west + 10), box, out, files, log, t0, BLOCK_MARGIN,
+                          blocks=roads.read_block_lines(args.grip_blocks, south, west))
+        return
     if not args.grip:
         return
     for z in args.grip:
@@ -181,10 +202,14 @@ def _roads(args, box, out, files, sources, log, t0):
             _roads_of(args, (south, west, south + 10, west + 10), box, out, files, log, t0, BLOCK_MARGIN)
 
 
-def _roads_of(args, area, box, out, files, log, t0, margin):
+def _roads_of(args, area, box, out, files, log, t0, margin, blocks=None):
     main, local = [], []
     lbox = getattr(args, "local_roads_box", None)
-    for z in args.grip:
+    if blocks is not None:   # (a block's own lines, already quantised: split_grip)
+        for q in blocks:
+            if q[0] != 5 or args.local_roads:
+                (local if q[0] == 5 else main).append(q)
+    for z in (args.grip or []) if blocks is None else []:
         for line in roads.read_grip(z, area, margin):
             if line[0] == 5:
                 if not args.local_roads:
@@ -362,6 +387,7 @@ def main(argv=None):
     b.add_argument("--runways")
     b.add_argument("--places")
     b.add_argument("--grip", action="append")
+    b.add_argument("--grip-blocks", help="GRIP filed by block (split-grip): a part's roads from its blocks' files")
     b.add_argument("--local-roads", action="store_true")
     b.add_argument("--glo90-listing")
     b.add_argument("--glo90-dir")
@@ -370,6 +396,9 @@ def main(argv=None):
     b.add_argument("--part", help="record what this part wrote (parts/PART.json) for `index`, not the index")
     i = sub.add_parser("index")
     i.add_argument("pack")
+    sg = sub.add_parser("split-grip")
+    sg.add_argument("--out", required=True)
+    sg.add_argument("zips", nargs="+")
     k = sub.add_parser("package")
     k.add_argument("pack")
     k.add_argument("dist")
@@ -386,6 +415,10 @@ def main(argv=None):
             print("FAIL", p)
         if problems:
             return 1
+    if args.cmd == "split-grip":
+        written = split_grip(args.zips, args.out, lambda *a: print(*a, flush=True))
+        print("%d block files, %.1f MB" % (len(written), sum(os.path.getsize(p) for p in written) / 1e6))
+        return 0
     if args.cmd == "package":
         for name in package(args.pack, args.dist, args.max_bytes):
             print(name, os.path.getsize(os.path.join(args.dist, name)))

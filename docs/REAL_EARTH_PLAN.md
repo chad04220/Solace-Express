@@ -376,6 +376,11 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
       has the same id in both, and the game reads it once: 132 of the 133 edges crossing 70° W in New England. The
       one left is a long chain cut into 5 km pieces from different starts, so a few km of it are doubled.
     - A GRIP region whose bounds miss the block isn't read.
+    - In CI, GRIP is filed by block once, in the sources job (`split-grip`): each line goes in every block within
+      0.5° of it, quantised as the edges are, its points as steps, in zlib chunks. A part reads its blocks' files
+      alone, and the same bytes come out as from the zips. North America's 909 MB of zips become 390 MB of block
+      files, so the sources stay well under the Actions cache's 10 GB. The New England part builds in 92 s, down
+      from 146.
     - `index` writes the pack's index from the parts and `verify` checks it. `package` puts the pack in zips under
       2 GB, stored, each unpacking into `earth/`.
     - The zips are kept as the run's artifacts and attached to a release only when one is named.

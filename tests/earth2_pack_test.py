@@ -162,6 +162,69 @@ def test_parts_index():
         shutil.rmtree(tmp)
 
 
+def _grip_zip(path, records):
+    """A GRIP-shaped zip (a polyline shapefile and its table, GP_RTP and GP_RSE) of records [(class, surface, [[(lat,
+    lon)]])]"""
+    import struct
+    import zipfile
+    shp, dbf = bytearray(), bytearray()
+    for k, (cls, surf, parts) in enumerate(records):
+        pts = [p for part in parts for p in part]
+        xs, ys = [p[1] for p in pts], [p[0] for p in pts]
+        body = struct.pack("<i4d2i", 3, min(xs), min(ys), max(xs), max(ys), len(parts), len(pts))
+        at = 0
+        for part in parts:
+            body += struct.pack("<i", at)
+            at += len(part)
+        for lat, lon in pts:
+            body += struct.pack("<2d", lon, lat)
+        shp += struct.pack(">2i", k + 1, len(body) // 2) + body
+        dbf += b" " + ("%2d" % cls).encode() + ("%2d" % surf).encode()
+    xs = [p[1] for r in records for part in r[2] for p in part]
+    ys = [p[0] for r in records for part in r[2] for p in part]
+    head = struct.pack(">7i", 9994, 0, 0, 0, 0, 0, (100 + len(shp)) // 2) + struct.pack("<2i4d4d", 1000, 3, min(xs), min(ys), max(xs), max(ys), 0, 0, 0, 0)
+    fields = b"".join(name.ljust(11, b"\0") + b"N" + b"\0" * 4 + bytes([2, 0]) + b"\0" * 14 for name in (b"GP_RTP", b"GP_RSE"))
+    dhead = struct.pack("<4xIHH20x", len(records), 32 + len(fields) + 1, 5) + fields + b"\x0d"
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr("GRIP4_test.shp", bytes(head + shp))
+        z.writestr("GRIP4_test.dbf", bytes(dhead + dbf))
+
+
+def test_grip_blocks():
+    """split_grip files each line in the blocks a part reads it for: a block's file holds what read_grip(block, 0.5)
+    yields, quantised the same"""
+    rng = random.Random(3)
+    records = []
+    for k in range(300):
+        lat, lon = rng.uniform(38, 52), rng.uniform(-82, -48)
+        parts = []
+        for _ in range(rng.randrange(1, 3)):
+            line = [(lat, lon)]
+            for _ in range(rng.randrange(1, 12)):
+                lat += rng.uniform(-0.3, 0.3)
+                lon += rng.uniform(-0.3, 0.3)
+                line.append((lat, lon))
+            line.append(line[-1])   # (a repeated point: dropped as the edges drop it)
+            parts.append(line)
+        records.append((rng.randrange(6), rng.randrange(3), parts))
+    tmp = tempfile.mkdtemp()
+    try:
+        zp = os.path.join(tmp, "GRIP4_Region9_vector_shp.zip")
+        _grip_zip(zp, records)
+        out = os.path.join(tmp, "blocks")
+        roads.split_grip([zp], out, 0.5, flush_bytes=4096)   # (small chunks: several to a file)
+        same = True
+        for south in (30, 40, 50):
+            for west in (-90, -80, -70, -60, -50):
+                want = list(roads.quantise_lines(roads.read_grip(zp, (south, west, south + 10, west + 10), 0.5)))
+                got = list(roads.read_block_lines(out, south, west))
+                same = same and sorted(want) == sorted(got)
+        check(same, "a block's file holds what read_grip reads for it")
+        check(len(os.listdir(out)) >= 6, "lines across the blocks' edges filed in each")
+    finally:
+        shutil.rmtree(tmp)
+
+
 def test_expectations():
     try:
         import numpy  # noqa: F401
@@ -186,6 +249,7 @@ if __name__ == "__main__":
     test_roads_roundtrip()
     test_tables_roundtrip()
     test_parts_index()
+    test_grip_blocks()
     test_expectations()
     print("earth2_pack_test: %s" % ("ok" if not failures else "%d failures" % failures))
     sys.exit(1 if failures else 0)

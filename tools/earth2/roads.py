@@ -11,9 +11,12 @@ An edge's ends are its junctions: two edges meet where an end of one is exactly 
 1e-7 degree position), and an edge never passes through a junction.
 """
 import io
+import itertools
 import math
+import os
 import struct
 import zipfile
+import zlib
 
 from . import svb
 
@@ -37,9 +40,9 @@ def _dbf_fields(f):
     return count, record_len, {n: (a, l) for n, a, l in fields}
 
 
-def read_grip(zip_path, box, margin=0.05):
-    """GRIP polylines with any part inside box (south, west, north, east), widened by margin degrees. Yields
-    (class, surface, [(lat, lon), ...]) per part."""
+def _records(zip_path, box=None):
+    """GRIP's polyline records: (record bounds (xmin, ymin, xmax, ymax), class, surface, [parts as [(lat, lon)]]), only
+    those whose bounds reach box (south, west, north, east) when one is given - none when the file's own don't."""
     z = zipfile.ZipFile(zip_path)
     shp_name = [n for n in z.namelist() if n.lower().endswith(".shp")][0]
     dbf_name = shp_name[:-4] + ".dbf"
@@ -47,11 +50,12 @@ def read_grip(zip_path, box, margin=0.05):
     dbf = io.BufferedReader(z.open(dbf_name), 1 << 20)
     count, record_len, fields = _dbf_fields(dbf)
     rtp, rse = fields["GP_RTP"], fields["GP_RSE"]
-    s, w, n, e = box[0] - margin, box[1] - margin, box[2] + margin, box[3] + margin
     head = shp.read(100)
-    xmin, ymin, xmax, ymax = struct.unpack_from("<4d", head, 36)
-    if xmax < w or xmin > e or ymax < s or ymin > n:   # (a region elsewhere: not read through)
-        return
+    if box:
+        s, w, n, e = box
+        xmin, ymin, xmax, ymax = struct.unpack_from("<4d", head, 36)
+        if xmax < w or xmin > e or ymax < s or ymin > n:   # (a region elsewhere: not read through)
+            return
     for _ in range(count):
         rec_head = shp.read(8)
         if len(rec_head) < 8:
@@ -61,18 +65,99 @@ def read_grip(zip_path, box, margin=0.05):
         attrs = dbf.read(record_len)
         if struct.unpack_from("<i", content, 0)[0] != 3:
             continue
-        xmin, ymin, xmax, ymax = struct.unpack_from("<4d", content, 4)
-        if xmax < w or xmin > e or ymax < s or ymin > n:
+        bounds = struct.unpack_from("<4d", content, 4)
+        if box and (bounds[2] < w or bounds[0] > e or bounds[3] < s or bounds[1] > n):
             continue
         nparts, npoints = struct.unpack_from("<ii", content, 36)
         parts = list(struct.unpack_from("<%di" % nparts, content, 44)) + [npoints]
         pts = struct.unpack_from("<%dd" % (2 * npoints), content, 44 + 4 * nparts)
         cls = int(attrs[rtp[0]:rtp[0] + rtp[1]].strip() or 0)
         surface = int(attrs[rse[0]:rse[0] + rse[1]].strip() or 0)
+        lines = []
         for p in range(nparts):
             line = [(pts[2 * k + 1], pts[2 * k]) for k in range(parts[p], parts[p + 1])]
             if len(line) >= 2:
-                yield cls if cls in CLASSES else 0, surface if surface in (1, 2) else 0, line
+                lines.append(line)
+        yield bounds, cls if cls in CLASSES else 0, surface if surface in (1, 2) else 0, lines
+
+
+def read_grip(zip_path, box, margin=0.05):
+    """GRIP polylines with any part inside box (south, west, north, east), widened by margin degrees. Yields
+    (class, surface, [(lat, lon), ...]) per part."""
+    for _, cls, surface, lines in _records(zip_path, (box[0] - margin, box[1] - margin, box[2] + margin, box[3] + margin)):
+        for line in lines:
+            yield cls, surface, line
+
+
+BLOCK_DEGREES = 10
+
+
+def split_grip(zip_paths, out_dir, margin=0.5, flush_bytes=1 << 27, log=None):
+    """GRIP's lines filed by 10-degree block, for a pack built in parts (build --grip-blocks): each line in every block
+    whose box, widened by margin, its record's bounds reach - what read_grip(block, margin) yields, so a block reads
+    its own file alone. Quantised as the edges are (1e-7 degree), each line its first point and then its steps, in
+    zlib chunks; returns the files written."""
+    os.makedirs(out_dir, exist_ok=True)
+    written = set()
+    for z in zip_paths:
+        buffers, size = {}, 0
+
+        def flush():
+            for (south, west), chunks in buffers.items():
+                path = os.path.join(out_dir, svb.corner_name(south, west) + ".lines")
+                raw = zlib.compress(b"".join(chunks), 6)
+                with open(path, "ab") as f:
+                    f.write(struct.pack("<I", len(raw)) + raw)
+                written.add(path)
+            buffers.clear()
+        for k, ((xmin, ymin, xmax, ymax), cls, surface, lines) in enumerate(_records(z)):
+            records = []
+            for line in lines:
+                q = [_q(*p) for p in line]
+                flat = [q[0][0], q[0][1]]   # (the first point, then each one's step from the last: small, so zlib packs them)
+                for a, b in zip(q, q[1:]):
+                    flat += [b[0] - a[0], b[1] - a[1]]
+                records.append(struct.pack("<BBI", cls, surface, len(q)) + struct.pack("<%di" % len(flat), *flat))
+            s0 = max(-90, int(math.floor((ymin - margin) / BLOCK_DEGREES)) * BLOCK_DEGREES)
+            w0 = max(-180, int(math.floor((xmin - margin) / BLOCK_DEGREES)) * BLOCK_DEGREES)
+            for south in range(s0, min(80, int(math.floor((ymax + margin) / BLOCK_DEGREES)) * BLOCK_DEGREES) + 1, BLOCK_DEGREES):
+                for west in range(w0, min(170, int(math.floor((xmax + margin) / BLOCK_DEGREES)) * BLOCK_DEGREES) + 1, BLOCK_DEGREES):
+                    s, w, n, e = south - margin, west - margin, south + BLOCK_DEGREES + margin, west + BLOCK_DEGREES + margin
+                    if xmax < w or xmin > e or ymax < s or ymin > n:
+                        continue
+                    buffers.setdefault((south, west), []).extend(records)
+                    size += sum(len(r) for r in records)
+            if size > flush_bytes:
+                flush()
+                size = 0
+            if log and k % 500000 == 0:
+                log("%s: %d records" % (os.path.basename(z), k))
+        flush()
+    return sorted(written)
+
+
+def read_block_lines(lines_dir, south, west):
+    """A block's lines (split_grip), quantise_lines' form: (class, surface, [packed points]), repeated points dropped"""
+    path = os.path.join(lines_dir, svb.corner_name(south, west) + ".lines")
+    if not os.path.exists(path):
+        return
+    with open(path, "rb") as f:
+        data = f.read()
+    at = 0
+    while at < len(data):
+        (size,) = struct.unpack_from("<I", data, at)
+        raw = zlib.decompress(data[at + 4:at + 4 + size])
+        at += 4 + size
+        k = 0
+        while k < len(raw):
+            cls, surface, n = struct.unpack_from("<BBI", raw, k)
+            k += 6
+            vals = struct.unpack_from("<%di" % (2 * n), raw, k)
+            k += 8 * n
+            q = [_pack(p) for p in zip(itertools.accumulate(vals[0::2]), itertools.accumulate(vals[1::2]))]
+            dedup = [q[0]] + [b for a, b in zip(q, q[1:]) if b != a]
+            if len(dedup) >= 2:
+                yield cls, surface, dedup
 
 
 def _q(lat, lon):
