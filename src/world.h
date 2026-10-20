@@ -104,6 +104,15 @@ public:
   // islands and the generated regions; little on the real Earth, whose data has the relief already - the channel
   // keeps its meaning there (how rough and natural the ground is: the scenery grows on it), only less of it is added
   float detailScale = 1.f;
+  // Where the detail noise is read (common.glsl noiseP, uNoiseFrame): a real-Earth chart's x and z turned and moved into
+  // the frame of an anchor, the centre of the 8-degree cell holding the chart's origin (World::buildEarth) - so
+  // neighbouring charts read one field, agreeing to a fraction of a metre where the flight moves from one to the next.
+  // Elsewhere the chart's own x and z
+  float noiseCos = 1.f, noiseSin = 0.f, noiseX = 0.f, noiseZ = 0.f;
+  vec2 noisePoint(float x, float z) const {
+    if (detailScale >= 1.f) return vec2(x / DETAIL_SCALE, z / DETAIL_SCALE);
+    return vec2((noiseCos * x - noiseSin * z + noiseX) / DETAIL_SCALE, (noiseSin * x + noiseCos * z + noiseZ) / DETAIL_SCALE);
+  }
   float wrap(float v) const { return repeating ? wrapCoord(v) : v; }
   float nearPoint(float v, float ref) const { return repeating ? nearCopy(v, ref) : v; }
   std::string regionId = "solace";

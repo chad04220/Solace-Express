@@ -166,6 +166,22 @@ void World::buildEarth(const procedural::Descriptor& chartDesc, const std::strin
   auto data = std::make_shared<earthCharts::ChartData>();
   data->descriptor = chartDesc; data->pack = pack;
   const regionTravel::Chart chart(chartDesc.origin);
+  // the detail noise's frame (World::noisePoint): this chart's x and z into the anchor's - its azimuthal x and z, in
+  // double, from the centre of the 8-degree cell holding the origin - the turn the mean of the two axes'
+  {
+    const double cell = 8.0;
+    const geo::Position anchor{(std::floor(chartDesc.origin.latitude / cell) + 0.5) * cell,
+                               (std::floor(chartDesc.origin.longitude / cell) + 0.5) * cell, 0.0};
+    auto anchored = [&](vec3 local, double& x, double& z) {
+      const geo::Position g = chart.position(local);
+      const double d = geo::surfaceDistance(anchor, g), b = geo::initialBearing(anchor, g).value_or(0.0) * geo::kDegrees;
+      x = d * std::sin(b); z = -d * std::cos(b);
+    };
+    double ox, oz, ex, ez, sx, sz;
+    anchored(vec3(0, 0, 0), ox, oz); anchored(vec3(2000, 0, 0), ex, ez); anchored(vec3(0, 0, 2000), sx, sz);
+    const double turn = 0.5 * (std::atan2(ez - oz, ex - ox) + std::atan2(sz - oz, sx - ox) - 0.5 * geo::kPi);
+    noiseCos = (float)std::cos(turn); noiseSin = (float)std::sin(turn); noiseX = (float)ox; noiseZ = (float)oz;
+  }
   const earth::Box box = chartBox(chart, WORLD_HALF);
   earth::Sampler sampler(pack, box, true);
   data->fineTiles = sampler.fineTiles();

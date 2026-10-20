@@ -20,6 +20,7 @@ uniform sampler2D uHM;
 // World topology must not invalidate the aircraft-only bake program/cache.
 uniform int uUnwrappedWorld; // one nonrepeating chart during Earth free flight
 uniform int uProceduralWorld; // authored-place-only features stay on Solace
+uniform vec4 uNoiseFrame = vec4(1.0, 0.0, 0.0, 0.0);   // where the detail noise is read (World::noisePoint): turn's cos, sin; x, z
 uniform float uDetailScale = 1.0;   // the procedural detail's share of its amplitude (World::detailScale: the real Earth's is small)
 #endif
 uniform vec4 uCrater[24]; uniform int uCraterN;  // impact craters: x, z, radius, depth (negative depth: dark-energy blast)
@@ -105,14 +106,16 @@ vec4 maskTexel(vec2 p){ return texelFetch(uMask, clamp(ivec2(floor((wrapW(p) + W
 float roadGrade(vec2 p, float g);   // the ground with the roads built into it (roads.glsl)
 float lakeGround(vec2 p, float g);  // and the Fjordhaven reservoir's lake (roads.glsl)
 #ifndef PART_BAKE
-float groundH(vec2 p, int oct){ p = wrapW(p); vec4 b = baseAt(p); return lakeGround(p, roadGrade(p, b.y < 0.01 ? b.x : b.x + b.y*uDetailScale*terrainFbm(p/2200.0, oct))); }
+// where the detail noise is read (World::noisePoint): a real-Earth chart's x and z in its anchor's frame, else its own
+vec2 noiseP(vec2 p){ return uDetailScale < 1.0 ? (vec2(uNoiseFrame.x*p.x - uNoiseFrame.y*p.y, uNoiseFrame.y*p.x + uNoiseFrame.x*p.y) + uNoiseFrame.zw)/2200.0 : p/2200.0; }
+float groundH(vec2 p, int oct){ p = wrapW(p); vec4 b = baseAt(p); return lakeGround(p, roadGrade(p, b.y < 0.01 ? b.x : b.x + b.y*uDetailScale*terrainFbm(noiseP(p), oct))); }
 // Terrain height: the bare heightfield (trees, rocks and buildings are separate entities) with the roads and the lake
 // built into it, plus impact craters
 float terrainH(vec2 p, int oct){
   COST(0);
   p = wrapW(p);
   vec4 b = baseAt(p);
-  float g = lakeGround(p, roadGrade(p, b.y < 0.01 ? b.x : b.x + b.y*uDetailScale*terrainFbm(p/2200.0, oct)));
+  float g = lakeGround(p, roadGrade(p, b.y < 0.01 ? b.x : b.x + b.y*uDetailScale*terrainFbm(noiseP(p), oct)));
   if (uCraterN > 0 && g > 0.3) g += craterH(p);
   return g;
 }

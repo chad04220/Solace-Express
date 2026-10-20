@@ -2,6 +2,7 @@
 #include "road_traffic.h"
 #include "volcano_effects.h"
 #include "game.h"
+#include "earth_charts.h"
 #include "sky.h"
 #include "load_pacer.h"
 #include <chrono>
@@ -1010,6 +1011,7 @@ void Game::updateEarthFlight() {
     } else if (auto heading = chart.bearing(plane.pos, goal)) plane.apHeading = (float)*heading;
   }
   updateHorizon();
+  if (earthCharts::isEarthId(flightRegion.id)) { slideEarthChart(chart); return; }
   auto owner = procedural::describe(earthPosition, flightRegion.worldSeed);
   earthFacilitiesPending = owner.id != g_world.regionId; earthPromotionDeferred = false;
   procedural::Descriptor wanted = owner;
@@ -1129,6 +1131,118 @@ void Game::updateEarthFlight() {
   bursts.clear(); trail.clear(); cloudWake.clear(); tipTrail[0].clear(); tipTrail[1].clear();
   for (auto& smoke : pieceTrail) smoke.clear();
   continueEarthFlight();
+  g_scenery.resumeStreaming(); earthSceneryDraining = false;
+}
+
+// The real Earth (earth_charts.h, docs/REAL_EARTH_PLAN.md section 5): one chart after another under the flight, its
+// edge never in reach. Past 5 km from its chart's centre the next is prepared ahead along the track - a minute's flying
+// on, 20 to 60 km, on the lattice; one already preparing, or ready, kept while it is within 8 km of that - and the flight
+// moves into it once nearer its centre than this one's by 2 km: over land or sea, at any height, its height over the
+// ground kept when it is low (the two charts' grounds a few metres apart). Never on the ground
+void Game::slideEarthChart(const regionTravel::Chart& chart) {
+  earthFacilitiesPending = earthPromotionDeferred = false;
+  vec3 horizontal(plane.vel.x, 0, plane.vel.z);
+  const float speed = length(horizontal);
+  if (speed < 10.f) { horizontal = plane.forward(); horizontal.y = 0; }
+  if (length(horizontal) < 1e-3f) horizontal = vec3(0, 0, -1);
+  horizontal = normalize(horizontal);
+  const float out = hypotf(plane.pos.x, plane.pos.z);
+  std::string wanted = flightRegion.id;   // (ids alone each frame: a chart's name is looked up once, when it starts)
+  if (out > 5000.f && !plane.onGround && !crashed) {
+    const vec3 aim = plane.pos + horizontal * std::clamp(speed * 60.f, 20000.f, 60000.f);
+    auto near = [&](const geo::Position& origin) { const vec3 c = chart.local(origin); return hypotf(c.x - aim.x, c.z - aim.z) < 8000.f; };
+    if (earthPrefetch && near(earthPrefetch->region.origin)) wanted = earthPrefetch->region.id;
+    else if (earthPrefetchJob.valid() && near(earthPrefetchOrigin)) wanted = earthPrefetchId;
+    else { const geo::Position g = chart.position(aim); wanted = earthCharts::idAt(g.latitude, g.longitude); }
+  }
+  if (earthRetireJob.valid()) {
+    if (earthRetireJob.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+    try { earthRetireJob.get(); } catch (...) {}
+  }
+  if (earthPrefetchJob.valid()) {
+    if (wanted != earthPrefetchId && earthPrefetchCancel) earthPrefetchCancel->requested = true;
+    if (earthPrefetchJob.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+    try { earthPrefetch = earthPrefetchJob.get(); }
+    catch (const GenerationCancelled&) { earthPrefetchError.clear(); }
+    catch (const std::exception& e) { earthPrefetchError = e.what(); earthPrefetchFailedId = earthPrefetchId; }
+    catch (...) { earthPrefetchError = "Chart preparation failed"; earthPrefetchFailedId = earthPrefetchId; }
+    earthPrefetchCancel.reset();
+    if (!earthPrefetchError.empty()) toast("The terrain ahead couldn't be prepared: " + earthPrefetchError, vec3(1.f, .65f, .3f), false);
+  }
+  if (earthPrefetch && earthPrefetch->region.id != wanted) { retireEarthPrefetch(); return; }
+  if (!earthPrefetch) {
+    if (wanted == flightRegion.id || wanted == earthPrefetchFailedId) return;
+    const auto next = earthCharts::find(wanted);
+    if (!next) return;
+    earthPrefetchId = wanted; earthPrefetchOrigin = next->origin; earthPrefetchError.clear();
+    const bool prepareGpu = g_ren.ok;
+    earthPrefetchCancel = std::make_shared<GenerationCancelState>();
+    // (built on two threads, never written to the cache: a flight lays down a chart every few minutes)
+    earthPrefetchJob = std::async(std::launch::async, [wanted = *next, prepareGpu, cancel = earthPrefetchCancel] {
+      ScopedParallelLimit threadBudget(2);
+      ScopedGenerationCancellation cancellation(cancel);
+      generationCheckpoint();
+      auto candidate = std::make_unique<PrefetchedRegion>();
+      candidate->region = wanted; candidate->world = std::make_unique<World>();
+      candidate->world->buildProcedural(wanted, std::string(), std::string(), false);
+      generationCheckpoint();
+      candidate->world->repeating = false;
+      if (prepareGpu) candidate->upload = Renderer::prepareWorldUpload(*candidate->world);
+      generationCheckpoint();
+      return candidate;
+    });
+    return;
+  }
+  if (g_ren.ok) {
+    if (!earthPrefetch->gpuStarted) {
+      if (!g_ren.beginWorldUpload(*earthPrefetch->world, std::move(earthPrefetch->upload))) {
+        const auto failedId = earthPrefetch->region.id, error = g_ren.worldUploadError();
+        retireEarthPrefetch(); earthPrefetchFailedId = failedId; earthPrefetchError = error; return;
+      }
+      earthPrefetch->gpuStarted = true;
+    }
+    if (!g_ren.worldUploadReady() && !g_ren.pumpWorldUpload()) {
+      if (!g_ren.worldUploadError().empty()) {
+        const auto failedId = earthPrefetch->region.id, error = g_ren.worldUploadError();
+        retireEarthPrefetch(); earthPrefetchFailedId = failedId; earthPrefetchError = error;
+      }
+      return;
+    }
+  }
+  // the move: nearer the new chart's centre than this one's by 2 km, and in the air
+  const vec3 centre = chart.local(earthPrefetch->region.origin);
+  if (hypotf(plane.pos.x - centre.x, plane.pos.z - centre.z) > out - 2000.f) return;
+  if (plane.onGround || crashed || !plane.spec) { earthPromotionDeferred = true; return; }
+  if (quoteJob.valid()) {
+    if (quoteJob.wait_for(std::chrono::seconds(0)) != std::future_status::ready) { earthPromotionDeferred = true; return; }
+    try { quoteJob.get(); } catch (...) {}
+    quoteFlown.clear(); menuPlanCache = menuPlan::Cache{};
+  }
+  if (!earthSceneryDraining) { g_scenery.beginDrain(); earthSceneryDraining = true; }
+  if (!g_scenery.isDrained()) return;
+  const float above = plane.pos.y - g_world.height(plane.pos.x, plane.pos.z);
+  const std::string wasNamed = flightRegion.name;
+  sceneryResetWorldCaches();
+  g_roadTraffic = RoadTraffic{}; g_groundPits.clear();
+  loadingRegion = earthPrefetch->region; regionResumePaused = paused;
+  regionPoseChange = regionTravel::Change(chart, regionTravel::Chart(earthPrefetch->region.origin), plane.pos);
+  auto retired = std::make_unique<World>(std::move(g_world));
+  g_world = std::move(*earthPrefetch->world);
+  Renderer::WorldUploadData retiredGpu;
+  if (g_ren.ok) g_ren.commitWorldUpload(&retiredGpu);
+  earthPrefetch.reset(); earthPrefetchId.clear(); earthPrefetchFailedId.clear();
+  earthRetireJob = std::async(std::launch::async, [old = std::move(retired), gpu = std::move(retiredGpu)]() mutable { old.reset(); gpu = Renderer::WorldUploadData{}; });
+  atc.cancel(); commsPending.clear(); traffic.reset(); hiveCombat.reset(1, combatWrap());
+  gpsMapValid = loadMap = false;
+  wreck.clear(); debris.clear(); pops.clear(); particles.clear(); pits.clear();
+  bursts.clear(); trail.clear(); cloudWake.clear(); tipTrail[0].clear(); tipTrail[1].clear();
+  for (auto& smoke : pieceTrail) smoke.clear();
+  continueEarthFlight();
+  if (above < 30.f) {   // (low: its height over this chart's ground what it was over the last's)
+    const float lift = g_world.height(plane.pos.x, plane.pos.z) + above - plane.pos.y;
+    plane.pos.y += lift; plane.wxAir.y += lift; camPos.y += lift; dbgCamPos.y += lift; dbgCamLook.y += lift;
+  }
+  if (flightRegion.name == wasNamed) while (!toasts.empty() && toasts.back().text.rfind("Entering ", 0) == 0) toasts.pop_back();
   g_scenery.resumeStreaming(); earthSceneryDraining = false;
 }
 

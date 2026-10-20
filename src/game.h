@@ -239,6 +239,7 @@ private:
   std::unique_ptr<PrefetchedRegion> earthPrefetch;
   std::future<void> earthRetireJob;
   std::string earthPrefetchId, earthPrefetchFailedId, earthPrefetchError;
+  geo::Position earthPrefetchOrigin;   // (the real Earth: where the chart preparing is, Game::slideEarthChart)
   bool earthSceneryDraining = false, earthFacilitiesPending = false, earthPromotionDeferred = false;
   void retireEarthPrefetch(); // never joins a running job on the flight thread
   void updateEarthSurfaceContext();
@@ -246,6 +247,7 @@ private:
   void updateHorizon();
   bool earthPromotionSafe(const World& candidate, const regionTravel::Change& change) const;
   void updateEarthFlight();
+  void slideEarthChart(const regionTravel::Chart& chart);   // (the real Earth: the next chart under the flight)
   void continueEarthFlight();
   void setEarthDestination(const procedural::Descriptor& region);
   void openEarthPicker();

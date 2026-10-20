@@ -22,6 +22,7 @@ bool isEarthId(const std::string& id);
 float lushOf(int cover, double lat);
 // The chart whose origin is the lattice point nearest (lat, lon), named for the largest place near it
 procedural::Descriptor chartAt(double lat, double lon);
+std::string idAt(double lat, double lon);   // (its id alone: no name looked up)
 std::optional<procedural::Descriptor> find(const std::string& id);
 // The chart to start from at an airport (its runway's centre on the lattice point nearest it)
 std::optional<procedural::Descriptor> chartForAirport(const std::string& ident);

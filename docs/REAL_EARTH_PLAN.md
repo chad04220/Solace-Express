@@ -331,6 +331,27 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
   Renders from the dev pack show it: from 9 km over Boston, Cape Cod Bay and the Cape's hook lie beyond the chart's
   edge.
 
+- **E4:** the first part is in. These pieces work:
+  - **Sliding.** `Game::slideEarthChart`: past 5 km from its chart's centre, the next chart is prepared ahead along
+    the track. It goes a minute's flying ahead (20 to 60 km), on the lattice, built on two threads and never written
+    to the cache. A chart already preparing is kept while it lies within 8 km of that aim.
+  - **The move.** The flight moves into the next chart once it is nearer its centre than the old one's by 2 km: over
+    land or sea, at any height, never on the ground. Below 30 m it keeps its height over the ground. The move goes
+    through `regionTravel::Change` as the region handoffs do.
+  - **Shared noise.** The detail noise of all charts is one field (`World::noisePoint`, `uNoiseFrame`). Each chart's
+    x and z are turned and moved into the frame of an anchor: the centre of its 8° cell, in double. Neighbouring
+    charts' grounds now differ by their base's texels alone: mean 0.17 m, p95 0.58 m, down from 0.55 and 1.6
+    (`earth_chart_test`).
+  - **Tests.** `earth_slide_test` flies two slides over the fixture. `earth_gpu_test` holds the GPU's ground to the
+    C++'s on a real-Earth chart, with its noise frame, lakes and roads (0.4 mm).
+  - **A fix.** A real-Earth flight no longer looks for a generated region to hand over to.
+
+  Still open in E4:
+  - **Scenery.** The scenery is drained and streamed again at each move, so trees and houses pop in round the
+    aircraft. It isn't placed by geographic position yet, and no chunks are prepared near the move.
+  - **Base agreement.** The bases still differ by up to a metre or so where the ground is rough: bilinear texels on
+    two grids.
+
 Decisions taken with the defaults (the owner can change them):
 - The generated regions keep working until E6. In real-Earth play the real world replaces them; they stay available
   as a "Generated Earth" choice in Free Flight.

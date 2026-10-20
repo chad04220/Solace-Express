@@ -304,7 +304,7 @@ float airportInfluence(const World& world, float x, float z) { return airportInf
 void World::build(const std::string& cachePath, const std::string& stamp, bool save) {
   generationCheckpoint();
   procedural = false; repeating = false; regionId = "solace"; regionRecipe.reset();   // (one place on the Earth: world.h)
-  earthChart.reset(); detailScale = 1.f;
+  earthChart.reset(); detailScale = 1.f; noiseCos = 1.f; noiseSin = noiseX = noiseZ = 0.f;
   airports.assign(std::begin(kAirports), std::end(kAirports));
   towns.assign(kTowns, kTowns + kNumTowns);
   for (auto& a : airports) a.hospital = !strcmp(a.code, "CAP") || !strcmp(a.code, "NPT") || !strcmp(a.code, "PVI");
@@ -316,7 +316,7 @@ void World::buildProcedural(const procedural::Descriptor& region, const std::str
   generationCheckpoint();
   if (region.authored) { build(cachePath, stamp, save); return; }
   if (earthCharts::isEarthId(region.id)) { buildEarth(region, cachePath, stamp, save); return; }
-  earthChart.reset(); detailScale = 1.f;
+  earthChart.reset(); detailScale = 1.f; noiseCos = 1.f; noiseSin = noiseX = noiseZ = 0.f;
   regionRecipe = std::make_shared<const procedural::Recipe>(region);
   procedural = true; repeating = false; regionId = region.id;
   airports = regionRecipe->airports; towns = regionRecipe->towns;
@@ -667,7 +667,7 @@ void World::buildHMax() {
         float x0 = -WORLD_HALF + ci * cs, z0 = -WORLD_HALF + cj * cs;
         for (int sj = 0; sj <= S; sj++)
           for (int si = 0; si <= S; si++)
-            fmax = std::max(fmax, terrainFbm((x0 + cs * si / S) / DETAIL_SCALE, (z0 + cs * sj / S) / DETAIL_SCALE, 6));
+            { const vec2 q = noisePoint(x0 + cs * si / S, z0 + cs * sj / S); fmax = std::max(fmax, terrainFbm(q.x, q.y, 6)); }
         fmax += 0.12f;  // finer octaves (<= 1/32) + sampling error of octaves up to 6
       }
       float top = b0 + b1 * std::max(fmax, 0.f);
@@ -702,7 +702,7 @@ void World::buildHMax() {
 void World::buildEnvelope() {
   const int N = HM_N, NV = HM_N + 1;
   auto H = [&](int i, int j, int c) { return hm[((size_t)std::clamp(j, 0, N - 1) * N + std::clamp(i, 0, N - 1)) * 4 + c]; };
-  auto fbmAt = [&](float x, float z) { return terrainFbm(x / DETAIL_SCALE, z / DETAIL_SCALE, 6); };
+  auto fbmAt = [&](float x, float z) { const vec2 q = noisePoint(x, z); return terrainFbm(q.x, q.y, 6); };
   auto vx = [&](float i) { return -WORLD_HALF + (i + 0.5f) * HM_TEXEL; };
   // detail amplitude near each vertex: the fbm is only needed where some cell around it has detail
   std::vector<float> fV((size_t)NV * NV, 0.f);
@@ -866,7 +866,7 @@ int World::fillInlandPits() {
       if (L >= lift - 0.01f || need0[k] <= 0.f) continue;
       float fmin = 1e9f;   // (the detail's lowest over the texel's reach, an eighth of a texel apart, less a margin)
       for (int sj = -8; sj <= 8; sj++) for (int si = -8; si <= 8; si++)
-        fmin = std::min(fmin, terrainFbm((cx + si * HM_TEXEL / 8.f) / DETAIL_SCALE, (cz + sj * HM_TEXEL / 8.f) / DETAIL_SCALE, 11));
+        { const vec2 q = noisePoint(cx + si * HM_TEXEL / 8.f, cz + sj * HM_TEXEL / 8.f); fmin = std::min(fmin, terrainFbm(q.x, q.y, 11)); }
       fmin -= 0.05f;
       const float floor1 = 1.f;
       if (t[0] + t[1] * fmin >= floor1) continue;
@@ -899,7 +899,9 @@ void World::sampleBase(float x, float z, float out[4]) const {
 float World::naturalHeight(float x, float z, int octaves) const {
   x = wrap(x); z = wrap(z);
   float b[4]; sampleBase(x, z, b);
-  return b[1] < 0.01f ? b[0] : b[0] + b[1] * detailScale * terrainFbm(x / DETAIL_SCALE, z / DETAIL_SCALE, octaves);
+  if (b[1] < 0.01f) return b[0];
+  const vec2 q = noisePoint(x, z);
+  return b[0] + b[1] * detailScale * terrainFbm(q.x, q.y, octaves);
 }
 
 float World::height(float x, float z, int octaves) const {

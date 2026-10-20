@@ -779,6 +779,7 @@ void Renderer::bakeTerrainShadow(const FrameParams& fp) {
   GLuint p = progTShBake;
   glUseProgram(p);
   glUniform1i(U(p, "uUnwrappedWorld"), g_world.repeating ? 0 : 1); glUniform1f(U(p, "uDetailScale"), g_world.detailScale);
+  glUniform4f(U(p, "uNoiseFrame"), g_world.noiseCos, g_world.noiseSin, g_world.noiseX, g_world.noiseZ);
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texHM); glUniform1i(U(p, "uHM"), 0);
   glActiveTexture(GL_TEXTURE0 + 4); glBindTexture(GL_TEXTURE_2D, texRoadId); glUniform1i(U(p, "uRoadGrid"), 4);   // (the roads graded in)
   glActiveTexture(GL_TEXTURE0 + 5); glBindTexture(GL_TEXTURE_2D, texData); glUniform1i(U(p, "uData"), 5);
@@ -829,6 +830,7 @@ void Renderer::renderDisplays(const FrameParams& fp, bool panel, int half) {
   GLuint p = progDisp;
   glUseProgram(p);
   glUniform1i(U(p, "uUnwrappedWorld"), g_world.repeating ? 0 : 1); glUniform1f(U(p, "uDetailScale"), g_world.detailScale);
+  glUniform4f(U(p, "uNoiseFrame"), g_world.noiseCos, g_world.noiseSin, g_world.noiseX, g_world.noiseZ);
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texHM); glUniform1i(U(p, "uHM"), 0);
   glActiveTexture(GL_TEXTURE0 + 4); glBindTexture(GL_TEXTURE_2D, texRoadId); glUniform1i(U(p, "uRoadGrid"), 4);
   glActiveTexture(GL_TEXTURE0 + 5); glBindTexture(GL_TEXTURE_2D, texData); glUniform1i(U(p, "uData"), 5);
@@ -892,6 +894,7 @@ void Renderer::renderMap(float cx, float cz, float half, int N) {
   GLuint p = progMap;
   glUseProgram(p);
   glUniform1i(U(p, "uUnwrappedWorld"), g_world.repeating ? 0 : 1); glUniform1f(U(p, "uDetailScale"), g_world.detailScale);
+  glUniform4f(U(p, "uNoiseFrame"), g_world.noiseCos, g_world.noiseSin, g_world.noiseX, g_world.noiseZ);
   glUniform1i(U(p, "uProceduralWorld"), g_world.procedural ? 1 : 0);
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texHM); glUniform1i(U(p, "uHM"), 0);
   glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D_ARRAY, texAlb); glUniform1i(U(p, "uAlb"), 1);
@@ -1654,6 +1657,7 @@ void Renderer::reportGLError(int stampIdx) {
 void Renderer::setRT(GLuint p, const FrameParams& fp) {
   glUseProgram(p);
   glUniform1i(U(p, "uUnwrappedWorld"), g_world.repeating ? 0 : 1); glUniform1f(U(p, "uDetailScale"), g_world.detailScale);
+  glUniform4f(U(p, "uNoiseFrame"), g_world.noiseCos, g_world.noiseSin, g_world.noiseX, g_world.noiseZ);
   glUniform1i(U(p, "uProceduralWorld"), g_world.procedural ? 1 : 0);
   glUniform1f(U(p, "uPlanetR"), fp.pano > 0.f ? 0.f : planetRadius());   // (the round world: planet.h; a panorama feed's camera keeps it flat)
   glUniform1f(U(p, "uSunDim"), fp.sunDim);
@@ -1910,6 +1914,7 @@ void Renderer::cloudPass(const FrameParams& fp) {
     GLuint p = progCloudAcc;
     glUseProgram(p);
   glUniform1i(U(p, "uUnwrappedWorld"), g_world.repeating ? 0 : 1); glUniform1f(U(p, "uDetailScale"), g_world.detailScale);
+  glUniform4f(U(p, "uNoiseFrame"), g_world.noiseCos, g_world.noiseSin, g_world.noiseX, g_world.noiseZ);
     const GLuint tex[5] = {texCloud, texCloudT, texCloudD, texCloudAcc[cloudAccIdx], texCloudAccD[cloudAccIdx]};
     const char* nm[5] = {"uCur", "uCurT", "uCurD", "uHist", "uHistD"};
     for (int i = 0; i < 5; i++) { glActiveTexture(GL_TEXTURE0 + i); glBindTexture(GL_TEXTURE_2D, tex[i]); glUniform1i(U(p, nm[i]), i); }

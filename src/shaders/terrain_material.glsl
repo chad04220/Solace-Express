@@ -581,7 +581,7 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
     if (lc != 0u) { lm = 1.0; level = earthLakeLevel(lc); }
     if (lm > 0.0) {
       vec2 pw = wrapW(p.xz);
-      float nat = base.y < 0.01 ? base.x : base.x + base.y*uDetailScale*terrainFbm(pw/2200.0, 7);
+      float nat = base.y < 0.01 ? base.x : base.x + base.y*uDetailScale*terrainFbm(noiseP(pw), 7);
       float lake = step(0.5, lm)*(1.0 - step(level, nat));
       m.alb *= 1.0 - 0.35*(1.0 - smoothstep(level, level + 1.5, nat))*(1.0 - lake);
       if (lake > 0.0) {

@@ -125,6 +125,32 @@ int main(int argc, char** argv) {
     check(nearStart >= 3, fmt("the towns by the start, not only the biggest in the square (%zu within 10 km)", nearStart));
     check(!w.roads.paths.empty(), "roads on the islands");
   }
+  const bool fixture = dir.find("fixtures/earth2") != std::string::npos;
+  if (fixture || getenv("EARTH_OVERLAP")) {   // the neighbouring chart, 12 lattice steps east: how far their grounds agree
+    const auto east = earthCharts::find(earthCharts::idAt(chart->origin.latitude, chart->origin.longitude + 12.0 / earthCharts::kLattice));
+    World v; v.buildProcedural(*east, "", "", false);
+    const regionTravel::Chart ca(chart->origin), cb(east->origin);
+    std::vector<float> d, base;
+    uint32_t seed = 12345;
+    auto rnd = [&] { seed = seed * 1664525u + 1013904223u; return (seed >> 8) / 16777216.f; };
+    for (int k = 0; k < 20000 && d.size() < 3000; k++) {
+      const vec3 a(-15000.f + 60000.f * rnd(), 0, -20000.f + 40000.f * rnd());
+      const geo::Position g = ca.position(a);
+      const vec3 b = cb.local(g);
+      if (std::max(std::fabs(b.x), std::fabs(b.z)) > 30000.f || std::max(std::fabs(a.x), std::fabs(a.z)) > 30000.f) continue;
+      const float ha = w.naturalHeight(a.x, a.z), hb = v.naturalHeight(b.x, b.z);
+      if (ha < 3.f || hb < 3.f) continue;
+      d.push_back(std::fabs(ha - hb));
+      float ba[4], bb[4]; w.sampleBase(a.x, a.z, ba); v.sampleBase(b.x, b.z, bb); base.push_back(std::fabs(ba[0] - bb[0]));
+    }
+    std::sort(base.begin(), base.end());
+    if (!base.empty()) printf("  their base heights alone: p50 %.2f, p95 %.2f, max %.2f\n", base[base.size() / 2], base[base.size() * 95 / 100], base.back());
+    std::sort(d.begin(), d.end());
+    double mean = 0; for (float x : d) mean += x; mean /= std::max<size_t>(d.size(), 1);
+    if (!d.empty()) printf("overlap with %s: %zu land points, mean %.2f m, p50 %.2f, p95 %.2f, max %.2f\n", east->id.c_str(), d.size(), mean, d[d.size() / 2], d[d.size() * 95 / 100], d.back());
+    // (the detail noise one field in both, World::noisePoint: what is left is the base's texels on two grids)
+    check(d.size() > 200 && mean < 0.3 && d[d.size() * 95 / 100] < 1.0f, fmt("neighbouring charts' grounds agree (mean %.2f m)", mean));
+  }
   printf("earth_chart_test: %d checks, %d failures\n", checks, failures);
   return failures ? 1 : 0;
 }
