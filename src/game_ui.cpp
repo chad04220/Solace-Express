@@ -934,7 +934,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   }
   const Airport& A = g_world.airports[c.from]; const Airport& B = arrivalAirport(c);
   row("Route", fmt("%s %s  >  %s %s", A.code, A.name, B.code, B.name));
-  if (c.longHaul()) { const auto to = procedural::find(c.toRegion); row("Distance", fmt("%.0f km across the open ocean, to the %s", c.haulKm, to ? to->name.c_str() : "next region")); }
+  if (c.longHaul()) { const auto to = procedural::find(c.toRegion); row("Distance", fmt("%.0f km to %s", c.haulKm, to ? earthCharts::regionPhrase(*to).c_str() : "the next region")); }
   else row("Distance", c.from == c.to ? (c.wps.empty() ? std::string("Local flight") : fmt("Local flight, %d checkpoint%s", (int)c.wps.size(), c.wps.size() == 1 ? "" : "s"))
                                  : fmt("%.1f km", g_world.distanceKm(c.from, c.to)));
   row("Destination", fmt("Rwy %02d/%02d, %.0f m %s, elev %s", B.rwyNumber(false), B.rwyNumber(true), B.length, surfaceName(B.surface), fmtAlt(B.elev).c_str()));
@@ -1252,16 +1252,29 @@ void Game::drawTravel(float x, float y, float w, float h) {
   float s = S();
   const float px = x + 22 * s, iw = w - 44 * s;
   float py = y + 18 * s;
-  g_ren.text(px, py, 24 * s, career.atHome() ? "Beyond the islands" : "Travel on, or home", C_TEXT, 1); py += 40 * s;
-  const std::string brief = career.atHome()
+  g_ren.text(px, py, 24 * s, career.atHome() ? "Beyond the islands" : "Travel on, or home", C_TEXT, 1);
+  // the world beyond the islands, when the Earth pack is there: chosen at home (Career::chooseWorld)
+  if (earthCharts::pack() && career.atHome() &&
+      button(px + iw - 230 * s, py - 2 * s, 230 * s, 32 * s, career.realEarth ? "Beyond: the real Earth" : "Beyond: generated regions", !commitBlocked(), career.realEarth)) {
+    std::string m; bool ok = false;
+    commit([&](Career& k) { ok = k.chooseWorld(!k.realEarth, &m); });
+    hubMsg = m; hubMsgTime = 6;
+    if (ok) g_audio.trigger(SFX_CLICK);
+  }
+  py += 40 * s;
+  const std::string brief = career.realEarth ? (career.atHome()
+    ? "Fly with the airline to a real airport and work there: its own board, the fields round it, and pay 15% above the islands'. Bermuda is 640 km west; the American coast lies beyond. Your own aircraft stay parked where they are; rentals wait at every field. The campaign, the trials, Defense Command and your airline stay in the Solace Islands."
+    : "Fly on to another real airport, or home to the Solace Islands for the campaign, the trials, Defense Command and your airline. Your own aircraft stay parked where they are.") : career.atHome()
     ? "Fly with the airline to another region and work there: its own airports, its own board, and pay 15% above the islands'. Your own aircraft stay parked where they are; rentals wait at every field. The campaign, the trials, Defense Command and your airline stay in the Solace Islands."
     : "Fly on to another region, or home to the Solace Islands for the campaign, the trials, Defense Command and your airline. Your own aircraft stay parked where they are.";
   for (auto& l : wrap(brief, iw, 15 * s)) { g_ren.text(px, py, 15 * s, l, C_TEXT, 0.92f); py += 21 * s; }
   py += 8 * s;
   const bool busy = career.job.has_value() || career.attemptOpen;
   if (busy) { g_ren.text(px, py, 14 * s, "Finish or release the open job before you travel.", C_WARN, 1); py += 26 * s; }
-  static std::string listFor; static int listLic = -1; static std::vector<Career::Destination> list;
-  if (listFor != career.region || listLic != career.license) { list = career.destinations(); listFor = career.region; listLic = career.license; }
+  static std::string listFor; static int listLic = -1, listWorld = -1; static std::vector<Career::Destination> list;
+  if (listFor != career.region || listLic != career.license || listWorld != (int)career.realEarth) {
+    list = career.destinations(); listFor = career.region; listLic = career.license; listWorld = (int)career.realEarth;
+  }
   header(px, py, iw, "DESTINATIONS"); py += 30 * s;
   const float top = py, bottom = y + h - 16 * s, rowH = 56 * s;
   static float scroll = 0.f;
@@ -1281,6 +1294,7 @@ void Game::drawTravel(float x, float y, float w, float h) {
       g_ren.rect(px, ry, iw, rowH - 6 * s, d.home ? C_ACCENT * 0.12f : C_PANEL2, d.home ? 0.8f : 0.45f, 4 * s);
       g_ren.text(px + 12 * s, ry + 7 * s, 15 * s, ellipsize(d.name, iw - 210 * s, 15 * s), licensed ? C_TEXT : C_DIM, 1);
       std::string sub = d.home ? std::string("Home: the campaign, the trials, Defense Command, your airline")
+                               : earthCharts::isEarthId(d.id) ? std::string("The real Earth")
                                : region ? fmt("%s %s", procedural::scaleName(region->scale), lowerS(procedural::archetypeName(region->archetype)).c_str()) : std::string();
       sub += fmt("  /  %.0f km", d.km);
       if (!licensed) sub += std::string("  /  needs a ") + licenseName(needs);
@@ -1306,6 +1320,7 @@ void Game::drawHubHangar(float x, float y, float w, float h) {
     if (career.here(p) && g_world.regionId == career.region && p.location < (int)g_world.airports.size())
       return name ? g_world.airports[p.location].name : g_world.airports[p.location].code;
     if (p.region == "solace") return "the Solace Islands";
+    if (earthCharts::isEarthId(p.region)) if (const Airport* a = procedural::airportOf(p.region, p.location)) return a->name;   // (the real Earth: its field)
     if (auto d = procedural::find(p.region)) return "the " + d->name;
     return p.region;
   };

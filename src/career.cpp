@@ -3,6 +3,7 @@
 #include "profile.h"
 #include "military_missions.h"
 #include "procedural_regions.h"
+#include "earth_charts.h"
 #include "region_travel.h"
 #include "finite_float.h"
 #include <charconv>
@@ -261,7 +262,19 @@ static float contractKm(const Contract& c) {
 void Career::newGame() {
   *this = Career();
   for (int i = 0; i < solaceAirportCount(); ++i) if (!strcmp(solaceAirport(i).code, "MDB")) location = i;   // (whatever g_world is)
+  realEarth = earthCharts::pack() != nullptr;   // (beyond the islands: the real Earth, when its pack is there)
   refreshBoard();
+}
+
+bool Career::chooseWorld(bool real, std::string* msg) {
+  auto no = [&](const std::string& why) { if (msg) *msg = why; return false; };
+  if (real == realEarth) return true;
+  if (real && !earthCharts::pack()) return no("The real Earth needs its pack in an earth folder beside the game.");
+  if (!atHome() || job || attemptOpen) return no("Change the world beyond the islands from home, with no job open.");
+  for (const auto& p : fleet) if (p.region != "solace") return no("Bring your aircraft home first: one is parked beyond the islands.");
+  realEarth = real; board.clear(); refreshBoard();
+  if (msg) *msg = real ? "Beyond the islands: the real Earth's airports." : "Beyond the islands: the generated regions.";
+  return true;
 }
 
 // ------------------------------------------------------------------ travel between the regions
@@ -269,6 +282,45 @@ std::vector<Career::Destination> Career::destinations() const {
   std::vector<Destination> out;
   const auto at = procedural::find(region);
   const geo::Position from = at ? at->origin : geo::solaceOrigin();
+  if (realEarth) {   // the real Earth: the airports an airline flies to - scheduled service, a medium or large field - the
+                     // nearest within 3,000 km, each at its own chart (the islands always among them when away)
+    if (auto pack = earthCharts::pack()) {
+      const double reach = 3000.0, dLat = reach / 111.32, dLon = dLat / std::max(0.05, std::cos(from.latitude * geo::kDegrees));
+      const earth::Box box = dLon >= 180.0 ? earth::Box{std::max(-90.0, from.latitude - dLat), -180, std::min(90.0, from.latitude + dLat), 180} :
+                             earth::Box{std::max(-90.0, from.latitude - dLat), from.longitude - dLon, std::min(90.0, from.latitude + dLat), from.longitude + dLon};
+      std::vector<std::pair<double, earth::AirportRecord>> inReach;   // (not "near": windows.h makes that a macro)
+      for (auto& a : pack->airports(box)) {
+        if (a.type < 1 || !a.scheduled || a.runways.empty()) continue;
+        const double km = geo::surfaceDistance(from, {a.lat, a.lon, 0}) / 1000.;
+        if (km >= 30. && km <= reach) inReach.push_back({km, std::move(a)});
+      }
+      std::sort(inReach.begin(), inReach.end(), [](const auto& a, const auto& b) { return a.first != b.first ? a.first < b.first : a.second.ident < b.second.ident; });
+      for (const auto& [km, a] : inReach) {
+        if (out.size() >= 12) break;
+        const auto chart = earthCharts::chartForAirport(a.ident);
+        if (!chart || chart->id == region) continue;
+        int index = -1;
+        for (int i = 0, n = procedural::airportCount(chart->id); i < n && index < 0; i++)
+          if (const Airport* p = procedural::airportOf(chart->id, i); p && a.ident == p->code) index = i;
+        if (index < 0) continue;
+        bool dup = false;
+        for (const Destination& o : out) dup = dup || (o.id == chart->id && o.airport == index);
+        if (dup) continue;
+        Destination t; t.id = chart->id; t.airport = index; t.km = km;
+        t.name = a.name + (a.municipality.empty() ? "" : ", " + a.municipality);
+        t.fare = (int)(120. + 0.45 * t.km) / 10 * 10;
+        t.minLicense = t.km <= 450. ? LIC_PPL : t.km <= 900. ? LIC_CPL : LIC_ATP;
+        out.push_back(t);
+      }
+    }
+    if (!atHome()) {
+      Destination t; t.id = "solace"; t.name = "The Solace Islands"; t.home = true;
+      t.km = geo::surfaceDistance(from, geo::solaceOrigin()) / 1000.; t.fare = (int)(120. + 0.45 * t.km) / 10 * 10; t.minLicense = LIC_STUDENT;
+      out.push_back(t);
+    }
+    std::stable_sort(out.begin(), out.end(), [](const Destination& a, const Destination& b) { return a.home != b.home && a.home; });
+    return out;
+  }
   auto add = [&](const procedural::Descriptor& d) {
     if (d.id == region) return;
     for (const Destination& o : out) if (o.id == d.id) return;
@@ -295,8 +347,9 @@ bool Career::travel(const Destination& d, std::string* msg) {
   const bool credit = to->authored && money < d.fare;   // (home is always within reach: never stranded)
   if (!credit && money < d.fare) return no(fmt("The ticket is $%d.", d.fare));
   if (!credit) money -= d.fare;
-  region = d.id; location = main; board.clear();
-  const std::string where = to->authored ? std::string("home to the Solace Islands") : "to the " + to->name;
+  const int arrive = d.airport >= 0 && d.airport < procedural::airportCount(d.id) ? d.airport : main;
+  region = d.id; location = arrive; board.clear();
+  const std::string where = to->authored ? std::string("home to the Solace Islands") : earthCharts::isEarthId(d.id) ? "to " + d.name : "to the " + to->name;
   if (msg) *msg = credit ? "The airline flew you home on account: the ticket's on us." : fmt("Flown %s for $%d.", where.c_str(), d.fare);
   return true;
 }
@@ -837,7 +890,7 @@ void Career::refreshBoard() {
     for (const Destination& d : destinations()) {
       if (added >= 2) break;
       if (!d.home && license < std::max(d.minLicense, (int)LIC_PPL)) continue;
-      const int main = procedural::mainAirport(d.id);
+      const int main = d.airport >= 0 ? d.airport : procedural::mainAirport(d.id);
       const Airport* B = procedural::airportOf(d.id, main);
       if (!B) continue;
       const geo::Position there = airportPlace(d.id, *B);
@@ -862,10 +915,12 @@ void Career::refreshBoard() {
       c.payout = c.payout * (100 + c.repBonusPct) / 100 / 10 * 10;
       const auto bearing = geo::initialBearing(here, there);
       const char* way = bearing ? bearings[((int)lround(*bearing / 45.0) % 8 + 8) % 8] : "out";
-      const std::string where = d.home ? std::string("the Solace Islands") : "the " + d.name;
+      const std::string where = d.home ? std::string("the Solace Islands") : realEarth ? d.name : "the " + d.name;
       c.title = pax ? fmt("Long haul: passengers to %s", B->name) : fmt("Long haul: %s to %s", cargoNames[r.next() % 10], B->name);
-      c.brief = fmt("%s for %s, in %s: %.0f km %s across the open ocean. Fly it there yourself - the islands ahead are made ready "
-                    "as you cross. Land at %s to deliver it; the job is called off anywhere else, and you fly back to %s.",
+      c.brief = fmt(realEarth ? "%s for %s, %s: %.0f km %s. Fly it there yourself - the land ahead is made ready as you fly. Land "
+                                "at %s to deliver it; the job is called off anywhere else, and you fly back to %s." :
+                                "%s for %s, in %s: %.0f km %s across the open ocean. Fly it there yourself - the islands ahead are made ready "
+                                "as you cross. Land at %s to deliver it; the job is called off anywhere else, and you fly back to %s.",
                     pax ? fmt("%d passengers", c.pax).c_str() : fmt("%d kg of freight", c.cargoKg).c_str(), B->name, where.c_str(), c.haulKm, way,
                     B->code, g_world.airports[location].code);
       c.wx = W(r.range(0, 360), r.range(0, 10), 0, r.range(0.05f, 0.25f), r.range(0, 0.5f), r.range(3000, 7000), r.range(25, 50), 0, false, r.range(8.f, 14.f));
@@ -1435,9 +1490,11 @@ bool Career::save(const std::string& path) const {
   if (!f) return false;
   // (version 7 is a career with something beyond the islands - its own region, or an aircraft parked in one: a career
   // that never left them writes version 6 exactly, as every release before could read)
+  // (version 8: a career on the real Earth - "earth 1"; one with the generated regions writes 7 or 6 as before)
   bool away = !atHome();
   for (auto& p : fleet) away = away || p.region != "solace";
-  bool ok = fprintf(f, "somnium_save %d\n", away ? 7 : 6) > 0;
+  bool ok = fprintf(f, "somnium_save %d\n", realEarth ? 8 : away ? 7 : 6) > 0;
+  if (realEarth) ok = ok && fprintf(f, "earth 1\n") > 0;
   if (away) ok = ok && fprintf(f, "region %s\n", region.c_str()) > 0;
   ok = ok && fprintf(f, "money %d\nlicense %d\nrep %d\nlocation %d\nstory %d\nflights %d\nlandings %d\ncrashes %d\nhours %f\nbest %f\nseed %u\nfinished %d\nattempt %u\nattempt_open %d\n",
                     money, license, reputation, location, storyIndex, flights, landings, crashes, hours, bestLandingFpm, boardSeed, finished ? 1 : 0, attempt, attemptOpen ? 1 : 0) > 0;
@@ -1496,12 +1553,13 @@ bool Career::load(const std::string& path) {
   FILE* f = fopen(path.c_str(), "r");
   if (!f) return false;
   Career c; char key[64]; int ver = 0;
-  if (fscanf(f, "%63s %d", key, &ver) != 2 || (strcmp(key, "somnium_save") && strcmp(key, "solace_save") && strcmp(key, "airxpress_save")) || ver < 1 || ver > 7) { fclose(f); return false; }
+  if (fscanf(f, "%63s %d", key, &ver) != 2 || (strcmp(key, "somnium_save") && strcmp(key, "solace_save") && strcmp(key, "airxpress_save")) || ver < 1 || ver > 8) { fclose(f); return false; }
   // the career's airports are its region's (the islands' until a "region" line, which comes first), wherever g_world is;
   // the airline's routes and the military are the islands'; an aircraft's are the region it is parked in (checked last)
   int nApt = solaceAirportCount();
   const int nHome = solaceAirportCount();
   bool ok = true;
+  bool earthGone = false;   // (a real-Earth career without its pack: home, its job released - never lost)
   unsigned have = 0;   // mandatory fields seen (version 2: every field, the fleet count and the end marker)
   int fleetN = -1; bool ended = false, militaryRead = false, militaryProgressRead = false, surveyRead = false, surveyKnownRead = false, plan2Read = false;
   auto rdI = [&](int& v, unsigned bit) { ok = ok && fscanf(f, "%d", &v) == 1; have |= bit; };
@@ -1509,11 +1567,15 @@ bool Career::load(const std::string& path) {
   while (ok && fscanf(f, "%63s", key) == 1) {
     int fin = 0;
     if (!strcmp(key, "region")) {
-      char id[64]; ok = ver >= 7 && (have & 4) == 0 && fscanf(f, "%63s", id) == 1 && procedural::airportCount(id) > 0;
+      char id[64]; ok = ver >= 7 && (have & 4) == 0 && fscanf(f, "%63s", id) == 1;
+      if (ok && earthCharts::isEarthId(id) && procedural::airportCount(id) == 0) { earthGone = true; continue; }
+      ok = ok && procedural::airportCount(id) > 0;
       // (a generated region's airports are its recipe's: read up to the most a region has, and any its recipe no longer
-      // has are moved to its main airport below - a save is never lost to a change in the landscape)
-      if (ok) { c.region = id; nApt = id == std::string("solace") ? nHome : (int)procedural::kMaxAirports; }
+      // has are moved to its main airport below - a save is never lost to a change in the landscape; a real-Earth
+      // chart's, as many as it has now)
+      if (ok) { c.region = id; nApt = id == std::string("solace") ? nHome : std::max((int)procedural::kMaxAirports, procedural::airportCount(id)); }
     }
+    else if (!strcmp(key, "earth")) { int e = 0; ok = ver >= 8 && fscanf(f, "%d", &e) == 1 && (e == 0 || e == 1); c.realEarth = e == 1; }
     else if (!strcmp(key, "money")) rdI(c.money, 1);
     else if (!strcmp(key, "license")) rdI(c.license, 2);
     else if (!strcmp(key, "rep")) rdI(c.reputation, 16);
@@ -1556,7 +1618,9 @@ bool Career::load(const std::string& path) {
     }
     else if (!strcmp(key, "plane_region")) {
       int i = -1; char id[64];
-      ok = ver >= 7 && fscanf(f, "%d %63s", &i, id) == 2 && i >= 0 && i < (int)c.fleet.size() && procedural::airportCount(id) > 0;
+      ok = ver >= 7 && fscanf(f, "%d %63s", &i, id) == 2 && i >= 0 && i < (int)c.fleet.size();
+      if (ok && earthCharts::isEarthId(id) && procedural::airportCount(id) == 0) { c.fleet[i].location = procedural::mainAirport("solace"); continue; }   // (its pack gone: home)
+      ok = ok && procedural::airportCount(id) > 0;
       if (ok) c.fleet[i].region = id;
     }
     else if (!strcmp(key, "insured")) { int v = 0; ok = fscanf(f, "%d", &v) == 1 && (v == 0 || v == 1); c.insured = v == 1; }
@@ -1652,6 +1716,7 @@ bool Career::load(const std::string& path) {
   }
   fclose(f);
   if (ver >= 2) ok = ok && have == 4095 && ended && fleetN == (int)c.fleet.size();   // a truncated save is rejected
+  if (earthGone) { c.region = "solace"; c.location = procedural::mainAirport("solace"); c.job.reset(); c.attemptOpen = false; }
   for (auto& r : c.airline.routes) if (r.fleetIdx >= (int)c.fleet.size() || r.pilot >= (int)c.airline.pilots.size() || c.fleet[r.fleetIdx].region != "solace") ok = false;   // (a route needs its aircraft, in the islands, and its pilot)
   for (auto& p : c.fleet)   // (each at an airport of its own region: the islands' exactly, a generated one's moved to its main one)
     if (p.location >= procedural::airportCount(p.region)) { if (p.region == "solace") ok = false; else p.location = procedural::mainAirport(p.region); }

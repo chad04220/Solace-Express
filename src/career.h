@@ -131,6 +131,10 @@ public:
   // hub are there; the campaign, the trials, the military and the airline are the Solace Islands' alone
   std::string region = "solace";
   int location = 0;
+  // Beyond the islands: the real Earth (docs/REAL_EARTH_PLAN.md, E7) - travel and long hauls to real airports, their
+  // charts its regions ("earth:..." ids) - or the generated regions. A new career takes the real Earth when the Earth
+  // pack is there; a save from before keeps the generated regions (Career::chooseWorld changes it, at home)
+  bool realEarth = false;
   int storyIndex = 0;          // next story contract
   int flights = 0, landings = 0, crashes = 0;
   float hours = 0, bestLandingFpm = 9999;
@@ -173,8 +177,11 @@ public:
   // (up to 450 km), a Commercial one twice as far, the ATP every region listed; the way home needs none. travel()
   // buys the ticket (free home when the bank can't pay it) and moves the career to the region's main airport; its
   // world is then loaded and the board drawn there (Game::loadCareerWorld). Never with a job or a flight open
-  struct Destination { std::string id, name; double km = 0; int fare = 0, minLicense = LIC_PPL; bool home = false; };
+  // (airport: the one flown to there - on the real Earth the airport named, else the region's main one)
+  struct Destination { std::string id, name; double km = 0; int fare = 0, minLicense = LIC_PPL; bool home = false; int airport = -1; };
   std::vector<Destination> destinations() const;
+  // The world beyond the islands, chosen at home with nothing parked or open elsewhere (false, with the reason, else)
+  bool chooseWorld(bool real, std::string* msg);
   bool travel(const Destination& d, std::string* msg);
   const Contract* nextStory() const;
   void refreshBoard();

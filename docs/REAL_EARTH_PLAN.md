@@ -419,6 +419,38 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
   - **The real Earth's charts and the islands.** They reach only the islands' open sea, so no chart shows Solace's land
     at its own detail but the islands' own.
 
+- **E7:** the first part is in. These pieces work:
+  - **The career's world.** A new career takes the real Earth beyond the islands when the pack is there
+    (`Career::realEarth`). An older career keeps the generated regions; the hub's travel screen changes it, at home,
+    with nothing parked or open beyond the islands.
+  - **Travel.** The airline flies to real airports: scheduled service, medium or large fields, the twelve nearest
+    within 3,000 km, each at the chart about its runway. The licences reach as they did for the regions: 450 km for
+    a Private, 900 km for a Commercial, the rest for an ATP. From the islands the nearest are Bermuda (640 km) and
+    the American coast.
+  - **Airports without a chart.** A chart's airports come without building it (`earthCharts::chartAirports`, the
+    same selection `World::buildEarth` uses). The career's boards, travel and long hauls read them through
+    `procedural::airportOf`, as they read a region's recipe.
+  - **Long hauls** go to real airports. A haul flies out of the islands on the real Earth's charts and is there in
+    any chart that holds its airport inside the square. Near the destination, the slide prefers the chart about the
+    airport. The career goes on from that field.
+  - **Saves.** A real-Earth career writes version 8 ("earth 1"); one with the generated regions writes 6 or 7 as
+    before. A career whose chart can't be read (its pack gone) loads at home, its aircraft with it, rather than
+    being lost.
+  - **Names.** A real-Earth place is named bare ("Nantucket Memorial Airport"), not as a region ("the ...").
+  - **Tests.** `earth_career_test`, over the fixture:
+    - travel from the islands to real airports;
+    - a long haul on the islands' board to Nantucket (1,432 km), flown out of the islands and arriving in the
+      chart about KACK;
+    - delivered, the career and its aircraft there;
+    - saved as version 8 and loaded again;
+    - flown home;
+    - the pack gone: loaded at home.
+
+  Still open in E7:
+  - **The board's local work.** The local contracts at a real airport are drawn from the airports of its chart
+    alone, up to 40 of them.
+  - **A spatial index** for ATC and the GPS across charts: today both see the chart's own airports.
+
 Decisions taken with the defaults (the owner can change them):
 - The generated regions keep working until E6. In real-Earth play the real world replaces them; they stay available
   as a "Generated Earth" choice in Free Flight.

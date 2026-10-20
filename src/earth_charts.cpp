@@ -109,6 +109,10 @@ static procedural::Descriptor descriptorAt(int la, int lo) {
 
 procedural::Descriptor chartAt(double lat, double lon) { return descriptorAt(latIndex(lat), lonIndex(lon)); }
 std::string idAt(double lat, double lon) { return chartId(latIndex(lat), lonIndex(lon)); }
+std::string regionPhrase(const procedural::Descriptor& region) {
+  if (region.authored) return "the Solace Islands";
+  return isEarthId(region.id) ? region.name : "the " + region.name;
+}
 std::string slideIdAt(double lat, double lon) {
   if (geo::surfaceDistance({lat, lon, 0}, geo::solaceOrigin()) < kSolaceReach) return "solace";
   return idAt(lat, lon);

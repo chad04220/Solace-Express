@@ -157,36 +157,15 @@ earth::Box chartBox(const regionTravel::Chart& chart, float half) {
 }
 } // namespace
 
-void World::buildEarth(const procedural::Descriptor& chartDesc, const std::string& cachePath, const std::string& stamp, bool save) {
-  generationCheckpoint();
-  auto pack = earthCharts::pack();
-  if (!pack) throw std::runtime_error("The real Earth needs its data pack: " + earthCharts::packError());
-  regionRecipe.reset();
-  procedural = true; repeating = false; regionId = chartDesc.id; detailScale = kEarthDetailScale;
-  auto data = std::make_shared<earthCharts::ChartData>();
-  data->descriptor = chartDesc; data->pack = pack;
+// The airports of a real-Earth chart (earth_charts.h)
+std::shared_ptr<const earthCharts::ChartAirports> earthCharts::chartAirports(const procedural::Descriptor& chartDesc,
+                                                                            const std::shared_ptr<const earth::Pack>& pack,
+                                                                            const earth::Sampler* given) {
   const regionTravel::Chart chart(chartDesc.origin);
-  // the detail noise's frame (World::noisePoint): this chart's x and z into the anchor's - its azimuthal x and z, in
-  // double, from the centre of the 8-degree cell holding the origin - the turn the mean of the two axes'
-  {
-    const double cell = 8.0;
-    const geo::Position anchor{(std::floor(chartDesc.origin.latitude / cell) + 0.5) * cell,
-                               (std::floor(chartDesc.origin.longitude / cell) + 0.5) * cell, 0.0};
-    auto anchored = [&](vec3 local, double& x, double& z) {
-      const geo::Position g = chart.position(local);
-      const double d = geo::surfaceDistance(anchor, g), b = geo::initialBearing(anchor, g).value_or(0.0) * geo::kDegrees;
-      x = d * std::sin(b); z = -d * std::cos(b);
-    };
-    double ox, oz, ex, ez, sx, sz;
-    anchored(vec3(0, 0, 0), ox, oz); anchored(vec3(2000, 0, 0), ex, ez); anchored(vec3(0, 0, 2000), sx, sz);
-    const double turn = 0.5 * (std::atan2(ez - oz, ex - ox) + std::atan2(sz - oz, sx - ox) - 0.5 * geo::kPi);
-    noiseCos = (float)std::cos(turn); noiseSin = (float)std::sin(turn); noiseX = (float)ox; noiseZ = (float)oz;
-  }
   const earth::Box box = chartBox(chart, WORLD_HALF);
-  earth::Sampler sampler(pack, box, true);
-  data->fineTiles = sampler.fineTiles();
-
-  // ---- the airports: OurAirports' in the square, each on its main runway, the biggest first, none on another's grounds
+  std::optional<earth::Sampler> own;
+  if (!given) own.emplace(pack, box, true);
+  const earth::Sampler& sampler = given ? *given : *own;
   struct Candidate { earth::AirportRecord rec; float x, z, heading, length, width, elev; int size; };
   // (where its main runway lies on the chart, and which way)
   auto placeRunway = [&](const earth::AirportRecord& a, Candidate& c) {
@@ -268,21 +247,63 @@ void World::buildEarth(const procedural::Descriptor& chartDesc, const std::strin
       chosen.push_back(std::move(c));
     }
   }
-  data->codes.reserve(chosen.size()); data->names.reserve(chosen.size()); data->blurbs.reserve(chosen.size());
+  auto out = std::make_shared<earthCharts::ChartAirports>();
+  out->codes.reserve(chosen.size()); out->names.reserve(chosen.size()); out->blurbs.reserve(chosen.size());
   for (const auto& c : chosen) {
-    data->codes.push_back(c.rec.ident);
-    data->names.push_back(c.rec.name);
+    out->codes.push_back(c.rec.ident);
+    out->names.push_back(c.rec.name);
     std::string where = c.rec.municipality;
     if (!c.rec.country.empty()) where += (where.empty() ? "" : ", ") + c.rec.country;
-    data->blurbs.push_back(where);
-    data->airports.push_back(c.rec);
+    out->blurbs.push_back(where);
+    out->records.push_back(c.rec);
   }
-  airports.clear();
   for (size_t i = 0; i < chosen.size(); i++) {
     const auto& c = chosen[i];
-    Airport a{data->codes[i].c_str(), data->names[i].c_str(), c.x, c.z, c.elev, c.heading, c.length, c.width,
-              surfaceOf(c.rec.runways[0].surface, c.size), c.size, data->blurbs[i].c_str()};
+    Airport a{out->codes[i].c_str(), out->names[i].c_str(), c.x, c.z, c.elev, c.heading, c.length, c.width,
+              surfaceOf(c.rec.runways[0].surface, c.size), c.size, out->blurbs[i].c_str()};
     a.hospital = c.size >= 1;
+    out->airports.push_back(a);
+  }
+  return out;
+
+}
+
+void World::buildEarth(const procedural::Descriptor& chartDesc, const std::string& cachePath, const std::string& stamp, bool save) {
+  generationCheckpoint();
+  auto pack = earthCharts::pack();
+  if (!pack) throw std::runtime_error("The real Earth needs its data pack: " + earthCharts::packError());
+  regionRecipe.reset();
+  procedural = true; repeating = false; regionId = chartDesc.id; detailScale = kEarthDetailScale;
+  auto data = std::make_shared<earthCharts::ChartData>();
+  data->descriptor = chartDesc; data->pack = pack;
+  const regionTravel::Chart chart(chartDesc.origin);
+  // the detail noise's frame (World::noisePoint): this chart's x and z into the anchor's - its azimuthal x and z, in
+  // double, from the centre of the 8-degree cell holding the origin - the turn the mean of the two axes'
+  {
+    const double cell = 8.0;
+    const geo::Position anchor{(std::floor(chartDesc.origin.latitude / cell) + 0.5) * cell,
+                               (std::floor(chartDesc.origin.longitude / cell) + 0.5) * cell, 0.0};
+    auto anchored = [&](vec3 local, double& x, double& z) {
+      const geo::Position g = chart.position(local);
+      const double d = geo::surfaceDistance(anchor, g), b = geo::initialBearing(anchor, g).value_or(0.0) * geo::kDegrees;
+      x = d * std::sin(b); z = -d * std::cos(b);
+    };
+    double ox, oz, ex, ez, sx, sz;
+    anchored(vec3(0, 0, 0), ox, oz); anchored(vec3(2000, 0, 0), ex, ez); anchored(vec3(0, 0, 2000), sx, sz);
+    const double turn = 0.5 * (std::atan2(ez - oz, ex - ox) + std::atan2(sz - oz, sx - ox) - 0.5 * geo::kPi);
+    noiseCos = (float)std::cos(turn); noiseSin = (float)std::sin(turn); noiseX = (float)ox; noiseZ = (float)oz;
+  }
+  const earth::Box box = chartBox(chart, WORLD_HALF);
+  earth::Sampler sampler(pack, box, true);
+  data->fineTiles = sampler.fineTiles();
+
+  // ---- the airports (earthCharts::chartAirports: the career's boards read the same)
+  const auto picked = earthCharts::chartAirports(chartDesc, pack, &sampler);
+  data->codes = picked->codes; data->names = picked->names; data->blurbs = picked->blurbs; data->airports = picked->records;
+  airports.clear();
+  for (size_t i = 0; i < picked->airports.size(); i++) {
+    Airport a = picked->airports[i];
+    a.code = data->codes[i].c_str(); a.name = data->names[i].c_str(); a.blurb = data->blurbs[i].c_str();
     airports.push_back(a);
   }
 

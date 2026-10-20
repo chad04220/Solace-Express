@@ -174,7 +174,7 @@ std::vector<Descriptor> recommendations(uint64_t worldSeed) {
 
 namespace {
 // Each region asked about: its recipe (kept, so its airports' names stay put) and its main airport
-struct AirportSummary { std::shared_ptr<const Recipe> recipe; int count = 0, main = -1; };
+struct AirportSummary { std::shared_ptr<const Recipe> recipe; std::shared_ptr<const earthCharts::ChartAirports> earth; int count = 0, main = -1; };
 const AirportSummary& summary(const std::string& id, uint64_t worldSeed) {
   static std::mutex lock;
   static std::map<std::pair<std::string, uint64_t>, AirportSummary> kept;
@@ -186,7 +186,14 @@ const AirportSummary& summary(const std::string& id, uint64_t worldSeed) {
     out.count = n;
     for (int i = 0; i < n; ++i) if (out.main < 0 || a[i].size > a[out.main].size) out.main = i;
   };
-  if (id == "solace") {
+  if (earthCharts::isEarthId(id)) {   // (a chart of the real Earth: its airports as its build lays them)
+    const auto d = earthCharts::find(id);
+    const auto pack = earthCharts::pack();
+    if (d && pack) {
+      try { out.earth = earthCharts::chartAirports(*d, pack); pick(out.earth->airports.data(), (int)out.earth->airports.size()); }
+      catch (const std::exception&) { out = AirportSummary{}; }
+    }
+  } else if (id == "solace") {
     std::vector<Airport> islands;
     for (int i = 0; i < solaceAirportCount(); ++i) islands.push_back(solaceAirport(i));
     pick(islands.data(), (int)islands.size());
@@ -202,7 +209,7 @@ int mainAirport(const std::string& id, uint64_t worldSeed) { return summary(id, 
 const Airport* airportOf(const std::string& id, int index, uint64_t worldSeed) {
   const AirportSummary& s = summary(id, worldSeed);
   if (index < 0 || index >= s.count) return nullptr;
-  return s.recipe ? &s.recipe->airports[index] : &solaceAirport(index);
+  return s.recipe ? &s.recipe->airports[index] : s.earth ? &s.earth->airports[index] : &solaceAirport(index);
 }
 
 Recipe::Recipe(const Descriptor& d) : descriptor(d) {

@@ -22,6 +22,8 @@ void setSearch(std::vector<std::string> dirs, std::string glo90Cache);
 std::string glo90Cache();
 
 bool isEarthId(const std::string& id);
+// A region as a sentence names it: "the Solace Islands", "the <generated region>", or a real-Earth chart's place bare
+std::string regionPhrase(const procedural::Descriptor& region);
 // How lush the ground grows for a land cover class at a latitude (World::hm's third channel, 0 bare .. 1 rainforest)
 float lushOf(int cover, double lat);
 // The chart whose origin is the lattice point nearest (lat, lon), named for the largest place near it
@@ -49,6 +51,16 @@ struct ChartData {
   std::vector<uint8_t> cover;                   // per HM_N^2 texel (World::buildEarth: the mask's farmland and forest)
   int fineTiles = 0;                            // GLO-90 tiles it was built with
 };
+// The airports a chart has, as World::buildEarth lays them: OurAirports' in its square, each on its main runway, the
+// biggest first, none on another's grounds - or, with none there, the nearest beyond it. Without the rest of the chart:
+// the career's boards and travel read them (procedural::airportOf). sampler: the chart's own (nullptr: one made here)
+struct ChartAirports {
+  std::vector<std::string> codes, names, blurbs;
+  std::vector<earth::AirportRecord> records;
+  std::vector<Airport> airports;   // (their code, name and blurb point into the vectors above)
+};
+std::shared_ptr<const ChartAirports> chartAirports(const procedural::Descriptor& chart, const std::shared_ptr<const earth::Pack>& pack,
+                                                   const earth::Sampler* sampler = nullptr);
 // The land cover as the mask's two fields, per mask texel (World::bakeMask): how wooded (0 open .. 1 closed forest)
 // and how farmed (cropland 1, grassland a little), blurred across the cover's 330 m cells
 void maskFields(const ChartData& chart, std::vector<float>& forest, std::vector<float>& farm);

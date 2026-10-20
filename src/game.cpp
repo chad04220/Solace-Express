@@ -622,7 +622,7 @@ void Game::beginHaul(const Contract& c) {
   earthFlight = true; earthDestination = *to; earthCourseHold = false;
   earthPosition = regionTravel::Chart(flightRegion.origin).position(plane.pos);
   chartHaul();
-  toast(fmt("Long haul: %.0f km to %s %s in the %s", c.haulKm, target->code, target->name, to->name.c_str()), vec3(0.6f, 1.f, 0.8f), false);
+  toast(fmt("Long haul: %.0f km to %s %s, %s", c.haulKm, target->code, target->name, earthCharts::regionPhrase(*to).c_str()), vec3(0.6f, 1.f, 0.8f), false);
   toast("The GPS shows the way: the regions ahead are made ready as you cross", vec3(0.8f, 0.9f, 1.f), false);
 }
 void Game::chartHaul() {
@@ -827,6 +827,7 @@ std::string Game::screenWorldFor(GameScreen screen) const {
 std::string Game::careerPlaceName() const {
   if (g_world.regionId == career.region && career.location >= 0 && career.location < (int)g_world.airports.size()) return g_world.airports[career.location].name;
   if (career.atHome()) return "the Solace Islands";
+  if (earthCharts::isEarthId(career.region)) if (const Airport* a = procedural::airportOf(career.region, career.location)) return a->name;
   if (auto d = procedural::find(career.region)) return "the " + d->name;
   return career.region;
 }
@@ -1152,7 +1153,9 @@ void Game::updateEarthFlight() {
 bool Game::realEarthPlay() const {
   if (!earthFlight) return false;
   if (earthCharts::isEarthId(flightRegion.id)) return true;
-  return freeFlight && !haul.on && flightRegion.id == "solace" && !freeGeneratedEarth && earthCharts::pack() != nullptr;
+  if (flightRegion.id != "solace" || !earthCharts::pack()) return false;
+  if (haul.on) return career.realEarth;   // (a career's long haul out of the islands: its world beyond them)
+  return freeFlight && !freeGeneratedEarth;
 }
 
 // The real Earth's fine elevation (earth_fetch.h): the fetcher made when first wanted, and the tiles a chart at a place reads
@@ -1188,7 +1191,11 @@ void Game::slideEarthChart(const regionTravel::Chart& chart) {
   if (out > 5000.f && !plane.onGround && !crashed) {
     const vec3 aim = plane.pos + horizontal * std::clamp(speed * 60.f, 20000.f, 60000.f);
     auto near = [&](const geo::Position& origin) { const vec3 c = chart.local(origin); return hypotf(c.x - aim.x, c.z - aim.z) < 8000.f; };
-    if (earthPrefetch && near(earthPrefetch->region.origin)) wanted = earthPrefetch->region.id;
+    // (a route's destination chart once the aim is within 40 km of it: the flight arrives in the chart about its airport)
+    const bool toDestination = earthDestination && earthCharts::isEarthId(earthDestination->id) && [&] {
+      const vec3 c = chart.local(earthDestination->origin); return hypotf(c.x - aim.x, c.z - aim.z) < 40000.f; }();
+    if (toDestination) wanted = earthDestination->id;
+    else if (earthPrefetch && near(earthPrefetch->region.origin)) wanted = earthPrefetch->region.id;
     else if (earthPrefetchJob.valid() && near(earthPrefetchOrigin)) wanted = earthPrefetchId;
     else { const geo::Position g = chart.position(aim); wanted = earthCharts::slideIdAt(g.latitude, g.longitude); }
   }
@@ -1324,8 +1331,15 @@ void Game::continueEarthFlight() {
   earthPosition = regionTravel::Chart(flightRegion.origin).position(plane.pos);
   if (haul.on) {   // a long haul: on toward its destination, or there - the job's own airport the flight lands at
     const int near = std::max(0, g_world.nearestAirport(plane.pos.x, plane.pos.z));
-    haul.arrived = flightRegion.id == haul.job.toRegion && haul.job.to < (int)g_world.airports.size();
-    contract.from = near; contract.to = haul.arrived ? haul.job.to : near;
+    // (there: the destination's own chart, or on the real Earth any chart that holds its airport - in the square, not
+    // one beyond it)
+    int at = flightRegion.id == haul.job.toRegion && haul.job.to < (int)g_world.airports.size() ? haul.job.to : -1;
+    if (at < 0 && earthCharts::isEarthId(haul.job.toRegion) && haul.target.code) {
+      const int i = g_world.findAirport(haul.target.code);
+      if (i >= 0 && std::max(fabsf(g_world.airports[i].x), fabsf(g_world.airports[i].z)) < WORLD_HALF) at = i;
+    }
+    haul.arrived = at >= 0;
+    contract.from = near; contract.to = haul.arrived ? at : near;
     chartHaul();
     attemptFrom = near; wpIndex = 0; apDest = -1; tdRunway = -2;
     atcF = AtcFlight{}; atcF.dep = near; atcF.arr = contract.to; atcF.phase = plane.onGround ? 0 : 3;
@@ -1335,8 +1349,8 @@ void Game::continueEarthFlight() {
     regionPoseChange.reset();
     paused = regionResumePaused; screen = SCR_FLIGHT;
     earthFacilitiesPending = earthPromotionDeferred = false; updateEarthSurfaceContext();
-    if (haul.arrived) toast(fmt("Entering the %s: land at %s %s", flightRegion.name.c_str(), dest().code, dest().name), vec3(.6f, 1.f, .8f));
-    else toast(fmt("Entering the %s: on to the %s", flightRegion.name.c_str(), haul.to.name.c_str()), vec3(.6f, 1.f, .8f));
+    if (haul.arrived) toast(fmt("Over %s: land at %s %s", earthCharts::regionPhrase(flightRegion).c_str(), dest().code, dest().name), vec3(.6f, 1.f, .8f));
+    else toast(fmt("Over %s: on to %s", earthCharts::regionPhrase(flightRegion).c_str(), earthCharts::regionPhrase(haul.to).c_str()), vec3(.6f, 1.f, .8f));
     return;
   }
   freeAirport = std::max(0, g_world.nearestAirport(plane.pos.x, plane.pos.z));
