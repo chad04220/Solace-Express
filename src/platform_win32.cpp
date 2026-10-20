@@ -19,6 +19,7 @@
 #include <mutex>
 #include "crash.h"
 #include "game.h"
+#include "earth_charts.h"
 #include "joystick.h"
 #include "load_pacer.h"
 #include "world_load_progress.h"
@@ -731,6 +732,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     const std::string dir = cacheDirFor(exeDir, game.saveDir);
     g_shaderCacheDir = dir;
     game.cacheDir = dir;
+    // the real Earth's pack, beside the exe or in the user's or the cache's folder, and its fetched fine elevation
+    // (earth_fetch.h) kept with the rest of what the game builds and fetches
+    earthCharts::setSearch({game.assetDir + "\\earth", game.saveDir + "\\earth", dir + "\\earth"}, dir + "\\earth-glo90");
     // this build's stamp (the exe's size and time): what the launch caches beside the shaders (the islands, the aircraft
     // performance) is kept for this build only, and any other build makes it again
     WIN32_FILE_ATTRIBUTE_DATA fa;

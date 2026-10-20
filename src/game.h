@@ -12,6 +12,7 @@
 #include <map>
 #include "world.h"
 #include "procedural_regions.h"
+#include "earth_fetch.h"
 #include "earth_data.h"
 #include "region_travel.h"
 #include "aircraft.h"
@@ -240,6 +241,12 @@ private:
   std::future<void> earthRetireJob;
   std::string earthPrefetchId, earthPrefetchFailedId, earthPrefetchError;
   geo::Position earthPrefetchOrigin;   // (the real Earth: where the chart preparing is, Game::slideEarthChart)
+  // The real Earth's fine elevation fetched as it is wanted (earth_fetch.h): made when first wanted, where the game has
+  // a folder for it (earthCharts::glo90Cache) and a pack
+  std::unique_ptr<earthFetch::Glo90Fetcher> glo90Fetch;
+  float glo90WantT = 0.f;
+  earthFetch::Glo90Fetcher* glo90();
+  void wantGlo90(const geo::Position& where);   // the tiles a chart there reads, queued
   bool earthSceneryDraining = false, earthFacilitiesPending = false, earthPromotionDeferred = false;
   void retireEarthPrefetch(); // never joins a running job on the flight thread
   void updateEarthSurfaceContext();

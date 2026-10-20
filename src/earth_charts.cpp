@@ -7,7 +7,8 @@ namespace earthCharts {
 namespace {
 std::mutex g_lock;
 std::shared_ptr<const earth::Pack> g_pack;
-std::string g_error;
+std::string g_error, g_glo90Cache;
+std::vector<std::string> g_search;
 bool g_opened = false;
 
 std::string lower(std::string s) { for (auto& c : s) c = (char)std::tolower((unsigned char)c); return s; }
@@ -47,13 +48,23 @@ std::shared_ptr<const earth::Pack> pack() {
   if (!g_opened) {
     g_opened = true;
     const char* env = getenv("EARTH_PACK");
-    const std::string dir = env && *env ? env : "earth";
-    std::string why;
-    g_pack = earth::Pack::open(dir, &why);
-    if (!g_pack) g_error = why;
+    std::vector<std::string> dirs;
+    if (env && *env) dirs.push_back(env);
+    else { dirs = g_search; dirs.push_back("earth"); }
+    for (const auto& dir : dirs) {
+      std::string why;
+      auto p = earth::Pack::open(dir, &why);
+      if (p) { if (!g_glo90Cache.empty()) p->setGlo90Cache(g_glo90Cache); g_pack = std::move(p); g_error.clear(); break; }
+      g_error += (g_error.empty() ? "" : "; ") + why;
+    }
   }
   return g_pack;
 }
+void setSearch(std::vector<std::string> dirs, std::string glo90Cache) {
+  std::lock_guard<std::mutex> g(g_lock);
+  g_search = std::move(dirs); g_glo90Cache = std::move(glo90Cache);
+}
+std::string glo90Cache() { std::lock_guard<std::mutex> g(g_lock); return g_glo90Cache; }
 std::string packError() { pack(); std::lock_guard<std::mutex> g(g_lock); return g_error; }
 void usePack(std::shared_ptr<const earth::Pack> p) {
   std::lock_guard<std::mutex> g(g_lock);

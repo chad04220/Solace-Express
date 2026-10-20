@@ -11,6 +11,10 @@ if(SANITIZE AND NOT MSVC)
   add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined -O1)
   add_link_options(-fsanitize=address,undefined)
 endif()
+# The real Earth's elevation fetched as it is wanted (src/earth_fetch.cpp): WinHTTP, for everything that links the islands
+if(WIN32)
+  link_libraries(winhttp)
+endif()
 
 # GLSL sources (src/shaders/*.glsl) embedded as C++ constants in gen/shaders_gen.h at build time
 set(SHADER_GEN ${CMAKE_BINARY_DIR}/gen/shaders_gen.h)
@@ -36,7 +40,7 @@ add_custom_target(aircraft_geometry_gen DEPENDS ${AIRCRAFT_GEOMETRY_GEN})
 # renderer, the UI, the audio): each compiled once, as object libraries, for every program that links them besides the
 # game itself, which keeps its own build (on MSVC it links the static runtime, with its own flags). Before this every
 # test compiled the shared sources itself: the islands' five 39 times over (the review of v3.44.0, ENG-1).
-set(ENVIRONMENT_SOURCES src/geo.cpp src/earth_data.cpp src/earth_charts.cpp src/earth_far.cpp src/world_earth.cpp src/region_travel.cpp src/procedural_regions.cpp src/distant_regions.cpp src/regional_surface.cpp src/world.cpp src/road_network.cpp src/bridges.cpp src/settlements.cpp src/road_furniture.cpp src/landmarks.cpp src/road_traffic.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp)
+set(ENVIRONMENT_SOURCES src/geo.cpp src/earth_data.cpp src/earth_charts.cpp src/earth_far.cpp src/earth_fetch.cpp src/world_earth.cpp src/region_travel.cpp src/procedural_regions.cpp src/distant_regions.cpp src/regional_surface.cpp src/world.cpp src/road_network.cpp src/bridges.cpp src/settlements.cpp src/road_furniture.cpp src/landmarks.cpp src/road_traffic.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp)
 set(CORE_ONLY_SOURCES
   src/aircraft.cpp src/aircraft_perf.cpp src/aircraft_stunt.cpp src/aero.cpp src/aero_strips.cpp src/aero_wake.cpp src/breakup.cpp src/models.cpp src/career.cpp src/profile.cpp src/weather.cpp src/hive_combat.cpp src/hive_loadout.cpp src/hive_world_collision.cpp)
 set(CORE_SOURCES ${ENVIRONMENT_SOURCES} ${CORE_ONLY_SOURCES})
@@ -362,6 +366,12 @@ add_test(NAME earth_rebase_flight COMMAND geo_flight_test)
 add_test(NAME earth_data COMMAND earth_data_test ${CMAKE_SOURCE_DIR}/tests/fixtures/earth2 WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 add_test(NAME earth_chart COMMAND earth_chart_test ${CMAKE_SOURCE_DIR}/tests/fixtures/earth2 WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 add_test(NAME earth_far COMMAND earth_far_test ${CMAKE_SOURCE_DIR}/tests/fixtures/earth2 WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+# the fine elevation fetched as it is wanted (src/earth_fetch.h), with a transfer of its own (and curl, from a file); not
+# on Windows, whose download is WinHTTP's
+if(NOT WIN32)
+  add_executable(earth_fetch_test tests/earth_fetch_test.cpp ${CORE_OBJS})
+  add_test(NAME earth_fetch COMMAND earth_fetch_test ${CMAKE_SOURCE_DIR}/tests/fixtures/earth2 WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+endif()
 add_test(NAME earth_data_fastmath COMMAND earth_data_fastmath_test ${CMAKE_SOURCE_DIR}/tests/fixtures/earth2 WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/earth_data_fastmath)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/earth_data_fastmath)
 add_test(NAME menu_plan_cache COMMAND menu_plan_cache_test)

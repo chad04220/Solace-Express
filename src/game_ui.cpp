@@ -1650,7 +1650,7 @@ void Game::drawFreeFlightSetup(const FrameParams& fp) {
   g_ren.rectGrad(0, 0, W, 110 * s, C_PANEL, vec3(0.007f, 0.018f, 0.032f), 0.96f);
   g_ren.text(x, 22 * s, 28 * s, "FREE FLIGHT", C_TEXT, 1);
   g_ren.text(x, 61 * s, 14 * s, realEarth ? "Fly Solace, the real Earth or generated destinations. No fees, missions or career changes." :
-             "Fly Solace or generated Earth destinations. No fees, missions or career changes.", C_DIM, 1);
+             "Fly Solace or generated Earth destinations. No fees, missions or career changes. (The real Earth: its pack in an earth folder beside the game.)", C_DIM, 1);
   const float selectW = std::max(240 * s, W - (realEarth ? 640 : 490) * s);
   if (button(x, 86 * s, 30 * s, 28 * s, "<")) freeRegion = (freeRegion + (int)freeRegions.size() - 1) % (int)freeRegions.size();
   if (button(x + selectW - 30 * s, 86 * s, 30 * s, 28 * s, ">")) freeRegion = (freeRegion + 1) % (int)freeRegions.size();

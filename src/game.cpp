@@ -798,6 +798,8 @@ void Game::loadFreeRegion(int index, GameScreen after) {
       g_roadTraffic = RoadTraffic{};
       g_groundPits.clear();
       regionLoadStage = 1;
+      // (a real-Earth chart: its fine elevation fetched first where it can be - offline, a few seconds lost, then ETOPO's)
+      if (earthCharts::isEarthId(target.id)) if (auto* fetch = glo90()) { wantGlo90(target.origin); fetch->settle(40.0); }
       // Release the old terrain first: a second full region is never resident.
       g_world = World{};
       if (target.authored) g_world.build(path, stamp, save);
@@ -1134,6 +1136,17 @@ void Game::updateEarthFlight() {
   g_scenery.resumeStreaming(); earthSceneryDraining = false;
 }
 
+// The real Earth's fine elevation (earth_fetch.h): the fetcher made when first wanted, and the tiles a chart at a place reads
+earthFetch::Glo90Fetcher* Game::glo90() {
+  if (!glo90Fetch && !earthCharts::glo90Cache().empty() && earthCharts::pack())
+    glo90Fetch = std::make_unique<earthFetch::Glo90Fetcher>(earthCharts::glo90Cache());
+  return glo90Fetch.get();
+}
+void Game::wantGlo90(const geo::Position& where) {
+  auto pack = earthCharts::pack();
+  if (auto* fetch = glo90(); fetch && pack) fetch->want(*pack, earthFetch::tilesAround(where.latitude, where.longitude, WORLD_HALF * 1.5f));
+}
+
 // The real Earth (earth_charts.h, docs/REAL_EARTH_PLAN.md section 5): one chart after another under the flight, its
 // edge never in reach. Past 5 km from its chart's centre the next is prepared ahead along the track - a minute's flying
 // on, 20 to 60 km, on the lattice; one already preparing, or ready, kept while it is within 8 km of that - and the flight
@@ -1148,6 +1161,11 @@ void Game::slideEarthChart(const regionTravel::Chart& chart) {
   horizontal = normalize(horizontal);
   const float out = hypotf(plane.pos.x, plane.pos.z);
   std::string wanted = flightRegion.id;   // (ids alone each frame: a chart's name is looked up once, when it starts)
+  {   // (and every two seconds the fine elevation the next chart will read, fetched ahead of it)
+    const vec3 ahead = plane.pos + horizontal * std::clamp(speed * 60.f, 20000.f, 60000.f);
+    glo90WantT -= 1.f / 60.f;
+    if (glo90WantT <= 0.f) { glo90WantT = 2.f; wantGlo90(chart.position(ahead)); }
+  }
   if (out > 5000.f && !plane.onGround && !crashed) {
     const vec3 aim = plane.pos + horizontal * std::clamp(speed * 60.f, 20000.f, 60000.f);
     auto near = [&](const geo::Position& origin) { const vec3 c = chart.local(origin); return hypotf(c.x - aim.x, c.z - aim.z) < 8000.f; };
