@@ -2,6 +2,7 @@
 and, where NumPy is installed, the fixture's expect.txt is what the reference sampler reads from it today (so the
 C++ reader's parity test, tests/earth_data_test.cpp, checks against the tools as they are)."""
 import array
+import json
 import os
 import random
 import shutil
@@ -110,6 +111,57 @@ def test_tables_roundtrip():
           tables.surface_code("WATER") == 7 and tables.surface_code("") == 0, "runway surfaces")
 
 
+def test_parts_index():
+    """A pack built in parts (build --part, then index): the index lists every part's files, the sources once, the box
+    round them all, and it verifies; a part's file missing, or written by two parts, is refused."""
+    tmp = tempfile.mkdtemp()
+    try:
+        w = 122
+        flat = svb.encode_raster(array.array("h", [12] * (w * w)), svb.TYPE_INT16, w)
+
+        def part(root, name, south, west, sources):
+            path = svb.bundle_path(root, svb.LAYER_ELEV, south, west)
+            size = svb.write_bundle(path, svb.LAYER_ELEV, svb.TYPE_INT16, south, west, 120, 1, {(south + 1, west + 2): flat})
+            os.makedirs(os.path.join(root, "parts"), exist_ok=True)
+            with open(os.path.join(root, "parts", name + ".json"), "w") as f:
+                json.dump({"box": [south, west, south + 10, west + 30], "sources": sources,
+                           "files": {os.path.relpath(path, root).replace(os.sep, "/"): size}}, f)
+        etopo = {"name": "ETOPO 2022 30s surface", "licence": "CC0-1.0", "file": "e.tif", "bytes": 1, "sha256": "0"}
+        root = os.path.join(tmp, "pack")
+        part(root, "a", 40, -80, [etopo])
+        part(root, "b", -10, 100, [etopo, {"name": "GRIP4 GRIP4_Region6_vector_shp.zip", "licence": "CC-BY-4.0"}])
+        check(build.index(root) == [], "two parts indexed")
+        check(not build.verify(root), "the pack of two parts verifies: %s" % build.verify(root))
+        manifest = json.load(open(os.path.join(root, "manifest.json")))
+        check(manifest["box"] == [-10, -80, 50, 130], "the box round both parts")
+        check(len(manifest["sources"]) == 2, "each source once")
+        check(not os.path.exists(os.path.join(root, "parts")), "the parts' records removed")
+        check("licenses/ATTRIBUTION.txt" in manifest["files"], "the attribution written")
+        bad = os.path.join(tmp, "bad")
+        part(bad, "a", 40, -80, [etopo])
+        part(bad, "b", 40, -80, [etopo])
+        dist = os.path.join(tmp, "dist")
+        names = build.package(root, dist, max_bytes=1)
+        check(len(names) == 3, "packaged in zips under the size given, a file each (%d)" % len(names))
+        import zipfile
+        unpacked = os.path.join(tmp, "unpacked")
+        for n in names:
+            zipfile.ZipFile(os.path.join(dist, n)).extractall(unpacked)
+        first = zipfile.ZipFile(os.path.join(dist, names[0])).namelist()
+        check("earth/pack.idx" in first and "earth/manifest.json" in first, "the index in the first zip")
+        check(not build.verify(os.path.join(unpacked, "earth")), "the zips unpack into a pack that verifies")
+        sums = open(os.path.join(dist, "SHA256SUMS")).read().split("\n")
+        check(all(any(line.endswith("  " + n) for line in sums) for n in names), "SHA256SUMS lists every zip")
+        check(any("two parts" in p for p in build.index(bad)), "a file written by two parts is refused")
+        missing = os.path.join(tmp, "missing")
+        part(missing, "a", 40, -80, [etopo])
+        os.remove(svb.bundle_path(missing, svb.LAYER_ELEV, 40, -80))
+        check(any("missing" in p for p in build.index(missing)), "a part's file missing is refused")
+        check(not os.path.exists(os.path.join(missing, "pack.idx")), "and no index written")
+    finally:
+        shutil.rmtree(tmp)
+
+
 def test_expectations():
     try:
         import numpy  # noqa: F401
@@ -133,6 +185,7 @@ if __name__ == "__main__":
     test_bundle_roundtrip()
     test_roads_roundtrip()
     test_tables_roundtrip()
+    test_parts_index()
     test_expectations()
     print("earth2_pack_test: %s" % ("ok" if not failures else "%d failures" % failures))
     sys.exit(1 if failures else 0)

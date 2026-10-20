@@ -48,7 +48,10 @@ def read_grip(zip_path, box, margin=0.05):
     count, record_len, fields = _dbf_fields(dbf)
     rtp, rse = fields["GP_RTP"], fields["GP_RSE"]
     s, w, n, e = box[0] - margin, box[1] - margin, box[2] + margin, box[3] + margin
-    shp.read(100)
+    head = shp.read(100)
+    xmin, ymin, xmax, ymax = struct.unpack_from("<4d", head, 36)
+    if xmax < w or xmin > e or ymax < s or ymin > n:   # (a region elsewhere: not read through)
+        return
     for _ in range(count):
         rec_head = shp.read(8)
         if len(rec_head) < 8:
@@ -74,6 +77,25 @@ def read_grip(zip_path, box, margin=0.05):
 
 def _q(lat, lon):
     return (int(round(lat * 1e7)), int(round(lon * 1e7)))
+
+
+def _pack(p):
+    """A quantised point as one int, ordered as the (lat, lon) pair is: a third of a pair's memory"""
+    return ((p[0] + 0x80000000) << 32) | (p[1] + 0x80000000)
+
+
+def _unpack(k):
+    return ((k >> 32) - 0x80000000, (k & 0xFFFFFFFF) - 0x80000000)
+
+
+def quantise_lines(lines):
+    """(class, surface, [(lat, lon)]) -> (class, surface, [packed points]), repeated points dropped, lines of fewer
+    than two points left out: what build_edges works on (a caller with millions of lines packs them as it reads)."""
+    for cls, surf, line in lines:
+        q = [_pack(_q(*p)) for p in line]
+        dedup = [q[0]] + [b for a, b in zip(q, q[1:]) if b != a]
+        if len(dedup) >= 2:
+            yield cls, surf, dedup
 
 
 def _metres(a, b):
@@ -116,16 +138,12 @@ def _simplify(pts, tol):
     return [p for p, kp in zip(pts, keep) if kp]
 
 
-def build_edges(lines):
+def build_edges(lines, quantised=False):
     """lines: (class, surface, [(lat, lon)]) -> edges [(class, surface, [quantised points])]: split at every
     junction (an end of any line met by a point of another), chained through the points where just two lines of the
-    same class and surface meet end to end, simplified, and cut into pieces of at most MAX_EDGE_M."""
-    qlines = []
-    for cls, surf, line in lines:
-        q = [_q(*p) for p in line]
-        dedup = [q[0]] + [b for a, b in zip(q, q[1:]) if b != a]
-        if len(dedup) >= 2:
-            qlines.append((cls, surf, dedup))
+    same class and surface meet end to end, simplified, and cut into pieces of at most MAX_EDGE_M. quantised: the
+    lines are quantise_lines' already."""
+    qlines = lines if quantised else list(quantise_lines(lines))
     ends = {}
     for cls, surf, q in qlines:
         for p in (q[0], q[-1]):
@@ -185,7 +203,7 @@ def build_edges(lines):
         # a canonical direction (the smaller end first), so the same chain is the same edge whichever piece it began at
         if chain[-1] < chain[0]:
             chain.reverse()
-        simple = _simplify(chain, SIMPLIFY_M)
+        simple = _simplify([_unpack(k) for k in chain], SIMPLIFY_M)
         for part in _cut(simple):
             edges.append((cls, surf, part))
     return edges

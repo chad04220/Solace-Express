@@ -3,12 +3,20 @@
   python3 -m tools.earth2 build --out PACK --box SOUTH WEST NORTH EAST \\
       --etopo ETOPO_30s(.bin with .hdr, or GeoTIFF) --cover CGLS_LC100(.tif or URL) \\
       --airports airports.csv --runways runways.csv --places cities500.zip --grip GRIP4_RegionN_vector_shp.zip ... \\
-      [--glo90-listing listing.txt] [--glo90-dir DIR] [--local-roads]
+      [--glo90-listing listing.txt] [--glo90-dir DIR] [--local-roads] [--only rasters,tables,roads,glo90] [--part NAME]
+  python3 -m tools.earth2 index PACK
+  python3 -m tools.earth2 package PACK DIST [--max-bytes N]
   python3 -m tools.earth2 verify PACK
 
 The box is in whole degrees (the tiles it covers are built); --box -90 -180 90 180 is the globe. Each source is
 recorded in manifest.json with its size and SHA-256 (a URL with the bytes actually read). pack.idx is the game's
 plain-text index of the same.
+
+A pack too big for one machine is built in parts (.github/workflows/earth-pack.yml): each part a box of whole
+10-degree blocks, or the global tables alone (--only), into one folder; --part NAME records what a part wrote in
+parts/NAME.json instead of the index, and `index` then writes the index of them all. `package` puts a pack in zips
+of at most --max-bytes each (a release's files are under 2 GB), stored, not compressed again, each unpacking into an
+earth folder; the first holds the index and the tables, and SHA256SUMS lists them all.
 """
 import argparse
 import hashlib
@@ -17,6 +25,7 @@ import os
 import shutil
 import sys
 import time
+import zipfile
 
 from . import TOOL_VERSION, glo90, roads, svb, tables
 
@@ -72,17 +81,51 @@ def tiles_in(box):
     return [(lat, lon) for lat in range(s, n) for lon in range(w, e)]
 
 
+STAGES = ("rasters", "tables", "roads", "glo90")
+
+
 def build(args):
-    from . import rasters   # (NumPy)
     box = tuple(args.box)
     out = args.out
+    only = set(args.only.split(",")) if getattr(args, "only", None) else set(STAGES)
+    if only - set(STAGES):
+        raise SystemExit("--only: %s (the stages are %s)" % (",".join(sorted(only - set(STAGES))), ",".join(STAGES)))
+    if getattr(args, "part", None) and only & {"rasters", "roads"}:   # (parts share no bundle: each whole blocks)
+        if any(edge % 10 for edge in box):
+            raise SystemExit("--part: the box's edges must be on the 10-degree blocks (%s)" % (box,))
     os.makedirs(out, exist_ok=True)
     t0 = time.time()
     files = {}
     sources = []
     log = (lambda *a: print(*a, flush=True)) if not args.quiet else (lambda *a: None)
 
-    # elevation and cover, tile by tile
+    if "rasters" in only:
+        if not args.etopo:
+            raise SystemExit("the rasters need --etopo")
+        _rasters(args, box, out, files, sources, log, t0)
+    if "tables" in only:
+        _tables(args, box, out, files, sources, log)
+    if "roads" in only:
+        _roads(args, box, out, files, sources, log, t0)
+    if "glo90" in only:
+        _glo90(args, box, out, files, sources)
+
+    if getattr(args, "part", None):
+        os.makedirs(os.path.join(out, "parts"), exist_ok=True)
+        with open(os.path.join(out, "parts", args.part + ".json"), "w") as f:
+            json.dump({"box": list(box), "files": {rel.replace(os.sep, "/"): size for rel, size in files.items()},
+                       "sources": sources}, f, indent=1, sort_keys=True)
+            f.write("\n")
+        log("part %s: %d files, %.1f MB, %.0fs" % (args.part, len(files), sum(files.values()) / 1e6, time.time() - t0))
+        return
+    _attribution(out, files)
+    write_index(out, box, files, sources)
+    log("pack %s: %d files, %.1f MB, %.0fs" % (out, len(files), sum(files.values()) / 1e6, time.time() - t0))
+
+
+def _rasters(args, box, out, files, sources, log, t0):
+    """Elevation and cover, tile by tile."""
+    from . import rasters   # (NumPy)
     etopo = rasters.open_grid(args.etopo)
     sources.append(source_record("ETOPO 2022 30s surface", args.etopo, "CC0-1.0"))
     cover_grid = rasters.open_grid(args.cover) if args.cover else None
@@ -102,7 +145,8 @@ def build(args):
         files.update(rasters.write_layer(out, svb.LAYER_COVER, cover_tiles, rasters.COVER_SPD))
     log("rasters done %.0fs" % (time.time() - t0))
 
-    # tables
+
+def _tables(args, box, out, files, sources, log):
     if args.airports:
         rows = tables.read_airports(args.airports, args.runways, None if box == (-90, -180, 90, 180) else box)
         size, na, nr = tables.write_airports(os.path.join(out, "airports.bin"), rows)
@@ -117,24 +161,49 @@ def build(args):
         sources.append(source_record("GeoNames cities500", args.places, "CC-BY-4.0"))
         log("places %d" % n)
 
-    # roads
-    if args.grip:
-        lines = []
-        for z in args.grip:
-            lines.extend(roads.read_grip(z, box))
-            sources.append(source_record("GRIP4 " + os.path.basename(z), z, "CC-BY-4.0 (working assumption)"))
-        main = [l for l in lines if l[0] != 5]
-        local = [l for l in lines if l[0] == 5]
-        lbox = getattr(args, "local_roads_box", None)
-        if lbox:   # (the test fixture: the local roads of the islands alone)
-            local = [l for l in local if any(lbox[0] <= la < lbox[2] and lbox[1] <= lo < lbox[3] for la, lo in l[2])]
-        log("roads: %d lines (%d local) %.0fs" % (len(lines), len(local), time.time() - t0))
-        files.update(roads.write_roads(out, roads.build_edges(main), box))
-        if args.local_roads and local:
-            files.update(roads.write_roads(out, roads.build_edges(local), box, svb.LAYER_LOCAL_ROADS))
-        log("roads done %.0fs" % (time.time() - t0))
 
-    # GLO-90
+BLOCK_MARGIN = 0.5   # (degrees: the lines a block's roads are noded from, past its edges)
+
+
+def _roads(args, box, out, files, sources, log, t0):
+    if not args.grip:
+        return
+    for z in args.grip:
+        sources.append(source_record("GRIP4 " + os.path.basename(z), z, "CC-BY-4.0 (working assumption)"))
+    if not getattr(args, "part", None):
+        _roads_of(args, box, box, out, files, log, t0, 0.05)
+        return
+    # A part's roads block by block, to bound the memory (a 10-degree block of Europe is millions of lines). Each block
+    # is noded from the lines within half a degree of it, so an edge crossing into the next block is the same edge,
+    # with the same id, in both: the game reads it once.
+    for south in range(box[0], box[2], 10):
+        for west in range(box[1], box[3], 10):
+            _roads_of(args, (south, west, south + 10, west + 10), box, out, files, log, t0, BLOCK_MARGIN)
+
+
+def _roads_of(args, area, box, out, files, log, t0, margin):
+    main, local = [], []
+    lbox = getattr(args, "local_roads_box", None)
+    for z in args.grip:
+        for line in roads.read_grip(z, area, margin):
+            if line[0] == 5:
+                if not args.local_roads:
+                    continue
+                if lbox and not any(lbox[0] <= la < lbox[2] and lbox[1] <= lo < lbox[3] for la, lo in line[2]):
+                    continue   # (the test fixture: the local roads of the islands alone)
+            for q in roads.quantise_lines((line,)):   # (packed as read: a block of Europe is millions of lines)
+                (local if q[0] == 5 else main).append(q)
+    if not main and not local:
+        return
+    log("roads %s: %d lines (%d local) %.0fs" % (area, len(main) + len(local), len(local), time.time() - t0))
+    files.update(roads.write_roads(out, roads.build_edges(main, quantised=True), area))
+    del main
+    if local:
+        files.update(roads.write_roads(out, roads.build_edges(local, quantised=True), area, svb.LAYER_LOCAL_ROADS))
+    log("roads %s done %.0fs" % (area, time.time() - t0))
+
+
+def _glo90(args, box, out, files, sources):
     if args.glo90_listing:
         listing = glo90.read_listing(args.glo90_listing)
         with open(os.path.join(out, "glo90.bits"), "wb") as f:
@@ -151,12 +220,45 @@ def build(args):
                 shutil.copyfile(src, os.path.join(dst, name))
                 files["glo90/" + name] = os.path.getsize(src)
 
+
+def _attribution(out, files):
     os.makedirs(os.path.join(out, "licenses"), exist_ok=True)
     with open(os.path.join(out, "licenses", "ATTRIBUTION.txt"), "w") as f:
         f.write(ATTRIBUTION)
     files["licenses/ATTRIBUTION.txt"] = len(ATTRIBUTION)
-    write_index(out, box, files, sources)
-    log("pack %s: %d files, %.1f MB, %.0fs" % (out, len(files), sum(files.values()) / 1e6, time.time() - t0))
+
+
+def index(root):
+    """The index of a pack built in parts (build --part): every part's files, which must all be there, the sources
+    they read (each once), and the box round them all; the parts' records are then removed. Returns the problems."""
+    pdir = os.path.join(root, "parts")
+    names = sorted(n for n in os.listdir(pdir) if n.endswith(".json")) if os.path.isdir(pdir) else []
+    if not names:
+        return ["%s: no parts to index" % root]
+    files, sources, seen, problems = {}, [], set(), []
+    box = None
+    for n in names:
+        part = json.load(open(os.path.join(pdir, n)))
+        b = part["box"]
+        box = b if box is None else [min(box[0], b[0]), min(box[1], b[1]), max(box[2], b[2]), max(box[3], b[3])]
+        for rel, size in part["files"].items():
+            p = os.path.join(root, rel)
+            if rel in files:
+                problems.append("%s: written by two parts" % rel)
+            elif not os.path.exists(p) or os.path.getsize(p) != size:
+                problems.append("%s (part %s): missing or changed" % (rel, n[:-5]))
+            files[rel] = size
+        for rec in part["sources"]:
+            key = json.dumps(rec, sort_keys=True)
+            if key not in seen:
+                seen.add(key)
+                sources.append(rec)
+    if problems:
+        return problems
+    _attribution(root, files)
+    write_index(root, tuple(box), files, sources)
+    shutil.rmtree(pdir)
+    return []
 
 
 def write_index(out, box, files, sources):
@@ -218,13 +320,43 @@ def verify(root):
     return problems
 
 
+def package(root, dist, max_bytes=1900000000):
+    """The zips of a pack (see the module's notes); returns their names."""
+    listed = []
+    for line in open(os.path.join(root, "pack.idx")).read().split("\n"):
+        if line.startswith("file "):
+            listed.append(line.split(" ")[1])
+    first = ["pack.idx", "manifest.json"] + [r for r in listed if "/" not in r or r.startswith("licenses/")]
+    rest = sorted(r for r in listed if r not in first)
+    bins, size = [[]], 0
+    for rel in first + rest:
+        n = os.path.getsize(os.path.join(root, rel))
+        if bins[-1] and rel not in first and size + n > max_bytes:
+            bins.append([])
+            size = 0
+        bins[-1].append(rel)
+        size += n
+    os.makedirs(dist, exist_ok=True)
+    names = []
+    for k, rels in enumerate(bins):
+        name = "earth-pack-%02d-of-%02d.zip" % (k + 1, len(bins))
+        with zipfile.ZipFile(os.path.join(dist, name), "w", zipfile.ZIP_STORED, allowZip64=True) as z:
+            for rel in rels:
+                z.write(os.path.join(root, rel), "earth/" + rel)
+        names.append(name)
+    with open(os.path.join(dist, "SHA256SUMS"), "w") as f:
+        for name in names:
+            f.write("%s  %s\n" % (sha256(os.path.join(dist, name)), name))
+    return names
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="python3 -m tools.earth2")
     sub = ap.add_subparsers(dest="cmd", required=True)
     b = sub.add_parser("build")
     b.add_argument("--out", required=True)
     b.add_argument("--box", type=int, nargs=4, required=True, metavar=("SOUTH", "WEST", "NORTH", "EAST"))
-    b.add_argument("--etopo", required=True)
+    b.add_argument("--etopo")
     b.add_argument("--cover")
     b.add_argument("--airports")
     b.add_argument("--runways")
@@ -234,11 +366,29 @@ def main(argv=None):
     b.add_argument("--glo90-listing")
     b.add_argument("--glo90-dir")
     b.add_argument("--quiet", action="store_true")
+    b.add_argument("--only", help="the stages to run, of " + ",".join(STAGES))
+    b.add_argument("--part", help="record what this part wrote (parts/PART.json) for `index`, not the index")
+    i = sub.add_parser("index")
+    i.add_argument("pack")
+    k = sub.add_parser("package")
+    k.add_argument("pack")
+    k.add_argument("dist")
+    k.add_argument("--max-bytes", type=int, default=1900000000)
     v = sub.add_parser("verify")
     v.add_argument("pack")
     args = ap.parse_args(argv)
     if args.cmd == "build":
         build(args)
+        return 0
+    if args.cmd == "index":
+        problems = index(args.pack)
+        for p in problems:
+            print("FAIL", p)
+        if problems:
+            return 1
+    if args.cmd == "package":
+        for name in package(args.pack, args.dist, args.max_bytes):
+            print(name, os.path.getsize(os.path.join(args.dist, name)))
         return 0
     problems = verify(args.pack)
     for p in problems:

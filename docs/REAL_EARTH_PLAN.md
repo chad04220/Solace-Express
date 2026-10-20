@@ -352,6 +352,42 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
   - **Base agreement.** The bases still differ by up to a metre or so where the ground is rough: bilinear texels on
     two grids.
 
+- **E5:** the game side and the build are in:
+  - **GLO-90 streaming** (`src/earth_fetch.*`). Copernicus tiles come from the AWS open data bucket into the cache
+    folder (`%LOCALAPPDATA%\SomniumVolandi\earth-glo90`). They download one at a time on a thread of their own,
+    nearest first, over WinHTTP on Windows and curl elsewhere.
+    - A tile is written beside its place and renamed in when whole.
+    - Only tiles Copernicus lists (the pack's bitmap) are asked for, and only if neither the pack nor the cache has
+      them.
+    - A failed tile isn't tried again in the session. Offline, the charts are ETOPO's as before.
+    - A chart's tiles are fetched before it is built (40 s at most). While flying, the tiles of the chart ahead are
+      asked for every two seconds.
+    - A chart built before its tiles came is built again with them: its cache key counts them.
+  - **Finding the pack.** The game looks beside the executable, then in the user's and the cache's folders, then in
+    the working folder (`earthCharts::setSearch`). Free Flight says where the pack goes when there is none.
+  - **The global build** (`.github/workflows/earth-pack.yml`, run by hand).
+    - The sources go into the Actions cache once: ETOPO's GeoTIFF (read as it is, the same samples as the grid it was
+      converted to), CGLS-LC100, GRIP4's seven regions, OurAirports, GeoNames and the GLO-90 listing.
+    - The world is built in parts of 10° by 30 to 120°, on a matrix (`build --part --only rasters,roads`). The tables
+      are built as one more part.
+    - A part's roads are built block by block, to bound the memory. The lines are packed as they are read, a point
+      to one integer, which halves the peak and gives the same bytes.
+    - Each block is noded from the lines within 0.5° of it. An edge crossing into the next block then nearly always
+      has the same id in both, and the game reads it once: 132 of the 133 edges crossing 70° W in New England. The
+      one left is a long chain cut into 5 km pieces from different starts, so a few km of it are doubled.
+    - A GRIP region whose bounds miss the block isn't read.
+    - `index` writes the pack's index from the parts and `verify` checks it. `package` puts the pack in zips under
+      2 GB, stored, each unpacking into `earth/`.
+    - The zips are kept as the run's artifacts and attached to a release only when one is named.
+    - A three-block part of New England (40-50° N, 80-50° W) builds here in about 3 minutes (44 s of rasters,
+      2.5 minutes of roads) at a peak of 2.2 GB. It writes 42 MB, 30 MB of it the New England block's local roads.
+
+  Still open in E5:
+  - **Installing from the game.** For now the zips are unpacked by hand beside the game. A download from the release,
+    with progress, would use the fetcher.
+  - **A first global run** and its size.
+  - **The far terrain** doesn't read GLO-90 yet.
+
 Decisions taken with the defaults (the owner can change them):
 - The generated regions keep working until E6. In real-Earth play the real world replaces them; they stay available
   as a "Generated Earth" choice in Free Flight.
