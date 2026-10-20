@@ -1,8 +1,0 @@
-BACKGROUND threads_limit=2 active_chart_populated=1 active_reads=17533 active_chunks=1 active_lots=26764 build_seconds=19.626
-REGION id=pr1-5-27-0 name=Quartz Continental Isles archetype=Continental fragments from_cache=0 build_seconds=19.626
-AIRPORTS count=4 objects=1181 solid_collisions=4 max_flatness_m=0.000000 max_approach_excess_m=-11.194153
-SETTLEMENTS towns=4 dry_lots=4365 road_paths=1453 road_segments=17578 road_collision_probes=64
-MEMORY world_owned_capacity_bytes=144555224 recipe_bytes=15317 streamed_chunks=62
-FLIGHT chart_repeating=0 boundary_crossings=4
-PROCESS peak_rss_kib=393096
-procedural_world_test: 10000 checks, 0 failures

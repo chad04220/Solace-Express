@@ -1,2 +1,0 @@
-Publication CPU ms: begin=0.005 cancel=0.188 commit=0.355
-PASS world upload: 110732056 bytes in 296 budgeted frames; CPU isolation, empty allocations, 256 KiB batches, ready-only publication, cancellation, failure recovery, bounded handles

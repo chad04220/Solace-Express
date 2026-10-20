@@ -1,4 +1,0 @@
-Loading strip: on-screen bounds and clear central aircraft region at five window sizes: PASS
-Hangar geometry: 3960 vertices, finite positions, unit normals, outward winding, fixed budget: PASS
-Hangar scale: metric workbench, drawers, crates, safety stripes and floor cues; all-yaw service clearance across five room sizes: PASS
-Hangar dimensions: actual mesh extrema, exact values, classified privacy, parked transform and room clearance across 96 poses; <=228 vertices: PASS

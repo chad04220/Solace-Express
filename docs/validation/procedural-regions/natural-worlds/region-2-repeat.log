@@ -1,8 +1,0 @@
-BACKGROUND threads_limit=2 active_chart_populated=1 active_reads=8249 active_chunks=1 active_lots=26764 build_seconds=9.223
-REGION id=pr1-4-17-7 name=Juniper Fjords archetype=Fjords from_cache=0 build_seconds=9.223
-AIRPORTS count=4 objects=617 solid_collisions=4 max_flatness_m=0.000000 max_approach_excess_m=-11.385193
-SETTLEMENTS towns=4 dry_lots=2530 road_paths=230 road_segments=3093 road_collision_probes=64
-MEMORY world_owned_capacity_bytes=141545613 recipe_bytes=15308 streamed_chunks=61
-FLIGHT chart_repeating=0 boundary_crossings=4
-PROCESS peak_rss_kib=393500
-procedural_world_test: 6318 checks, 0 failures

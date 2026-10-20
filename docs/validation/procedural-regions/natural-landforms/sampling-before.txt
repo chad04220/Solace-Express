@@ -1,2 +1,0 @@
-pr1-1-9-19 sample_count=2097152 seconds=0.307922 ns_per_sample=146.8 memory=2292 sum=-161258657.312
-pr1-4-17-7 sample_count=2097152 seconds=0.555127 ns_per_sample=264.7 memory=2292 sum=278108422.191

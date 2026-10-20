@@ -1,6 +1,0 @@
-[0/2] Re-checking globbed directories...
-[1/6] Building CXX object CMakeFiles/SolaceExpress.dir/src/game_research_ui.cpp.obj
-[2/6] Building CXX object CMakeFiles/SolaceExpress.dir/src/platform_win32.cpp.obj
-[3/6] Building CXX object CMakeFiles/SolaceExpress.dir/src/game_ui.cpp.obj
-[4/6] Building CXX object CMakeFiles/SolaceExpress.dir/src/game.cpp.obj
-[5/6] Linking CXX executable SomniumVolandi.exe

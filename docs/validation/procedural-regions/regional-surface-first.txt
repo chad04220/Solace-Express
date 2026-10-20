@@ -1,7 +1,0 @@
-SURFACE pr1-1-3-22 projected_triangle_max_error_m=0.000092
-SURFACE pr1-0-31-16 projected_triangle_max_error_m=0.000076
-SURFACE pr1-1-15-16 projected_triangle_max_error_m=0.000076
-SURFACE pr1-4-16-16 projected_triangle_max_error_m=0.000096
-SURFACE pr1-5-15-16 projected_triangle_max_error_m=0.000073
-SURFACE_CONTACT_BENCH queries=10000 wall_ms=22.359
-PASS regional surfaces: 10826 checks

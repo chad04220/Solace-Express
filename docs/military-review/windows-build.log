@@ -1,5 +1,0 @@
-[0/2] Re-checking globbed directories...
-[1/5] Building CXX object CMakeFiles/SolaceExpress.dir/src/game_military_ui.cpp.obj
-[2/5] Building CXX object CMakeFiles/SolaceExpress.dir/src/career.cpp.obj
-[3/5] Building CXX object CMakeFiles/SolaceExpress.dir/src/game.cpp.obj
-[4/5] Linking CXX executable SolaceExpress.exe

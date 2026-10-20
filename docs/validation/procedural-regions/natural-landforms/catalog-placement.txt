@@ -1,1 +1,0 @@
-catalog_placement: regions=6143 checks=2397110 failures=0

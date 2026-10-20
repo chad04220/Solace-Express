@@ -1,4 +1,0 @@
-[0/2] Re-checking globbed directories...
-[1/4] Building CXX object CMakeFiles/SolaceExpress.dir/src/hive_world_collision.cpp.obj
-[2/4] Building CXX object CMakeFiles/SolaceExpress.dir/src/regional_surface.cpp.obj
-[3/4] Linking CXX executable SolaceExpress.exe

@@ -75,7 +75,7 @@ The existing symmetric-transport yaw-integral decay policy now applies throughou
 
 The old four-minute maximum-reheat research-tier fixture in `flight_test` is now explicitly fixed-fuel/fixed-weight. It measures aerodynamic maximum speed, not an operational endurance claim. Separate fuel tests exercise actual reheat consumption and starvation. Production-aircraft takeoff/landing, engine-out, save, career and autopilot regressions are rerun with the new mass/capacity values.
 
-Validation logs and measured full-endurance results are recorded under `docs/validation/jet-fuel/`. The final native Release build passed `jet_fuel_test`, all six tank-to-reserve flights, and a 9/9 serial CTest run covering `flight_model_1/2/3`, `campaign_progression_2`, `career_saves`, `new_aircraft_autoland_galleon`, `new_aircraft_go_around`, `new_aircraft_performance` and their world fixture. Core-source hashes are recorded alongside the logs. This fuel validation does not claim a Windows run, sanitizer run, full combined application test suite, or Earth streaming/render validation.
+The calibration's native Release build passed `jet_fuel_test`, all six tank-to-reserve flights, and a 9/9 serial CTest run covering `flight_model_1/2/3`, `campaign_progression_2`, `career_saves`, `new_aircraft_autoland_galleon`, `new_aircraft_go_around`, `new_aircraft_performance` and their world fixture. Core-source hashes are recorded alongside the logs. This fuel validation does not claim a Windows run, sanitizer run, full combined application test suite, or Earth streaming/render validation.
 
 ### Integrated tank-to-reserve result
 

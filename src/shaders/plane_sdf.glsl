@@ -710,7 +710,7 @@ vec2 mapPlane(vec3 p){
   }
   return res;
 }
-// The Wavecrest C6's cabin trim (Codex, proposals/aircraft/wavecrest-reverie): static fittings in body coordinates (+z aft),
+// The Wavecrest C6's cabin trim (Codex's): static fittings in body coordinates (+z aft),
 // drawn for that type only (gModelId == kWavecrest in aircraft.h).
 // IDs 120 ivory composite, 121 copper anodized trim, 122 tobacco upholstery,
 // 123 dark cocoa textile, 124 warm-white lens. Static geometry ONLY.

@@ -1,6 +1,6 @@
-# Aircraft interior architecture and review
+# Aircraft interiors
 
-This branch prepares the cockpit redesign on upstream `ce435bba8063507ff2d90983b7663a477717fa20` (v3.36.3 follow-up). It preserves the newer landing-gear mechanism, aircraft outer model definitions, NVIDIA-safe gear compilation and reduced shader paths. Integration and per-aircraft verification are still being completed; this document is an architecture guide, not a claim that every occupant-space check has passed.
+How the cockpits are authored and fitted: the layout records, the crew-station fit and the live controls.
 
 ## Authored data
 
@@ -39,8 +39,9 @@ Those tests do not prove whole-cockpit ergonomics. Each changed craft also requi
 
 Native game captures must show both normal seats where applicable, daylight/night legibility, meaningful control extrema, and detail views of new supports. Empty-cabin images establish rendered geometry/legibility, not body fit. A diagnostic occupant overlay must retain real scene depth, exact checked dimensions and a paired plain reference; never use an x-ray or cutaway to conceal cockpit-solid collisions.
 
-## Preservation and publication
+## Shared files
 
-Review shared-file hunks against the pinned upstream head. Never transplant whole older `models.cpp`, `plane_parts.glsl`, `plane_sdf.glsl`, gear-material or renderer files: that would discard newer gear and driver fixes. In particular, preserve `gearStations` packing, `gearNosePose` vector division, new gear/well/floor paths, Reverie external definitions, shader retry/rejection markers and reduced variants.
-
-The requested destination is a separate review branch, with the default branch unchanged. Publish only after the prepared work and its stated checks meet the agreed quality bar. Per-craft evidence and any remaining limitations belong in the final handoff; a successful build alone is not final cockpit approval.
+Edit shared-file hunks, never whole files: transplanting an older `models.cpp`, `plane_parts.glsl`, `plane_sdf.glsl`,
+gear-material or renderer file discards newer gear and driver fixes. In particular, preserve `gearStations` packing,
+`gearNosePose` vector division, the gear, well and floor paths, Reverie's external definitions, the shader retry and
+rejection markers and the reduced variants.

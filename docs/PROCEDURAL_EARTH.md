@@ -1,215 +1,120 @@
-# Procedural Earth destinations
+# Procedural regions
 
-This review branch reuses the existing terrain, road routing, settlement growth,
-airport facilities, environment meshes, collision system and flight model. The
-new places are invented landscapes at stable geographic addresses, not a model
-of real countries, coastlines or airports. No global elevation download is needed.
+Around the authored Solace Islands the game places 6,143 generated island regions at stable addresses on the real
+globe. They are invented landscapes, not a model of real countries, coastlines or airports, and nothing is
+downloaded: each region is worked out from its address and a world seed. They reuse the game's own terrain, road
+routing, settlement growth, airport facilities, scenery meshes, collision and flight model. Free Flight can start in
+any of them, a flight can cross from one to the next, and the career travels to them.
 
-## World contract
+Code: `src/procedural_regions.*` (descriptors and recipes), `src/geo.*` (geodesy on the sphere),
+`src/region_travel.*` (charts and handoffs), `src/distant_regions.*` (the far silhouettes), `src/regional_surface.*`
+(the coarse collision fallback), and the region loading and Earth flight in `src/game.cpp`.
 
-- Solace's authored geometry and its sixteen airport indices are preserved.
-  The original world regenerated to the same 146,389,954 cache bytes as the
-  unchanged baseline in the first implementation check.
-- Generator version 1 divides a tangent cube into 6,144 address cells, reserves
-  the area around Solace, and derives a repeatable recipe from the canonical
-  address and a world seed. The menu never generates or stores the whole planet.
-- Recipes include archipelagos, volcanic chains, fjords, atolls and continental
-  fragments. Latitude affects climate. Each recipe creates four to six airfields,
-  separate protected town sites and terrain-aware roads between local places.
-- A chart has an 80 km terrain square. Generated land fades to ocean before its
-  boundary. Airport aprons, taxiways, runways and approaches use the same physical
-  terrain as collision and rendering. Nearby detailed scenery is streamed by
-  the existing bounded chunk system.
-- The runtime budget is one active full chart and one pending/retiring full chart.
-  Background generation uses a two-thread parallel-work cap. Disk caching is
-  bounded to the authored world cache and one replaceable generated-world cache.
-  The generated cache stamp incorporates generator version, terrain-recipe
-  revision, address, world seed and build identity. Terrain-content revisions
-  do not renumber addresses or change Solace's cache stamp. Airport and town
-  text is owned by an immutable recipe.
+## Addresses and recipes
+
+- Generator version 1 divides a tangent cube into 6,144 address cells at level 5, reserves the area round Solace and
+  derives a repeatable recipe from the canonical address and the world seed. Neighbouring centres are 226.52-312.73 km
+  apart; Solace's nearest generated neighbour is 196.94 km away. The menu never generates or stores the whole planet.
+- A descriptor (`procedural::Descriptor`) carries the id, the name, the origin, the archetype (archipelago, volcanic
+  chain, fjords, atolls, continental fragments; latitude picks the climate and the tropical or temperate set) and the
+  size class. The size comes from a stream of its own, so it changes nothing else about the region: 30% are small,
+  38% medium, 32% large.
+- **Small:** a few islands and two or three fields (two cones joined at their feet, one mountain block cut by three
+  fjords, two atolls, one long island with a field at each end), and two villages.
+- **Medium:** four to six fields, and four villages, one of them a market town.
+- **Large:** islands on Solace's own scale, with a city round an international airport, up to ten airports, and ten
+  villages, three of them market towns.
+- A recipe (`procedural::Recipe`) builds the region's airports, towns, landmasses (rolling islands, calderas, reef
+  rings) and fjord channels. Coastlines use 64-knot periodic profiles with headlands, bays and coves; atolls have
+  uneven lagoons, reef passages and dry inhabited arcs; fjords have curved trunks, unequal heads and tributaries.
+  Runways, aprons and town pads are graded on their own ground and every approach is kept clear. Land fades to ocean
+  before a 38 km square edge. A recipe is under 16 KiB, and sampling it is pure, thread safe and allocation free.
+- `kRecipeRevision` (3) invalidates the generated terrain caches when the landscape formulas change. It never moves
+  an address, renames a region or enters Solace's cache stamp.
+
+## Sights
+
+`Recipe::features()` works out a region's sights from its layout whenever asked (nothing is stored, so a recipe's
+memory stays as it is): volcano craters (from the rim's height), summits over 200 m off the cones (two in a small or
+medium region, three in a large one), capes, islets, the sounds between an archipelago's islands, atoll lagoons,
+fjord heads and the strait. Each has a key of its own in the region (`crater0`, `summit1`) and a name drawn from
+32-word pools shuffled by the region's seed, so neighbouring regions don't repeat each other. A small region has two
+to six, a large one five to thirteen, besides its built landmarks. They are on the GPS and the moving map as
+diamonds, the job board offers photo flights over them, and the pilot profile's passport keeps a page per region:
+its airports stamped (`regionId:CODE`) and its sights found (`regionId/key`). Four achievements count them: land
+beyond the islands, land in five regions, land at every airport in a region, find twenty sights.
+
+## In the career
+
+- `Career::region` is where the career is ("solace" until it travels) and `OwnedPlane::region` where each aircraft is
+  parked. The campaign, the trials, Defense Command and the airline stay in the islands.
+- **Travel** (`Career::destinations`, `Career::travel`): an airline ticket to the regions near this one, $120 plus
+  $0.45 a km. A Private licence reaches 450 km, a Commercial 900 km, the ATP every region listed; the islands are
+  always listed when away, and the flight home is on account when the bank can't pay. The career arrives at the
+  region's main airport (`procedural::mainAirport`).
+- Each region has its own job board, paying 15% more than the islands'. An aircraft bought there is parked there;
+  one parked elsewhere is rented instead.
+- **Long hauls**: with an aircraft that has the range (the Emissary 500 owned, the Galleon 180 rented), the board
+  offers up to two jobs to another region's main airport, flown whole across the open ocean. The destination is
+  charted on every region the flight crosses, so the HUD, the GPS and the autopilot's course hold point at it from
+  the start; the Earth flight machinery below carries the flight. Delivered, the career and the aircraft go on from
+  there; anything else calls the job off and the career stays where it set out. A long haul is never saved mid-flight.
+- Saves: a career with nothing beyond the islands writes save version 6 byte for byte. Anything away writes version
+  7, with a `region` line and `plane_region` lines. The loader reads the islands' airports from their table and a
+  region's from its recipe, never from the loaded world; a region airport its recipe no longer has moves the career
+  or the aircraft to the region's main airport and releases the job.
+- Each screen has its world (`Game::screenWorld`): the hub and the debrief stand in the career's region, the
+  research terminal in the islands, the menu in either.
 
 ## Loading and isolation
 
-Free Flight offers recommended regions and a latitude/longitude address picker.
-Selecting a descriptor is cheap; loading it replaces the actual terrain world.
-An initial loading screen remains interactive while generation runs. Initial
-world replacement joins old scenery workers and career quote readers, clears
-region-specific airport/lighthouse/collision caches and uploads the initial
-terrain. In-flight prefetch is a separate asynchronous path: candidate terrain
-and CPU navigation/road/bridge data are prepared off-thread, candidate GPU data
-is staged in bounded batches, and active flight continues while it is pending.
-Baked lots, vegetation, landmarks, furniture, ferry routes and spatial indices
-belong to each World. Candidate generation does not overwrite active scenery.
-Only a ready candidate can be published after a nonblocking scenery-reader drain.
+Selecting a descriptor is cheap; loading it replaces the actual terrain world behind an interactive loading screen.
+World replacement joins the old scenery workers and the career's quote readers, clears the region's airport,
+lighthouse and collision caches and uploads the new terrain. Scenery lots, vegetation, landmarks, road furniture,
+ferry routes and spatial indices belong to each World, so a candidate being prepared never overwrites the active
+one's.
 
-The ordinary campaign keeps its authored Solace chart and existing save format.
-Free Flight never serializes procedural airport indices into a career. Returning
-to any career/research/menu path restores the authored world before reading those
-indices. Existing and pending career saves are tested for byte and mtime stability.
+The runtime holds one active full chart and one pending or retiring chart. Background generation uses at most two
+threads. The disk cache holds the authored world and one replaceable generated world; its stamp covers the generator
+version, the recipe revision, the address, the world seed and the build.
 
-## Travel model
+## Flying between regions
 
-Procedural charts are nonrepeating: flying beyond the old 50 km seam continues
-through ocean instead of revealing a duplicate island. Surface-chart coordinates
-map to double-precision geographic positions; y remains altitude because that is
-what the existing flight model simulates. Neighboring chart changes must preserve
-geographic position, altitude, speed, attitude, fuel and elapsed flight state.
-They are not rigid ECEF rebases and do not establish native spherical/orbital physics.
+Charts are nonrepeating: past the islands' square the ocean goes on, and the next region is solid ground when you
+reach it. Chart coordinates map to double-precision geographic positions (y stays altitude, as the flight model
+simulates it). A handoff keeps the geographic position, altitude, speed, attitude, fuel and the flight's state; it is
+a change of chart, not an ECEF rebase, and physics stays local to the chart.
 
-The in-flight implementation starts heading/route-based neighbor generation from
-takeoff, stages candidate GPU data with a 2 MiB frame cap and 256 KiB calls, and
-publishes only a ready candidate after an asynchronous scenery-reader drain.
-Obsolete work is retired off-thread rather than joined in a flight frame. The
-handoff uses ownership hysteresis and a conservative ocean-clearance condition;
-plane, camera, weather and flight state are transported rather than restarted.
-The render path keeps far geometry for the active, candidate and previous region,
-with a dithered near/far transition. A multi-second terrain-shadow bake found in
-real EGL testing has been changed to incremental eight-row updates on streaming
-publication. End-to-end smoothness remains a measured acceptance gate, not a
-consequence of passing the upload-budget unit test.
+From takeoff, the regions ahead (by heading or route) are prepared off-thread: terrain, navigation, roads and bridges
+on the CPU, then the GPU data staged at most 2 MiB a frame in 256 KiB calls. Only a ready candidate is published,
+after a nonblocking drain of the scenery readers; stale work is retired off-thread. The handoff has ownership
+hysteresis and needs the aircraft clear over open ocean; the far geometry of the active, candidate and previous
+regions stays drawn, with a dithered near/far blend.
 
-If full detail arrives late, the drawable coarse proxy has a paired immutable
-collision grid. Only the active Earth Free Flight World can consult these
-foreign surfaces; candidate generation and authored career/research cannot.
-Height and geometric normals use the same projected grid triangles and clamped
-shoreline as rendering. A low/contacting aircraft pins the accepted version;
-GPU completion alone cannot replace it. A newly arriving surface is withheld
-from both rendering and collision if revealing it would put terrain under the
-aircraft. Detailed terrain and airport facilities are promoted only after the
-protected footprint is safely above both surfaces or bounded open ocean.
+If full detail is late, the drawn coarse surface has a paired collision grid of the same triangles and shoreline, so
+the ground you see is the ground you hit. An aircraft low over it pins the version it is on; a newer surface is held
+back if it would put terrain under the aircraft, and full terrain and airport facilities are promoted only once the
+aircraft is safely clear of both. The fallback has no buildings or airport services.
 
-This fallback is deliberately coarse terrain without local buildings or usable
-airport services. It prevents the former visible-land/ocean-collision mismatch,
-but does not guarantee full scenery readiness on arbitrarily slow hardware.
-The numerical contact tests cover adjacent and prolonged 260/1,200 km chart
-separations. Shared-edge coverage has a bounded floating-point tolerance; this
-does not change the authored terrain or its saved geometry.
+The horizon (`distant_regions`) samples the regions' recipes and Solace's base into 129-square silhouette meshes,
+with no heightmaps, roads, trees or towns: an immutable centre catalogue under 320 KiB, selection in every direction
+with 3 km of altitude lookahead, and a hard cap of 64 groups (reported as incomplete when it truncates). A coarse mesh
+is at most 3.75 MiB of GPU triangles, and 64 collision counterparts at most 16.25 MiB. Visual curvature uses the
+same 6,371 km Earth radius as the catalogue.
 
-The default visual curvature uses the same 6,371 km Earth radius as the catalog.
-The existing ocean mesh reaches beyond the horizon. Physics remains local-chart
-physics, and the debug flat-world radius override does not describe the normal
-horizon-coverage contract.
+## Tests and tools
 
-At address level 5, neighboring centers are 226.52–312.73 km apart. With the
-53.74 km conservative circular generated land extent, the minimum coast-to-coast ocean gap
-is 119.04 km between generated groups. Solace is an authored exception: its
-nearest generated center is 196.94 km away, with a conservative 86.63 km ocean
-gap using Solace's entire terrain-square diagonal as its land bound. These are
-useful generation lead times, but are not proof that land
-is out of sight at high altitude. Distant rendering needs to bridge publication.
-A separately authorized jet-fuel calibration is included on this review
-branch. Route warnings use the flight model's nominal remaining-range API, with
-no reserve claimed; shorter-range aircraft still need suitable route planning.
-
-## Distant coverage and memory
-
-At conventional light/research-analogue jet heights (about 14–16 km), the measured
-conservative 360-degree neighborhood is typically17–19 groups with hypothetical
-3 km summits, with a sampled maximum 24. At fictional XR mission/stress heights
-25/28/30 km, that sampled maximum becomes 32/34/36. These are envelope candidates,
-not promises that every group is visually resolvable through fog or in one camera
-view. The generated land envelope is a square; using 38 km as its disk radius
-would undercount corner cases. See the reproducible visibility report in
-`docs/validation/procedural-regions/visibility-28km-summary.md`.
-
-The lightweight horizon module independently samples analytic regional recipes
-and the raw authored Solace base into 129-square silhouette meshes, without full
-World heightmaps, roads, trees or settlements. Its immutable center catalog is
-under 320 KiB. Selection is all-directional, includes 3 km of altitude lookahead
-and a 3 km terrain-height allowance, and reports incomplete coverage when its
-hard 64-group cap truncates a request. Approximate far silhouettes omit detailed
-terrain smoothing and grading; the authoritative near mesh still comes from the
-full World. A coarse mesh is at most 3.75 MiB of expanded GPU triangle payload,
-with submerged triangles omitted in practice. Full nearby Worlds and driver/
-texture resources are separate memory costs.
-
-Exact collision counterparts retain 16-byte position/height grid vertices:
-64 full 129-square grids consume at most 17,040,384 bytes (16.25 MiB), separate
-from GPU triangles. At most two pending grids add 532,512 bytes, alongside the
-bounded two-mesh worker result. Construction temporarily uses the ordinary
-vertex grid. The older CPU-only proxy-memory measurements predate this retention
-and must not be used as the final combined allocation total.
-
-The paired renderer checkpoint completed actual generated and Solace crossings
-on llvmpipe with 278/391 ms handoff frames against its roughly 300–420 ms normal
-scene envelope. Those are diagnostic software-renderer timings, not hardware
-FPS targets. A 30 km camera selected and populated 28 groups; the three-scene
-process peaked at 1.80 GiB RSS. See `validation/procedural-regions/renderer-acceptance.md`.
-Air traffic was explicitly disabled for those measurements: earlier mixed-fleet
-shader compilation exceeded this host's process memory limit. Production traffic
-is unchanged and needs hardware-GPU validation. Do not quote World allocations
-or coarse vertex counts as total game RAM/VRAM.
-
-## Checks and review tools
-
-- `procedural_regions_test`: deterministic recipes, canonical IDs, seam/pole
-  discovery, distinct terrain families, protected airport/town footprints and
-  dry routes under strict, fast and sanitizer math.
-- `region_scenery_isolation_test`: concurrent active reads/candidate scenery
-  bakes, deterministic parity, copy detachment and move publication.
-- `distant_regions_test`: independent horizon enumeration, seam/pole/date-line
-  coverage, all five coarse landforms plus Solace, bounded allocations, invalid
-  input handling, deterministic concurrency and strict/fast-math parity.
-- `world_upload_budget_test`: staged GPU handle isolation, byte/allocation
-  budgets, commit/cancel/failure recovery and bounded repeated resources.
-- `region_scenery_test`: per-world settlement isolation, airport cache A/B/A
-  replacement, drained worker jobs, and no authored landmark/code leakage.
-- `procedural_world_test`: actual generated terrain/roads/lots/facilities,
-  flatness, approaches, production collisions, world memory, nonrepeating ocean
-  queries and real Plane crossings. `--recipe-only --region all` is a cheap check.
-- `tools/validation/procedural_world_report.py`: isolated-process fresh/replay/
-  repeat/cache-byte comparisons, wrong-descriptor rejection and optional full
-  authored Solace preservation. It does not modify its baseline cache.
-- `procedural_region_runtime_test`: real Free Flight region loading, flights,
-  cancellation, repeated requests and restoration with existing/pending saves.
-- `ui_review_harness region-<canonical-id> OUTPUT W H SCALE scene`: production
-  EGL scene capture. `freeflight0earth` captures the actual destination picker.
-- `tools/validation/procedural_render_report.py`: explicitly builds the optional
-  `ui_review_harness` target, records source/executable hashes and UTC capture
-  times, and refuses mixed-provenance output. The harness is excluded from the
-  default build; rebuilding default tests alone does not refresh it. This
-  diagnostic runner disables airborne traffic and labels that coverage limit.
-
-Validation results and limitations belong with the final review evidence. A
-passing analytic recipe test alone is not proof of a rendered or playable world.
-
-## Integration boundaries
-
-This is a local review branch, not a release. It touches Game setup/pause routing
-and loading telemetry plus renderer world ownership. A concurrent UI/branding
-branch must integrate these functional paths deliberately rather than replacing
-whole Game or renderer files. No branding or visual-style redesign is included.
-The current career save schema and authored airport IDs remain unchanged; runtime
-procedural airport identity is the region ID plus local airport index.
-
-## Landscape content revision 2
-
-The address/seed version remains 1 (`pr1-...`). A separate recipe-content
-revision invalidates generated terrain caches when landscape formulas change;
-it does not move addresses, rename destinations, change the layout seed or enter
-the authored Solace cache stamp. Before/after metadata digests match across all
-6,143 generated addresses with the default seed and eight alternate seeds.
-
-Coastlines use immutable 64-knot periodic profiles with broad asymmetric
-headlands, medium bays and smaller coves. Coastal slopes vary to reuse the
-existing beach and rock materials. Atolls have uneven lagoon boundaries, broad
-inhabited islands, narrow reef sections, seeded passages and submerged breaks
-between uninhabited motu. Their eastern airport-to-town arc stays continuously
-dry. Fjords have unequal inland ends, curved trunks, differently widened mouths
-and three connected tributaries. Narrow protected coast sectors and the
-inhabited fjord band retain access between the existing airport and town sites.
-
-Sampling remains allocation-free and thread-safe; shape profiles are generated
-from a separate salted random stream after the original layout. The existing
-runway/apron grading, town pads, approach-clearance calculation and exact 38 km
-square ocean cutoff still apply last. Recipe memory remains below 16 KiB.
-Analytic coast maps are diagnostics, not game screenshots or evidence of full
-World road/collision behavior; production captures and generation checks remain
-separate acceptance gates.
-
-`procedural_landforms_test` checks measurable atoll asymmetry and rim-width
-variety, lagoon passages, dry inhabited reef arcs, curved/branched
-ocean-connected fjords, periodic-profile continuity, exact ocean edges, memory
-and concurrent deterministic sampling. The fast-math target applies the same
-shape checks. Existing `procedural_regions_test` continues to cover the airport,
-town and dry-route invariants across its alternate-seed fixtures.
+- `procedural_regions_test`: deterministic recipes, canonical ids, seam and pole discovery, distinct landforms,
+  protected airport and town footprints and dry routes.
+- `procedural_landforms_test`: atoll asymmetry, lagoon passages, dry reef arcs, branched fjords, profile continuity,
+  exact ocean edges, memory and concurrent sampling.
+- `procedural_world_test`: the generated terrain, roads, lots and facilities, flatness, approaches, collisions,
+  memory, real Plane crossings, and each region's sights and their landmarks (`--recipe-only --region all` for a
+  cheap pass).
+- `region_scenery_isolation_test`, `region_scenery_test`, `distant_regions_test`, `world_upload_budget_test`: world
+  ownership, the far silhouettes and the staging budgets.
+- `procedural_region_runtime_test`: real Free Flight loading, flights, cancellation and restoration with saves; the
+  career's travel, a region's board, a v7 save, the world each screen stands in, and a long haul flown across and
+  delivered.
+- `tools/validation/procedural_world_report.py` and `tools/validation/procedural_render_report.py`: isolated-process
+  cache comparisons and fingerprinted renders (`ui_review_harness region-<id>` captures a region scene).

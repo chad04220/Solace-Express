@@ -30,9 +30,10 @@ were stopped; instead Codex built seeded *procedural* regions round the planet f
 (`codex/procedural-earth-regions-20261012`, merged into `claude/compassionate-davinci-4cfo20` at d829de5, for
 v3.49.5): `src/geo.*` (this plan's Phase 1 geodesy, on the sphere), 6,143 generated regions plus authored Solace,
 background generation with bounded GPU staging, distant terrain with a paired collision fallback, and ocean-crossing
-handoffs between nonrepeating charts. Its own design note is `docs/PROCEDURAL_EARTH.md`, its review
-`docs/CLAUDE_PROCEDURAL_EARTH_REVIEW.md`. Phases 2 to 5 below (the real ground, roads, airports and land cover from
-the data) are on hold unless the owner asks for them again; the career stays on Solace (Phase 6 not started).
+handoffs between nonrepeating charts. Its design note is `docs/PROCEDURAL_EARTH.md`. Phases 2 to 5 below (the real
+ground, roads, airports and land cover from the data) are on hold unless the owner asks for them again. Since v3.52.0
+the career travels to the procedural regions (airline tickets and long hauls), so Phase 6's career half is done on
+generated ground rather than real ground.
 What the merge kept from the game's side: the ground's depth prepass (`prepass_auto.h`) never runs while a region's
 far blend dithers the near terrain out, and the loading screen's progress follows only the active world.
 

@@ -1,1 +1,0 @@
-{"backend": "numpy", "level": 6, "area_samples": 2, "samples": 66564, "rss_before_KiB": 22240, "peak_RSS_KiB": 41476, "traced_peak_bytes": 3445868, "source_mapped_bytes": 933120000, "note": "Memory-only run with tracemalloc; timing intentionally omitted. RSS includes source-backed mapped pages."}

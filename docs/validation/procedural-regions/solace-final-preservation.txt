@@ -1,4 +1,0 @@
-FLIGHT chart_repeating=1 boundary_crossings=4
-SOLACE_PRESERVATION identical_bytes=146389954 airports=16 towns=26
-PROCESS peak_rss_kib=205048
-procedural_world_test: 12 checks, 0 failures

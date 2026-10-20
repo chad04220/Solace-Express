@@ -55,7 +55,7 @@ The interactions batch also traverses all15hangar rows through keyboard and D-pa
 
 The `militaryN` scenes select stable military mission ID N on a fresh career (board IDs 3,4,5,6,7,1,8,9,2); only ID 3 is initially available. Use `military4_locked`, `military4_unlocked` and `military4_completed` to compare the same XR-20 silhouette, unlocked aircraft and replay state. The unlocked/completed screenshot fixtures explicitly seed prerequisite success records; gameplay tests separately prove genuine objective/extraction unlocks. `militaryNscroll` exercises the right-hand briefing's scroll region. `military_loadingN` launches the real supplied mission and updates the loading readiness path between completed render frames; `military_loadingNlive` suppresses only the packaged photo in the fixture to exercise native exterior fallback. `military_pauseN` and `military_debriefN` show production military pause and aborted-sortie results.
 
-For this review, full production startup and native aircraft rendering succeeded on Mesa llvmpipe using the normal rendering programs. See `docs/CLAUDE_MILITARY_CAREER_REVIEW.md` for measured coverage and committed native captures. UI-only mode remains layout evidence only.
+Full production startup and native aircraft rendering run on Mesa llvmpipe with the normal rendering programs. UI-only mode remains layout evidence only.
 
 ## Research equipment and preview controls
 

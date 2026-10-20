@@ -1,7 +1,0 @@
-{
-  "unchanged_programs": 104,
-  "only_unused_world_uniforms_removed": 64,
-  "all_removed_programs_are_aircraft_bakes": true,
-  "unexpected": [],
-  "glsl_files_validated": 280
-}

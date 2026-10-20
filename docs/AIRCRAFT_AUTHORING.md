@@ -2,10 +2,7 @@
 
 How to add an aircraft to Somnium Volandi, from its numbers to its shape, materials, moving parts, cockpit, weapons,
 sound, career role and tests. It is written for whoever adds the next type, a person or an AI assistant, and reflects
-the original v3.33.0 architecture, with roster, cache and capability guidance updated for the October 2026 two-aircraft review. Where the code and this guide disagree, the code wins: fix the guide in the same change.
-
-Older material, kept for its history: `docs/design/additional-aircraft/` (Codex's proposals for the Cutwater S6, the
-Wavecrest C6 and the XR-10 / XR-20).
+the current fleet of 15 types. Where the code and this guide disagree, the code wins: fix the guide in the same change.
 
 ---
 
@@ -547,8 +544,8 @@ puts whitecaps on the crests as the wind rises. A seaplane or a ditching reads t
 - **Cost.** The owner plays at 60 fps on a mid-range GPU and prefers performance to fancy graphics. Baseline from the
   owner's v3.29.2 diagnostic: cockpit 7.4 ms, Reverie cockpit 10.1 ms, night 7.7 ms. Every line in the field or the
   material code runs for every aircraft pixel of several passes, so bound sub-fields, keep loops short, and never trace
-  the field per pixel in the mesh pass (v3.30.0 did, and the cockpit went from 7.4 to 98.9 ms). The gate
-  (`docs/WORK_PLAN.md`): the owner's `diagnostics.bat` before and after; the targeted pass improves and nothing else
+  the field per pixel in the mesh pass (v3.30.0 did, and the cockpit went from 7.4 to 98.9 ms). The gate: the
+  owner's `diagnostics.bat` before and after; the targeted pass improves and nothing else
   regresses by more than 0.2 ms.
 
 ---

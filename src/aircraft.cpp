@@ -40,7 +40,7 @@ const AircraftSpec kAircraft[] = {
    0.25f, 5.0f, 1.40f, 0.75f, 0.022f, 0.012f, 0.070f, 0.80f, 15000, 0, 55, 62, 200, 4350, 1250, false, false, true,
    30000, 60000, 85000, 0.42f, 0.050f, 0.055f, LIC_ATP, 260000, 0,
    14.0f, 0.95f, -0.58f, 1.0f, 2, 1, vec3(0.97f, 0.97f, 0.97f), vec3(0.55f, 0.08f, 0.12f), 0, 0, 3.0f, -1.2f, false, 0, .2f, 0, 1.55e-5f, 0, 11000, 200, .547f, 8000},
-  // ---- Codex's aircraft (docs/design/additional-aircraft, proposals on codex/*): Cutwater S6, Wavecrest C6, XR-10 Vigil
+  // ---- Codex's aircraft: Cutwater S6, Wavecrest C6, XR-10 Vigil
   // Cutwater S6: four-seat retractable touring piston
   {"cutwater_s6", "Cutwater S6", "Retractable low-wing tourer", ENG_PISTON, 1, 6, 3, 700.0f, 2700.0f,
   980.0f, 180.0f, 420.0f, 3, 17.10f, 11.40f, 1.552f,

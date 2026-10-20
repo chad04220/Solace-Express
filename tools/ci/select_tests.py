@@ -24,7 +24,7 @@ import argparse, fnmatch, glob, json, os, re, subprocess, sys
 # a change to any of these can change any test: run them all
 RUN_ALL = ["CMakeLists.txt", "*.cmake", "**/*.cmake", ".github/**", "tools/ci/**"]
 # never read by a test
-DOCS = ["docs/**", "*.md", "**/*.md", "LICENSE*", "proposals/**", ".gitignore", ".gitattributes"]
+DOCS = ["docs/**", "*.md", "**/*.md", "LICENSE*", ".gitignore", ".gitattributes"]
 # generated sources: what each is made from (CMakeLists.txt's add_custom_command DEPENDS)
 GENERATED = {
     "shaders_gen.h": ["src/shaders/", "tools/embed_shaders.cmake"],
