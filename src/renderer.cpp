@@ -1052,6 +1052,8 @@ Renderer::WorldUploadData Renderer::prepareWorldUpload(const World& world) {
   generationCheckpoint();
   out.roadLod = prepareRoadLod(world);
   generationCheckpoint();
+  out.coastLod = prepareCoastLod(world);
+  generationCheckpoint();
   buildBridgeMeshes(world.bridges, out.bridgeVertices, out.bridgeRanges);
   out.ceiling = 0.f;
   for (size_t i = 0; i + 1 < world.hm.size(); i += 4)
@@ -1275,7 +1277,7 @@ bool Renderer::commitWorldUpload(WorldUploadData* retired) {
   GLuint* active[] = {&texHM, &texMask, &texRoadId, &texHMax, &texData, &minimapTex};
   for (size_t i = 0; i < 6; ++i) std::swap(*active[i], stage.textures[i]);
   std::swap(vaoBridge, stage.bridgeVao); std::swap(vboBridge, stage.bridgeVbo); std::swap(vboBridgeInst, stage.bridgeInst);
-  roadLod.swap(stage.data.roadLod); bridgeRange.swap(stage.data.bridgeRanges);
+  roadLod.swap(stage.data.roadLod); coastLod.swap(stage.data.coastLod); bridgeRange.swap(stage.data.bridgeRanges);
   // Retain only lightweight geometry from the region behind us; all its full-resolution textures and CPU World
   // may be retired. The previous-previous silhouette is now in stage.farProxy and released by cancellation below.
   std::swap(previousFarRegion, activeFarRegion);

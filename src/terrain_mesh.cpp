@@ -35,6 +35,12 @@ float roadCellDistance(float cs) {
   const float x = cs / kRoadDetail;
   return x <= kRoadDetailNear ? x : sqrtf(x * kRoadDetailNear);
 }
+// along the coasts: cells no wider than this much of the distance (about 3 pixels across at 1080p), and never finer
+// than the heightfield's own texel. The sea floor's vertices are held just under the sea (kTerrainVS), so a coarse
+// cell's waterline runs along its wet corners: at the plain levels' 240 m cells 20 km off, a notched, stepped coast
+const float kCoastDetail = 0.003f;
+float coastCellAllowed(float d) { return std::max(HM_TEXEL, kCoastDetail * d); }
+float coastCellDistance(float cs) { return cs / kCoastDetail; }
 }
 
 bool Renderer::compileTerrainMesh(const std::function<void()>& step) {
@@ -585,7 +591,40 @@ std::vector<std::vector<uint8_t>> Renderer::prepareRoadLod(const World& world) {
   return roadLod;
 }
 
-void Renderer::buildRoadLod() { roadLod = prepareRoadLod(g_world); }
+std::vector<std::vector<uint8_t>> Renderer::prepareCoastLod(const World& world) {
+  generationCheckpoint();
+  std::vector<std::vector<uint8_t>> coastLod;
+  const int N0 = HM_N;
+  coastLod.assign(1, std::vector<uint8_t>((size_t)N0 * N0, 0));
+  if (world.hm.size() < (size_t)N0 * N0 * 4) return coastLod;
+  std::vector<uint8_t>& L0 = coastLod[0];
+  for (int j = 0; j < N0; j++) {
+    if ((j & 63) == 0) generationCheckpoint();
+    for (int i = 0; i < N0; i++) {
+      // the texel and its neighbours along +x and +z (the cell the mesh draws between them), each give or take its
+      // detail's reach: the waterline (or the clamped sea floor just under it) can cross anywhere in that range
+      float lo = 1e30f, hi = -1e30f;
+      for (int q = 0; q < 4; q++) {
+        const int x = std::min(i + (q & 1), N0 - 1), z = std::min(j + (q >> 1), N0 - 1);
+        const float* t = &world.hm[((size_t)z * N0 + x) * 4];
+        lo = std::min(lo, t[0] - 1.5f * t[1]); hi = std::max(hi, t[0] + 1.5f * t[1]);
+      }
+      L0[(size_t)j * N0 + i] = lo < 0.5f && hi > -0.5f;
+    }
+  }
+  for (int L = 1; (N0 >> L) >= 1; L++) {
+    const int n = N0 >> L, pn = n * 2;
+    const std::vector<uint8_t>& P = coastLod[L - 1];
+    std::vector<uint8_t> C((size_t)n * n, 0);
+    for (int j = 0; j < n; j++) for (int i = 0; i < n; i++)
+      C[(size_t)j * n + i] = P[(size_t)(2 * j) * pn + 2 * i] | P[(size_t)(2 * j) * pn + 2 * i + 1] |
+                             P[(size_t)(2 * j + 1) * pn + 2 * i] | P[(size_t)(2 * j + 1) * pn + 2 * i + 1];
+    coastLod.push_back(std::move(C));
+  }
+  return coastLod;
+}
+
+void Renderer::buildRoadLod() { roadLod = prepareRoadLod(g_world); coastLod = prepareCoastLod(g_world); }
 
 // The chunks for this view, into terrInst (origin x, z, cell size, the distance its parent stops splitting at - 0: the
 // plain levels'): the quadtree from the world down, culled against the frustum, split by distance, and along the
@@ -626,7 +665,8 @@ void Renderer::selectTerrainChunks(const FrameParams& fp) {
     return inView(lo.x - sag, hi.x + sag, lo.y - sag, hi.y + sag, lo.z - sag, hi.z + sag);
   };
   float copyX = 0.f, copyZ = 0.f;   // the copy of the islands being visited (its offset: the map repeats, world.h WRAP_HALF)
-  // L: the chunk's level (cells of T * 2^L); x0, z0: its origin (m); byRoad: its parent split for a road's sake
+  // L: the chunk's level (cells of T * 2^L); x0, z0: its origin (m); byRoad: its parent split for a road's or a
+  // coast's sake
   std::function<void(int, float, float, bool)> visit = [&](int L, float x0, float z0, bool byRoad) {
     float cs = T * ldexpf(1.f, L), S = cs * TP_CHUNK;
     // height bound: the envelope's cell maximum at the chunk's size (L >= 0), or of the texel it lies in (L < 0)
@@ -649,15 +689,24 @@ void Renderer::selectTerrainChunks(const FrameParams& fp) {
       const int i = ox >> m, j = oz >> m;
       if (i >= 0 && j >= 0 && i < n && j < n) road = roadLod[m][(size_t)j * n + i];
     }
+    // the waterline across the chunk (as the road: the chunk spans one cell at level L + 5)
+    bool coast = false;
+    if (!coastLod.empty()) {
+      const int m = std::clamp(L + 5, 0, (int)coastLod.size() - 1), n = N >> m;
+      const int i = ox >> m, j = oz >> m;
+      if (i >= 0 && j >= 0 && i < n && j < n) coast = coastLod[m][(size_t)j * n + i] != 0;
+    }
     const bool plain = d2 < kSplit * kSplit * S * S;
     const bool forRoad = !plain && road > 0.f && cs > std::max(0.5f * road, roadCellAllowed(sqrtf(d2)));
-    if (L > kMinLevel && (plain || forRoad)) {
+    const bool forCoast = !plain && coast && cs > coastCellAllowed(sqrtf(d2));
+    if (L > kMinLevel && (plain || forRoad || forCoast)) {
       float h = S * 0.5f;
-      for (int k = 0; k < 4; k++) visit(L - 1, x0 + (k & 1) * h, z0 + (k >> 1) * h, forRoad);
+      for (int k = 0; k < 4; k++) visit(L - 1, x0 + (k & 1) * h, z0 + (k >> 1) * h, forRoad || forCoast);
     } else {
-      // (a chunk with a road on it there for the road's sake morphs onto its parent's grid by the distance the parent
-      // stops splitting for the road; the rest - plain, or a road's neighbour - by the plain levels')
-      const float merge = byRoad && road > 0.f ? roadCellDistance(2.f * cs) : 0.f;
+      // (a chunk with a road or the waterline on it there for its sake morphs onto its parent's grid by the distance
+      // the parent stops splitting for it; the rest - plain, or a neighbour - by the plain levels')
+      const float merge = byRoad ? std::max(road > 0.f ? roadCellDistance(2.f * cs) : 0.f,
+                                            coast ? coastCellDistance(2.f * cs) : 0.f) : 0.f;
       // (wholly past its morph - kTerrainVS's m reaches 1 at 0.95 of the distance it morphs by - every vertex the
       // parent lacks lies on the parent's grid: the coarse grid draws the same surface)
       const float Dm = 0.95f * (merge > 0.f ? merge : kSplit * 2.f * S);

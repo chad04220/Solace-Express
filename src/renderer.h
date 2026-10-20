@@ -249,7 +249,7 @@ public:
   struct WorldUploadData {
     std::vector<V4> data;
     std::vector<uint32_t> roadHead;
-    std::vector<std::vector<uint8_t>> minimapLevels, roadLod;
+    std::vector<std::vector<uint8_t>> minimapLevels, roadLod, coastLod;
     std::vector<EVert> bridgeVertices;
     std::vector<BridgeMeshRange> bridgeRanges;
     float ceiling = 20.f;
@@ -614,6 +614,7 @@ private:
   bool feedsWanted(const FrameParams& fp) const;
   static std::vector<V4> prepareWorldData(const World& world);
   static std::vector<std::vector<uint8_t>> prepareRoadLod(const World& world);
+  static std::vector<std::vector<uint8_t>> prepareCoastLod(const World& world);
   struct WorldUploadSlice {
     unsigned texture = 0; int level = 0, width = 0, height = 0, row = 0;
     GLenum internalFormat = 0, format = 0, type = 0;
@@ -765,6 +766,9 @@ private:
   // each level up a quarter as many cells) the narrowest graded road's half platform whose platform or the 20 m beside
   // it reaches the cell (m, rounded up; 0: none)
   std::vector<std::vector<uint8_t>> roadLod;
+  // where the waterline runs, for the terrain mesh's detail along the coasts: per level as roadLod, 1 where the ground
+  // (its base give or take its detail) crosses sea level in the cell
+  std::vector<std::vector<uint8_t>> coastLod;
   void buildRoadLod();
   // the stars (sky.cpp): the catalogue binned for the lighting pass's lookup; bound with the sky's frame for a view
   GLuint texStarCells = 0, texStars = 0; int starCellsG = 0, starTexW = 0;
