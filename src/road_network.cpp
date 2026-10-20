@@ -775,11 +775,13 @@ bool pavesTexel(const RoadSegment& s, int i, int j) {
 static void buildRoadGridImpl(const World* world, const RoadNetwork& net, RoadGrid& grid) {
   generationCheckpoint();
   grid.segs.clear(); grid.list.clear(); grid.head.assign((size_t)RoadGrid::N * RoadGrid::N, 0);
-  for (size_t pi = 0; pi < net.paths.size(); pi++) {
-    generationCheckpoint();
+  // (each stage below in parallel - by path, by run of segments, by band of rows - and each gives what the one thread
+  // did, in the same order: the grid is the same however many cores build it)
+  std::vector<std::vector<RoadSegment>> perPath(net.paths.size());
+  parallelFor((int)net.paths.size(), [&](int pi) {
     const RoadPath& p = net.paths[pi];
     const int n = (int)p.pts.size();
-    if (n < 2) continue;
+    if (n < 2) return;
     // each run of bridge, of road by an airfield, of graded road kept whole (its ends kept), the points along it
     // simplified
     std::vector<uint8_t> airfield(n - 1);
@@ -799,10 +801,11 @@ static void buildRoadGridImpl(const World* world, const RoadNetwork& net, RoadGr
       // profile held on it there)
       if (airfield[a]) seg.flags |= RS_NOGRADE;
       for (int k = a; k < b; k++) along += hypotf(p.pts[k + 1].x - p.pts[k].x, p.pts[k + 1].z - p.pts[k].z);
-      grid.segs.push_back(seg);
+      perPath[pi].push_back(seg);
       a = b;
     }
-  }
+  });
+  for (auto& v : perPath) { grid.segs.insert(grid.segs.end(), v.begin(), v.end()); std::vector<RoadSegment>().swap(v); }
   // the texels each segment's reach (its platform and widest banks) overlaps: a capsule against each texel's square
   const float T = 2.f * WORLD_HALF / RoadGrid::N;
   std::vector<std::vector<uint32_t>> at((size_t)RoadGrid::N * RoadGrid::N);
@@ -825,48 +828,76 @@ static void buildRoadGridImpl(const World* world, const RoadNetwork& net, RoadGr
     }
     return P + std::min(need + 6.f, most);
   };
-  for (size_t si = 0; si < grid.segs.size(); si++) {
-    generationCheckpoint();
+  const size_t S = grid.segs.size();
+  std::vector<float> reach(S);
+  parallelFor((int)((S + 1023) / 1024), [&](int c) { for (size_t si = (size_t)c * 1024; si < std::min(S, (size_t)c * 1024 + 1024); si++) reach[si] = reachOf(grid.segs[si]); });
+  // (the segments each band of 32 rows of texels can hold, in order; each band then filled on its own)
+  constexpr int kBand = 32;
+  std::vector<std::vector<uint32_t>> bands(RoadGrid::N / kBand);
+  for (size_t si = 0; si < S; si++) {
+    if ((si & 4095u) == 0) generationCheckpoint();
     const RoadSegment& s = grid.segs[si];
-    const float R = reachOf(s);
-    const int i0 = RoadGrid::cell(std::min(s.ax, s.bx) - R), i1 = RoadGrid::cell(std::max(s.ax, s.bx) + R);
-    const int j0 = RoadGrid::cell(std::min(s.az, s.bz) - R), j1 = RoadGrid::cell(std::max(s.az, s.bz) + R);
-    const float dx = s.bx - s.ax, dz = s.bz - s.az, L2 = std::max(dx * dx + dz * dz, 1e-6f);
-    for (int j = j0; j <= j1; j++) for (int i = i0; i <= i1; i++) {
-      // nearest point of the segment to the texel's centre, then the texel's half-diagonal as slack
-      const float cx = -WORLD_HALF + (i + 0.5f) * T, cz = -WORLD_HALF + (j + 0.5f) * T;
-      const float t = std::clamp(((cx - s.ax) * dx + (cz - s.az) * dz) / L2, 0.f, 1.f);
-      if (hypotf(s.ax + dx * t - cx, s.az + dz * t - cz) > R + T * 0.7072f) continue;
-      at[(size_t)j * RoadGrid::N + i].push_back((uint32_t)si);
-    }
+    const int j0 = RoadGrid::cell(std::min(s.az, s.bz) - reach[si]), j1 = RoadGrid::cell(std::max(s.az, s.bz) + reach[si]);
+    for (int b = j0 / kBand; b <= j1 / kBand; b++) bands[b].push_back((uint32_t)si);
   }
+  parallelFor((int)bands.size(), [&](int band) {
+    for (size_t q = 0; q < bands[band].size(); q++) {
+      if ((q & 1023u) == 0) generationCheckpoint();
+      const uint32_t si = bands[band][q];
+      const RoadSegment& s = grid.segs[si];
+      const float R = reach[si];
+      const int i0 = RoadGrid::cell(std::min(s.ax, s.bx) - R), i1 = RoadGrid::cell(std::max(s.ax, s.bx) + R);
+      const int j0 = std::max(RoadGrid::cell(std::min(s.az, s.bz) - R), band * kBand), j1 = std::min(RoadGrid::cell(std::max(s.az, s.bz) + R), band * kBand + kBand - 1);
+      const float dx = s.bx - s.ax, dz = s.bz - s.az, L2 = std::max(dx * dx + dz * dz, 1e-6f);
+      for (int j = j0; j <= j1; j++) for (int i = i0; i <= i1; i++) {
+        // nearest point of the segment to the texel's centre, then the texel's half-diagonal as slack
+        const float cx = -WORLD_HALF + (i + 0.5f) * T, cz = -WORLD_HALF + (j + 0.5f) * T;
+        const float t = std::clamp(((cx - s.ax) * dx + (cz - s.az) * dz) / L2, 0.f, 1.f);
+        if (hypotf(s.ax + dx * t - cx, s.az + dz * t - cz) > R + T * 0.7072f) continue;
+        at[(size_t)j * RoadGrid::N + i].push_back(si);
+      }
+    }
+    // those paving the texel first: the painting reads no further (roadEntryRows marks where it can stop)
+    for (int j = band * kBand; j < band * kBand + kBand; j++) for (int i = 0; i < RoadGrid::N; i++) {
+      if (i == 0) generationCheckpoint();
+      auto& v = at[(size_t)j * RoadGrid::N + i];
+      if (v.size() > 1) std::stable_partition(v.begin(), v.end(), [&](uint32_t si) { return pavesTexel(grid.segs[si], i, j); });
+    }
+  });
+  std::vector<std::vector<uint32_t>>().swap(bands);
   for (size_t c = 0; c < at.size(); c++) {
     if ((c & 1023u) == 0) generationCheckpoint();
     if (at[c].empty()) continue;
-    // those paving the texel first: the painting reads no further (roadEntryRows marks where it can stop)
-    const int ci = (int)(c % RoadGrid::N), cj = (int)(c / RoadGrid::N);
-    std::stable_partition(at[c].begin(), at[c].end(), [&](uint32_t si) { return pavesTexel(grid.segs[si], ci, cj); });
     const size_t n = std::min<size_t>(at[c].size(), 63);   // (never more than a few dozen: junctions of three roads)
     if (grid.list.size() + n > RoadGrid::kFirstMask) break;   // (the bits a texel's first entry has: roads_test watches)
     grid.head[c] = (uint32_t)n << RoadGrid::kFirstBits | (uint32_t)grid.list.size();
     grid.list.insert(grid.list.end(), at[c].begin(), at[c].begin() + n);
   }
-  // the coarse index
-  const float CS = 2.f * WORLD_HALF / RoadGrid::NC, reach = 500.f;
+  std::vector<std::vector<uint32_t>>().swap(at);
+  // the coarse index (by row of cells, each from the segments its reach can hold)
+  const float CS = 2.f * WORLD_HALF / RoadGrid::NC, nearReach = 500.f;
   std::vector<std::vector<uint32_t>> near((size_t)RoadGrid::NC * RoadGrid::NC);
   auto ccell = [&](float v) { return std::clamp((int)floorf((v + WORLD_HALF) / CS), 0, RoadGrid::NC - 1); };
-  for (size_t si = 0; si < grid.segs.size(); si++) {
-    generationCheckpoint();
+  std::vector<std::vector<uint32_t>> rows(RoadGrid::NC);
+  for (size_t si = 0; si < S; si++) {
+    if ((si & 4095u) == 0) generationCheckpoint();
     const RoadSegment& s = grid.segs[si];
-    const float dx = s.bx - s.ax, dz = s.bz - s.az, L2 = std::max(dx * dx + dz * dz, 1e-6f);
-    for (int j = ccell(std::min(s.az, s.bz) - reach); j <= ccell(std::max(s.az, s.bz) + reach); j++)
-      for (int i = ccell(std::min(s.ax, s.bx) - reach); i <= ccell(std::max(s.ax, s.bx) + reach); i++) {
+    for (int j = ccell(std::min(s.az, s.bz) - nearReach); j <= ccell(std::max(s.az, s.bz) + nearReach); j++) rows[j].push_back((uint32_t)si);
+  }
+  parallelFor(RoadGrid::NC, [&](int j) {
+    for (size_t q = 0; q < rows[j].size(); q++) {
+      if ((q & 1023u) == 0) generationCheckpoint();
+      const uint32_t si = rows[j][q];
+      const RoadSegment& s = grid.segs[si];
+      const float dx = s.bx - s.ax, dz = s.bz - s.az, L2 = std::max(dx * dx + dz * dz, 1e-6f);
+      for (int i = ccell(std::min(s.ax, s.bx) - nearReach); i <= ccell(std::max(s.ax, s.bx) + nearReach); i++) {
         const float cx = -WORLD_HALF + (i + 0.5f) * CS, cz = -WORLD_HALF + (j + 0.5f) * CS;
         const float t = std::clamp(((cx - s.ax) * dx + (cz - s.az) * dz) / L2, 0.f, 1.f);
-        if (hypotf(s.ax + dx * t - cx, s.az + dz * t - cz) > reach + CS * 0.7072f) continue;
-        near[(size_t)j * RoadGrid::NC + i].push_back((uint32_t)si);
+        if (hypotf(s.ax + dx * t - cx, s.az + dz * t - cz) > nearReach + CS * 0.7072f) continue;
+        near[(size_t)j * RoadGrid::NC + i].push_back(si);
       }
-  }
+    }
+  });
   grid.nearHead.assign(near.size(), 0); grid.nearList.clear();
   for (size_t c = 0; c < near.size(); c++) {
     if ((c & 1023u) == 0) generationCheckpoint();

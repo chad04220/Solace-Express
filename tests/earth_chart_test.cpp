@@ -5,6 +5,7 @@
 #include "../src/world.h"
 #include "../src/earth_charts.h"
 #include "../src/region_travel.h"
+#include "../src/scenery.h"
 #include <chrono>
 #include <map>
 
@@ -49,11 +50,20 @@ int main(int argc, char** argv) {
     for (uint32_t si : w.roadGrid.list) ent[w.roadGrid.segs[si].cls]++;
     for (const auto& s : w.roadGrid.segs) segs[s.cls]++;
     for (int c = 0; c < RC_COUNT; c++) if (len[c] > 0) printf("  class %d: %.0f km, %zu segments, %zu grid entries\n", c, len[c] / 1000, segs[c], ent[c]);
+    printf("  %zu lots, %zu settlements\n", sceneryState(w).lots.size(), w.settlements.size());
     const size_t gpu = roadEntryRows(w.roadGrid).size() * sizeof(float);
     printf("  the road data's upload: %.1f MB\n", gpu / 1048576.0);
     check(gpu < 96u << 20, "the road data within its upload's budget");
   }
   check(w.earthChart != nullptr && w.procedural && w.detailScale < 1.f && w.regionId == chart->id, "a real-Earth World");
+  {   // the road grid built on one thread the same as on every core (buildRoadGrid's stages run in parallel)
+    RoadGrid one;
+    { ScopedParallelLimit single(1); buildRoadGrid(w, w.roads, one); }
+    bool same = one.head == w.roadGrid.head && one.list == w.roadGrid.list && one.nearHead == w.roadGrid.nearHead &&
+                one.nearList == w.roadGrid.nearList && one.segs.size() == w.roadGrid.segs.size();
+    for (size_t i = 0; same && i < one.segs.size(); i++) same = !memcmp(&one.segs[i], &w.roadGrid.segs[i], sizeof(RoadSegment));
+    check(same, "the road grid the same on one thread as on many");
+  }
   // the airport we came for, on its real heading, levelled at its height
   int at = w.findAirport(ident.c_str());
   check(at >= 0, ident + " is one of the chart's airports");
