@@ -13,6 +13,7 @@
 #include "world.h"
 #include "procedural_regions.h"
 #include "earth_fetch.h"
+#include "earth_install.h"
 #include "earth_data.h"
 #include "region_travel.h"
 #include "aircraft.h"
@@ -253,6 +254,11 @@ private:
   void setEarthAirportRoute(const earth::AirportRecord& airport);
   earthFetch::Glo90Fetcher* glo90();
   void wantGlo90(const geo::Position& where);   // the tiles a chart there reads, queued
+  // The real Earth's pack fetched and installed from the Free Flight screen when it isn't there (earth_install.h): into
+  // the user's folder's earth, where the game looks for it, and opened from there when whole
+  std::unique_ptr<earthInstall::Installer> earthInstaller;
+  bool startEarthInstall();   // false: no folder of the user's to put it in (a diskless run)
+  void updateEarthInstall();
   bool earthSceneryDraining = false, earthFacilitiesPending = false, earthPromotionDeferred = false;
   void retireEarthPrefetch(); // never joins a running job on the flight thread
   void updateEarthSurfaceContext();

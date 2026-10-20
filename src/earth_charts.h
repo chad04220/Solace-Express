@@ -16,6 +16,7 @@ constexpr const char* kIdPrefix = "earth:";
 std::shared_ptr<const earth::Pack> pack();
 std::string packError();
 void usePack(std::shared_ptr<const earth::Pack> pack);   // (the tests and tools: a pack of their own)
+void reopen();   // (the search made again: a pack installed since, earth_install.h)
 // Where the game looks for the pack, before "earth" in its working folder (beside the executable, in the user's and
 // the cache's folders), and the folder fetched GLO-90 tiles go to (earth_fetch.h): set at startup, before pack()
 void setSearch(std::vector<std::string> dirs, std::string glo90Cache);

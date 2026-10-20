@@ -1674,9 +1674,18 @@ void Game::drawFreeFlightSetup(const FrameParams& fp) {
   uiGlass = true;
   g_ren.rectGrad(0, 0, W, 110 * s, C_PANEL, vec3(0.007f, 0.018f, 0.032f), 0.96f);
   g_ren.text(x, 22 * s, 28 * s, "FREE FLIGHT", C_TEXT, 1);
-  g_ren.text(x, 61 * s, 14 * s, realEarth ? "Fly Solace, the real Earth or generated destinations. No fees, missions or career changes." :
-             "Fly Solace or generated Earth destinations. No fees, missions or career changes. (The real Earth: its pack in an earth folder beside the game.)", C_DIM, 1);
-  const float selectW = std::max(240 * s, W - (realEarth ? 800 : 490) * s);
+  // the real Earth not there: downloaded from here (earth_install.h), its progress where the screen's line goes
+  const auto* install = earthInstaller.get();
+  const bool offerInstall = !realEarth && !diskless && !saveDir.empty();
+  if (install) {
+    const bool failed = install->state() == earthInstall::Installer::FAILED;
+    g_ren.text(x, 61 * s, 14 * s, ellipsize(install->status(), W - 48 * s, 14 * s), failed ? C_WARN : C_ACCENT, 1);
+  } else {
+    g_ren.text(x, 61 * s, 14 * s, realEarth ? "Fly Solace, the real Earth or generated destinations. No fees, missions or career changes." :
+               offerInstall ? "Fly Solace or generated Earth destinations. No fees, missions or career changes. The real Earth: download it here." :
+               "Fly Solace or generated Earth destinations. No fees, missions or career changes. (The real Earth: its pack in an earth folder beside the game.)", C_DIM, 1);
+  }
+  const float selectW = std::max(240 * s, W - (realEarth || offerInstall ? 800 : 490) * s);
   if (button(x, 86 * s, 30 * s, 28 * s, "<")) freeRegion = (freeRegion + (int)freeRegions.size() - 1) % (int)freeRegions.size();
   if (button(x + selectW - 30 * s, 86 * s, 30 * s, 28 * s, ">")) freeRegion = (freeRegion + 1) % (int)freeRegions.size();
   const auto& region = freeRegions[freeRegion];
@@ -1688,6 +1697,14 @@ void Game::drawFreeFlightSetup(const FrameParams& fp) {
   if (button(x + selectW + 174 * s, 86 * s, 180 * s, 28 * s, "Choose on Earth map")) { freeRegionMap = true; uiGlass = false; return; }
   if (realEarth && button(x + selectW + 366 * s, 86 * s, 138 * s, 28 * s, "Real Earth", true, earthCharts::isEarthId(region.id))) {
     freeEarthPicker = true; earthPick = 0; uiGlass = false; return;
+  }
+  if (offerInstall) {
+    const bool running = install && install->state() == earthInstall::Installer::RUNNING;
+    const float bx = x + selectW + 366 * s, bw = 300 * s;
+    const std::string label = running ? fmt("Downloading the real Earth %.0f%%", install->progress() * 100.f) :
+                              install ? "Try the download again" : "Download the real Earth";
+    if (button(bx, 86 * s, bw, 28 * s, label, !running, !install) && startEarthInstall()) g_audio.trigger(SFX_CLICK);
+    if (running) g_ren.rect(bx + 4 * s, 110 * s, (bw - 8 * s) * std::clamp(install->progress(), 0.f, 1.f), 2 * s, C_ACCENT, 0.9f);
   }
   // what lies beyond the islands: the real Earth (Bermuda 640 km west, the American coast beyond) or the generated islands
   if (realEarth && button(x + selectW + 516 * s, 86 * s, 150 * s, 28 * s, freeGeneratedEarth ? "Beyond: generated" : "Beyond: real Earth",

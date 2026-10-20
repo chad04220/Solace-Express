@@ -66,6 +66,10 @@ void setSearch(std::vector<std::string> dirs, std::string glo90Cache) {
 }
 std::string glo90Cache() { std::lock_guard<std::mutex> g(g_lock); return g_glo90Cache; }
 std::string packError() { pack(); std::lock_guard<std::mutex> g(g_lock); return g_error; }
+void reopen() {
+  std::lock_guard<std::mutex> g(g_lock);
+  g_pack.reset(); g_opened = false; g_error.clear();
+}
 void usePack(std::shared_ptr<const earth::Pack> p) {
   std::lock_guard<std::mutex> g(g_lock);
   g_pack = std::move(p); g_opened = true; g_error = g_pack ? std::string() : "no Earth pack";

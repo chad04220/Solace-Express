@@ -4,12 +4,13 @@ name: Earth pack
 # once into the Actions cache, GRIP's roads filed by 10-degree block (tools/earth2 split-grip: a part reads its blocks'
 # files alone, and the cache stays well under its 10 GB). The world is built in parts of 10 degrees by the width asked,
 # on a matrix, with the global tables beside them. One job then indexes the parts into a pack that verifies, puts it in zips under 2 GB
-# (tools/earth2 package), keeps them as the run's artifacts and, when a release is named, attaches them to it.
+# (tools/earth2 package), keeps them as the run's artifacts and, when a release is named, attaches them to it (making it
+# first when it isn't there: the game's installer, src/earth_install.h, reads the release "earth").
 on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Attach the pack to this existing release (empty: the run's artifacts only)"
+        description: "Attach the pack to this release, made when it isn't there (the game's installer reads \"earth\"; empty: the run's artifacts only)"
         required: false
         default: ""
       part_width:
@@ -168,4 +169,9 @@ jobs:
         if: inputs.release_tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ inputs.release_tag }}" dist/* --clobber --repo "$GITHUB_REPOSITORY"
+        run: |
+          gh release view "${{ inputs.release_tag }}" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1 ||
+            gh release create "${{ inputs.release_tag }}" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --latest=false \
+              --title "The real Earth (data pack)" \
+              --notes "The real Earth's data pack, which the game downloads from its Free Flight screen. Built by the Earth pack workflow from ETOPO 2022, Copernicus GLO-90 (fetched as flown), CGLS-LC100, GRIP4, OurAirports and GeoNames; their licences are in the pack's licenses folder."
+          gh release upload "${{ inputs.release_tag }}" dist/* --clobber --repo "$GITHUB_REPOSITORY"

@@ -364,7 +364,22 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
       asked for every two seconds.
     - A chart built before its tiles came is built again with them: its cache key counts them.
   - **Finding the pack.** The game looks beside the executable, then in the user's and the cache's folders, then in
-    the working folder (`earthCharts::setSearch`). Free Flight says where the pack goes when there is none.
+    the working folder (`earthCharts::setSearch`).
+  - **Installing from the game** (`src/earth_install.*`). With no pack, Free Flight offers "Download the real Earth".
+    - The zips listed in `SHA256SUMS` come from the release `earth` of the game's repository, or from the address on
+      the first line of `earth-source.txt` beside the game. They download one after another over the fetcher's own
+      transfer. The button shows the share done; the line under the title shows the zip and its megabytes so far.
+    - Each zip is unpacked into a staging folder as it comes, then deleted, so the disk holds the pack and one zip at
+      most. The reader takes stored zips only (zip64 too), checks each file's CRC, and refuses a name that would leave
+      its folder.
+    - The result must open as a pack before it is moved into the user's folder (`%APPDATA%\SomniumVolandi\earth`).
+      A folder already there is set aside and put back if the move fails. The game then opens the pack without a
+      restart.
+    - A failure says why, removes the download, and offers to try again. The pack already there is never touched.
+    - The workflow makes the `earth` release when it is named and isn't there.
+    - `earth_install_test` packages the fixture in four zips and installs it from a file address through curl: whole,
+      and again over the last. It also checks that a missing source and a damaged zip each fail and leave the pack as
+      it was, and that the zip reader refuses compressed zips and escaping names.
   - **The global build** (`.github/workflows/earth-pack.yml`, run by hand).
     - The sources go into the Actions cache once: ETOPO's GeoTIFF (read as it is, the same samples as the grid it was
       converted to), CGLS-LC100, GRIP4's seven regions, OurAirports, GeoNames and the GLO-90 listing.
@@ -388,9 +403,8 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
       2.5 minutes of roads) at a peak of 2.2 GB. It writes 42 MB, 30 MB of it the New England block's local roads.
 
   Still open in E5:
-  - **Installing from the game.** For now the zips are unpacked by hand beside the game. A download from the release,
-    with progress, would use the fetcher.
-  - **A first global run** and its size.
+  - **A first global run** and its size, then the `earth` release it fills.
+  - **Resuming a download.** A broken download starts again from the first zip.
   - **The far terrain** doesn't read GLO-90 yet.
 
 - **E6:** the first part is in. These pieces work:

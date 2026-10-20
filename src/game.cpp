@@ -1169,6 +1169,27 @@ void Game::wantGlo90(const geo::Position& where) {
   if (auto* fetch = glo90(); fetch && pack) fetch->want(*pack, earthFetch::tilesAround(where.latitude, where.longitude, WORLD_HALF * 1.5f));
 }
 
+// The real Earth's pack installed from the game (earth_install.h): its zips from the source beside the game names (a
+// release of the game's own otherwise), downloaded and unpacked in the user's folder, there beside where they go
+bool Game::startEarthInstall() {
+  if (diskless || saveDir.empty() || (earthInstaller && earthInstaller->state() == earthInstall::Installer::RUNNING)) return false;
+#ifdef _WIN32
+  const std::string sep = "\\";
+#else
+  const std::string sep = "/";
+#endif
+  earthInstaller.reset();
+  earthInstaller = std::make_unique<earthInstall::Installer>(earthInstall::sourceFor(assetDir), saveDir + sep + "earth-download", saveDir + sep + "earth");
+  return true;
+}
+void Game::updateEarthInstall() {
+  if (!earthInstaller || earthInstaller->state() != earthInstall::Installer::DONE) return;
+  earthInstaller.reset();
+  earthCharts::reopen();   // (the user's earth folder is among those the game looks in)
+  if (earthCharts::pack()) toast("The real Earth is installed: fly it from Free Flight, or out beyond the islands", vec3(.6f, 1.f, .8f), false);
+  else toast("The real Earth was installed but doesn't open: " + earthCharts::packError(), vec3(1.f, .5f, .35f), false);
+}
+
 // The real Earth (earth_charts.h, docs/REAL_EARTH_PLAN.md section 5): one chart after another under the flight, its
 // edge never in reach. Past 5 km from its chart's centre the next is prepared ahead along the track - a minute's flying
 // on, 20 to 60 km, on the lattice; one already preparing, or ready, kept while it is within 8 km of that - and the flight
@@ -5489,6 +5510,7 @@ void Game::update(float dt) {
     retryT += dt;
     if (retryT > 3.f) { retryT = 0; retryCommit(); }
   }
+  updateEarthInstall();
   // the render resolution: native, a fixed scale, or adjusted to hold the frame-rate target (Settings)
   fpsAvg = lerpf(fpsAvg, dt, 1.f - expf(-dt * 3.f));   // (a third of a second, whatever the frame rate)
   maxFrameWin = std::max(maxFrameWin, dt); maxFrameT += dt;
