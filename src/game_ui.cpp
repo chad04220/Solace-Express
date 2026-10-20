@@ -3359,6 +3359,16 @@ void Game::drawGps() {
     // click an airport to pick it for the autopilot
     if (in.mPressed[0] && !pointerOverOverlay() && inside(p, 0) && fabsf(in.mx - p.x) < 16 * s && fabsf(in.my - p.y) < 16 * s && apDest != i) { apDest = i; g_audio.trigger(SFX_CLICK); }
   }
+  // the real Earth: its airports beyond this chart (the next charts' own, there once flown into), dimmer, the larger
+  // named, every one once the map is close in
+  for (const BeyondAirport& b : beyondAirports()) {
+    const vec2 p = toR(b.pos.x, b.pos.y); if (!inside(p, -40 * s)) continue;
+    const float hl = std::max(b.length * 0.5f * k, 5 * s);
+    const vec3 c = b.size >= 1 ? vec3(0.78f, 0.84f, 0.9f) : vec3(0.62f, 0.68f, 0.74f);
+    seg(vec2(p.x - b.dir.x * hl, p.y - b.dir.y * hl), vec2(p.x + b.dir.x * hl, p.y + b.dir.y * hl), 3.5f * s, vec3(0.05f, 0.05f, 0.07f), 0.7f);
+    seg(vec2(p.x - b.dir.x * hl, p.y - b.dir.y * hl), vec2(p.x + b.dir.x * hl, p.y + b.dir.y * hl), 1.6f * s, c, 0.8f);
+    if ((b.size >= 1 || range < 15000.f) && inside(p, 30 * s)) g_ren.text(p.x + 7 * s, p.y + 3 * s, 11 * s, b.ident, c, 0.8f * e, 0, true);
+  }
   // the autopilot's approach plan: descent orbit, intercept and final approach course
   if (plane.apOn && plane.apMode == Plane::AP_APPR) {
     vec2 hc = toS(plane.apHoldC.x, plane.apHoldC.z); float hr = plane.apHoldR * k;

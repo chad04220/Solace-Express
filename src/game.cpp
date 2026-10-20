@@ -1171,6 +1171,34 @@ void Game::wantGlo90(const geo::Position& where) {
   if (auto* fetch = glo90(); fetch && pack) fetch->want(*pack, earthFetch::tilesAround(where.latitude, where.longitude, WORLD_HALF * 1.5f));
 }
 
+const std::vector<Game::BeyondAirport>& Game::beyondAirports() {
+  if (earthBeyondFor == flightRegion.id) return earthBeyond;
+  earthBeyondFor = flightRegion.id; earthBeyond.clear();
+  const auto pack = earthCharts::pack();
+  if (!pack || !earthCharts::isEarthId(flightRegion.id)) return earthBeyond;
+  const regionTravel::Chart chart(flightRegion.origin);
+  const double lat = flightRegion.origin.latitude, lon = flightRegion.origin.longitude, reach = 120000.0;
+  const double dLat = reach / 111000.0 + 0.1, dLon = dLat / std::max(std::cos(lat * PI / 180.0), 0.2);
+  for (const earth::AirportRecord& a : pack->airports({lat - dLat, lon - dLon, lat + dLat, lon + dLon})) {
+    if (a.runways.empty()) continue;
+    const vec3 p = chart.local({a.lat, a.lon, 0.0});
+    // (one in the square is g_world's, or one the chart's selection left out: never there to land on)
+    if (std::max(fabsf(p.x), fabsf(p.z)) < WORLD_HALF || hypotf(p.x, p.z) > reach) continue;
+    const earth::Runway& r = a.runways[0];
+    vec3 along;
+    if (r.endsKnown) along = chart.local({r.lat2, r.lon2, 0.0}) - chart.local({r.lat1, r.lon1, 0.0});
+    else along = chart.local(geo::destination({a.lat, a.lon, 0.0}, r.hasHeading ? r.heading : 0.0, 1000.0)) - p;
+    along.y = 0;
+    BeyondAirport b;
+    b.pos = vec2(p.x, p.z);
+    const float span = length(along);
+    b.dir = span > 1.f ? vec2(along.x / span, along.z / span) : vec2(0.f, 1.f);
+    b.length = std::max(r.length, 300.f); b.size = a.type; b.ident = a.ident;
+    earthBeyond.push_back(std::move(b));
+  }
+  return earthBeyond;
+}
+
 // The real Earth's pack installed from the game (earth_install.h): its zips from the source beside the game names (a
 // release of the game's own otherwise), downloaded and unpacked in the user's folder, there beside where they go
 bool Game::startEarthInstall() {

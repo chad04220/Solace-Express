@@ -254,6 +254,12 @@ private:
   bool freeGeneratedEarth = false;
   bool realEarthPlay() const;
   std::string earthRouteIdent;   // (the real airport a real-Earth route goes to: Game::setEarthAirportRoute)
+  // The real Earth's airports beyond the chart's square, for the GPS map (the chart's own are g_world's): read from the
+  // pack once a chart, within 120 km of its centre - where each lies on this chart, its main runway's line, its ident
+  struct BeyondAirport { vec2 pos, dir; float length = 0; int size = 0; std::string ident; };
+  std::vector<BeyondAirport> earthBeyond;
+  std::string earthBeyondFor;
+  const std::vector<BeyondAirport>& beyondAirports();
   void setEarthAirportRoute(const earth::AirportRecord& airport);
   earthFetch::Glo90Fetcher* glo90();
   void wantGlo90(const geo::Position& where);   // the tiles a chart there reads, queued

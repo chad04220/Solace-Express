@@ -107,6 +107,20 @@ struct GameTest {
     };
     slide(12000.f, 18000.f, 600.f, "at 600 m");
     slide(12000.f, 18000.f, 20.f, "at 20 m");
+    {   // the GPS map's airports beyond the chart (Game::beyondAirports): from Nantucket's, Martha's Vineyard's among them,
+        // where the Earth has it on this chart, and none in the square (those are g_world's)
+      const auto& beyond = game.beyondAirports();
+      const regionTravel::Chart here(game.flightRegion.origin);
+      bool outside = true, placed = false;
+      for (const auto& b : beyond) {
+        outside &= std::max(fabsf(b.pos.x), fabsf(b.pos.y)) >= WORLD_HALF && hypotf(b.pos.x, b.pos.y) <= 120000.f;
+        if (b.ident == "KMVY") {
+          const auto mvy = pack->airports({41.3, -70.7, 41.5, -70.5});
+          for (const auto& a : mvy) if (a.ident == "KMVY") { const vec3 p = here.local({a.lat, a.lon, 0.0}); placed = hypotf(p.x - b.pos.x, p.z - b.pos.y) < 1.f; }
+        }
+      }
+      check(!beyond.empty() && outside && placed, fmt("the GPS map's airports beyond the chart: %zu, KMVY among them in its place", beyond.size()));
+    }
     check(onlyCharts, "never a generated region wanted on the real Earth");
     printf("earth_slide_test: %s\n", failed ? "FAILED" : "passed");
     return failed ? 1 : 0;

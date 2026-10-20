@@ -479,10 +479,17 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
     - flown home;
     - the pack gone: loaded at home.
 
+  - **The GPS map beyond the chart** (`Game::beyondAirports`). The real airports within 120 km of the chart's centre
+    but outside its square are read from the pack's cell-indexed table, once for each chart, and placed on it. Each is
+    drawn dimmer than the chart's own, by its main runway's line. Medium and large ones are named; at 15 km of range and
+    less, every one is. `earth_slide_test`: from Nantucket's chart, 16 of them, Martha's Vineyard's where the Earth has
+    it.
+
   Still open in E7:
   - **The board's local work.** The local contracts at a real airport are drawn from the airports of its chart
     alone, up to 40 of them.
-  - **A spatial index** for ATC and the GPS across charts: today both see the chart's own airports.
+  - **ATC across charts.** ATC sees the chart's own airports. Since the flight is never more than about 30 km from
+    its chart's centre, the field it is near is always among them.
 
 - **E8:** the first realism pass is in: the cities built over as the land cover has them.
   - **Districts.** The cover's built-up class is read on a 400 m grid. Each stretch of it is covered by up to 56
