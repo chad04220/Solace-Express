@@ -296,6 +296,14 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
   - The road grid's GPU data is an index list plus a segment table: 40 MB for Boston, down from 136 MB. The forest
     noise moved to the road grid's second channel, so a texel's first entry has 26 bits.
 
+  - The ground material's sand keeps to the beaches on the real Earth: land under 3.5 m within two texels of the
+    sea. On Solace it covers everything up to 4.5 m, which on a real coast would sand over the marshes, the harbour
+    landfill and Logan.
+
+  Seen in renders: Boston from the harbour, with Logan on its peninsula, the harbour islands and the downtown towers.
+  Between the towns' blobs lies open grass, though, where the real metro is continuous: the settlements are circles
+  from the population, at most 1.8 km across, not yet shaped by the built-up cover. That is an E8 item.
+
   Still open in E2:
   - Boston's build time against the 10 s budget: about 25 s, down from 34. The road grid and the community lots now
     run in parallel. What remains is mostly the settlements' streets (~5 s) and the farm tracks (~3 s), each laid

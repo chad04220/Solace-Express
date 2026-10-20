@@ -391,6 +391,7 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
   wSnow = max(wSnow, uSnow*smoothstep(0.6, 0.35, slope)*step(1.0, p.y));
   float wRock = smoothstep(0.30, 0.54, slope + (n2-0.5)*0.18);
   float wSand = smoothstep(4.5 + 3.0*hNoise, 1.0, p.y) * (1.0 - wRock);
+  if (uDetailScale < 1.0) wSand *= smoothstep(0.45, 0.25, lush);   // (the real Earth: its beaches alone, World::buildEarthTerrain)
   float forestN = forestAt(p.xz);
   float wForest = smoothstep(0.42 - lush*0.1, 0.5 - lush*0.1, forestN) * smoothstep(0.35, 0.2, slope) * smoothstep(4.0, 9.0, p.y) * smoothstep(1500.0 - cold*900.0, 1100.0 - cold*700.0, p.y);
   wForest *= smoothstep(2.0, 3.0, base.y);   // airport grounds are cleared (no trees there either: amp < 2.5)

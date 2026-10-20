@@ -427,6 +427,19 @@ void World::buildEarthTerrain() {
       if (!nearLake.empty() && nearLake[k]) t[1] = std::min(t[1], 4.f);   // (nor much by a lake: no hollows under its level)
     }
   });
+  // the beaches: the low land within two texels of the sea, its lushness all but none - the ground material's sand
+  // keeps to them on the real Earth (terrain_material.glsl), not to every flat a few metres up (a marsh, a harbour's
+  // landfill, an airfield)
+  for (int j = 0; j < N; j++) for (int i = 0; i < N; i++) {
+    const size_t k = (size_t)j * N + i;
+    if (sea[k] || hm[k * 4] > 3.5f) continue;
+    bool shore = false;
+    for (int dj = -2; dj <= 2 && !shore; dj++) for (int di = -2; di <= 2 && !shore; di++) {
+      const int a = i + di, b = j + dj;
+      shore = a >= 0 && b >= 0 && a < N && b < N && sea[(size_t)b * N + a];
+    }
+    if (shore) lush[k] = std::min(lush[k], 0.12f);
+  }
   // lushness and coldness: the cover, the latitude and the height (the snowline about 5 km up in the tropics, at sea
   // level past 75 degrees)
   for (size_t k = 0; k < NN; k++) {
