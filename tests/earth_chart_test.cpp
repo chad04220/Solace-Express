@@ -6,6 +6,7 @@
 #include "../src/earth_charts.h"
 #include "../src/region_travel.h"
 #include <chrono>
+#include <map>
 
 static int failures = 0, checks = 0;
 static void check(bool ok, const std::string& what) {
@@ -88,6 +89,24 @@ int main(int argc, char** argv) {
   check(bad == 0, fmt("every texel finite (%d not)", bad));
   printf("land %.1f%%, sea %.1f%%\n", 100.0 * landN / (landN + seaN), 100.0 * seaN / (landN + seaN));
   check(landN > 0, "some land");
+  {   // the lakes (World::lakes): the ground never under a lake's level where its code is, and water where the natural
+      // ground lies under it
+    std::map<uint16_t, size_t> levels;
+    size_t coded = 0, wet = 0, low = 0;
+    for (int j = 0; j < HM_N; j++) for (int i = 0; i < HM_N; i++) {
+      const uint16_t c = w.lakes.empty() ? 0 : w.lakes[(size_t)j * HM_N + i];
+      if (!c) continue;
+      coded++;
+      const float x = -WORLD_HALF + (i + 0.5f) * HM_TEXEL, z = -WORLD_HALF + (j + 0.5f) * HM_TEXEL, level = World::lakeLevelOf(c);
+      if (w.height(x, z) < level - 1e-3f) low++;
+      if (w.naturalHeight(x, z) < level) { wet++; levels[c]++; check(w.underLake(x, z), "a lake's water is under it"); }
+    }
+    check(low == 0, fmt("the ground never under a lake's level where it lies (%zu texels under)", low));
+    size_t big = 0; for (const auto& l : levels) big += l.second >= 200;
+    printf("lakes: %zu levels, %zu of them over 30 ha; %zu texels coded, %zu under water\n", levels.size(), big, coded, wet);
+    if (ident == "KBOS") check(big >= 5, "Boston's chart has its reservoirs and ponds");
+    if (ident == "KMVY" && dir.find("fixtures/earth2") != std::string::npos) check(big >= 3, "the upper Cape's ponds (Mashpee-Wakeby, Johns, Ashumet)");
+  }
   if (dir == "tests/fixtures/earth2" || dir.find("fixtures/earth2") != std::string::npos) {
     check(seaN > landN, "the islands' chart is mostly sea");
     check(w.towns.size() >= 3, "towns on the islands");

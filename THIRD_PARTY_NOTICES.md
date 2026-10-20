@@ -63,7 +63,7 @@ inputs in `manifest.json`.
   COPERNICUS by the European Union and ESA; all rights reserved.
   - Available on a free basis for the general public under the Copernicus DEM licence.
   - Read from the AWS open data bucket `copernicus-dem-90m`.
-  - The fixture holds one tile whole and one cropped to 41.20-41.55° N.
+  - The fixture holds one tile whole and one cropped to 41.20-41.68° N.
 - **Land cover:** Copernicus Global Land Service, *Land Cover 100 m*, collection 3, epoch 2019 (Buchhorn et al. 2020),
   https://doi.org/10.5281/zenodo.3939050.
   - CC BY 4.0: https://creativecommons.org/licenses/by/4.0/.

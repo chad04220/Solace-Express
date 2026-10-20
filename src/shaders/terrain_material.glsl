@@ -570,15 +570,18 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
       }
     }
   }
-  // ---- the Fjordhaven reservoir's lake (world.h Reservoir): where its mask has water and the natural ground lies under
-  // its level (built in there: roads.glsl lakeGround) - judged on the ground itself, not the mesh over it, so its shore
-  // follows the ground's contour at any distance - deep green water, rippling; the shore just above it darkened, wet
+  // ---- the Fjordhaven reservoir's lake (world.h Reservoir), or a real-Earth chart's (World::lakes): where its mask has
+  // water and the natural ground lies under its level (built in there: roads.glsl lakeGround) - judged on the ground
+  // itself, not the mesh over it, so its shore follows the ground's contour at any distance - deep green water,
+  // rippling; the shore just above it darkened, wet
   {
-    float lm = lakeMaskAt(p.xz);
+    float lm = lakeMaskAt(p.xz), level = lakeLevel();
+    uint lc = earthLakeCode(p.xz);
+    if (lc != 0u) { lm = 1.0; level = earthLakeLevel(lc); }
     if (lm > 0.0) {
       vec2 pw = wrapW(p.xz);
       float nat = base.y < 0.01 ? base.x : base.x + base.y*uDetailScale*terrainFbm(pw/2200.0, 7);
-      float level = lakeLevel(), lake = step(0.5, lm)*(1.0 - step(level, nat));
+      float lake = step(0.5, lm)*(1.0 - step(level, nat));
       m.alb *= 1.0 - 0.35*(1.0 - smoothstep(level, level + 1.5, nat))*(1.0 - lake);
       if (lake > 0.0) {
         vec2 q = p.xz/9.0;

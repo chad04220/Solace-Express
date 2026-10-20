@@ -349,11 +349,18 @@ void profile(const World& world, RoadPath& path, float h0, float h1, const std::
   const int n = (int)path.pts.size();
   std::vector<float> ground(n), ds(n, 0.f);
   for (int k = 0; k < n; k++) ground[k] = world.groundHeight(path.pts[k].x, path.pts[k].z, 8);
+  // over water: the sea, or a lake of the real Earth's (World::lakes; the ground there its level) - its deck that far over
+  std::vector<uint8_t> wet(n);
+  std::vector<float> deckAt(n);
+  for (int k = 0; k < n; k++) {
+    const bool lake = !world.lakes.empty() && world.underLake(path.pts[k].x, path.pts[k].z);
+    wet[k] = ground[k] < 0.5f || lake;
+    deckAt[k] = (lake ? ground[k] : 0.f) + 9.f;
+  }
   for (int k = 1; k < n; k++) ds[k] = hypotf(path.pts[k].x - path.pts[k - 1].x, path.pts[k].z - path.pts[k - 1].z);
   std::vector<float> along(n, 0.f);
   for (int k = 1; k < n; k++) along[k] = along[k - 1] + ds[k];
   const float half = (path.cls == RC_HIGHWAY ? 300.f : path.cls == RC_ROAD || path.cls == RC_CIRCUIT ? 140.f : path.cls == RC_LANE ? 70.f : 50.f) * 0.5f;
-  const float deck = 9.f;   // a bridge's deck over the sea
   const float steepest = s.maxGrade;
   // the ground (over the sea, the deck's height) averaged along the road, the nearer the more (by distance: the points
   // closer round a bend than along a straight)
@@ -363,10 +370,10 @@ void profile(const World& world, RoadPath& path, float h0, float h1, const std::
     float sum = 0, wsum = 0;
     for (int q = q0; q < n && along[q] - along[k] <= half; q++) {
       const float wt = (1.f - fabsf(along[q] - along[k]) / (half + 1.f)) * 0.5f * ((q > 0 ? ds[q] : 0.f) + (q + 1 < n ? ds[q + 1] : 0.f) + 1e-3f);
-      sum += (ground[q] < 0.5f ? std::max(ground[q], deck) : ground[q]) * wt; wsum += wt;
+      sum += (wet[q] ? std::max(ground[q], deckAt[q]) : ground[q]) * wt; wsum += wt;
     }
     target[k] = sum / wsum;
-    if (ground[k] < 0.5f) target[k] = std::max(target[k], deck);
+    if (wet[k]) target[k] = std::max(target[k], deckAt[k]);
   }
   target[0] = h0; target[n - 1] = h1;
   // under an approach funnel never above what it holds the ground to (a metre's margin, the banks blending down to
@@ -374,7 +381,7 @@ void profile(const World& world, RoadPath& path, float h0, float h1, const std::
   std::vector<float> ceiling(n), floor(n);
   for (int k = 0; k < n; k++) {
     ceiling[k] = std::max(airportFunnelCeiling(world, path.pts[k].x, path.pts[k].z) - 1.f, ground[k]);
-    floor[k] = ground[k] < 0.5f ? std::min(deck, ceiling[k]) : -1e9f;
+    floor[k] = wet[k] ? std::min(deckAt[k], ceiling[k]) : -1e9f;
   }
   // by an airfield's grounds the road lies on the ground as it is (buildRoadGrid paints it there, ungraded): its points
   // held there, as its ends are
@@ -444,7 +451,7 @@ void profile(const World& world, RoadPath& path, float h0, float h1, const std::
   }
   path.bridge.assign(n - 1, 0);
   for (int k = 0; k + 1 < n; k++) {
-    const bool water = ground[k] < 0.5f || ground[k + 1] < 0.5f;
+    const bool water = wet[k] || wet[k + 1];
     const float clear = std::min(h[k] - ground[k], h[k + 1] - ground[k + 1]);
     const bool high = clear > 9.f && (!(hillside[k] && hillside[k + 1]) || clear > 15.f);
     path.bridge[k] = (water || high) && !airfield[k];
@@ -460,9 +467,9 @@ void profile(const World& world, RoadPath& path, float h0, float h1, const std::
   }
   for (int k = 0; k + 1 < n; ) {
     if (!path.bridge[k]) { k++; continue; }
-    int e = k; bool wet = false;
-    while (e + 1 < n && path.bridge[e]) { wet = wet || ground[e] < 0.5f || ground[e + 1] < 0.5f; e++; }
-    if (!wet && along[e] - along[k] < 45.f) for (int q = k; q < e; q++) path.bridge[q] = 0;
+    int e = k; bool overWater = false;
+    while (e + 1 < n && path.bridge[e]) { overWater = overWater || wet[e] || wet[e + 1]; e++; }
+    if (!overWater && along[e] - along[k] < 45.f) for (int q = k; q < e; q++) path.bridge[q] = 0;
     k = e;
   }
 }

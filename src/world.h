@@ -128,6 +128,13 @@ public:
   float lakeMaskAt(float x, float z) const;              // the mask, bilinear (0 off it)
   float lakeGround(float x, float z, float g) const;     // the ground g with the lake in it
   bool underLake(float x, float z) const;                // under the water: nothing grows or stands there
+  // A real-Earth chart's lakes (World::buildEarthTerrain): per heightfield texel the level of the lake in it or beside
+  // it (lakeCode), 0 where there is none; the ground is never below that level there, and is water where the natural
+  // ground lies under it. Empty off the real Earth. Cached
+  std::vector<uint16_t> lakes;
+  static uint16_t lakeCode(float level) { return (uint16_t)std::clamp(lroundf((level + 1000.f) * 8.f), 1L, 65535L); }
+  static float lakeLevelOf(uint16_t code) { return (float)code * 0.125f - 1000.f; }   // (exact in float, as on the GPU)
+  uint16_t lakeAt(float x, float z) const;               // the code of the texel holding (x, z)
   std::vector<uint8_t> mask; // RGBA8: road distance, building density, urbanness, farmland / sea-stack flag
   std::vector<float> hmax[HMAX_LEVELS];   // upper bound of the terrain per cell, level L has HMAX_N>>L cells per side
   // cachePath: the generated arrays are read from there when its stamp matches (a launch after the first skips the

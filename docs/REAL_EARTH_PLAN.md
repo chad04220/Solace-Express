@@ -274,19 +274,32 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
   Changes from section 3.2 so far:
   - The chart-local `terrainFbm` is scaled down (`World::detailScale`, 0.2 on Earth). Its amplitude comes from the
     slope and the source's resolution. Geographic noise on the sphere waits for E4, where charts must agree.
-  - The sea also takes class 80 at sea level (salt marsh and estuaries the cover calls water). Inland lakes aren't
-    painted as water yet.
+  - The sea also takes class 80 at sea level (salt marsh and estuaries the cover calls water), and the lakes at the
+    sea's level beside it.
+  - Lakes come from the DEM, not only the cover. The Copernicus DEM flattens its lakes (Wachusett Reservoir reads
+    115.0 m across, Quabbin 158.0 m). A lake is a stretch of the cover's water holding at least a dozen texels within
+    10 cm of each other:
+    - its bed lies 1.5 m under its level, flat;
+    - the land within 6 texels of it is held 1.5 m over it, so a wooded shore with its canopy taken off doesn't sink
+      under the water;
+    - `World::lakes` holds each texel's level code, beside the forest noise in the road grid's second channel;
+    - the ground is never under the level there, water is painted where the natural ground lies under it, and roads
+      bridge it.
+
+    Water the DEM doesn't hold level stays land. That covers small ponds, unflattened rivers, and every lake where only
+    ETOPO is loaded. Boston's chart finds 75 lakes (38 over 30 ha). The fixture's crop now reaches 41.68° N, so the
+    test chart holds the upper Cape's ponds.
   - GRIP edges are cut 1.5 km inside the square. Local roads (GRIP class 5) come from a separate `lroads` layer.
   - Towns: the 24 largest places, merged where they overlap.
   - The road grid's GPU data is an index list plus a segment table: 40 MB for Boston, down from 136 MB. The forest
     noise moved to the road grid's second channel, so a texel's first entry has 26 bits.
 
   Still open in E2:
-  - lakes as water;
   - Boston's build time, against the 10 s budget (the mask bake ~12 s, the settlements' streets ~5 s, the road grid
     ~5 s);
   - towns chosen nearer the start, not only by population;
-  - the overlap-agreement test in section 7.
+  - the overlap-agreement test in section 7. It waits for E4's geographic detail: the chart-local noise still
+    differs between overlapping charts by up to a few metres.
 
 Decisions taken with the defaults (the owner can change them):
 - The generated regions keep working until E6. In real-Earth play the real world replaces them; they stay available

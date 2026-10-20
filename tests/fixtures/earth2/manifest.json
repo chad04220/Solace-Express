@@ -35,8 +35,8 @@
    "sha256": "64adf9a1e2d60c31806d9547a5c6cddb516cdc3f3d238a967fc17ce2a52f6120"
   },
   "glo90/Copernicus_DSM_COG_30_N41_00_W071_00_DEM.tif": {
-   "bytes": 224616,
-   "sha256": "fa4c562674e74404c7e9b40fc2d50ac1b9d28a54c24c7a4c748be43f13e650f4"
+   "bytes": 501661,
+   "sha256": "e27c3368cfd3397e897d475a076ade89a3c30138f1e1bb77225a0389034b78b4"
   },
   "inflate.bin": {
    "bytes": 236114,
@@ -129,7 +129,7 @@
   },
   {
    "licence": "Copernicus DEM licence",
-   "name": "Copernicus DEM GLO-90 N41W071 (cropped 41.20-41.55 N) and N41W070"
+   "name": "Copernicus DEM GLO-90 N41W071 (cropped 41.20-41.68 N) and N41W070"
   }
  ],
  "tool": 1,

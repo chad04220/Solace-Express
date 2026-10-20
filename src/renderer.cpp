@@ -604,6 +604,7 @@ std::vector<uint8_t> Renderer::prepareWorldMinimap(const World& world) {
     float b[4]; world.sampleBase(x, z, b);
     vec3 c;
     if (h < 0) { float d = clampf(-h / 60.f, 0, 1); c = lerp(vec3(0.20f, 0.55f, 0.62f), vec3(0.05f, 0.16f, 0.30f), d); }
+    else if (!world.lakes.empty() && world.underLake(x, z)) c = vec3(0.16f, 0.44f, 0.56f);   // (a real-Earth chart's lakes)
     else {
       c = lerp(vec3(0.38f, 0.58f, 0.30f), vec3(0.30f, 0.50f, 0.28f), b[2]);
       c = lerp(c, vec3(0.62f, 0.56f, 0.42f), smoothstepf(300, 1100, h));
@@ -992,7 +993,7 @@ std::vector<uint32_t> Renderer::roadGridTexels(const World& world) {
   const auto& g = world.roadGrid;
   for (size_t i = 0; i < n; i++) {
     out[2 * i] = i < g.head.size() ? g.head[i] : 0u;
-    out[2 * i + 1] = i < g.forest.size() ? g.forest[i] : 0u;
+    out[2 * i + 1] = (i < g.forest.size() ? g.forest[i] : 0u) | (i < world.lakes.size() ? (uint32_t)world.lakes[i] << 16 : 0u);   // (roads.glsl earthLakeCode)
   }
   return out;
 }

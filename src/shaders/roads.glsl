@@ -4,8 +4,10 @@
 //! declarations would change their cache key, and the bake reads no ground.
 #ifndef PART_BAKE
 // uRoadGrid: RG32UI per mask texel - r: how many road entries reach the texel (top 6 bits) and the first of them (low
-// 26); g: the baked forest noise (0..127). The entries are uData's rows from 1 on, two texels each (Renderer's upload):
-// (a.x, a.z, b.x, b.z), (a.h, b.h, distance along the road at a, class + 8 x flags + 128 x banks-only + 256 x path);
+// 26); g: the baked forest noise (low 7 bits, 0..127) and a real-Earth chart's lake code (top 16, earthLakeCode). The
+// entries are uData's rows from 1 on, a segment's index each, four to a texel, + 2^23 if banks-only; then the segments,
+// two texels each, from the row texel 3 of row 0 names (Renderer's upload, road_network.h roadEntryRows):
+// (a.x, a.z, b.x, b.z), (a.h, b.h, distance along the road at a, class + 8 x flags + 256 x path);
 // flags 1 a bridge's span (the ground below left alone, no paint), 2 by an airfield's grounds (painted on the ground as
 // it is), 4 and 8 its end a or b at a bridge (the platform stopping square at the joint); banks-only: none from this
 // entry on in the texel's list paves the texel (each texel's paving entries listed first: the paint reads no further)
@@ -34,8 +36,16 @@ float lakeMaskAt(vec2 p){
   }
   return (m[0]*(1.0 - t.x) + m[1]*t.x)*(1.0 - t.y) + (m[2]*(1.0 - t.x) + m[3]*t.x)*t.y;
 }
-float lakeGround(vec2 p, float g){ return lakeMaskAt(p) > 0.5 ? max(g, lakeLevel()) : g; }
-float forestTexel(ivec2 i){ return float(texelFetch(uRoadGrid, clamp(i, ivec2(0), ivec2(MASKN-1)), 0).g)/127.0; }
+// A real-Earth chart's lakes (World::lakes): the code of the lake's level in the texel holding p, beside the forest noise
+// (0: none), and the level it codes - exactly World::lakeAt and World::lakeLevelOf
+uint earthLakeCode(vec2 p){ if (uUnwrappedWorld != 0 && max(abs(p.x), abs(p.y)) > WH) return 0u; return texelFetch(uRoadGrid, clamp(ivec2(floor((wrapW(p) + WH)/MTEX)), ivec2(0), ivec2(MASKN-1)), 0).g >> 16u; }
+float earthLakeLevel(uint code){ return float(code)*0.125 - 1000.0; }
+float lakeGround(vec2 p, float g){
+  if (lakeMaskAt(p) > 0.5) g = max(g, lakeLevel());
+  uint c = earthLakeCode(p);
+  return c != 0u ? max(g, earthLakeLevel(c)) : g;
+}
+float forestTexel(ivec2 i){ return float(texelFetch(uRoadGrid, clamp(i, ivec2(0), ivec2(MASKN-1)), 0).g & 127u)/127.0; }
 float forestAt(vec2 p){
   if (uUnwrappedWorld != 0 && max(abs(p.x), abs(p.y)) > WH) return 0.0;
   vec2 f = (p + WH)/MTEX - 0.5; vec2 fl = floor(f); ivec2 i = ivec2(fl); vec2 t = f - fl;
@@ -143,5 +153,7 @@ float roadGrade(vec2 p, float g){ return g; }
 float circuitStartLine(){ return 0.0; }
 float lakeLevel(){ return 0.0; }
 float lakeMaskAt(vec2 p){ return 0.0; }
+uint earthLakeCode(vec2 p){ return 0u; }
+float earthLakeLevel(uint code){ return 0.0; }
 float lakeGround(vec2 p, float g){ return g; }
 #endif

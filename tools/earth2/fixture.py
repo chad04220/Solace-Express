@@ -5,7 +5,7 @@ sampling, the tables, the roads), which tests/earth_data_test.cpp checks the gam
   python3 -m tools.earth2.fixture --out tests/fixtures/earth2 --etopo ... --cover ... --airports ... --runways ...
       --places ... --grip ... --glo90-dir DIR
 
-GLO-90: N41W071 is cropped to 41.20-41.55 N (the islands), N41W070 is whole, and N41W072 is listed in the bitmap but
+GLO-90: N41W071 is cropped to 41.20-41.68 N (the islands and the upper Cape's ponds), N41W070 is whole, and N41W072 is listed in the bitmap but
 left out, so the reader's fallback beside a tile it hasn't got is tested too.
 """
 import argparse
@@ -56,7 +56,7 @@ def main(argv=None):
     # GLO-90: two tiles, one cropped, and the bitmap listing a third that isn't there
     gdir = os.path.join(out, "glo90")
     os.makedirs(gdir, exist_ok=True)
-    glo90.crop(os.path.join(a.glo90_dir, glo90.tile_name(41, -71) + ".tif"), os.path.join(gdir, glo90.tile_name(41, -71) + ".tif"), 41.20, 41.55)
+    glo90.crop(os.path.join(a.glo90_dir, glo90.tile_name(41, -71) + ".tif"), os.path.join(gdir, glo90.tile_name(41, -71) + ".tif"), 41.20, 41.68)
     with open(os.path.join(a.glo90_dir, glo90.tile_name(41, -70) + ".tif"), "rb") as f, \
          open(os.path.join(gdir, glo90.tile_name(41, -70) + ".tif"), "wb") as g:
         g.write(f.read())
@@ -67,7 +67,7 @@ def main(argv=None):
     files = {rel: info["bytes"] for rel, info in manifest["files"].items()}
     for rel in ("glo90/" + glo90.tile_name(41, -71) + ".tif", "glo90/" + glo90.tile_name(41, -70) + ".tif", "glo90.bits", "inflate.bin"):
         files[rel] = os.path.getsize(os.path.join(out, rel))
-    manifest["sources"].append({"name": "Copernicus DEM GLO-90 N41W071 (cropped 41.20-41.55 N) and N41W070", "licence": "Copernicus DEM licence"})
+    manifest["sources"].append({"name": "Copernicus DEM GLO-90 N41W071 (cropped 41.20-41.68 N) and N41W070", "licence": "Copernicus DEM licence"})
     builder.write_index(out, BOX, files, manifest["sources"])
     write_expect(out)
 
@@ -77,7 +77,7 @@ def write_expect(root):
     rng = random.Random(7)
     lines = []
     points = [(41.393, -70.614), (41.40, -70.55), (41.2531, -70.0602), (41.45, -70.60), (41.548, -70.9), (41.30, -71.5),
-              (41.70, -70.30), (41.05, -69.5), (41.2, -70.0), (41.5499, -70.70), (41.551, -70.70), (41.9999, -69.0001),
+              (41.70, -70.30), (41.05, -69.5), (41.2, -70.0), (41.6799, -70.70), (41.681, -70.70), (41.9999, -69.0001),
               (41.0001, -71.9999), (41.25, -70.0001), (41.25, -69.9999)]
     points += [(41 + rng.random(), -72 + 3 * rng.random()) for _ in range(200)]
     for lat, lon in points:

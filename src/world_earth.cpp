@@ -45,6 +45,83 @@ float lushOf(int cover, double lat) {
     default: return 0.55f;
   }
 }
+// The chart's lakes, per texel (-1: none), with each one's level: the cover's inland water where the surface model holds
+// it level. The Copernicus DEM's lakes are flattened, every texel of one at its surface's height to the centimetre, so a
+// lake is a stretch of the cover's water holding at least a dozen texels within 10 cm of each other. Its level is
+// theirs. From them it takes in every texel at that level or a little under it (the bicubic's undershoot at the
+// shore), out to 8 texels past the cover's water (its cells are 330 m, the texels 39). A stretch holding more than one
+// level (a reservoir's chain, a river's flattened reaches) gives a lake for each. Water the data doesn't hold level
+// stays land: unflattened rivers, and ETOPO's lakes where GLO-90 isn't loaded.
+std::vector<int> findLakes(const std::vector<float>& elev, const std::vector<uint8_t>& sea, const std::vector<uint8_t>& cover,
+                           const std::vector<uint8_t>& fine, int N, std::vector<float>& levels) {
+  const size_t NN = (size_t)N * N;
+  std::vector<int> lake(NN, -1);
+  std::vector<uint8_t> seen(NN, 0), steps(NN, 0);
+  std::vector<size_t> stretch, rest, queue;
+  std::vector<float> hs;
+  auto water = [&](size_t k) { return !sea[k] && cover[k] == earth::COVER_WATER; };
+  auto neighbours = [&](size_t k, auto&& f) {
+    const int i = (int)(k % N), j = (int)(k / N);
+    if (i > 0) f(k - 1);
+    if (i + 1 < N) f(k + 1);
+    if (j > 0) f(k - N);
+    if (j + 1 < N) f(k + N);
+  };
+  for (size_t s = 0; s < NN; s++) {
+    if (seen[s] || !water(s)) continue;
+    if ((s & 1023u) == 0) generationCheckpoint();
+    stretch.clear(); queue.assign(1, s); seen[s] = 1;
+    for (size_t q = 0; q < queue.size(); q++) {
+      stretch.push_back(queue[q]);
+      neighbours(queue[q], [&](size_t n) { if (!seen[n] && water(n)) { seen[n] = 1; queue.push_back(n); } });
+    }
+    size_t fineN = 0; for (size_t k : stretch) fineN += fine[k];
+    if (fineN * 2 < stretch.size()) continue;
+    for (int reach = 0; reach < 64; reach++) {
+      rest.clear(); for (size_t k : stretch) if (lake[k] == -1) rest.push_back(k);
+      if (rest.size() < 12) break;
+      hs.clear(); for (size_t k : rest) hs.push_back(elev[k]);
+      std::sort(hs.begin(), hs.end());
+      size_t best = 0, at = 0;
+      for (size_t a = 0, b = 0; a < hs.size(); a++) { while (b < hs.size() && hs[b] <= hs[a] + 0.1f) b++; if (b - a > best) { best = b - a; at = a; } }
+      if (best < 12) break;
+      const float lo = hs[at], hi = hs[at] + 0.1f, level = World::lakeLevelOf(World::lakeCode(hs[at + best / 2]));
+      const int id = (int)levels.size();
+      queue.clear();
+      for (size_t k : rest) if (elev[k] >= lo && elev[k] <= hi) { lake[k] = id; steps[k] = 0; queue.push_back(k); }
+      for (size_t q = 0; q < queue.size(); q++) {
+        const size_t k = queue[q];
+        neighbours(k, [&](size_t n) {
+          if (lake[n] != -1 || sea[n] || elev[n] > level + 0.05f || elev[n] < level - 2.5f) return;
+          const int st = cover[n] == earth::COVER_WATER ? 0 : steps[k] + 1;
+          if (st > 8) return;
+          lake[n] = id; steps[n] = (uint8_t)st; queue.push_back(n);
+        });
+      }
+      levels.push_back(level);
+    }
+  }
+  return lake;
+}
+
+// The largest of each texel's neighbours within r texels each way (a square), over an N x N grid
+void maxFilter(std::vector<float>& v, int n, int r) {
+  std::vector<float> tmp(v.size());
+  parallelFor(n, [&](int j) {
+    for (int i = 0; i < n; i++) {
+      float m = -1e30f;
+      for (int a = std::max(i - r, 0); a <= std::min(i + r, n - 1); a++) m = std::max(m, v[(size_t)j * n + a]);
+      tmp[(size_t)j * n + i] = m;
+    }
+  });
+  parallelFor(n, [&](int i) {
+    for (int j = 0; j < n; j++) {
+      float m = -1e30f;
+      for (int b = std::max(j - r, 0); b <= std::min(j + r, n - 1); b++) m = std::max(m, tmp[(size_t)b * n + i]);
+      v[(size_t)j * n + i] = m;
+    }
+  });
+}
 // Runway surfaces: the pack's codes to the game's
 int surfaceOf(int s, int type) {
   switch (s) {
@@ -247,6 +324,22 @@ void World::buildEarthTerrain() {
     if (reports) worldLoadProgress(.02f + .14f * float(rows.fetch_add(1) + 1) / N);
   });
   generationCheckpoint();
+  // the lakes (findLakes); one at the sea's level beside it is the sea's (a salt pond behind the dunes, a lagoon)
+  std::vector<float> levels;
+  std::vector<int> lakeOf = findLakes(elev, sea, data.cover, fine, N, levels);
+  {
+    std::vector<uint8_t> tidal(levels.size(), 0);
+    for (size_t k = 0; k < NN; k++) {
+      const int id = lakeOf[k];
+      if (id < 0 || levels[id] >= 2.5f || tidal[id]) continue;
+      const int i = (int)(k % N), j = (int)(k / N);
+      for (int dj = -1; dj <= 1; dj++) for (int di = -1; di <= 1; di++) {
+        const int a = i + di, b = j + dj;
+        if (a >= 0 && b >= 0 && a < N && b < N && sea[(size_t)b * N + a]) tidal[id] = 1;
+      }
+    }
+    for (size_t k = 0; k < NN; k++) if (lakeOf[k] >= 0 && tidal[lakeOf[k]]) { sea[k] = 1; bathy[k] = -1.f; lakeOf[k] = -1; }
+  }
   // the canopy and the roofs the surface model holds, blurred across the classes' edges
   std::vector<float> canopy(NN);
   for (size_t k = 0; k < NN; k++) canopy[k] = sea[k] ? 0.f : canopyOf(data.cover[k]);
@@ -275,11 +368,45 @@ void World::buildEarthTerrain() {
       t[1] = 0.f;
     } else {
       t[0] = std::max(elev[k] - canopy[k], 0.6f);   // (land never below the sea: the sea is everywhere y = 0)
-      t[1] = data.cover[k] == earth::COVER_WATER ? 0.f : 1.f;   // (the amplitude itself below: lakes lie flat)
+      t[1] = 1.f;   // (the amplitude itself below)
     }
     lush[k] = sea[k] ? 0.f : lushOf(data.cover[k], lat[k]);
   }
   blur(lush, N, 1);
+  // the lakes into the ground: each one's bed a metre and a half under its level, flat; the land within 6 texels of it
+  // at least a metre and a half over it (the canopy taken off a wooded shore would leave it under the water), unless it
+  // lies under the lake to begin with (below a dam); and the code of its level on its texels and on those beside them
+  // (World::lakes): the ground never under the level there, and water where the natural ground lies under it
+  lakes.clear();
+  std::vector<uint8_t> nearLake;
+  if (!levels.empty()) {
+    lakes.assign(NN, 0);
+    std::vector<float> top(NN, -1e9f);
+    for (size_t k = 0; k < NN; k++) {
+      if (lakeOf[k] < 0) continue;
+      const float level = levels[lakeOf[k]];
+      hm[k * 4] = level - 1.5f; hm[k * 4 + 1] = 0.f;
+      top[k] = level + 1.5f;
+      lakes[k] = World::lakeCode(level);
+    }
+    maxFilter(top, N, 6);
+    nearLake.assign(NN, 0);
+    for (size_t k = 0; k < NN; k++) {
+      if (lakeOf[k] >= 0 || sea[k] || top[k] < -1e8f || elev[k] < top[k] - 4.f) continue;
+      hm[k * 4] = std::max(hm[k * 4], top[k]);
+      nearLake[k] = 1;
+    }
+    for (size_t k = 0; k < NN; k++) {
+      if (lakeOf[k] < 0) continue;
+      const int i = (int)(k % N), j = (int)(k / N);
+      for (int dj = -1; dj <= 1; dj++) for (int di = -1; di <= 1; di++) {
+        const int a = i + di, b = j + dj;
+        if (a < 0 || b < 0 || a >= N || b >= N) continue;
+        const size_t n = (size_t)b * N + a;
+        if (lakeOf[n] < 0 && nearLake[n]) lakes[n] = std::max(lakes[n], lakes[k]);
+      }
+    }
+  }
   // the detail's amplitude from the lie of the land: rougher ground more of it; where the fine data isn't there (ETOPO
   // only, 0.9 km) much more, standing in for the relief it hasn't got
   parallelFor(N, [&](int j) {
@@ -293,6 +420,7 @@ void World::buildEarthTerrain() {
       const float slope = sqrtf(gx * gx + gz * gz);
       t[1] = fine[k] ? 8.f + 14.f * smoothstepf(0.03f, 0.4f, slope) : 14.f + 60.f * smoothstepf(0.02f, 0.3f, slope);
       t[1] *= smoothstepf(0.6f, 3.f, t[0]);   // (the shore's flats: little)
+      if (!nearLake.empty() && nearLake[k]) t[1] = std::min(t[1], 4.f);   // (nor much by a lake: no hollows under its level)
     }
   });
   // lushness and coldness: the cover, the latitude and the height (the snowline about 5 km up in the tropics, at sea

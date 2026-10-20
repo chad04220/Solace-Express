@@ -348,7 +348,7 @@ void World::buildConfigured(const std::string& cachePath, const std::string& sta
   };
   auto loadProgress = [reports](float done) { if (reports) worldLoadProgress(done); };
   if (reports) { g_worldLoadProgress = 0.f; g_worldLoadTask = "Reading island cache"; }
-  roads = RoadNetwork(); roadGrid = RoadGrid(); bridges.clear(); settlements.clear(); farms.clear(); reservoir = Reservoir(); lake = LakeMask();   // (the natural ground first: the roads are routed over it)
+  roads = RoadNetwork(); roadGrid = RoadGrid(); bridges.clear(); settlements.clear(); farms.clear(); reservoir = Reservoir(); lake = LakeMask(); lakes.clear();   // (the natural ground first: the roads are routed over it)
   setStage(cachePath.empty() ? 2 : 1);
   fromCache = !cachePath.empty() && loadCache(cachePath, stamp);
   if (fromCache) {
@@ -476,7 +476,7 @@ void World::buildConfigured(const std::string& cachePath, const std::string& sta
 // The generated world on disk: its height and mask textures, height bounds and terrain envelope, stamped with the
 // build that made them (any other build generates again)
 namespace {
-const uint32_t kWorldMagic = 0x574c4437u;   // "WLD7": the road network, its grid (each texel's paving entries first; 26-bit firsts) and the forest noise beside it; the reservoir
+const uint32_t kWorldMagic = 0x574c4438u;   // "WLD8": the road network, its grid (each texel's paving entries first; 26-bit firsts) and the forest noise beside it; the reservoir; a real-Earth chart's lakes
 bool replaceCacheFile(const std::string& from, const std::string& to) {
 #ifdef _WIN32
   return MoveFileExA(from.c_str(), to.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
@@ -557,6 +557,7 @@ bool World::loadCache(const std::string& path, const std::string& stamp) {
   for (int L = 0; ok && L < TP_LEVELS; L++) { const uint64_t n = (uint64_t)(HM_N >> L); ok = getVec(f, w.tpM[L], n * n); }
   std::vector<float> res;
   ok = ok && getVec(f, res, RESERVOIR_FLOATS);
+  ok = ok && getVecUpTo(f, w.lakes, (uint64_t)HM_N * HM_N) && (w.lakes.empty() || w.lakes.size() == (size_t)HM_N * HM_N);
   if (ok) { static_assert(sizeof(Reservoir) == RESERVOIR_FLOATS * sizeof(float), "the reservoir's floats"); memcpy(&w.reservoir, res.data(), sizeof(Reservoir)); }
   ok = ok && fgetc(f) == EOF;   // (nothing after the last array: not some other format's file)
   file.reset();
@@ -577,7 +578,7 @@ bool World::loadCache(const std::string& path, const std::string& stamp) {
   if (!ok) return false;
   generationCheckpoint();
   hm.swap(w.hm); mask.swap(w.mask); tpV0.swap(w.tpV0);
-  std::swap(roads, w.roads); std::swap(roadGrid, w.roadGrid); reservoir = w.reservoir;
+  std::swap(roads, w.roads); std::swap(roadGrid, w.roadGrid); reservoir = w.reservoir; lakes.swap(w.lakes);
   for (int L = 0; L < HMAX_LEVELS; L++) hmax[L].swap(w.hmax[L]);
   for (int L = 0; L < TP_LEVELS; L++) tpM[L].swap(w.tpM[L]);
   return true;
@@ -599,6 +600,7 @@ void World::saveCache(const std::string& path, const std::string& stamp) const {
   putVec(f, tpV0);
   for (int L = 0; L < TP_LEVELS; L++) putVec(f, tpM[L]);
   { std::vector<float> res(RESERVOIR_FLOATS); memcpy(res.data(), &reservoir, sizeof(Reservoir)); putVec(f, res); }
+  putVec(f, lakes);
   const bool ok = !ferror(f);
   const int closed = fclose(file.release());
   generationCheckpoint(); // a canceled candidate never publishes its cache
@@ -615,11 +617,20 @@ int World::findAirport(const char* code) const {
 
 // Every cell of an n x n grid over the map (cell size cs) the lake's square reaches, with its level
 template <class F> static void forEachLakeCell(const World& w, float cs, int n, F f) {
-  if (!w.lake.n) return;
   auto cell = [&](float v) { return std::clamp((int)floorf((v + WORLD_HALF) / cs), 0, n - 1); };
-  const float s = w.lake.n * w.lake.cell;
-  for (int j = cell(w.lake.z0 - w.lake.cell); j <= cell(w.lake.z0 + s + w.lake.cell); j++)
-    for (int i = cell(w.lake.x0 - w.lake.cell); i <= cell(w.lake.x0 + s + w.lake.cell); i++) f(i, j, w.reservoir.level);
+  if (w.lake.n) {
+    const float s = w.lake.n * w.lake.cell;
+    for (int j = cell(w.lake.z0 - w.lake.cell); j <= cell(w.lake.z0 + s + w.lake.cell); j++)
+      for (int i = cell(w.lake.x0 - w.lake.cell); i <= cell(w.lake.x0 + s + w.lake.cell); i++) f(i, j, w.reservoir.level);
+  }
+  // (a real-Earth chart's: each texel with a lake's code, its level over the cells the texel overlaps)
+  if (w.lakes.size() == (size_t)HM_N * HM_N)
+    for (int tj = 0; tj < HM_N; tj++) for (int ti = 0; ti < HM_N; ti++) {
+      const uint16_t c = w.lakes[(size_t)tj * HM_N + ti];
+      if (!c) continue;
+      const float x0 = -WORLD_HALF + ti * HM_TEXEL, z0 = -WORLD_HALF + tj * HM_TEXEL;
+      for (int j = cell(z0); j <= cell(z0 + HM_TEXEL); j++) for (int i = cell(x0); i <= cell(x0 + HM_TEXEL); i++) f(i, j, World::lakeLevelOf(c));
+    }
 }
 
 // Every cell of an n x n grid over the map (cell size cs) that a graded road segment's platform or banks reach, with the
@@ -919,8 +930,21 @@ float World::lakeMaskAt(float x, float z) const {   // (exactly roads.glsl lakeM
   auto m = [&](int a, int b) { return a < 0 || b < 0 || a >= lake.n || b >= lake.n ? 0.f : lake.m[(size_t)b * lake.n + a]; };
   return (m(i, j) * (1.f - tx) + m(i + 1, j) * tx) * (1.f - tz) + (m(i, j + 1) * (1.f - tx) + m(i + 1, j + 1) * tx) * tz;
 }
-float World::lakeGround(float x, float z, float g) const { return lake.n && lakeMaskAt(x, z) > 0.5f ? std::max(g, reservoir.level) : g; }
-bool World::underLake(float x, float z) const { return lake.n && lakeMaskAt(x, z) > 0.5f && naturalHeight(x, z) < reservoir.level + 0.3f; }
+uint16_t World::lakeAt(float x, float z) const {   // (exactly roads.glsl earthLakeCode)
+  if (lakes.empty()) return 0;
+  const int i = std::clamp((int)floorf((x + WORLD_HALF) / HM_TEXEL), 0, HM_N - 1), j = std::clamp((int)floorf((z + WORLD_HALF) / HM_TEXEL), 0, HM_N - 1);
+  return lakes[(size_t)j * HM_N + i];
+}
+float World::lakeGround(float x, float z, float g) const {
+  if (lake.n && lakeMaskAt(x, z) > 0.5f) g = std::max(g, reservoir.level);
+  if (const uint16_t c = lakeAt(x, z)) g = std::max(g, lakeLevelOf(c));
+  return g;
+}
+bool World::underLake(float x, float z) const {
+  if (lake.n && lakeMaskAt(x, z) > 0.5f && naturalHeight(x, z) < reservoir.level + 0.3f) return true;
+  const uint16_t c = lakeAt(x, z);
+  return c && naturalHeight(x, z) < lakeLevelOf(c) + 0.3f;
+}
 
 vec3 World::normal(float x, float z) const {
   if (!repeating && std::max(fabsf(x), fabsf(z)) >= WORLD_HALF + 3000.f && regionalSurface::appliesTo(*this)) {
