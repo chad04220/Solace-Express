@@ -451,6 +451,25 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
     alone, up to 40 of them.
   - **A spatial index** for ATC and the GPS across charts: today both see the chart's own airports.
 
+- **E8:** the first realism pass is in: the cities built over as the land cover has them.
+  - **Districts.** The cover's built-up class is read on a 400 m grid. Each stretch of it is covered by up to 56
+    districts: towns about 2.6 km apart, each named for the nearest place, the densest and the most central first.
+    They fill what the places' circles left between them: a city's suburbs, towns grown into each other. Boston's
+    chart goes from 24 towns to 80 and from 355,000 lots to 613,000. Its build takes 34 s, up from about 25.
+  - **Low built-up land.** On the real Earth, built-up cover is built on from 1 m over the sea, not 2.5 m
+    (`buildableHeight`). Taking the roofs off the surface model never leaves the ground under 2 m where the model
+    stands over it. Boston's waterfront, Back Bay and South Boston were left bare before.
+  - **Approaches.** On the real Earth an airport's approach funnels no longer keep streets and houses away.
+    Only its grounds do (`airportExclusion`). Under a funnel, a building stands only if it is lower than the
+    approach surface, as real ones are under Logan's approaches.
+  - **The cache.** The world cache (WLD9) keeps a real-Earth chart's land cover, so a chart loaded from it builds
+    its towns as a fresh one does. The charts' content version is 2.
+  - Seen in renders: Boston from 380 m over South Boston, a city of streets and houses to the horizon where open
+    grass lay before.
+
+  Still open in E8: secondary runways, airport layouts by size, rivers (GRIP has none; a rivers dataset), regional
+  building styles, night lights by population, and real landmarks.
+
 Decisions taken with the defaults (the owner can change them):
 - The generated regions keep working until E6. In real-Earth play the real world replaces them; they stay available
   as a "Generated Earth" choice in Free Flight.

@@ -8,7 +8,7 @@
 
 namespace earthCharts {
 constexpr int kLattice = 32;                  // a chart's origin snaps to 1/32 of a degree each way
-constexpr uint32_t kGeneratorVersion = 1;     // the real Earth's charts' content (their cache, never an id)
+constexpr uint32_t kGeneratorVersion = 2;     // the real Earth's charts' content (their cache, never an id): 2, the built-up districts
 constexpr const char* kIdPrefix = "earth:";
 
 // The Earth pack the game reads: EARTH_PACK when set, else "earth" beside the game's working folder (opened when

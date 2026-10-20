@@ -38,7 +38,7 @@ SettlementField makeField(const World& w, const RoadIndex& roads, int town) {
       if ((i & 63) == 0) generationCheckpoint();
       const size_t c = (size_t)j * n + i;
       const float x = cx(i), z = cz(j);
-      if (h[c] < 2.5f || airportInfluence(w, x, z) > 0.02f) { cost[c] = INFINITY; continue; }   // (the sea, the beach, an airfield)
+      if (h[c] < buildableHeight(w, x, z) || airportExclusion(w, x, z) > 0.02f) { cost[c] = INFINITY; continue; }   // (the sea, the beach, an airfield)
       auto H = [&](int a, int b) { return h[(size_t)std::clamp(b, 0, n - 1) * n + std::clamp(a, 0, n - 1)]; };
       const float sx = (H(i + 1, j) - H(i - 1, j)) / (2.f * SETTLE_CELL), sz = (H(i, j + 1) - H(i, j - 1)) / (2.f * SETTLE_CELL);
       const float s = sqrtf(sx * sx + sz * sz);
@@ -239,7 +239,7 @@ void addSettlementStreets(const World& world, const std::vector<SettlementField>
   // whether a place is in this settlement, within a share of its extent, on dry land clear of the airfields
   auto inside = [&](vec2 p, const SettlementField& F, float limit) {
     int t; const float share = settlementShare(fields, p.x, p.y, &t);
-    return t == F.town && share < limit && ground(p) >= 2.5f && airportInfluence(world, p.x, p.y) < 0.02f;
+    return t == F.town && share < limit && ground(p) >= buildableHeight(world, p.x, p.y) && airportExclusion(world, p.x, p.y) < 0.02f;
   };
   auto lay = [&](const std::vector<vec2>& line) { return layPath(world, idx, net, RC_STREET, line); };
   // ---- the cores: a grid of streets turned to the main road, blocks of 110 x 80 m in a city, 100 x 75 in a town;

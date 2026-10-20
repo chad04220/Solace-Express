@@ -300,6 +300,16 @@ float solaceDistanceKm(int a, int b) {
   return sqrtf((A.x - B.x) * (A.x - B.x) + (A.z - B.z) * (A.z - B.z)) / 1000.f;
 }
 float airportInfluence(const World& world, float x, float z) { return airportInfluenceFor(world.airports.data(), world.airports.size(), x, z); }
+float buildableHeight(const World& world, float x, float z) {
+  if (!world.earthChart || world.earthChart->cover.empty()) return 2.5f;
+  const int i = std::clamp((int)((x + WORLD_HALF) / HM_TEXEL), 0, HM_N - 1), j = std::clamp((int)((z + WORLD_HALF) / HM_TEXEL), 0, HM_N - 1);
+  return world.earthChart->cover[(size_t)j * HM_N + i] == earth::COVER_BUILT ? 1.f : 2.5f;
+}
+float airportExclusion(const World& world, float x, float z) {
+  if (!world.earthChart) return airportInfluence(world, x, z);
+  float grounds, cap; airportLimits(world.airports.data(), world.airports.size(), x, z, grounds, cap);
+  return grounds;
+}
 
 void World::build(const std::string& cachePath, const std::string& stamp, bool save) {
   generationCheckpoint();
@@ -476,7 +486,7 @@ void World::buildConfigured(const std::string& cachePath, const std::string& sta
 // The generated world on disk: its height and mask textures, height bounds and terrain envelope, stamped with the
 // build that made them (any other build generates again)
 namespace {
-const uint32_t kWorldMagic = 0x574c4438u;   // "WLD8": the road network, its grid (each texel's paving entries first; 26-bit firsts) and the forest noise beside it; the reservoir; a real-Earth chart's lakes
+const uint32_t kWorldMagic = 0x574c4439u;   // "WLD9": the road network, its grid (each texel's paving entries first; 26-bit firsts) and the forest noise beside it; the reservoir; a real-Earth chart's lakes and its land cover (buildableHeight reads it)
 bool replaceCacheFile(const std::string& from, const std::string& to) {
 #ifdef _WIN32
   return MoveFileExA(from.c_str(), to.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
@@ -558,6 +568,8 @@ bool World::loadCache(const std::string& path, const std::string& stamp) {
   std::vector<float> res;
   ok = ok && getVec(f, res, RESERVOIR_FLOATS);
   ok = ok && getVecUpTo(f, w.lakes, (uint64_t)HM_N * HM_N) && (w.lakes.empty() || w.lakes.size() == (size_t)HM_N * HM_N);
+  std::vector<uint8_t> cover;
+  ok = ok && getVecUpTo(f, cover, (uint64_t)HM_N * HM_N) && (cover.empty() || cover.size() == (size_t)HM_N * HM_N) && cover.empty() == !earthChart;
   if (ok) { static_assert(sizeof(Reservoir) == RESERVOIR_FLOATS * sizeof(float), "the reservoir's floats"); memcpy(&w.reservoir, res.data(), sizeof(Reservoir)); }
   ok = ok && fgetc(f) == EOF;   // (nothing after the last array: not some other format's file)
   file.reset();
@@ -579,6 +591,7 @@ bool World::loadCache(const std::string& path, const std::string& stamp) {
   generationCheckpoint();
   hm.swap(w.hm); mask.swap(w.mask); tpV0.swap(w.tpV0);
   std::swap(roads, w.roads); std::swap(roadGrid, w.roadGrid); reservoir = w.reservoir; lakes.swap(w.lakes);
+  if (earthChart) earthChart->cover.swap(cover);
   for (int L = 0; L < HMAX_LEVELS; L++) hmax[L].swap(w.hmax[L]);
   for (int L = 0; L < TP_LEVELS; L++) tpM[L].swap(w.tpM[L]);
   return true;
@@ -601,6 +614,7 @@ void World::saveCache(const std::string& path, const std::string& stamp) const {
   for (int L = 0; L < TP_LEVELS; L++) putVec(f, tpM[L]);
   { std::vector<float> res(RESERVOIR_FLOATS); memcpy(res.data(), &reservoir, sizeof(Reservoir)); putVec(f, res); }
   putVec(f, lakes);
+  putVec(f, earthChart ? earthChart->cover : std::vector<uint8_t>());
   const bool ok = !ferror(f);
   const int closed = fclose(file.release());
   generationCheckpoint(); // a canceled candidate never publishes its cache

@@ -388,7 +388,7 @@ void sceneryBakeCommunityLots(World& world) {
       const vec2 p = f.c + f.u * a + v * b;
       const float g = ground(p.x, p.y);
       lo = std::min(lo, g); hi = std::max(hi, g);
-      if (g < 2.5f || airportInfluence(world, p.x, p.y) > 0.02f) return false;
+      if (g < buildableHeight(world, p.x, p.y) || airportExclusion(world, p.x, p.y) > 0.02f) return false;
       if (roads.nearest(p, 3.f, -1, nullptr, nullptr, true) < 1.f) return false;   // (a platform within a metre)
       int t = -1; const float share = settlementShare(world.settlements, p.x, p.y, &t);
       if (t != town || share > maxShare) return false;
@@ -412,6 +412,10 @@ void sceneryBakeCommunityLots(World& world) {
       for (int i = (int)floorf((g.c.x - r) / kLotCell); i <= (int)floorf((g.c.x + r) / kLotCell); i++) C.placed[lotKey(i, j)].push_back(id);
   };
   auto addLot = [&](Claims& C, const Footprint& f, int kind, float base, float seed, int town, int street, float share) {
+    if (world.earthChart) {   // (the real Earth: under an approach, only a building below its surface - airportExclusion)
+      float grounds, cap; airportGroundsCap(world, f.c.x, f.c.y, grounds, cap);
+      if (base + kEntInfo[kind].h > cap) return;
+    }
     Lot L = {};
     L.present = true; L.cx = f.c.x; L.cz = f.c.y; L.hw = f.hw; L.hd = f.hd; L.ground = base;
     const vec2 front(-f.u.y, f.u.x);   // (local +z: the frontage turned a quarter - towards the road)

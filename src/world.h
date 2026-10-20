@@ -193,6 +193,13 @@ private:
 
 // World-explicit variants are required while building a different regional world.
 float airportInfluence(const World& world, float x, float z);
+// How strongly a point is kept clear of streets and buildings: an airport's grounds and approach funnels - or on the
+// real Earth its grounds alone, where the funnels cap a building's height instead (airportGroundsCap), as real
+// approaches do over the houses under them
+float airportExclusion(const World& world, float x, float z);
+// The least height over the sea the ground must have to be built on: 2.5 m (clear of the beaches), but on the real
+// Earth 1 m where its cover is built-up - a city's waterfront, its filled land, stand that low
+float buildableHeight(const World& world, float x, float z);
 // The islands' own airports, wherever g_world is (the airline's routes fly there while a career is away)
 int solaceAirportCount();
 const Airport& solaceAirport(int i);

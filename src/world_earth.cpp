@@ -14,7 +14,7 @@
 namespace {
 constexpr float kAirportMargin = 3000.f;   // (an airport's runway this far inside the square at least)
 constexpr float kRoadMargin = 1500.f;      // (the roads cut this far inside it)
-constexpr size_t kMaxAirports = 40, kMaxTowns = 24;
+constexpr size_t kMaxAirports = 40, kMaxTowns = 24, kMaxDistricts = 56;
 constexpr float kEarthDetailScale = 0.2f;  // (World::detailScale: the data has the relief; the detail adds a little)
 
 // What the surface model holds above the ground for each cover class (m): the canopy of a closed or an open forest,
@@ -332,6 +332,62 @@ void World::buildEarth(const procedural::Descriptor& chartDesc, const std::strin
     for (const auto& a : airports) if (free && hypotf(p.x - a.x, p.z - a.z) < 0.5f * a.length + p.r + 500.f) free = false;
     if (free) kept.push_back(p);
   }
+  // ---- the built-up land between them: the cover's built-up class on a 400 m grid, each stretch of it covered by
+  // districts - a town each, about 2.6 km apart, named for the nearest place - so a city's suburbs, and the towns grown
+  // into each other, are built over as they are rather than left as open fields between the places' circles. The
+  // densest first, the nearer the centre the sooner (as the places), none on another town's or an airport's grounds
+  {
+    constexpr float kCell = 400.f, kReach = 1300.f;
+    const int G = (int)(2 * WORLD_HALF / kCell);
+    std::vector<uint8_t> built((size_t)G * G, 0);
+    auto centreOf = [&](int i) { return -WORLD_HALF + (i + 0.5f) * kCell; };
+    for (int j = 0; j < G; j++) for (int i = 0; i < G; i++) {
+      int n = 0;
+      for (int b = 0; b < 2; b++) for (int a = 0; a < 2; a++) {
+        const geo::Position g = chart.position(vec3(centreOf(i) + (a - 0.5f) * 0.5f * kCell, 0, centreOf(j) + (b - 0.5f) * 0.5f * kCell));
+        n += sampler.cover(g.latitude, g.longitude) == earth::COVER_BUILT;
+      }
+      built[(size_t)j * G + i] = n >= 2;
+    }
+    const int reachCells = (int)std::ceil(kReach / kCell);
+    auto builtNear = [&](int i, int j) {
+      int n = 0;
+      for (int b = -reachCells; b <= reachCells; b++) for (int a = -reachCells; a <= reachCells; a++) {
+        const int u = i + a, v = j + b;
+        if (u < 0 || v < 0 || u >= G || v >= G || (a * a + b * b) * kCell * kCell > kReach * kReach) continue;
+        n += built[(size_t)v * G + u];
+      }
+      return n;
+    };
+    struct Seed { int i, j, n; float score; };
+    std::vector<Seed> seeds;
+    for (int j = 0; j < G; j++) for (int i = 0; i < G; i++) {
+      if (!built[(size_t)j * G + i] || std::max(std::fabs(centreOf(i)), std::fabs(centreOf(j))) > WORLD_HALF - 2500.f) continue;
+      const int n = builtNear(i, j);
+      if (n < 8) continue;   // (a stretch of at least about 1.3 km^2 round it)
+      const float d = hypotf(centreOf(i), centreOf(j)) / 15000.f;
+      seeds.push_back({i, j, n, n / (1.f + d * d)});
+    }
+    std::sort(seeds.begin(), seeds.end(), [](const Seed& a, const Seed& b) { return a.score != b.score ? a.score > b.score : std::tie(a.j, a.i) < std::tie(b.j, b.i); });
+    size_t districts = 0;
+    for (const Seed& sd : seeds) {
+      if (districts >= kMaxDistricts) break;
+      const float x = centreOf(sd.i), z = centreOf(sd.j);
+      const float r = std::clamp(sqrtf(sd.n * kCell * kCell / PI), 500.f, kReach);
+      bool free = true;
+      for (const auto& k : kept) if (hypotf(x - k.x, z - k.z) < std::max(0.95f * (k.r + r), 1500.f)) { free = false; break; }
+      // (its centre off an airport's grounds: its lots keep off them themselves, airportInfluence)
+      for (const auto& a : airports) if (free && hypotf(x - a.x, z - a.z) < 0.5f * a.length + 0.5f * r + 300.f) free = false;
+      if (!free) continue;
+      // named for the nearest place, a city's district when one is near
+      const Place* name = nullptr; float best = 1e30f;
+      for (const auto& p : places) { const float d = hypotf(p.x - x, p.z - z); if (d < best) { best = d; name = &p; } }
+      int kind = 1;
+      for (const auto& k : kept) if (k.kind == 2 && hypotf(x - k.x, z - k.z) < 9000.f) kind = 2;
+      Place pl; pl.name = name ? name->name : std::string("Town"); pl.x = x; pl.z = z; pl.r = r; pl.kind = kind; pl.pop = 0; pl.score = sd.score;
+      kept.push_back(pl); districts++;
+    }
+  }
   data->towns.reserve(kept.size());
   for (const auto& p : kept) data->towns.push_back(p.name);
   towns.clear();
@@ -422,7 +478,9 @@ void World::buildEarthTerrain() {
       t[0] = std::min(std::clamp(bathy[k], -200.f, -1.f), -0.8f - 0.004f * std::min(toLand[k], 5e4f));
       t[1] = 0.f;
     } else {
-      t[0] = std::max(elev[k] - canopy[k], 0.6f);   // (land never below the sea: the sea is everywhere y = 0)
+      // (land never below the sea, the sea everywhere y = 0; and the canopy or the roofs never taken off below 2 m where
+      // the surface model stands over it - a city's waterfront, its filled land, stay dry and buildable)
+      t[0] = std::max(std::max(elev[k] - canopy[k], std::min(elev[k], 2.f)), 0.6f);
       t[1] = 1.f;   // (the amplitude itself below)
     }
     lush[k] = sea[k] ? 0.f : earthCharts::lushOf(data.cover[k], lat[k]);
