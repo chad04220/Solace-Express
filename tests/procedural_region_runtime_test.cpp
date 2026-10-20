@@ -4,6 +4,7 @@
 #include "../src/scenery.h"
 #include "../src/regional_surface.h"
 #include "test_world.h"
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -156,7 +157,10 @@ struct GameTest {
       std::string m; const bool bought = k.buy(1, &m) && k.fleet.size() == 1 && k.fleet[0].region == A.id && k.here(k.fleet[0]);
       const fs::path regionSave = root / "region_career.sav";
       Career back; back.newGame();
-      const bool saved = k.save(regionSave.string()) && bytes(regionSave).rfind("somnium_save 7\nregion " + A.id + "\n", 0) == 0 &&
+      auto lines = [&](const fs::path& file) {  // the save is text: CRLF on Windows
+        std::string s = bytes(file); s.erase(std::remove(s.begin(), s.end(), '\r'), s.end()); return s;
+      };
+      const bool saved = k.save(regionSave.string()) && lines(regionSave).rfind("somnium_save 7\nregion " + A.id + "\n", 0) == 0 &&
         back.load(regionSave.string()) && back.region == A.id && back.location == k.location && back.fleet.size() == 1 && back.fleet[0].region == A.id;
       const auto away = k.destinations();
       const bool homeFirst = !away.empty() && away.front().home;
