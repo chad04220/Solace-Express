@@ -47,6 +47,9 @@ Descriptor fromTile(geo::Tile t, uint64_t worldSeed) {
     d.archetype = temperate[choice % 3];
   }
   d.name = std::string(prefixes[(d.seed >> 9) % 24]) + " " + suffixes[int(d.archetype)];
+  // (its own stream: the size changes nothing above - the address, the seed, the archetype and the name)
+  const uint64_t size = mix(d.seed ^ UINT64_C(0x5343414c45000001)) % 100;
+  d.scale = size < 30 ? Scale::Small : size < 68 ? Scale::Medium : Scale::Large;
   return d;
 }
 geo::Tile neighbor(geo::Tile t, int dx, int dy) {
@@ -66,6 +69,14 @@ float cubic(float a, float b, float c, float d, float t) {
 }
 }
 
+const char* scaleName(Scale scale) {
+  switch (scale) {
+    case Scale::Small: return "Small";
+    case Scale::Medium: return "Medium";
+    case Scale::Large: return "Large";
+  }
+  return "Unknown";
+}
 const char* archetypeName(Archetype type) {
   switch (type) {
     case Archetype::Archipelago: return "Archipelago";
@@ -80,7 +91,7 @@ Descriptor solaceDescriptor(uint64_t worldSeed) {
   Descriptor d;
   d.id = "solace"; d.name = "The Solace Islands"; d.origin = geo::solaceOrigin();
   d.address = geo::positionTile(d.origin, kAddressLevel).tile;
-  d.worldSeed = worldSeed; d.seed = 0; d.authored = true;
+  d.worldSeed = worldSeed; d.seed = 0; d.authored = true; d.scale = Scale::Large;
   return d;
 }
 Descriptor describe(geo::Position p, uint64_t worldSeed) {
@@ -169,80 +180,204 @@ Recipe::Recipe(const Descriptor& d) : descriptor(d) {
   cold_ = smooth(43.f, 78.f, latitude);
   lush_ = clampf(.86f - .52f * cold_ + random.range(-.12f, .10f), .2f, .96f);
   if (d.archetype == Archetype::Atolls) { lush_ = .92f; cold_ = 0.f; }
-  land_.reserve(12); channels_.reserve(10); townPads_.reserve(6);
-  airports.reserve(6); towns.reserve(6); airportCodes_.reserve(6); airportNames_.reserve(6); townNames_.reserve(6);
+  // (the reserves bound every region: the names' storage must never move once an Airport or Town points into it)
+  land_.reserve(16); channels_.reserve(10); townPads_.reserve(kMaxTowns);
+  airports.reserve(kMaxAirports); towns.reserve(kMaxTowns); airportCodes_.reserve(kMaxAirports); airportNames_.reserve(kMaxAirports); townNames_.reserve(kMaxTowns);
+  const Scale scale = descriptor.scale;
   auto point = [&](float x, float z) { return vec2(x * rotationCos_ - z * rotationSin_, x * rotationSin_ + z * rotationCos_); };
   auto land = [&](float x, float z, float rx, float rz, float h, int shape) {
     land_.push_back({x, z, rx, rz, h, random.range(0.f, 2.f * PI), shape});
   };
-  auto field = [&](float x, float z, float heading, float elev, float len, int size, int surface, float tx, float tz, float townRadius) {
+  auto field = [&](float x, float z, float heading, float elev, float len, int size, int surface, float tx, float tz, float townRadius, int townKind = -1) {
     const size_t i = airports.size();
     const vec2 a = point(x, z), t = point(tx, tz);
     // Codes are compact, unique within the active world, and independent of the
     // menu order. They are fictional identifiers rather than real ICAO claims.
     char code[8]; std::snprintf(code, sizeof(code), "%c%c%c", char('A' + (d.seed >> 12) % 26), char('A' + (d.seed >> 22) % 26), char('A' + i));
     airportCodes_.emplace_back(code);
-    static const char* settlements[] = {"Harbor", "Landing", "Haven", "Point", "Cove", "Reach"};
-    townNames_.push_back(std::string(prefixes[(d.seed >> 9) % 24]) + " " + settlements[i]);
-    airportNames_.push_back(townNames_.back() + (size > 0 ? " Regional" : " Airstrip"));
+    static const char* settlements[] = {"Harbor", "Landing", "Haven", "Point", "Cove", "Reach", "Sound", "Bay", "Strand", "Quay"};
+    townNames_.push_back(std::string(prefixes[(d.seed >> 9) % 24]) + " " + settlements[i % 10]);
+    airportNames_.push_back(townNames_.back() + (size >= 2 ? " International" : size > 0 ? " Regional" : " Airstrip"));
     Airport airport{airportCodes_.back().c_str(), airportNames_.back().c_str(), a.x, a.y, elev,
-      wrapDeg360(heading + rotation / DEG), len, size > 0 ? 32.f : 22.f, surface, size,
+      wrapDeg360(heading + rotation / DEG), len, size >= 2 ? 45.f : size > 0 ? 32.f : 22.f, surface, size,
       "A seeded Earth-region field. Check runway length and terrain before arrival."};
     airport.hospital = i == 0;
     airports.push_back(airport);
-    towns.push_back({townNames_.back().c_str(), t.x, t.y, townRadius, size > 0 ? 1 : 0});
+    towns.push_back({townNames_.back().c_str(), t.x, t.y, townRadius, townKind >= 0 ? townKind : size > 0 ? 1 : 0});
     townPads_.push_back({t.x, t.y, townRadius + 100.f, elev + 3.f});
   };
   if (d.archetype == Archetype::Archipelago) {
-    const int n = 4 + random.integer(3);
-    for (int i = 0; i < n; ++i) {
-      const float angle = (2.f * PI * i) / n + random.range(-.13f, .13f);
-      const float distance = random.range(14500.f, 20500.f);
-      const float x = std::cos(angle) * distance, z = std::sin(angle) * distance;
-      const float rx = random.range(5500.f, 7600.f), rz = random.range(4800.f, 6800.f);
-      land(x, z, rx, rz, random.range(250.f, 720.f), 0);
-      field(x, z + .45f * rz, 90.f, random.range(25.f, 65.f), i ? 850.f : 1600.f, i ? 0 : 1,
-        i % 3 ? SURF_GRASS : SURF_ASPHALT, x + 600.f, z + .45f * rz + 1500.f, i ? 280.f : 500.f);
+    if (scale == Scale::Small) {   // two or three islands close together, a field on each
+      const int n = 2 + random.integer(2);
+      for (int i = 0; i < n; ++i) {
+        const float angle = (2.f * PI * i) / n + random.range(-.3f, .3f);
+        const float distance = random.range(7000.f, 10000.f);
+        const float x = std::cos(angle) * distance, z = std::sin(angle) * distance;
+        const float rx = random.range(3600.f, 4700.f), rz = random.range(3200.f, 4300.f);
+        land(x, z, rx, rz, random.range(220.f, 560.f), 0);
+        field(x, z + .42f * rz, 90.f, 30.f, i ? 800.f : 1400.f, i ? 0 : 1,   // (the town abeam the runway's middle)
+          i % 2 ? SURF_GRASS : SURF_ASPHALT, x, z + .42f * rz + 1350.f, i ? 220.f : 330.f);
+      }
+      land(random.range(-2500.f, 2500.f), random.range(-2500.f, 2500.f), random.range(800.f, 1500.f),
+        random.range(700.f, 1300.f), random.range(30.f, 90.f), 0);
+    } else if (scale == Scale::Large) {   // a main island - the city, the international airport - in a ring of islands
+      const float mrx = random.range(13000.f, 15000.f), mrz = random.range(11000.f, 13000.f);
+      land(0.f, 0.f, mrx, mrz, random.range(800.f, 1300.f), 0);
+      field(-.10f * mrx, .40f * mrz, 90.f, 30.f, 2800.f, 2, SURF_ASPHALT, -.10f * mrx + 900.f, .40f * mrz + 2700.f, 1200.f, 2);
+      const int n = 5 + random.integer(3);
+      for (int i = 0; i < n; ++i) {
+        const float angle = (2.f * PI * i) / n + random.range(-.12f, .12f);
+        const float distance = random.range(22500.f, 25500.f);
+        const float x = std::cos(angle) * distance, z = std::sin(angle) * distance;
+        const float rx = random.range(4800.f, 6500.f), rz = random.range(4400.f, 6000.f);
+        land(x, z, rx, rz, random.range(300.f, 820.f), 0);
+        field(x, z + .45f * rz, 90.f, 30.f, i % 2 ? 900.f : 1500.f, i % 2 ? 0 : 1,
+          i % 3 ? SURF_GRASS : SURF_ASPHALT, x + 600.f, z + .45f * rz + 1700.f, i % 2 ? 280.f : 450.f);
+        const float gap = angle + PI / n;   // (an islet in the gap to the next)
+        land(std::cos(gap) * 19000.f, std::sin(gap) * 19000.f, random.range(900.f, 1900.f), random.range(800.f, 1600.f),
+          random.range(40.f, 140.f), 0);
+      }
+    } else {
+      const int n = 4 + random.integer(3);
+      for (int i = 0; i < n; ++i) {
+        const float angle = (2.f * PI * i) / n + random.range(-.13f, .13f);
+        const float distance = random.range(14500.f, 20500.f);
+        const float x = std::cos(angle) * distance, z = std::sin(angle) * distance;
+        const float rx = random.range(5500.f, 7600.f), rz = random.range(4800.f, 6800.f);
+        land(x, z, rx, rz, random.range(250.f, 720.f), 0);
+        field(x, z + .45f * rz, 90.f, random.range(25.f, 65.f), i ? 850.f : 1600.f, i ? 0 : 1,
+          i % 3 ? SURF_GRASS : SURF_ASPHALT, x + 600.f, z + .45f * rz + 1500.f, i ? 280.f : 500.f);
+      }
+      for (int i = 0; i < 3; ++i) land(random.range(-10500.f, 10500.f), random.range(-10500.f, 10500.f),
+        random.range(1100.f, 2300.f), random.range(900.f, 1900.f), random.range(40.f, 130.f), 0);
     }
-    for (int i = 0; i < 3; ++i) land(random.range(-10500.f, 10500.f), random.range(-10500.f, 10500.f),
-      random.range(1100.f, 2300.f), random.range(900.f, 1900.f), random.range(40.f, 130.f), 0);
   } else if (d.archetype == Archetype::VolcanicChain) {
-    const int n = 4;
-    for (int i = 0; i < n; ++i) {
-      const float x = -21500.f + 14000.f * i, z = -16500.f + 10500.f * i + random.range(-1800.f, 1800.f);
-      const float rx = random.range(6100.f, 7900.f), rz = random.range(6200.f, 8100.f);
-      land(x, z, rx, rz, random.range(1200.f, 2400.f), 1);
-      field(x + .72f * rx, z, 0.f, 90.f + i * 20.f, i == 1 ? 1700.f : 1000.f, i == 1 ? 1 : 0,
-        i == 1 ? SURF_ASPHALT : SURF_GRAVEL, x + .20f * rx, z + .80f * rz, i == 1 ? 450.f : 280.f);
+    if (scale == Scale::Small) {   // two cones, joined at their feet
+      for (int i = 0; i < 2; ++i) {
+        const float x = i ? 6500.f : -6500.f, z = (i ? 4200.f : -4200.f) + random.range(-1200.f, 1200.f);
+        const float rx = random.range(5200.f, 6400.f), rz = random.range(5200.f, 6600.f);
+        land(x, z, rx, rz, random.range(1000.f, 1900.f), 1);
+        field(x + .72f * rx, z, 0.f, 90.f, i ? 900.f : 1500.f, i ? 0 : 1, i ? SURF_GRAVEL : SURF_ASPHALT,
+          x + .20f * rx, z + .80f * rz, i ? 260.f : 400.f);
+      }
+    } else if (scale == Scale::Large) {   // five cones down a long chain; a lava plain off its middle with the city
+      land(7000.f, -9500.f, 10500.f, 7000.f, random.range(160.f, 260.f), 0);
+      field(7000.f, -7400.f, 90.f, 30.f, 2700.f, 2, SURF_ASPHALT, 7900.f, -4700.f, 1150.f, 2);
+      for (int i = 0; i < 5; ++i) {   // (inside 31 km of the middle whichever way the region turns: the ocean edge is square)
+        const float x = -22500.f + 11250.f * i, z = -14000.f + 7000.f * i + random.range(-1200.f, 1200.f);
+        const bool end = i == 0 || i == 4;
+        const float rx = end ? random.range(5000.f, 5800.f) : random.range(5800.f, 7000.f);
+        const float rz = end ? random.range(5000.f, 5800.f) : random.range(5800.f, 7200.f);
+        land(x, z, rx, rz, random.range(1400.f, 2800.f), 1);
+        if (i == 2) continue;   // (the middle cone stands over the plain: no field on it)
+        const bool regional = i == 1 || i == 3;
+        field(x + .72f * rx, z, 0.f, 90.f, regional ? 1500.f : 1000.f, regional ? 1 : 0, regional ? SURF_ASPHALT : SURF_GRAVEL,
+          x + .20f * rx, z + .80f * rz, regional ? 420.f : 280.f);
+      }
+    } else {
+      const int n = 4;
+      for (int i = 0; i < n; ++i) {
+        const float x = -21500.f + 14000.f * i, z = -16500.f + 10500.f * i + random.range(-1800.f, 1800.f);
+        const float rx = random.range(6100.f, 7900.f), rz = random.range(6200.f, 8100.f);
+        land(x, z, rx, rz, random.range(1200.f, 2400.f), 1);
+        field(x + .72f * rx, z, 0.f, 90.f + i * 20.f, i == 1 ? 1700.f : 1000.f, i == 1 ? 1 : 0,
+          i == 1 ? SURF_ASPHALT : SURF_GRAVEL, x + .20f * rx, z + .80f * rz, i == 1 ? 450.f : 280.f);
+      }
     }
   } else if (d.archetype == Archetype::Fjords) {
-    land(0.f, -6500.f, 30500.f, 30500.f, 1450.f, 0);
-    land(-25000.f, -20000.f, 9000.f, 12000.f, 1200.f, 0);
-    land(22000.f, -21000.f, 11500.f, 11000.f, 1800.f, 0);
-    for (int i = 0; i < 5; ++i) channels_.push_back({-24000.f + 12000.f * i, 28000.f,
-      random.range(36500.f, 46500.f), random.range(1000.f, 1650.f), random.range(-1600.f, 1600.f)});
-    for (int i = 0; i < 4; ++i) {
-      const float x = -18000.f + 12000.f * i, z = 9500.f + (i % 2) * 2200.f;
-      field(x, z, 0.f, 65.f + i * 12.f, i ? 1150.f : 1750.f, i ? 0 : 1,
-        i ? SURF_GRAVEL : SURF_ASPHALT, x + 1750.f, z - 450.f, i ? 350.f : 650.f);
+    if (scale == Scale::Small) {   // one mountain block cut by three fjords, two fields between their mouths
+      bandZ_ = 6500.f;
+      land(0.f, -3500.f, 18000.f, 17000.f, 1150.f, 0);
+      land(-15500.f, -15000.f, 6500.f, 7500.f, 950.f, 0);
+      for (int i = 0; i < 3; ++i) channels_.push_back({-12000.f + 12000.f * i, 15000.f,
+        random.range(21000.f, 26000.f), random.range(850.f, 1300.f), random.range(-1200.f, 1200.f)});
+      for (int i = 0; i < 2; ++i) {
+        const float x = -6000.f + 12000.f * i, z = 6000.f + 1500.f * i;
+        field(x, z, 0.f, 60.f, i ? 1000.f : 1500.f, i ? 0 : 1, i ? SURF_GRAVEL : SURF_ASPHALT, x + 1750.f, z - 450.f, i ? 300.f : 500.f);
+      }
+    } else if (scale == Scale::Large) {   // the medium's coast, higher, with a city, and a strip up on the high plateau
+      land(0.f, -6500.f, 31000.f, 31000.f, 1500.f, 0);
+      land(-25000.f, -20000.f, 9000.f, 12000.f, 1250.f, 0);
+      land(22000.f, -21000.f, 11500.f, 11000.f, 1900.f, 0);
+      for (int i = 0; i < 5; ++i) channels_.push_back({-24000.f + 12000.f * i, 28000.f,
+        random.range(36500.f, 46500.f), random.range(1000.f, 1650.f), random.range(-1600.f, 1600.f)});
+      for (int i = 0; i < 4; ++i) {
+        const float x = -18000.f + 12000.f * i, z = 9500.f + (i % 2) * 2200.f;
+        if (i == 0) field(x, z, 0.f, 65.f, 2600.f, 2, SURF_ASPHALT, x + 2300.f, z - 450.f, 1050.f, 2);
+        else field(x, z, 0.f, 65.f, 1150.f, 0, i % 2 ? SURF_GRAVEL : SURF_ASPHALT, x + 1750.f, z - 450.f, 350.f);
+      }
+      field(0.f, -21000.f, 90.f, 900.f, 1300.f, 0, SURF_GRAVEL, 0.f, -19200.f, 260.f);
+    } else {
+      land(0.f, -6500.f, 30500.f, 30500.f, 1450.f, 0);
+      land(-25000.f, -20000.f, 9000.f, 12000.f, 1200.f, 0);
+      land(22000.f, -21000.f, 11500.f, 11000.f, 1800.f, 0);
+      for (int i = 0; i < 5; ++i) channels_.push_back({-24000.f + 12000.f * i, 28000.f,
+        random.range(36500.f, 46500.f), random.range(1000.f, 1650.f), random.range(-1600.f, 1600.f)});
+      for (int i = 0; i < 4; ++i) {
+        const float x = -18000.f + 12000.f * i, z = 9500.f + (i % 2) * 2200.f;
+        field(x, z, 0.f, 65.f + i * 12.f, i ? 1150.f : 1750.f, i ? 0 : 1,
+          i ? SURF_GRAVEL : SURF_ASPHALT, x + 1750.f, z - 450.f, i ? 350.f : 650.f);
+      }
     }
   } else if (d.archetype == Archetype::Atolls) {
-    const float centers[][2] = {{-18000.f,-15000.f}, {14000.f,-16000.f}, {-13000.f,16000.f}, {19000.f,15000.f}};
-    for (int i = 0; i < 4; ++i) {
-      const float rx = random.range(5500.f, 7300.f), rz = random.range(5000.f, 6700.f);
-      land(centers[i][0], centers[i][1], rx, rz, random.range(12.f, 23.f), 2);
-      field(centers[i][0] + rx, centers[i][1], 0.f, 7.f, i ? 700.f : 1050.f, 0,
-        i ? SURF_SAND : SURF_ASPHALT, centers[i][0] + rx * std::cos(1.05f), centers[i][1] + rz * std::sin(1.05f), 170.f);
+    auto atollField = [&](float cx, float cz, float rx, float rz, bool main) {
+      field(cx + rx, cz, 0.f, 7.f, main ? 1050.f : 700.f, 0, main ? SURF_ASPHALT : SURF_SAND,
+        cx + rx * std::cos(1.05f), cz + rz * std::sin(1.05f), 170.f);
+    };
+    if (scale == Scale::Small) {   // two atolls
+      const float centers[][2] = {{-9000.f, -6500.f}, {9500.f, 7000.f}};
+      for (int i = 0; i < 2; ++i) {
+        const float rx = random.range(5000.f, 6500.f), rz = random.range(4600.f, 6000.f);
+        land(centers[i][0], centers[i][1], rx, rz, random.range(12.f, 23.f), 2);
+        atollField(centers[i][0], centers[i][1], rx, rz, i == 0);
+      }
+    } else if (scale == Scale::Large) {   // a great atoll in the middle and six round it
+      const float rx = random.range(7600.f, 8800.f), rz = random.range(7000.f, 8200.f);
+      land(0.f, 0.f, rx, rz, random.range(14.f, 24.f), 2);
+      field(rx, 0.f, 0.f, 7.f, 1500.f, 1, SURF_ASPHALT, rx * std::cos(1.05f), rz * std::sin(1.05f), 260.f);
+      for (int i = 0; i < 6; ++i) {
+        const float angle = i * PI / 3.f + random.range(-.10f, .10f);
+        const float cx = std::cos(angle) * 23000.f, cz = std::sin(angle) * 23000.f;
+        const float ax = random.range(4800.f, 6200.f), az = random.range(4400.f, 5800.f);
+        land(cx, cz, ax, az, random.range(12.f, 23.f), 2);
+        atollField(cx, cz, ax, az, false);
+      }
+    } else {
+      const float centers[][2] = {{-18000.f,-15000.f}, {14000.f,-16000.f}, {-13000.f,16000.f}, {19000.f,15000.f}};
+      for (int i = 0; i < 4; ++i) {
+        const float rx = random.range(5500.f, 7300.f), rz = random.range(5000.f, 6700.f);
+        land(centers[i][0], centers[i][1], rx, rz, random.range(12.f, 23.f), 2);
+        field(centers[i][0] + rx, centers[i][1], 0.f, 7.f, i ? 700.f : 1050.f, 0,
+          i ? SURF_SAND : SURF_ASPHALT, centers[i][0] + rx * std::cos(1.05f), centers[i][1] + rz * std::sin(1.05f), 170.f);
+      }
     }
   } else {
-    land(-16000.f, -2000.f, 16200.f, 28000.f, 570.f, 0);
-    land(14500.f, 8000.f, 16000.f, 22700.f, 800.f, 0);
-    land(17000.f, -20000.f, 11500.f, 12600.f, 1400.f, 0);
-    channels_.push_back({0.f, 34000.f, 71000.f, 1600.f, 2800.f});
-    field(-17000.f, 14000.f, 0.f, 80.f, 2000.f, 1, SURF_ASPHALT, -19000.f, 14000.f, 750.f);
-    field(-15000.f, -15500.f, 90.f, 160.f, 1100.f, 0, SURF_GRASS, -15000.f, -17300.f, 350.f);
-    field(15500.f, 15000.f, 90.f, 95.f, 1700.f, 1, SURF_ASPHALT, 15500.f, 17500.f, 600.f);
-    field(18500.f, -20000.f, 0.f, 210.f, 900.f, 0, SURF_GRAVEL, 20500.f, -20000.f, 300.f);
+    if (scale == Scale::Small) {   // one long island, a field at each end
+      const float rx = random.range(9500.f, 12000.f), rz = random.range(14000.f, 17000.f);
+      land(0.f, 0.f, rx, rz, random.range(450.f, 750.f), 0);
+      field(-.25f * rx, .40f * rz, 0.f, 40.f, 1600.f, 1, SURF_ASPHALT, -.25f * rx + 1600.f, .40f * rz + 300.f, 520.f);
+      field(.20f * rx, -.45f * rz, 90.f, 40.f, 900.f, 0, SURF_GRASS, .20f * rx, -.45f * rz - 1350.f, 280.f);
+    } else if (scale == Scale::Large) {   // the medium's fragments, larger, with a city and two more fields
+      land(-16500.f, -2000.f, 17000.f, 29500.f, 650.f, 0);
+      land(15000.f, 8000.f, 17000.f, 23500.f, 900.f, 0);
+      land(17500.f, -20000.f, 12000.f, 13000.f, 1500.f, 0);
+      channels_.push_back({0.f, 34000.f, 71000.f, 1700.f, 2800.f});
+      field(-17000.f, 14000.f, 0.f, 80.f, 2800.f, 2, SURF_ASPHALT, -19400.f, 13500.f, 1250.f, 2);
+      field(-15000.f, -15500.f, 90.f, 160.f, 1100.f, 0, SURF_GRASS, -15000.f, -17300.f, 350.f);
+      field(15500.f, 15000.f, 90.f, 95.f, 1700.f, 1, SURF_ASPHALT, 15500.f, 17500.f, 600.f);
+      field(18500.f, -20000.f, 0.f, 210.f, 900.f, 0, SURF_GRAVEL, 20500.f, -20000.f, 300.f);
+      field(-21000.f, 1500.f, 90.f, 60.f, 1300.f, 1, SURF_ASPHALT, -21000.f, 3200.f, 450.f);
+      field(13000.f, -1500.f, 0.f, 60.f, 1200.f, 1, SURF_ASPHALT, 14800.f, -1500.f, 420.f);
+    } else {
+      land(-16000.f, -2000.f, 16200.f, 28000.f, 570.f, 0);
+      land(14500.f, 8000.f, 16000.f, 22700.f, 800.f, 0);
+      land(17000.f, -20000.f, 11500.f, 12600.f, 1400.f, 0);
+      channels_.push_back({0.f, 34000.f, 71000.f, 1600.f, 2800.f});
+      field(-17000.f, 14000.f, 0.f, 80.f, 2000.f, 1, SURF_ASPHALT, -19000.f, 14000.f, 750.f);
+      field(-15000.f, -15500.f, 90.f, 160.f, 1100.f, 0, SURF_GRASS, -15000.f, -17300.f, 350.f);
+      field(15500.f, 15000.f, 90.f, 95.f, 1700.f, 1, SURF_ASPHALT, 15500.f, 17500.f, 600.f);
+      field(18500.f, -20000.f, 0.f, 210.f, 900.f, 0, SURF_GRAVEL, 20500.f, -20000.f, 300.f);
+      }
   }
   // Shape variation owns a separate random stream. The original layout above,
   // including every airport/town coordinate and text, retains its exact draws.
@@ -308,6 +443,7 @@ Recipe::Recipe(const Descriptor& d) : descriptor(d) {
     }
   }
   const size_t trunks = channels_.size();
+  const float fjordK = scale == Scale::Small ? .62f : 1.f;   // (a small region's fjords: shorter, their mouths closer)
   for (size_t i = 0; i < trunks; ++i) {
     Channel& c = channels_[i];
     c.originalLength = c.length;
@@ -317,9 +453,9 @@ Recipe::Recipe(const Descriptor& d) : descriptor(d) {
     if (d.archetype == Archetype::Fjords) {
       const float mouths[] = {3500.f, -6500.f, 5200.f, -6500.f, -1800.f};
       const float lengths[] = {34000.f, 49000.f, 38000.f, 45000.f, 33000.f};
-      c.mouth = mouths[i] + shapeRandom.range(-1300.f, 1300.f);
+      c.mouth = (mouths[i] + shapeRandom.range(-1300.f, 1300.f)) * fjordK;
       c.mouthWidth = shapeRandom.range(1.35f, 2.30f);
-      c.length = lengths[i] + shapeRandom.range(0.f, 6000.f);
+      c.length = (lengths[i] + shapeRandom.range(0.f, 6000.f)) * fjordK;
     }
   }
   if (d.archetype == Archetype::Fjords) {
@@ -327,13 +463,13 @@ Recipe::Recipe(const Descriptor& d) : descriptor(d) {
     // mouth is exactly on the trunk centerline, so no disconnected water cuts.
     for (size_t i = 1; i < trunks - 1; ++i) {
       const Channel parent = channels_[i];
-      const float along = std::max(31000.f, shapeRandom.range(.67f, .79f) * parent.length);
+      const float along = std::max(31000.f * fjordK, shapeRandom.range(.67f, .79f) * parent.length);
       const float t = along / parent.length, oldT = clampf(along / parent.originalLength, 0.f, 1.f);
       const float z = parent.z - along;
-      const float free = smooth(3000.f, 8500.f, std::abs(z - 10500.f));
+      const float free = smooth(3000.f, 8500.f, std::abs(z - bandZ_));
       const float offset = parent.bend * std::sin(oldT * 4.2f + roughPhase_) +
         free * (parent.turn * t + parent.sway * 4.f * t * (1.f - t) + parent.mouth * (1.f - t) * (1.f - t) * (1.f - t));
-      Channel branch{parent.x + offset, z, shapeRandom.range(9000.f, 15000.f),
+      Channel branch{parent.x + offset, z, shapeRandom.range(9000.f, 15000.f) * fjordK,
         parent.width * shapeRandom.range(.55f, .85f), 0.f};
       const float angle = (i % 2 ? -1.f : 1.f) * shapeRandom.range(.65f, 1.f);
       branch.axisX = std::sin(angle); branch.axisZ = -std::cos(angle);
@@ -342,16 +478,62 @@ Recipe::Recipe(const Descriptor& d) : descriptor(d) {
       channels_.push_back(branch);
     }
   }
+  // Every field at the height of its own ground (the mean along its runway, never below 6 m) and every town's pad at
+  // its own: the land is levelled for them where they are, not cut down to a fixed height round them
+  for (Airport& a : airports) {
+    const vec3 dir = a.dir();
+    float sum = 0.f;
+    for (int k = -4; k <= 4; ++k) {
+      const float t = k / 4.f * a.length * .5f;
+      sum += std::max(natural(a.x + dir.x * t, a.z + dir.z * t), 6.f);
+    }
+    a.elev = std::round(sum / 9.f);
+  }
+  for (TownPad& pad : townPads_) pad.elevation = std::max(natural(pad.x, pad.z), 4.f) + 1.f;
+  // Villages and towns away from the fields - two on a small region, four on a medium, ten on a large - on dry, gentle
+  // ground inland of the shore, outside every field's grounds and approaches, and well apart (their own stream)
+  Random townRandom{mix(d.seed ^ UINT64_C(0x56494c4c41474553))};
+  static const char* places[] = {"Ridge", "Vale", "Ford", "Hollow", "Mill", "Cross", "Falls", "Bluff",
+                                 "Springs", "Wick", "Field", "Mere", "Down", "Glen", "Rise", "Brook"};
+  const int villages = scale == Scale::Small ? 2 : scale == Scale::Medium ? 4 : 10;
+  const int market = scale == Scale::Large ? 3 : scale == Scale::Medium ? 1 : 0;   // (the first few are towns)
+  const float highest = cold_ > .5f ? 260.f : 480.f;
+  const float gentle = d.archetype == Archetype::VolcanicChain ? 60.f : 35.f;   // (a cone's lower flanks are its only room)
+  for (int attempt = 0, placed = 0; attempt < 1500 && placed < villages && towns.size() < kMaxTowns; ++attempt) {
+    const bool town = placed < market;
+    const float radius = town ? townRandom.range(520.f, 760.f) : townRandom.range(200.f, 380.f);
+    const float x = townRandom.range(-31000.f, 31000.f), z = townRandom.range(-31000.f, 31000.f);
+    if (std::max(std::abs(x), std::abs(z)) > 31500.f - radius) continue;
+    const float h = natural(x, z);
+    if (h < 14.f || h > highest) continue;
+    bool ok = true;
+    for (int k = 0; k < 8 && ok; ++k) {   // gentle: near its centre's height all over it
+      const float angle = k * PI / 4.f, edge = natural(x + std::cos(angle) * radius, z + std::sin(angle) * radius);
+      ok = edge > 6.f && std::abs(edge - h) < gentle;
+    }
+    for (int k = 0; k < 12 && ok; ++k) {   // inland: dry all round, past the edge of its levelled ground
+      const float angle = k * PI / 6.f, reach = radius + 650.f;
+      ok = natural(x + std::cos(angle) * reach, z + std::sin(angle) * reach) > 3.f;
+    }
+    for (size_t i = 0; i < airports.size() && ok; ++i) {   // off the grounds, out of the approaches
+      const Airport& a = airports[i];
+      const vec3 dir = a.dir();
+      const float dx = x - a.x, dz = z - a.z;
+      const float u = std::abs(dx * dir.x + dz * dir.z), v = std::abs(-dx * dir.z + dz * dir.x), beyond = u - a.length * .5f;
+      if (beyond > 0.f && beyond < 7800.f && v < 250.f + .18f * beyond + 1100.f + radius) ok = false;
+      const float du = std::max(0.f, u - (a.length * .5f + 260.f)), dv = std::max(0.f, v - (a.size == 2 ? 420.f : 240.f));
+      if (std::hypot(du, dv) < 900.f + radius) ok = false;
+    }
+    for (size_t i = 0; i < towns.size() && ok; ++i) ok = std::hypot(x - towns[i].x, z - towns[i].z) > towns[i].r + radius + 2200.f;
+    if (!ok) continue;
+    townNames_.push_back(std::string(prefixes[(d.seed >> 9) % 24]) + " " + places[(placed + (d.seed >> 17)) % 16]);
+    towns.push_back({townNames_.back().c_str(), x, z, radius, town ? 1 : 0});
+    townPads_.push_back({x, z, radius + 100.f, h + 1.f});
+    ++placed;
+  }
 }
 
-void Recipe::sample(float x, float z, float out[4]) const {
-  // The entire outer 2 km is exactly ocean, before the existing 10 km wrapper.
-  // Return early to keep remote water cheap, and to preserve the shared boundary.
-  const float edge = std::max(std::abs(x), std::abs(z));
-  if (edge >= kOceanEdge || !std::isfinite(x) || !std::isfinite(z)) {
-    out[0] = -SEA_DEPTH; out[1] = 0.f; out[2] = lush_; out[3] = cold_; return;
-  }
-  const float px = x * rotationCos_ + z * rotationSin_, pz = -x * rotationSin_ + z * rotationCos_;
+float Recipe::shapeHeight(float px, float pz) const {
   float height = -SEA_DEPTH;
   for (const Landmass& island : land_) {
     const float dx = px - island.x, dz = pz - island.z;
@@ -401,7 +583,7 @@ void Recipe::sample(float x, float z, float out[4]) const {
     const float oldT = channel.branch ? t : clampf(along / channel.originalLength, 0.f, 1.f);
     // Keep the old trunk cross-section across the inhabited band. Stronger
     // bends begin beyond it; the usual final grading still owns flight safety.
-    const float free = channel.branch ? 1.f : smooth(3000.f, 8500.f, std::abs(pz - 10500.f));
+    const float free = channel.branch ? 1.f : smooth(3000.f, 8500.f, std::abs(pz - bandZ_));
     const float remaining = 1.f - t;
     const float center = (channel.branch ? 0.f : channel.bend * std::sin(oldT * 4.2f + roughPhase_)) +
       free * (channel.turn * t + channel.sway * 4.f * t * remaining + channel.mouth * remaining * remaining * remaining);
@@ -415,6 +597,23 @@ void Recipe::sample(float x, float z, float out[4]) const {
     const float cut = (1.f - smooth(width, width + bank, std::abs(across))) * cap * mouthCap;
     height = lerpf(height, -SEA_DEPTH, cut);
   }
+  return height;
+}
+float Recipe::natural(float x, float z) const {
+  const float edge = std::max(std::abs(x), std::abs(z));
+  if (edge >= kOceanEdge || !std::isfinite(x) || !std::isfinite(z)) return -SEA_DEPTH;
+  const float h = shapeHeight(x * rotationCos_ + z * rotationSin_, -x * rotationSin_ + z * rotationCos_);
+  return lerpf(-SEA_DEPTH, h, 1.f - smooth(34000.f, kOceanEdge, edge));
+}
+void Recipe::sample(float x, float z, float out[4]) const {
+  // The entire outer 2 km is exactly ocean, before the existing 10 km wrapper.
+  // Return early to keep remote water cheap, and to preserve the shared boundary.
+  const float edge = std::max(std::abs(x), std::abs(z));
+  if (edge >= kOceanEdge || !std::isfinite(x) || !std::isfinite(z)) {
+    out[0] = -SEA_DEPTH; out[1] = 0.f; out[2] = lush_; out[3] = cold_; return;
+  }
+  const float px = x * rotationCos_ + z * rotationSin_, pz = -x * rotationSin_ + z * rotationCos_;
+  float height = shapeHeight(px, pz);
   float amplitude = descriptor.archetype == Archetype::Atolls ? .65f :
     clampf(5.f + std::max(0.f, height) * .032f, 5.f, 65.f);
   amplitude *= smooth(-15.f, 45.f, height);
@@ -428,7 +627,7 @@ void Recipe::sample(float x, float z, float out[4]) const {
     const vec2 uv = aptLocal(airport, {x, 0.f, z});
     const float u = std::abs(uv.x), v = std::abs(uv.y);
     const float halfLength = airport.length * .5f + 280.f;
-    const float halfWidth = airport.size > 0 ? 370.f : 260.f;
+    const float halfWidth = airport.size >= 2 ? 520.f : airport.size > 0 ? 370.f : 260.f;   // (an international's wider apron)
     const float padDistance = std::hypot(std::max(0.f, u - halfLength), std::max(0.f, v - halfWidth));
     const float pad = 1.f - smooth(0.f, descriptor.archetype == Archetype::Atolls ? 210.f : 650.f, padDistance);
     height = lerpf(height, airport.elev, pad); amplitude *= 1.f - pad;

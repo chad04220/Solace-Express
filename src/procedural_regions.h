@@ -11,14 +11,19 @@ namespace procedural {
 constexpr uint32_t kGeneratorVersion = 1;
 // Landscape-content/cache revision, deliberately separate from the stable
 // catalog/address version above. Never mix this into IDs or layout seeds.
-constexpr uint32_t kRecipeRevision = 2;
+constexpr uint32_t kRecipeRevision = 3;   // (3: three sizes, fields and towns on their own ground, villages)
 constexpr uint64_t kDefaultWorldSeed = 0x534f4c4143452026ULL;
 constexpr int kAddressLevel = 5;
 constexpr size_t kMaxNearby = 24;
 constexpr float kOceanEdge = 38000.f;
+constexpr size_t kMaxAirports = 10, kMaxTowns = 24;   // (a large region: its fields' towns and the villages besides)
 
 enum class Archetype { Archipelago, VolcanicChain, Fjords, Atolls, ContinentalFragments };
 const char* archetypeName(Archetype type);
+// How much land a region holds: a few islands and two or three fields, an archipelago, or islands on Solace's own scale
+// with a city and an international airport. From the seed, apart from the address, the archetype and the name.
+enum class Scale { Small, Medium, Large };
+const char* scaleName(Scale scale);
 
 struct Descriptor {
   std::string id, name;
@@ -27,6 +32,7 @@ struct Descriptor {
   uint32_t generatorVersion = kGeneratorVersion;
   geo::Tile address{geo::Face::PX, kAddressLevel, 0, 0};
   Archetype archetype = Archetype::Archipelago;
+  Scale scale = Scale::Medium;
   bool authored = false;
 };
 
@@ -54,6 +60,9 @@ public:
   // RGBA: base height, procedural detail amplitude, lushness, coldness. Pure,
   // thread safe and allocation free. Exact sea floor at/outside the ocean edge.
   void sample(float x, float z, float out[4]) const;
+  // The land alone at x, z (m, the region's chart): the islands and the channels, without the fields' and the towns'
+  // levelled ground or the approaches cut below their funnels
+  float natural(float x, float z) const;
   size_t memoryBytes() const;
 private:
   static constexpr int kCoastSamples = 64;
@@ -80,5 +89,7 @@ private:
   std::vector<std::string> airportCodes_, airportNames_, townNames_;
   float rotationSin_ = 0, rotationCos_ = 1, lush_ = .6f, cold_ = 0;
   float roughPhase_ = 0;
+  float bandZ_ = 10500.f;   // (fjords: the inhabited band across the channels, where they keep their straight cross-section)
+  float shapeHeight(float px, float pz) const;   // (natural, in the layout's own frame)
 };
 } // namespace procedural

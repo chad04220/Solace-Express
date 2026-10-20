@@ -67,8 +67,15 @@ bool dryConnection(const procedural::Recipe& recipe, const Airport& a, const Tow
   return false;
 }
 void checkAirports(const procedural::Recipe& recipe) {
-  expect(recipe.airports.size() >= 3 && recipe.airports.size() <= 6, "bounded useful airport population");
-  expect(recipe.towns.size() == recipe.airports.size(), "a separate settlement for each field");
+  // (a small region two or three fields, a large one up to eight; a town for each field, and villages besides)
+  expect(recipe.airports.size() >= 2 && recipe.airports.size() <= procedural::kMaxAirports, "bounded useful airport population");
+  expect(recipe.towns.size() >= recipe.airports.size() && recipe.towns.size() <= procedural::kMaxTowns, "a separate settlement for each field");
+  for (size_t i = recipe.airports.size(); i < recipe.towns.size(); ++i) {   // the villages: dry, apart, off every field
+    const Town& t = recipe.towns[i];
+    expect(texel(recipe, t.x, t.z)[0] > 2.f, "village centre is dry");
+    expect(airportExclusion(recipe, t.x, t.z) < .02f, "village centre clears airport scenery exclusion");
+    for (size_t j = 0; j < i; ++j) expect(std::hypot(t.x - recipe.towns[j].x, t.z - recipe.towns[j].z) > t.r + recipe.towns[j].r + 2000.f, "villages stand apart");
+  }
   for (size_t i = 0; i < recipe.airports.size(); ++i) {
     const Airport& a = recipe.airports[i]; const Town& t = recipe.towns[i];
     expect(a.code && std::strlen(a.code) == 3 && a.name && std::strlen(a.name) > 5, "owned airport name and compact code");
@@ -93,12 +100,13 @@ void checkAirports(const procedural::Recipe& recipe) {
         expect(b[0] + 2.f * b[1] <= a.elev + 8.f + .03f * distance + .1f, "entire approach funnel stays beneath obstacle ceiling");
       }
     }
+    const float level = texel(recipe, t.x, t.z)[0];   // (each town levelled at its own ground: Recipe's TownPad)
     for (int j = 0; j < 12; ++j) {
       const float angle = 2.f * PI * j / 12.f;
       const float x = t.x + .9f * t.r * std::cos(angle), z = t.z + .9f * t.r * std::sin(angle);
       expect(airportExclusion(recipe, x, z) < .02f, "town footprint clears runway/approach exclusions");
       const auto b = texel(recipe, x, z);
-      expect(b[0] > 3.f && std::abs(b[0] - a.elev - 3.f) < .03f && b[1] < .001f, "dry flat separate town footprint");
+      expect(b[0] > 3.f && std::abs(b[0] - level) < .03f && b[1] < .001f, "dry flat separate town footprint");
     }
   }
 }
@@ -153,7 +161,7 @@ int main() {
     const uint64_t before = fingerprint(a);
     expect(before == fingerprint(b), "same seed/version/address exactly reproduces sample bits");
     expect(heights.insert(before).second, "different landforms have different terrain signatures");
-    expect(a.memoryBytes() < 16384, "analytic recipe has bounded kilobyte footprint");
+    expect(a.memoryBytes() < 24576, "analytic recipe has bounded kilobyte footprint");
     checkAirports(a);
     float top = -1000.f; size_t dry = 0;
     for (int z = -34000; z <= 34000; z += 850) for (int x = -34000; x <= 34000; x += 850) {

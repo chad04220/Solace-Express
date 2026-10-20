@@ -116,11 +116,11 @@ void fjords() {
 }
 }
 int main() {
-  expect(procedural::kGeneratorVersion == 1 && procedural::kRecipeRevision == 2, "stable address version and independent terrain-content revision");
+  expect(procedural::kGeneratorVersion == 1 && procedural::kRecipeRevision == 3, "stable address version and independent terrain-content revision");
   atolls(); fjords();
   for (const auto& d : procedural::recommendations()) if (!d.authored) {
     const procedural::Recipe a(d), b(d); const uint64_t expected = fingerprint(a);
-    expect(a.memoryBytes() < 16384, "profile tables and branches fit the existing 16 KiB recipe budget");
+    expect(a.memoryBytes() < 24576, "profile tables and branches fit the 24 KiB recipe budget (a large region's islands and towns)");
     expect(expected == fingerprint(b), "profile generation is deterministic");
     auto concurrent = std::async(std::launch::async, [&a] { return fingerprint(a); });
     expect(fingerprint(a) == expected && concurrent.get() == expected, "immutable profiles sample consistently across threads");

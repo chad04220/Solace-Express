@@ -250,9 +250,9 @@ void checkWorldBounds() {
     if (std::max(std::abs(x), std::abs(z)) >= WORLD_HALF + 3000) ocean = ocean && h == -SEA_DEPTH;
   }
   check(finite, "regional terrain samples are finite");
-  check(g_world.repeating == !g_world.procedural, "procedural Earth chart is nonrepeating; authored career chart retains wrapping");
-  if (g_world.repeating) check(periodic, "authored terrain retains the exact local-wrap lookup contract");
-  else {
+  check(!g_world.repeating, "no chart repeats: the Earth regions and the islands alike are one place each");
+  (void)periodic;
+  {
     check(remoteOcean, "regional islands do not repeat at the old 100 km chart period");
     for (const Airport& a : g_world.airports) {
       const vec3 remote(a.x + WRAP_SPAN, a.elev, a.z);
@@ -338,7 +338,7 @@ int main(int argc, char** argv) {
     FILE* f = std::fopen(argv[2], "rb"); check(f != nullptr, "unchanged baseline cache exists"); if (f) std::fclose(f);
     if (failures) return finish();
     g_world.build("", kSolaceStamp, false); // Explicitly no cache: this is a preservation test, not a reload test.
-    check(!g_world.procedural && g_world.repeating && g_world.regionId == "solace" && !g_world.regionRecipe && !g_world.fromCache,
+    check(!g_world.procedural && !g_world.repeating && g_world.regionId == "solace" && !g_world.regionRecipe && !g_world.fromCache,
       "original Solace is freshly generated through its authored path");
     checkChartTopologyFlight();
     g_world.saveCache(argv[3], kSolaceStamp);

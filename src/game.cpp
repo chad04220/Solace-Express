@@ -5563,6 +5563,11 @@ void Game::debugScene(const std::string& name) {
     }
     if (getenv("REGION_ALT")) plane.pos.y = std::max(plane.pos.y, (float)atof(getenv("REGION_ALT")));
     for (int i = 0; i < 8; ++i) updateCamera(.1f);
+    // REGION_VIEW="x,y,z,lookx,looky,lookz": a fixed camera over the region (its overview, for a review shot)
+    if (const char* view = getenv("REGION_VIEW")) {
+      vec3 p, l;
+      if (sscanf(view, "%f,%f,%f,%f,%f,%f", &p.x, &p.y, &p.z, &l.x, &l.y, &l.z) == 6) { dbgCam = true; dbgFollow = false; dbgCamPos = p; dbgCamLook = l; }
+    }
     toasts.clear(); botControl = true;
     printf("Region scene: %s / %s / %zu airports / %zu towns / actual Free Flight\n",
       descriptor->id.c_str(), descriptor->name.c_str(), g_world.airports.size(), g_world.towns.size());
