@@ -2,8 +2,10 @@
 //! Coarse land goes through the normal deferred terrain light and atmospheric perspective, never a sky overlay.
 in vec3 vColour, vNormal, vPosition;
 in float vHeight;
+in vec2 vLocal;
 uniform vec3 uCamPos;
 uniform float uRegionCoverage;
+uniform float uClipHalf;   // (> 0: nothing drawn inside the active chart's square of this half side - it is drawn there)
 layout(location=0) out vec4 oG0;
 layout(location=1) out vec4 oG1;
 layout(location=2) out vec4 oG2;
@@ -23,6 +25,7 @@ float regionLodDither() {
 void main() {
   if (uRegionCoverage <= 0.0 || regionLodDither() >= uRegionCoverage) discard;
   if (vHeight < 0.0) discard;
+  if (uClipHalf > 0.0 && max(abs(vLocal.x), abs(vLocal.y)) < uClipHalf) discard;
   oG0 = vec4(length(vPosition - uCamPos), octEncode(normalize(vNormal)), 1.0);
   oG1 = vec4(sqrt(clamp(vColour, 0.0, 1.0)), 0.9);
   oG2 = vec4(0.0);

@@ -10,6 +10,8 @@
 #include "renderer.h"
 #include "shaders.h"
 #include "procedural_regions.h"
+#include "earth_charts.h"
+#include "earth_far.h"
 #include "region_travel.h"
 #include <algorithm>
 #include <cstring>
@@ -161,11 +163,12 @@ void Renderer::warmFarTerrain() {
 // fully underwater triangles are omitted. It is prepared only with the candidate's own immutable World.
 void Renderer::prepareFarTerrain(const World& world, WorldUploadData& data) {
   generationCheckpoint();
-  data.origin = world.regionRecipe ? world.regionRecipe->descriptor.origin : geo::solaceOrigin();
+  const procedural::Descriptor descriptor = world.chartDescriptor();
+  data.origin = descriptor.origin;
   data.origin.height = 0;
   data.regionId = world.regionId;
-  data.worldSeed = world.regionRecipe ? world.regionRecipe->descriptor.worldSeed : procedural::kDefaultWorldSeed;
-  data.generatorVersion = world.regionRecipe ? world.regionRecipe->descriptor.generatorVersion : procedural::kGeneratorVersion;
+  data.worldSeed = descriptor.worldSeed;
+  data.generatorVersion = descriptor.generatorVersion;
   constexpr int N = 129;
   const float cell = 2.f * WORLD_HALF / (N - 1);
   const regionTravel::Chart chart(data.origin);
@@ -190,7 +193,6 @@ void Renderer::prepareFarTerrain(const World& world, WorldUploadData& data) {
     const vec3 dz = grid[size_t(std::min(z + 1, N - 1)) * N + x].position - grid[size_t(std::max(z - 1, 0)) * N + x].position;
     grid[size_t(z) * N + x].normal = normalize(cross(dz, dx));
   }
-  const auto descriptor = world.regionRecipe ? world.regionRecipe->descriptor : procedural::solaceDescriptor(data.worldSeed);
   data.surface = regionalSurface::makeSurface(descriptor, N, grid, regionalSurface::Provenance::FullDerived);
   data.farVertices.clear();
   auto tri = [&](int a, int b, int c) {
@@ -302,8 +304,7 @@ void Renderer::publishFarSurfaces() {
   auto append = [&](FarRegionGpu& mesh) { if (mesh.ready && mesh.surface) meshes.push_back(&mesh); };
   append(activeFarRegion); if (worldStage.active) append(worldStage.farProxy); append(previousFarRegion);
   for (auto& entry : horizonCache) append(entry.second);
-  const uint64_t seed = horizonContext ? horizonSeed :
-    (g_world.regionRecipe ? g_world.regionRecipe->descriptor.worldSeed : procedural::kDefaultWorldSeed);
+  const uint64_t seed = horizonContext ? horizonSeed : g_world.chartDescriptor().worldSeed;
   auto compatible = [&](const FarRegionGpu& mesh) {
     return (&mesh == &activeFarRegion && mesh.regionId == g_world.regionId) ||
       regionIdentityCompatible(mesh.regionId, mesh.worldSeed, mesh.generatorVersion, seed) ||
@@ -381,8 +382,12 @@ void Renderer::updateRegionHorizon(geo::Position viewer, uint64_t worldSeed) {
   try {
     // Validates even under the project's fast-math compilation policy.
     (void)geo::direction(viewer);
-    if (!horizonContext || horizonSeed != worldSeed) {
+    // (the real Earth's far patches, earth_far.h, or the generated regions: never the one where the other is wanted)
+    const std::shared_ptr<const earth::Pack> earthPack = g_world.earthChart ? g_world.earthChart->pack : nullptr;
+    const geo::Position chartOrigin = g_world.chartDescriptor().origin;
+    if (!horizonContext || horizonSeed != worldSeed || horizonEarth != (earthPack != nullptr)) {
       ++horizonGeneration; horizonSeed = worldSeed; horizonContext = true; horizonHasSelection = false;
+      horizonEarth = earthPack != nullptr;
       horizonPending.clear(); horizonSelection = {}; horizonError.clear();
       for (auto it = horizonCache.begin(); it != horizonCache.end();) {
         if (it->second.accepted && regionalSurface::isPinned(it->second.surface)) ++it;
@@ -454,9 +459,10 @@ void Renderer::updateRegionHorizon(geo::Position viewer, uint64_t worldSeed) {
       pin(activeFarRegion); if (worldStage.active) pin(worldStage.farProxy); pin(previousFarRegion);
       if (!g_world.repeating) pinned.push_back(g_world.regionId);
       const uint64_t generation = horizonGeneration;
-      horizonJob = std::async(std::launch::async, [viewer, worldSeed, generation, known = std::move(known), pinned = std::move(pinned), protectedCount = protectedCache.size()] {
+      horizonJob = std::async(std::launch::async, [viewer, worldSeed, generation, known = std::move(known), pinned = std::move(pinned), protectedCount = protectedCache.size(),
+                                                   earthPack, chartOrigin] {
         HorizonBatch batch; batch.viewer = viewer; batch.generation = generation;
-        batch.selection = horizon::select(viewer, worldSeed);
+        batch.selection = earthPack ? earthFar::select(viewer, chartOrigin, earthPack->box(), kHorizonCacheLimit) : horizon::select(viewer, worldSeed);
         size_t cacheNeeded = 0;
         auto& regions = batch.selection.regions;
         regions.erase(std::remove_if(regions.begin(), regions.end(), [&](const procedural::Descriptor& d) {
@@ -468,8 +474,8 @@ void Renderer::updateRegionHorizon(geo::Position viewer, uint64_t worldSeed) {
         for (const auto& d : regions) {
           if (std::find(pinned.begin(), pinned.end(), d.id) != pinned.end() ||
               std::find(known.begin(), known.end(), horizonKey(d.id, d.worldSeed, d.generatorVersion)) != known.end()) continue;
-          batch.meshes.push_back(horizon::build(d));
-          if (batch.meshes.size() == 2) break;
+          batch.meshes.push_back(earthPack ? earthFar::build(d, earthPack) : horizon::build(d));
+          if (batch.meshes.size() == (earthPack ? 4u : 2u)) break;
         }
         return batch;
       });
@@ -489,7 +495,7 @@ void Renderer::updateRegionHorizon(geo::Position viewer, uint64_t worldSeed) {
 
 float Renderer::activeTerrainFarBlend(const FrameParams& fp) const {
   // Both charts are already in this same coarse representation before ownership changes over their ocean gap.
-  const uint64_t activeSeed = g_world.regionRecipe ? g_world.regionRecipe->descriptor.worldSeed : procedural::kDefaultWorldSeed;
+  const uint64_t activeSeed = g_world.chartDescriptor().worldSeed;
   if (g_world.repeating || !activeFarRegion.ready || !activeFarRegion.accepted || activeFarRegion.count <= 0 || activeFarRegion.regionId != g_world.regionId ||
       !regionIdentityCompatible(activeFarRegion.regionId, activeFarRegion.worldSeed, activeFarRegion.generatorVersion, activeSeed)) return 0.f;
   return regionTerrainLodBlend(hypotf(fp.camPos.x, fp.camPos.z));
@@ -498,7 +504,7 @@ float Renderer::activeTerrainFarBlend(const FrameParams& fp) const {
 void Renderer::drawFarRegions(const FrameParams& fp, bool warm) {
   distantRegionDraws = 0;
   if (!progFarRegion || (!warm && g_world.repeating) || (dbgOff & kProbeTerrain)) return;
-  const geo::Position activeOrigin = g_world.regionRecipe ? g_world.regionRecipe->descriptor.origin : geo::solaceOrigin();
+  const geo::Position activeOrigin = g_world.chartDescriptor().origin;
   const geo::LocalFrame activeFrame(activeOrigin);
   glUseProgram(progFarRegion);
   const mat4 vp = viewProj(fp), view = viewMat(fp);
@@ -510,9 +516,10 @@ void Renderer::drawFarRegions(const FrameParams& fp, bool warm) {
   glUniform1f(U(progFarRegion, "uGeoRadius"), float(geo::radius()));
   glUniform1f(U(progFarRegion, "uPlanetR"), fp.pano > 0.f ? 0.f : planetRadius());
   glUniform3f(U(progFarRegion, "uCamPos"), fp.camPos.x, fp.camPos.y, fp.camPos.z);
-  auto draw = [&](const FarRegionGpu& mesh, float coverage = 1.f) {
+  auto draw = [&](const FarRegionGpu& mesh, float coverage = 1.f, float clip = 0.f) {
     if (!mesh.ready || !mesh.accepted || !mesh.vao || mesh.count <= 0 || coverage <= 0.f) return;
     glUniform1f(U(progFarRegion, "uRegionCoverage"), coverage);
+    glUniform1f(U(progFarRegion, "uClipHalf"), clip);
     const geo::FrameChange change(geo::LocalFrame(mesh.origin), activeFrame);
     const vec3 basis[4] = {change.vector(vec3(1, 0, 0)), change.vector(vec3(0, 1, 0)),
       change.vector(vec3(0, 0, 1)), change.point(vec3())};
@@ -524,8 +531,7 @@ void Renderer::drawFarRegions(const FrameParams& fp, bool warm) {
     glBindVertexArray(mesh.vao); glDrawArrays(GL_TRIANGLES, 0, mesh.count); ++distantRegionDraws;
   };
   draw(activeFarRegion, warm ? 1.f : activeTerrainFarBlend(fp));
-  const uint64_t currentSeed = horizonContext ? horizonSeed :
-    (g_world.regionRecipe ? g_world.regionRecipe->descriptor.worldSeed : procedural::kDefaultWorldSeed);
+  const uint64_t currentSeed = horizonContext ? horizonSeed : g_world.chartDescriptor().worldSeed;
   auto compatible = [&](const FarRegionGpu& mesh) {
     return regionIdentityCompatible(mesh.regionId, mesh.worldSeed, mesh.generatorVersion, currentSeed) ||
       (mesh.accepted && regionalSurface::isPinned(mesh.surface));
@@ -534,13 +540,17 @@ void Renderer::drawFarRegions(const FrameParams& fp, bool warm) {
   const bool stagedPriorDrawable = worldStage.active && compatible(worldStage.farProxy) && worldStage.farProxy.ready &&
     worldStage.farProxy.accepted && worldStage.farProxy.vao && worldStage.farProxy.count > 0 && previousFarRegion.regionId == worldStage.farProxy.regionId;
   if (previousFarRegion.regionId != g_world.regionId && !stagedPriorDrawable && compatible(previousFarRegion)) draw(previousFarRegion);
-  if (!warm && horizonContext && !g_world.earthChart) {   // (the generated regions' silhouettes: never on the real Earth)
+  if (!warm && horizonContext && horizonEarth == (g_world.earthChart != nullptr)) {
+    // the generated regions' silhouettes, or on the real Earth its far patches (earth_far.h) - those not drawn inside
+    // the chart's own square, where the chart is
     const auto viewer = regionTravel::Chart(activeOrigin).position(fp.camPos);
-    const double reach = geo::radius() * (acos(geo::radius() / (geo::radius() + std::max(0., viewer.height))) +
-      acos(geo::radius() / (geo::radius() + horizon::kSummitHeight))) + sqrt(2.) * WORLD_HALF;
+    const double horizonReach = geo::radius() * (acos(geo::radius() / (geo::radius() + std::max(0., viewer.height))) +
+      acos(geo::radius() / (geo::radius() + horizon::kSummitHeight)));
     for (const auto& entry : horizonCache) {
       const auto& mesh = entry.second;
-      if (compatible(mesh) && !horizonPinned(mesh.regionId, true) && geo::surfaceDistance(viewer, mesh.origin) <= reach) draw(mesh);
+      const double reach = horizonReach + (horizonEarth && mesh.surface ? mesh.surface->reach : sqrt(2.) * WORLD_HALF);
+      if (compatible(mesh) && !horizonPinned(mesh.regionId, true) && geo::surfaceDistance(viewer, mesh.origin) <= reach)
+        draw(mesh, 1.f, horizonEarth ? WORLD_HALF : 0.f);
     }
   }
 }

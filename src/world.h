@@ -113,6 +113,8 @@ public:
   // A chart of the real Earth (earth_charts.h, docs/REAL_EARTH_PLAN.md): its pack, its names, the records behind its
   // airports and its land cover. Owns the storage every Airport's and Town's name points into, as regionRecipe does
   std::shared_ptr<earthCharts::ChartData> earthChart;
+  // The chart this World is, whichever kind: a real-Earth chart's, a generated region's, else Solace's
+  procedural::Descriptor chartDescriptor() const;
   std::vector<Box> boxes;
   std::vector<float> hm;     // RGBA per texel: base height, detail amplitude, lushness, coldness
   // The road network (road_network.h): its paths (bridges, traffic) and the grid the terrain grades and the ground

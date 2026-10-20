@@ -139,6 +139,7 @@ public:
   float coarseElevation(double lat, double lon) const;   // ETOPO alone
   bool fine(double lat, double lon) const;                // GLO-90 is what elevation() reads there
   int cover(double lat, double lon) const;                // nearest (COVER_UNKNOWN without the layer)
+  bool hasElevation(double lat, double lon) const;        // the pack holds the elevation there (else: the sea)
   const Box& box() const { return box_; }
   int fineTiles() const { return fineCount_; }
 private:

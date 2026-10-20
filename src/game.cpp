@@ -738,10 +738,9 @@ procedural::Descriptor Game::chartRegion() const {
 }
 
 // The generated regions round the flight on the horizon (Renderer::updateRegionHorizon), whatever the flight: they are
-// where the Earth goes on past the islands' sea
+// where the Earth goes on past the islands' sea. On the real Earth, its far patches there (earth_far.h)
 void Game::updateHorizon() {
   if (!g_ren.ok || screen != SCR_FLIGHT || g_world.repeating) return;
-  if (g_world.earthChart) return;   // (the real Earth: no generated regions on its horizon)
   const procedural::Descriptor region = chartRegion();
   vec3 camera = dbgCam ? dbgCamPos : camPos;
   if (!std::isfinite(camera.x) || !std::isfinite(camera.y) || !std::isfinite(camera.z)) camera = plane.pos;

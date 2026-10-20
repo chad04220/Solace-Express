@@ -18,6 +18,8 @@ std::string packError();
 void usePack(std::shared_ptr<const earth::Pack> pack);   // (the tests and tools: a pack of their own)
 
 bool isEarthId(const std::string& id);
+// How lush the ground grows for a land cover class at a latitude (World::hm's third channel, 0 bare .. 1 rainforest)
+float lushOf(int cover, double lat);
 // The chart whose origin is the lattice point nearest (lat, lon), named for the largest place near it
 procedural::Descriptor chartAt(double lat, double lon);
 std::optional<procedural::Descriptor> find(const std::string& id);

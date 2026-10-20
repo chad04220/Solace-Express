@@ -1,5 +1,6 @@
 #include "procedural_regions.h"
 #include "earth_charts.h"
+#include "earth_far.h"
 #include "airport_layout.h"
 #include <array>
 #include <limits>
@@ -105,6 +106,7 @@ Descriptor describe(geo::Position p, uint64_t worldSeed) {
 std::optional<Descriptor> find(const std::string& id, uint64_t worldSeed) {
   if (id == "solace") return solaceDescriptor(worldSeed);
   if (earthCharts::isEarthId(id)) return earthCharts::find(id);   // (a chart of the real Earth: earth_charts.h)
+  if (earthFar::isFarId(id)) return earthFar::find(id);            // (and a patch of its far terrain: earth_far.h)
   // Parsing bounded canonical components avoids integer overflow in scanf/strtol
   // on untrusted IDs, and rejects path separators and trailing text.
   if (id.size() < 9 || id.size() > 17 || id.compare(0, 4, "pr1-") != 0) return std::nullopt;

@@ -312,6 +312,25 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
   - the overlap-agreement test in section 7. It waits for E4's geographic detail: the chart-local noise still
     differs between overlapping charts by up to a few metres.
 
+- **E3:** the first part is in (`src/earth_far.*`, `earth_far_test`). As built, compared with section 4:
+  - **Patches.** The patches are cells of a degree lattice: 0.5°, 1°, 2°, 4° and 8° a side. They are chosen as a
+    quadtree round the viewer: a cell nearer than 0.4 of its own side is drawn as its four.
+  - **Counts.** That gives 39 patches on the ground, 47 at 11 km and 56 at 100 km over a whole Earth's data, all
+    within the far pass's cache of 61.
+  - **Mesh.** Each patch is a 65 × 65 grid on the parallels and meridians, from ETOPO, coloured by the cover. GLO-90
+    isn't read for the far terrain yet.
+  - **Seams.** Neighbours of one level share their edges exactly; skirts hide the cracks between levels.
+  - **Plumbing.** The patches ride the generated regions' far pass: `Renderer::updateRegionHorizon` selects and
+    builds them when the World is a real-Earth chart. They aren't drawn inside the chart's own square
+    (`uClipHalf`).
+  - **Collision.** Each patch has a geographic collision surface (`regionalSurface::makeGeographicSurface`), which
+    is the ground beyond the chart's square.
+  - **Chart identity.** `World::chartDescriptor()` replaces the far pass's assumption that a World without a recipe
+    is Solace.
+
+  Renders from the dev pack show it: from 9 km over Boston, Cape Cod Bay and the Cape's hook lie beyond the chart's
+  edge.
+
 Decisions taken with the defaults (the owner can change them):
 - The generated regions keep working until E6. In real-Earth play the real world replaces them; they stay available
   as a "Generated Earth" choice in Free Flight.

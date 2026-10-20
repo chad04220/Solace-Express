@@ -639,6 +639,7 @@ private:
     uint64_t generation = 0; geo::Position viewer;
   };
   std::unordered_map<std::string, FarRegionGpu> horizonCache;
+  bool horizonEarth = false;   // (the cache holds the real Earth's far patches, earth_far.h: not the generated regions)
   std::future<HorizonBatch> horizonJob;
   std::deque<horizon::Mesh> horizonPending;
   horizon::Selection horizonSelection;

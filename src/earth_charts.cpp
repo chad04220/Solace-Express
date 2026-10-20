@@ -60,6 +60,26 @@ void usePack(std::shared_ptr<const earth::Pack> p) {
   g_pack = std::move(p); g_opened = true; g_error = g_pack ? std::string() : "no Earth pack";
 }
 
+// How lush the ground grows for each class (hm's third channel, 0 bare .. 1 rainforest)
+float lushOf(int cover, double lat) {
+  if (earth::coverForest(cover)) {
+    const int type = earth::coverForestType(cover);
+    const float tropical = std::fabs(lat) < 23.5 && type == 2 ? 1.f : 0.f;   // (evergreen broadleaf in the tropics)
+    return earth::coverClosedForest(cover) ? 0.86f + 0.12f * tropical : 0.74f + 0.1f * tropical;
+  }
+  switch (cover) {
+    case earth::COVER_CROPLAND: return 0.72f;
+    case earth::COVER_HERBACEOUS: return 0.58f;
+    case earth::COVER_WETLAND: return 0.8f;
+    case earth::COVER_SHRUBS: return 0.4f;
+    case earth::COVER_BUILT: return 0.5f;
+    case earth::COVER_MOSS: return 0.28f;
+    case earth::COVER_BARE: return 0.08f;
+    case earth::COVER_SNOW: return 0.15f;
+    default: return 0.55f;
+  }
+}
+
 bool isEarthId(const std::string& id) { return id.compare(0, 6, kIdPrefix) == 0; }
 
 static procedural::Descriptor descriptorAt(int la, int lo) {

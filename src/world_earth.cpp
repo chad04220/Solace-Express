@@ -26,25 +26,6 @@ float canopyOf(int cover) {
   if (cover == earth::COVER_SHRUBS) return 1.f;
   return 0.f;
 }
-// How lush the ground grows for each class (hm's third channel, 0 bare .. 1 rainforest)
-float lushOf(int cover, double lat) {
-  if (earth::coverForest(cover)) {
-    const int type = earth::coverForestType(cover);
-    const float tropical = std::fabs(lat) < 23.5 && type == 2 ? 1.f : 0.f;   // (evergreen broadleaf in the tropics)
-    return earth::coverClosedForest(cover) ? 0.86f + 0.12f * tropical : 0.74f + 0.1f * tropical;
-  }
-  switch (cover) {
-    case earth::COVER_CROPLAND: return 0.72f;
-    case earth::COVER_HERBACEOUS: return 0.58f;
-    case earth::COVER_WETLAND: return 0.8f;
-    case earth::COVER_SHRUBS: return 0.4f;
-    case earth::COVER_BUILT: return 0.5f;
-    case earth::COVER_MOSS: return 0.28f;
-    case earth::COVER_BARE: return 0.08f;
-    case earth::COVER_SNOW: return 0.15f;
-    default: return 0.55f;
-  }
-}
 // The chart's lakes, per texel (-1: none), with each one's level: the cover's inland water where the surface model holds
 // it level. The Copernicus DEM's lakes are flattened, every texel of one at its surface's height to the centimetre, so a
 // lake is a stretch of the cover's water holding at least a dozen texels within 10 cm of each other. Its level is
@@ -374,7 +355,7 @@ void World::buildEarthTerrain() {
       t[0] = std::max(elev[k] - canopy[k], 0.6f);   // (land never below the sea: the sea is everywhere y = 0)
       t[1] = 1.f;   // (the amplitude itself below)
     }
-    lush[k] = sea[k] ? 0.f : lushOf(data.cover[k], lat[k]);
+    lush[k] = sea[k] ? 0.f : earthCharts::lushOf(data.cover[k], lat[k]);
   }
   blur(lush, N, 1);
   // the lakes into the ground: each one's bed a metre and a half under its level, flat; the land within 6 texels of it
@@ -479,6 +460,12 @@ void World::buildEarthTerrain() {
       }
     }
   });
+}
+
+procedural::Descriptor World::chartDescriptor() const {
+  if (earthChart) return earthChart->descriptor;
+  if (regionRecipe) return regionRecipe->descriptor;
+  return procedural::solaceDescriptor();
 }
 
 // The pack's roads in the square, each laid on the ground (graded, bridged over water) as the network's own are

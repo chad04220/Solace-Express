@@ -841,6 +841,11 @@ float Sampler::elevation(double lat, double lon) const {
   return (float)h;
 }
 
+bool Sampler::hasElevation(double lat, double lon) const {
+  const int s = slot((int)std::floor(lat), (int)std::floor(lon));
+  return s >= 0 && elev_[s] != nullptr;
+}
+
 int Sampler::cover(double lat, double lon) const {
   const int la = (int)std::floor(lat), lo = (int)std::floor(lon);
   const int s = slot(la, lo);

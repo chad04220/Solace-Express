@@ -27,12 +27,21 @@ struct Surface {
   int resolution = 0;
   std::vector<GridVertex> grid;
   float maxHeight = 0;
+  // A real-Earth far patch's grid (earth_far.h) lies on the parallels and meridians: its rows from latN southward by
+  // dLat, its columns from lonW eastward by dLon (degrees). Else the region's own square, on its chart's x and z
+  bool geographic = false;
+  double latN = 0, lonW = 0, dLat = 0, dLon = 0;
+  double reach = 1.4142135623730950488 * WORLD_HALF;   // how far from its origin any of it lies (m)
 };
 using Handle = std::shared_ptr<const Surface>;
 Handle makeSurface(const procedural::Descriptor& region, int resolution,
                    const std::vector<horizon::Vertex>& grid, Provenance provenance);
 Handle makeSurface(const procedural::Descriptor& region, int resolution,
                    std::vector<GridVertex>&& grid, Provenance provenance);
+// A real-Earth far patch's (its grid on the parallels and meridians, Surface above). Never guarded as a region's is
+// against appearing under a low aircraft: it lies under the aircraft's own chart, whose ground is the ground there
+Handle makeGeographicSurface(const procedural::Descriptor& patch, int resolution, std::vector<GridVertex>&& grid,
+                             double latN, double lonW, double dLat, double dLon, double reach);
 struct Sample {
   bool covered = false, land = false;
   float height = -SEA_DEPTH;

@@ -416,6 +416,7 @@ void main(){
         auto tidy = [&] { if (clean) GameTest::clean(*g); };
         tidy();
         for (int i = 0; i < 3; i++) { g->update(1.f / 30.f); tidy(); g->render(); }
+        if (getenv("HORIZON")) { GameTest::waitHorizon(*g, (float)atof(getenv("HORIZON"))); fflush(stdout); for (int i = 0; i < 3; i++) g->render(); }
         for (int i = 0; i < taam; i++) { g->update(1.f / 60.f); tidy(); g->render(); }
         for (int i = 0; i < frames; i++) g->render();
         for (int i = 0; i < settle; i++) { g->update(1.f / 240.f); g->render(); }   // (the loading pictures: the TAA settles, barely moving)

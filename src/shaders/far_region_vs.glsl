@@ -11,6 +11,7 @@ uniform vec2 uJit, uPano;
 uniform float uLogC, uGeoRadius;
 out vec3 vColour, vNormal, vPosition;
 out float vHeight;
+out vec2 vLocal;   // (where it lies on the active chart: its x and z)
 void main() {
   vec3 q = (uRegionTransform*vec4(aPosition, 1.0)).xyz;
   float horizontal = length(q.xz);
@@ -23,6 +24,7 @@ void main() {
   vec2 across = n.xz - along*bearing;
   vec2 normalXZ = across + bearing*(along*c - n.y*s);
   vNormal = normalize(vec3(normalXZ.x, n.y*c + along*s, normalXZ.y));
+  vLocal = localPosition.xz;
   vec3 cp = planetPos(localPosition, uCamPos);
   vPosition = cp; vColour = aColour; vHeight = localPosition.y; // identical clamped sea-floor interpolation/discard to full terrain
   gl_Position = uVP*vec4(cp, 1.0);

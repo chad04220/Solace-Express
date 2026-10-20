@@ -7,7 +7,6 @@
 
 namespace regionalSurface {
 namespace {
-const double kBoundsRadius = 1.4142135623730950488 * WORLD_HALF;
 struct Snapshot {
   bool enabled = false;
   procedural::Descriptor active;
@@ -30,8 +29,8 @@ bool compatible(const Snapshot& s, const Handle& surface) {
     (surface->key.regionId == "solace" || surface->key.worldSeed == s.active.worldSeed);
 }
 bool protectedOverlap(const Snapshot& s, const Handle& surface) {
-  return s.enabled && compatible(s, surface) &&
-    geo::surfaceDistance(s.aircraft, surface->origin) <= kBoundsRadius + s.radius + 2.;
+  return s.enabled && compatible(s, surface) && !surface->geographic &&
+    geo::surfaceDistance(s.aircraft, surface->origin) <= surface->reach + s.radius + 2.;
 }
 bool safe(const Snapshot& s, const Handle& surface) {
   if (!surface) return false;
@@ -72,12 +71,18 @@ Sample sampleImpl(const Handle& surface, geo::Position origin, float x, float z,
   Sample result;
   if (!surface || !finite(x) || !finite(z)) return result;
   const auto geographic = knownGeographic ? *knownGeographic : regionTravel::Chart(origin).position(vec3(x, 0, z));
-  if (geo::surfaceDistance(geographic, surface->origin) > kBoundsRadius + 2.) return result;
-  const vec3 local = regionTravel::Chart(surface->origin).local(geographic);
+  if (geo::surfaceDistance(geographic, surface->origin) > surface->reach + 2.) return result;
   const int n = surface->resolution;
-  const double cell = 2. * WORLD_HALF / (n - 1);
-  const int ix = int(std::floor((local.x + WORLD_HALF) / cell));
-  const int iz = int(std::floor((local.z + WORLD_HALF) / cell));
+  int ix, iz;
+  if (surface->geographic) {
+    const double east = std::remainder(geographic.longitude - surface->lonW, 360.);
+    ix = int(std::floor(east / surface->dLon)); iz = int(std::floor((surface->latN - geographic.latitude) / surface->dLat));
+  } else {
+    const vec3 local = regionTravel::Chart(surface->origin).local(geographic);
+    const double cell = 2. * WORLD_HALF / (n - 1);
+    ix = int(std::floor((local.x + WORLD_HALF) / cell));
+    iz = int(std::floor((local.z + WORLD_HALF) / cell));
+  }
   const Projection projection(*surface, origin);
   Sample edgeFallback;
   double closestEdge = std::numeric_limits<double>::infinity();
@@ -179,6 +184,15 @@ Handle makeSurface(const procedural::Descriptor& region, int resolution,
   out->grid = std::move(grid);
   return out;
 }
+Handle makeGeographicSurface(const procedural::Descriptor& patch, int resolution, std::vector<GridVertex>&& grid,
+                             double latN, double lonW, double dLat, double dLon, double reach) {
+  if (!(dLat > 0) || !(dLon > 0) || !(reach > 0)) throw std::invalid_argument("invalid geographic regional grid");
+  auto made = makeSurface(patch, resolution, std::move(grid), Provenance::Analytic);
+  auto out = std::make_shared<Surface>(*made);
+  out->geographic = true; out->latN = latN; out->lonW = lonW; out->dLat = dLat; out->dLon = dLon; out->reach = reach;
+  for (double v : {latN, lonW, dLat, dLon}) hashBytes(out->key.contentHash, &v, sizeof v);
+  return out;
+}
 vec3 projectVertex(const Surface& surface, geo::Position activeOrigin, const GridVertex& vertex) {
   return Projection(surface, activeOrigin).point(vertex);
 }
@@ -213,13 +227,13 @@ bool appliesTo(const World& world) {
   if (&world != &g_world || world.repeating) return false;
   const auto s = read();
   if (!s->enabled || world.regionId != s->active.id) return false;
-  if (!world.regionRecipe) {
+  if (!world.regionRecipe && !world.earthChart) {
     const auto origin = geo::solaceOrigin();
     return world.regionId == "solace" && s->active.generatorVersion == procedural::kGeneratorVersion &&
       origin.latitude == s->active.origin.latitude && origin.longitude == s->active.origin.longitude &&
       origin.height == s->active.origin.height;
   }
-  const auto& descriptor = world.regionRecipe->descriptor;
+  const procedural::Descriptor descriptor = world.chartDescriptor();   // (a generated region's, or the real Earth's)
   return descriptor.generatorVersion == s->active.generatorVersion && descriptor.worldSeed == s->active.worldSeed &&
     descriptor.origin.latitude == s->active.origin.latitude && descriptor.origin.longitude == s->active.origin.longitude &&
     descriptor.origin.height == s->active.origin.height;
@@ -229,10 +243,10 @@ Sample queryCurrent(float x, float z) {
   if (!s->enabled || !finite(x) || !finite(z)) return result;
   const auto geographic = regionTravel::Chart(s->active.origin).position(vec3(x, 0, z));
   const auto direction = geo::direction(geographic);
-  const double cutoff = std::cos((kBoundsRadius + 2.) / geo::radius());
+
   for (const auto& surface : s->surfaces) {
     if (!compatible(*s, surface) || surface->key.regionId == s->active.id) continue;
-    if (geo::dot(direction, surface->direction) < cutoff) continue;
+    if (geo::dot(direction, surface->direction) < std::cos((surface->reach + 2.) / geo::radius())) continue;
     auto candidate = sampleImpl(surface, s->active.origin, x, z, &geographic);
     if (candidate.covered) return candidate;
   }
@@ -249,7 +263,7 @@ float currentUpperBound(vec3 a, vec3 b, float radius) {
   const auto center = regionTravel::Chart(s->active.origin).position(middle);
   for (const auto& surface : s->surfaces)
     if (compatible(*s, surface) && surface->key.regionId != s->active.id &&
-        geo::surfaceDistance(center, surface->origin) <= reach + kBoundsRadius + 2.)
+        geo::surfaceDistance(center, surface->origin) <= reach + surface->reach + 2.)
       top = std::max(top, surface->maxHeight);
   return top;
 }
