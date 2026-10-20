@@ -117,6 +117,26 @@ struct GameTest {
       launches &= game.screen == SCR_FREE_FLIGHT && g_world.regionId == A.id;
     }
     check(launches && unchanged(), "every generated airport supports real runway/airborne flight, restart and return with career intact");
+    {   // the region's own stamps (profile.h): its airport under its id, with the first achievement beyond the islands;
+        // a landmark of its own flown over, found under its id; the region explored
+      game.freeAirport = 0; game.freeAirborne = true; game.launchFreeFlight();
+      game.botControl = false;
+      game.profileTouchdown(120.f, 0);
+      const bool stamped = game.profile.airports.count(A.id + ":" + g_world.airports[0].code) == 1 && game.profile.has("region_first") &&
+        game.profile.regionAirports(A.id) == 1 && game.profile.islandAirports() == 0;
+      const auto& sites = profileSites();
+      bool found = false;
+      if (!sites.empty()) {
+        game.plane.pos = sites[0].pos + vec3(0, 300, 0); game.profileT = 1.f; game.profileTick(.1f);
+        found = game.profile.sites.count(sites[0].id) == 1 && game.profile.regionSites(A.id) == 1 && game.profile.sitesBeyond() == 1 &&
+          game.profile.regionsExplored() == std::vector<std::string>{A.id};
+      }
+      game.botControl = true;
+      game.endFlight(false, "Test return", OUT_ABANDONED);
+      check(stamped && found && sites.size() >= 2 && sites[0].id.rfind(A.id + "/", 0) == 0 && unchanged(),
+        fmt("%s: an airport stamped and %s found under the region's id, of its %d landmarks", A.name.c_str(),
+          sites.empty() ? "nothing" : sites[0].name.c_str(), (int)sites.size()));
+    }
     game.chooseFreeRegion(B); game.loadFreeRegion(game.freeRegion); drain();
     check(g_world.regionId == B.id && unchanged(), "second Earth destination replaces the first without career mutation");
     game.chooseFreeRegion(A); game.loadFreeRegion(game.freeRegion); drain();

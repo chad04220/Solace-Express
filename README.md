@@ -157,7 +157,7 @@ Two more airframes round out the register. The **XR-10 Vigil** is the programme'
 
 ## Your profile, the music
 
-Every landing gets a grade from S to D in the debrief. It's scored on the touchdown, the zone, the centreline and the approach; three stars and an S together make a **Flawless flight**. Your pilot profile collects 37 achievements, an airport stamp for each airport you land at, and the twelve landmarks you can find from the air. It also keeps your softest touchdown in each aircraft. It covers all your careers and is saved in `profile.cfg` beside the settings; **Logbook → Achievements** and **Logbook → Passport** show it.
+Every landing gets a grade from S to D in the debrief. It's scored on the touchdown, the zone, the centreline and the approach; three stars and an S together make a **Flawless flight**. Your pilot profile collects 41 achievements, an airport stamp for each airport you land at, and the twelve landmarks you can find from the air in the islands. The regions beyond them have their own airports to stamp and their own landmarks, from a volcano's crater to a fjord's head, marked on the maps with a diamond. It also keeps your softest touchdown in each aircraft. It covers all your careers and is saved in `profile.cfg` beside the settings; **Logbook → Achievements** and **Logbook → Passport** show it.
 
 The job board also has **photo flights** over the landmarks, and passengers sometimes ask to see a landmark on the way, for a tip. After the campaign, five **legendary contracts** join the board. The Military board opens after ten flights in your logbook, and the research terminal appears on the main menu as **Project NIGHTGLASS** once you hold the Airline Transport licence.
 

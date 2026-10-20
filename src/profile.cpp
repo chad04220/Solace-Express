@@ -1,10 +1,13 @@
 // Somnium Volandi - the pilot's profile: achievements, stamps and personal bests (profile.h)
 #include "profile.h"
 #include "career.h"
+#include "procedural_regions.h"
 #include "scenery.h"
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <ctime>
+#include <stdexcept>
 
 const Achievement kAchievements[] = {
   // flying
@@ -37,8 +40,12 @@ const Achievement kAchievements[] = {
   {"airports10", "Island Hopper", "Land at 10 different airports", false},
   {"airports_all", "Every Field", "Land at every airport in the islands", false},
   {"sites5", "Sightseer", "Find 5 landmarks", false},
-  {"sites_all", "Grand Tour", "Find every landmark", false},
+  {"sites_all", "Grand Tour", "Find every landmark in the islands", false},
   {"photo", "Shutterbug", "Complete a photo flight", false},
+  {"region_first", "Beyond the Horizon", "Land at an airport beyond the Solace Islands", false},
+  {"regions5", "Wayfarer", "Land in 5 regions beyond the islands", false},
+  {"region_all", "Charted", "Land at every airport in a region beyond the islands", false},
+  {"discover20", "Cartographer", "Find 20 landmarks beyond the islands", false},
   // trials
   {"medal", "On the Podium", "Win a medal in a trial", false},
   {"gold", "Gold Standard", "Win a gold medal in a trial", false},
@@ -103,14 +110,105 @@ bool Profile::save(const std::string& path) const {
   return replaceFile(tmp, path);
 }
 
-static std::vector<Site> s_sites;
-static bool s_sitesBuilt = false;
+static bool beyond(const std::string& key, char mark) { return key.find(mark) != std::string::npos; }
+static bool inRegion(const std::string& key, const std::string& region, char mark) {
+  return key.size() > region.size() && key[region.size()] == mark && key.compare(0, region.size(), region) == 0;
+}
+int Profile::islandAirports() const { int n = 0; for (auto& a : airports) n += !beyond(a, ':'); return n; }
+int Profile::islandSites() const { int n = 0; for (auto& s : sites) n += !beyond(s, '/'); return n; }
+int Profile::sitesBeyond() const { return (int)sites.size() - islandSites(); }
+std::vector<std::string> Profile::regionsLanded() const {
+  std::vector<std::string> out;
+  for (auto& a : airports) {
+    const size_t c = a.find(':');
+    if (c != std::string::npos && (out.empty() || out.back() != a.substr(0, c))) out.push_back(a.substr(0, c));   // (the set keeps a region's together)
+  }
+  return out;
+}
+std::vector<std::string> Profile::regionsExplored() const {
+  std::set<std::string> ids;
+  for (auto& a : airports) { const size_t c = a.find(':'); if (c != std::string::npos) ids.insert(a.substr(0, c)); }
+  for (auto& st : sites) { const size_t c = st.find('/'); if (c != std::string::npos) ids.insert(st.substr(0, c)); }
+  for (auto& sg : seen) if (sg.rfind("region:", 0) == 0) ids.insert(sg.substr(7));
+  return std::vector<std::string>(ids.begin(), ids.end());
+}
+int Profile::regionAirports(const std::string& region) const { int n = 0; for (auto& a : airports) n += inRegion(a, region, ':'); return n; }
+int Profile::regionSites(const std::string& region) const { int n = 0; for (auto& s : sites) n += inRegion(s, region, '/'); return n; }
 
-void resetProfileSites() { s_sites.clear(); s_sitesBuilt = false; }
+std::string airportStamp(const Airport& a) { return g_world.procedural ? g_world.regionId + ":" + a.code : std::string(a.code); }
+
+int regionAirportCount(const std::string& region) {
+  static std::map<std::string, int> counts;
+  auto it = counts.find(region);
+  if (it != counts.end()) return it->second;
+  int n = 0;
+  if (g_world.procedural && region == g_world.regionId) n = (int)g_world.airports.size();
+  else if (auto d = procedural::find(region); d && !d->authored) {
+    try { n = (int)procedural::Recipe(*d).airports.size(); } catch (const std::exception&) { n = 0; }
+  }
+  return counts[region] = n;
+}
+
+static std::vector<Site> s_sites;
+static std::string s_sitesWorld;   // (the world the list is of, by its region id: empty when there is none)
+static int s_solaceSites = -1;
+
+void resetProfileSites() { s_sites.clear(); s_sitesWorld.clear(); }
+int solaceSiteCount() { return s_solaceSites; }
+
+// A region's: its own sights, then the landmarks it has, each kind's pieces gathered into the places they stand (a
+// region may have two wind farms), named for the region
+static void regionSites() {
+  const std::string& rid = g_world.regionId;
+  const std::string place = g_world.regionRecipe->prefix();
+  for (const auto& f : g_world.regionRecipe->features())
+    s_sites.push_back({rid + "/" + f.key, f.name, vec3(f.x, f.y, f.z), f.radius});
+  struct K { int kind; const char* id; const char* name; float radius; };
+  const K kinds[] = {
+    {EK_WINDTURBINE, "windfarm", "wind farm", 1200.f},
+    {EK_BLOCK, "stonecircle", "stone circle", 600.f},
+    {EK_SHIPWRECK, "wreck", "wreck", 600.f},
+    {EK_PLATFORM, "platform", "offshore platform", 700.f},
+    {EK_STARFORT, "starfort", "star fort", 700.f},
+    {EK_GRANDSTAND, "racetrack", "racetrack", 1000.f},
+  };
+  for (const K& k : kinds) {
+    struct Group { vec3 first, sum; int n; };
+    std::vector<Group> groups;
+    for (const PlacedEnt& p : landmarks()) {
+      if (p.kind != k.kind) continue;
+      const vec3 at(p.e.x, p.e.y, p.e.z);
+      Group* g = nullptr;
+      for (Group& o : groups) if (length(vec3(at.x - o.first.x, 0, at.z - o.first.z)) < 5000.f) { g = &o; break; }
+      if (!g) { groups.push_back({at, vec3(), 0}); g = &groups.back(); }
+      g->sum += at; g->n++;
+    }
+    for (size_t i = 0; i < groups.size(); ++i) {
+      const vec3 c = groups[i].sum / (float)groups[i].n;
+      std::string name = "The " + place + " " + k.name;
+      if (groups.size() > 1) {   // (two of a kind: told apart by where they stand)
+        static const char* compass[] = {"north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"};
+        name += std::string(", ") + compass[((int)lroundf(atan2f(c.x, -c.z) / (PI / 4.f)) + 8) % 8];
+      }
+      s_sites.push_back({rid + "/" + k.id + (i ? std::to_string(i + 1) : std::string()), name, c, k.radius});
+    }
+  }
+  for (const Bridge& b : g_world.bridges)
+    if (b.main == BM_STAYED) {
+      s_sites.push_back({rid + "/straitbridge", "The " + place + " bridge", vec3((b.minX + b.maxX) * 0.5f, b.maxY, (b.minZ + b.maxZ) * 0.5f), 900.f});
+      break;
+    }
+}
 
 const std::vector<Site>& profileSites() {
-  if (s_sitesBuilt || g_world.airports.empty() || g_world.procedural) return s_sites;   // (the islands' own: built where they are)
-  s_sitesBuilt = true;
+  static const std::vector<Site> none;
+  if (g_world.airports.empty()) return none;
+  if (s_sitesWorld == g_world.regionId) return s_sites;   // (each world's own: built where it is)
+  s_sites.clear(); s_sitesWorld = g_world.regionId;
+  if (g_world.procedural) {
+    if (g_world.regionRecipe) regionSites();
+    return s_sites;
+  }
   // each landmark's kind, gathered to the middle of its pieces (the wind farm's turbines, the racetrack's stands)
   struct K { int kind; const char* id; const char* name; float radius; bool civic; };
   const K kinds[] = {
@@ -138,5 +236,6 @@ const std::vector<Site>& profileSites() {
       s_sites.push_back({"straitbridge", "The strait bridge", vec3((b.minX + b.maxX) * 0.5f, b.maxY, (b.minZ + b.maxZ) * 0.5f), 900.f});
       break;
     }
+  s_solaceSites = (int)s_sites.size();
   return s_sites;
 }

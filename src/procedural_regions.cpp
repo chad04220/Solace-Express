@@ -605,6 +605,196 @@ float Recipe::natural(float x, float z) const {
   const float h = shapeHeight(x * rotationCos_ + z * rotationSin_, -x * rotationSin_ + z * rotationCos_);
   return lerpf(-SEA_DEPTH, h, 1.f - smooth(34000.f, kOceanEdge, edge));
 }
+const char* Recipe::prefix() const { return prefixes[(descriptor.seed >> 9) % 24]; }
+std::vector<Recipe::Feature> Recipe::features() const {
+  static const char* volcanoes[] = {"Ash", "Cinder", "Ember", "Basalt", "Obsidian", "Sulphur", "Pumice", "Scoria",
+    "Tephra", "Brimstone", "Furnace", "Smoke", "Thunder", "Kiln", "Forge", "Pyre", "Blaze", "Flint", "Hearth", "Ochre",
+    "Crimson", "Garnet", "Anvil", "Torch", "Spark", "Glow", "Redcap", "Ironside", "Cauldron", "Brand", "Scorch", "Halo"};
+  static const char* heights[] = {"Raven", "Eagle", "Granite", "Storm", "Cloud", "Wolf", "Iron", "Crown", "Bell", "Sentinel",
+    "Grey", "Lantern", "Beacon", "Thorn", "Watch", "Heron", "Falcon", "Osprey", "Hawk", "Merlin", "Cedar", "Pine", "Larch",
+    "Slate", "Shepherd", "Signal", "Pilgrim", "Hermit", "Giant", "Saddle", "Table", "Windy"};
+  static const char* lagoons[] = {"Turquoise", "Coral", "Pearl", "Mirror", "Glass", "Jade", "Sapphire", "Lantern", "Moon",
+    "Shell", "Starfish", "Palm", "Azure", "Halcyon", "Opal", "Sunset", "Dolphin", "Turtle", "Manta", "Angel", "Lotus", "Silk",
+    "Cerulean", "Emerald", "Driftwood", "Frigate", "Sandpiper", "Paradise", "Crescent", "Lullaby", "Tranquil", "Seaglass"};
+  static const char* fjords[] = {"Long", "Raven", "Silver", "Deep", "Mist", "Echo", "Seal", "Thunder", "Glacier", "Hidden",
+    "Whale", "Storm", "Black", "Narrow", "Winter", "Aurora", "Otter", "Eider", "Frost", "Shadow", "Salmon", "Iron", "Cold",
+    "Cascade", "Moss", "Hollow", "Lynx", "Elk", "Orca", "Puffin", "Skerry", "Fog"};
+  static const char* capes[] = {"Wren", "Gull", "Farewell", "Anchor", "Hope", "Fog", "Morning", "Kittiwake", "Spray", "Gale",
+    "Plover", "Breaker", "Sorrow", "Welcome", "Mercy", "Tide", "Albatross", "Petrel", "Skua", "Compass", "Lookout", "Wreckers",
+    "Mariner", "Horizon", "Evening", "Squall", "Fortune", "Rescue", "Pilot", "Tempest", "Voyager", "Sanctuary"};
+  static const char* isletWords[] = {"Puffin", "Seal", "Shag", "Limpet", "Mussel", "Lobster", "Gull", "Cormorant", "Kelp",
+    "Barnacle", "Otter", "Petrel", "Fulmar", "Guillemot", "Razorbill", "Curlew", "Sandpiper", "Bell", "Lone", "Hermit",
+    "Haystack", "Anvil", "Sugarloaf", "Needle", "Chimney", "Saddle", "Mitre", "Pillar", "Whaleback", "Drum", "Lantern", "Cradle"};
+  static const char* soundWords[] = {"Herring", "Mackerel", "Seal", "Osprey", "Puffin", "Cormorant", "Plover", "Curlew", "Heron",
+    "Grebe", "Shearwater", "Ferry", "Pilot", "Pebble", "Kelp", "Mist", "Silver", "Blue", "Green", "Narrow", "Long", "Quiet",
+    "Windward", "Leeward", "Current", "Merchant", "Smuggler", "Mermaid", "Selkie", "Coracle", "Dolphin", "Whistle"};
+  // (each list in an order of the region's own: no two of a kind in a region share a name, and few across regions)
+  using Words = std::array<const char*, 32>;
+  auto shuffled = [&](const char* const (&list)[32], uint64_t salt) {
+    Words order; std::copy(std::begin(list), std::end(list), order.begin());
+    Random r{mix(descriptor.seed ^ salt)};
+    for (int i = 31; i > 0; --i) std::swap(order[i], order[r.integer(i + 1)]);
+    return order;
+  };
+  const Words volcanoNames = shuffled(volcanoes, 0x4d4f554e54ULL), heightNames = shuffled(heights, 0x53554d4d4954ULL);
+  const Words lagoonNames = shuffled(lagoons, 0x4c41474f4f4eULL), fjordNames = shuffled(fjords, 0x464a4f5244ULL);
+  const Words capeNames = shuffled(capes, 0x43415045ULL), isletNames = shuffled(isletWords, 0x49534c4554ULL);
+  const Words soundNames = shuffled(soundWords, 0x534f554e44ULL);
+  auto chart = [&](float px, float pz) { return vec2(px * rotationCos_ - pz * rotationSin_, px * rotationSin_ + pz * rotationCos_); };
+  auto ground = [&](vec2 p) { float s[4]; sample(p.x, p.y, s); return s[0]; };
+  std::vector<Feature> out;
+  int craters = 0, lagoonCount = 0;
+  struct Summit { vec2 at; float h; };
+  std::vector<Summit> summits;
+  for (const Landmass& island : land_) {
+    if (island.shape == 1) {   // the crater: its rim's height is the ground to see it from
+      const vec2 c = chart(island.x, island.z);
+      float rim = 0.f;
+      for (int k = 0; k < 16; ++k) for (float r : {.10f, .14f, .18f}) {
+        const float a = k * PI / 8.f;
+        rim = std::max(rim, ground(chart(island.x + std::cos(a) * r * island.rx, island.z + std::sin(a) * r * island.rz)));
+      }
+      out.push_back({"crater" + std::to_string(craters), std::string("Mount ") + volcanoNames[craters % 32], c.x, rim, c.y,
+        .20f * std::min(island.rx, island.rz)});
+      ++craters;
+    } else if (island.shape == 2) {
+      const vec2 c = chart(island.x, island.z);
+      out.push_back({"lagoon" + std::to_string(lagoonCount), std::string(lagoonNames[lagoonCount % 32]) + " Lagoon", c.x, 0.f, c.y,
+        .50f * std::min(island.rx, island.rz)});
+      ++lagoonCount;
+    } else {   // the island's highest ground, as flown over (off any cone's flanks): a coarse search, then a finer one
+      auto onCone = [&](float lx, float lz) {
+        for (const Landmass& cone : land_)
+          if (cone.shape == 1 && ellipseDistance(lx - cone.x, lz - cone.z, cone.rx, cone.rz) < 1.1f) return true;
+        return false;
+      };
+      vec2 best(0.f, 0.f); float top = -1e9f;
+      for (int i = -10; i <= 10; ++i) for (int j = -10; j <= 10; ++j) {
+        const vec2 l(island.x + i * .08f * island.rx, island.z + j * .08f * island.rz);
+        if (onCone(l.x, l.y)) continue;
+        const float h = ground(chart(l.x, l.y));
+        if (h > top) { top = h; best = l; }
+      }
+      const vec2 coarse = best; const float step = .02f * std::min(island.rx, island.rz);
+      for (int i = -4; i <= 4; ++i) for (int j = -4; j <= 4; ++j) {
+        const vec2 l = coarse + vec2(float(i), float(j)) * step;
+        if (onCone(l.x, l.y)) continue;
+        const float h = ground(chart(l.x, l.y));
+        if (h > top) { top = h; best = l; }
+      }
+      if (top > 200.f) summits.push_back({chart(best.x, best.y), top});
+    }
+  }
+  // the highest few, well apart: two on a small or a medium region, three on a large
+  std::sort(summits.begin(), summits.end(), [](const Summit& a, const Summit& b) { return a.h != b.h ? a.h > b.h : a.at.x < b.at.x; });
+  const size_t most = descriptor.scale == Scale::Large ? 3 : 2;
+  std::vector<Summit> kept;
+  for (const Summit& s : summits) {
+    if (kept.size() >= most) break;
+    bool near = false;
+    for (const Summit& k : kept) near = near || length(k.at - s.at) < 8000.f;
+    for (const Feature& f : out) near = near || length(vec2(f.x, f.z) - s.at) < f.radius + 3000.f;   // (not a crater's rim again)
+    if (!near) kept.push_back(s);
+  }
+  for (size_t i = 0; i < kept.size(); ++i)
+    out.push_back({"summit" + std::to_string(i), std::string(heightNames[i % 32]) + (kept[i].h >= 700.f ? " Peak" : " Hill"),
+      kept[i].at.x, kept[i].h, kept[i].at.y, 600.f});
+  // the capes: the far ends of the long islands, down their length to the last of the land (the largest islands first)
+  std::vector<const Landmass*> longest;
+  for (const Landmass& island : land_) if (island.shape == 0 && std::max(island.rx, island.rz) >= 9000.f) longest.push_back(&island);
+  std::sort(longest.begin(), longest.end(), [](const Landmass* a, const Landmass* b) { return a->rx * a->rz > b->rx * b->rz; });
+  const size_t capeMost = descriptor.scale == Scale::Large ? 3 : 2;
+  int capeCount = 0;
+  for (const Landmass* island : longest) for (float side : {1.f, -1.f}) {
+    if (size_t(capeCount) >= capeMost) break;
+    const bool alongX = island->rx >= island->rz;
+    const float reach = alongX ? island->rx : island->rz;
+    vec2 end(0.f, 0.f); float walked = -1.f; bool shore = false;
+    for (float t = 0.f; t < 1.4f * reach && !shore; t += 250.f) {
+      const vec2 p = chart(island->x + (alongX ? side * t : 0.f), island->z + (alongX ? 0.f : side * t));
+      if (natural(p.x, p.y) > 2.f) { end = p; walked = t; }
+      else shore = walked >= 0.f && t - walked > 1500.f;   // (past the shore: open water)
+    }
+    // (a real land's end, sloping to the sea: not the region's edge, nor a channel's bank)
+    if (!shore || walked < .6f * reach || std::max(std::abs(end.x), std::abs(end.y)) > 33000.f || natural(end.x, end.y) > 120.f) continue;
+    bool near = false;
+    for (const Feature& f : out) near = near || length(vec2(f.x, f.z) - end) < 8000.f;
+    if (near) continue;
+    out.push_back({"cape" + std::to_string(capeCount), std::string("Cape ") + capeNames[capeCount % 32], end.x,
+      std::max(natural(end.x, end.y), 0.f), end.y, 700.f});
+    ++capeCount;
+  }
+  auto clear = [&](vec2 p, float apart) {
+    for (const Feature& f : out) if (length(vec2(f.x, f.z) - p) < apart) return false;
+    return true;
+  };
+  const size_t most2 = descriptor.scale == Scale::Small ? 1 : descriptor.scale == Scale::Medium ? 2 : 3;
+  // the islets: the small islands on their own in the sea, at their highest ground
+  int islets = 0;
+  for (const Landmass& island : land_) {
+    if (island.shape != 0 || std::max(island.rx, island.rz) >= 2600.f || size_t(islets) >= most2) continue;
+    vec2 top(0.f, 0.f); float h = 2.f;
+    for (int i = -3; i <= 3; ++i) for (int j = -3; j <= 3; ++j) {
+      const vec2 p = chart(island.x + i * .2f * island.rx, island.z + j * .2f * island.rz);
+      const float g = natural(p.x, p.y);
+      if (g > h) { h = g; top = p; }
+    }
+    if (h <= 2.f || std::max(std::abs(top.x), std::abs(top.y)) > 33000.f || !clear(top, 4000.f)) continue;
+    out.push_back({"islet" + std::to_string(islets), std::string(isletNames[islets % 32]) + (h > 60.f ? " Rock" : " Islet"), top.x, h, top.y, 500.f});
+    ++islets;
+  }
+  // the sounds: the narrow water between two islands of an archipelago, at the middle of its crossing (the nearest first)
+  if (descriptor.archetype == Archetype::Archipelago) {
+    struct Crossing { float width; vec2 mid; };
+    std::vector<Crossing> crossings;
+    for (size_t i = 0; i < land_.size(); ++i) for (size_t j = i + 1; j < land_.size(); ++j) {
+      const Landmass& a = land_[i]; const Landmass& b = land_[j];
+      if (a.shape != 0 || b.shape != 0 || std::max(a.rx, a.rz) < 2600.f || std::max(b.rx, b.rz) < 2600.f) continue;
+      const vec2 pa = chart(a.x, a.z), pb = chart(b.x, b.z);
+      float firstWet = -1.f, lastWet = -1.f; bool landBeyond = false;
+      for (int k = 1; k < 80; ++k) {   // (along the line between their middles: the water from one shore to the other)
+        const float t = k / 80.f; const vec2 p = pa + (pb - pa) * t;
+        const bool wet = natural(p.x, p.y) < -1.f;
+        if (wet) { if (firstWet < 0.f) firstWet = t; lastWet = t; }
+        else if (firstWet >= 0.f) { landBeyond = true; break; }
+      }
+      const float width = (lastWet - firstWet) * length(pb - pa);
+      if (firstWet < 0.f || !landBeyond || width < 600.f || width > 12000.f) continue;
+      crossings.push_back({width, pa + (pb - pa) * (.5f * (firstWet + lastWet))});
+    }
+    std::sort(crossings.begin(), crossings.end(), [](const Crossing& a, const Crossing& b) { return a.width != b.width ? a.width < b.width : a.mid.x < b.mid.x; });
+    int sounds = 0;
+    for (const Crossing& c : crossings) {
+      if (size_t(sounds) >= most2 + 1 || std::max(std::abs(c.mid.x), std::abs(c.mid.y)) > 33000.f || !clear(c.mid, 5000.f)) continue;
+      out.push_back({"sound" + std::to_string(sounds), std::string(soundNames[sounds % 32]) + " Sound", c.mid.x, 0.f, c.mid.y, std::max(800.f, .5f * c.width)});
+      ++sounds;
+    }
+  }
+  // the fjords' heads: on each trunk's line, back from its end to where the water is (the channels' own geometry)
+  int heads = 0;
+  for (const Channel& c : channels_) {
+    if (c.branch) continue;
+    if (descriptor.archetype != Archetype::Fjords) {   // (the continental fragments' one channel: the strait between them)
+      const float along = .5f * c.length, t = .5f, oldT = clampf(along / c.originalLength, 0.f, 1.f), pz = c.z - along;
+      const float free = smooth(3000.f, 8500.f, std::abs(pz - bandZ_));
+      const float centre = c.bend * std::sin(oldT * 4.2f + roughPhase_) + free * (c.turn * t + c.sway * 4.f * t * (1.f - t) + c.mouth * .125f);
+      const vec2 p = chart(c.x + centre, pz);
+      if (natural(p.x, p.y) < 0.f) out.push_back({"strait", std::string("The ") + prefix() + " Strait", p.x, 0.f, p.y, 2500.f});
+      continue;
+    }
+    for (float back = 3500.f; back < .5f * c.length; back += 1500.f) {
+      const float along = c.length - back, t = along / c.length, oldT = clampf(along / c.originalLength, 0.f, 1.f), pz = c.z - along;
+      const float free = smooth(3000.f, 8500.f, std::abs(pz - bandZ_)), rest = 1.f - t;
+      const float centre = c.bend * std::sin(oldT * 4.2f + roughPhase_) + free * (c.turn * t + c.sway * 4.f * t * rest + c.mouth * rest * rest * rest);
+      const vec2 p = chart(c.x + centre, pz);
+      if (std::max(std::abs(p.x), std::abs(p.y)) > 33000.f || natural(p.x, p.y) >= 0.f) continue;
+      out.push_back({"fjord" + std::to_string(heads), std::string(fjordNames[heads % 32]) + " Fjord", p.x, 0.f, p.y, 1200.f});
+      ++heads;
+      break;
+    }
+  }
+  return out;
+}
 void Recipe::sample(float x, float z, float out[4]) const {
   // The entire outer 2 km is exactly ocean, before the existing 10 km wrapper.
   // Return early to keep remote water cheap, and to preserve the shared boundary.

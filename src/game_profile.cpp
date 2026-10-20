@@ -31,14 +31,23 @@ void Game::award(const std::string& id) {
 }
 
 void Game::profileTouchdown(float fpm, int ap) {
-  if (botControl || researchFlight || militaryFlight || !plane.spec || ap < 0 || g_world.procedural) return;   // (on a runway of the islands)
+  if (botControl || researchFlight || militaryFlight || !plane.spec || ap < 0 || ap >= (int)g_world.airports.size()) return;
   fpm = fabsf(fpm);
   const Airport& A = g_world.airports[ap];
-  if (profile.airports.insert(A.code).second) {
-    const int n = (int)profile.airports.size(), N = (int)g_world.airports.size();
-    toast(fmt("Airport stamp: %s %s (%d of %d)", A.code, A.name, n, N), vec3(1.f, 0.85f, 0.45f), false);
-    if (n >= 10) award("airports10");
-    if (n >= N) award("airports_all");
+  if (profile.airports.insert(airportStamp(A)).second) {   // (a region's stamps are its own: Profile::airports)
+    const int N = (int)g_world.airports.size();
+    if (g_world.procedural && g_world.regionRecipe) {
+      const int n = profile.regionAirports(g_world.regionId);
+      toast(fmt("Airport stamp: %s %s (%d of %d in the %s)", A.code, A.name, n, N, g_world.regionRecipe->descriptor.name.c_str()), vec3(1.f, 0.85f, 0.45f), false);
+      award("region_first");
+      if (profile.regionsLanded().size() >= 5) award("regions5");
+      if (n >= N) award("region_all");
+    } else {
+      const int n = profile.islandAirports();
+      toast(fmt("Airport stamp: %s %s (%d of %d)", A.code, A.name, n, N), vec3(1.f, 0.85f, 0.45f), false);
+      if (n >= N) award("airports_all");
+    }
+    if (profile.airports.size() >= 10) award("airports10");
   }
   const int grade = touchdownGrade(fpm);
   if (grade == TD_BUTTER) { award("butter"); if (profile.add("butters") >= 25.f) award("butter25"); }
@@ -71,7 +80,9 @@ void Game::profileTick(float dt) {
   if (plane.mach > 1.f) award("supersonic");
   if (ufo.on) { profile.seen.insert("ufo"); award("ufo"); }
   if (traffic.escortActive()) { profile.seen.insert("display"); award("display"); }
-  if (g_world.procedural || researchFlight) return;
+  if (researchFlight) return;
+  const bool region = g_world.procedural && g_world.regionRecipe;
+  if (region && !plane.onGround && profile.seen.insert("region:" + g_world.regionId).second) saveProfile();   // (explored: the passport lists it)
   // a landmark found: within sight of it, low enough to make it out
   const auto& sites = profileSites();
   for (const Site& st : sites) {
@@ -79,10 +90,16 @@ void Game::profileTick(float dt) {
     const float dx = g_world.wrap(plane.pos.x - st.pos.x), dz = g_world.wrap(plane.pos.z - st.pos.z);
     if (dx * dx + dz * dz > (st.radius + 1500.f) * (st.radius + 1500.f) || plane.pos.y - st.pos.y > 1500.f) continue;
     profile.sites.insert(st.id);
-    const int n = (int)profile.sites.size();
-    toast(fmt("Landmark found: %s (%d of %d)", st.name.c_str(), n, (int)sites.size()), vec3(1.f, 0.85f, 0.45f), false);
-    if (n >= 5) award("sites5");
-    if (n >= (int)sites.size()) award("sites_all");
+    if (region) {
+      toast(fmt("Landmark found: %s (%d of %d in the %s)", st.name.c_str(), profile.regionSites(g_world.regionId), (int)sites.size(),
+        g_world.regionRecipe->descriptor.name.c_str()), vec3(1.f, 0.85f, 0.45f), false);
+      if (profile.sitesBeyond() >= 20) award("discover20");
+    } else {
+      const int n = profile.islandSites();
+      toast(fmt("Landmark found: %s (%d of %d)", st.name.c_str(), n, (int)sites.size()), vec3(1.f, 0.85f, 0.45f), false);
+      if (n >= (int)sites.size()) award("sites_all");
+    }
+    if (profile.sites.size() >= 5) award("sites5");
     saveProfile();
   }
 }

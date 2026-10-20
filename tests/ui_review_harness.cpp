@@ -460,6 +460,12 @@ struct GameTest {
     }
     if(sc.find("airline_active")!=std::string::npos){g.career.money=1000000;g.career.license=LIC_ATP;g.career.storyIndex=(int)g_story.size();for(int i=0;i<5;i++){g.career.fleet.push_back({i,g.career.location,50,.9f});g.career.airline.pilots.push_back({"Review pilot "+std::to_string(i+1),2,200});}}
     if(sc=="logbook"){g.screen=SCR_HUB;g.hubTab=TAB_LOGBOOK;}
+    if(sc.rfind("passport",0)==0){   // (passport_scroll: its foot) the passport with the islands' stamps and three regions beyond them
+      g.screen=SCR_HUB;g.hubTab=TAB_LOGBOOK;g.logPage=2;
+      g.profile.airports={g_world.airports[0].code,g_world.airports[2].code,"pr1-0-0-17:UMA","pr1-0-0-17:UMB","pr1-1-9-19:ASA"};
+      g.profile.sites={"windfarm","pr1-0-0-17/crater0","pr1-0-0-17/sound1","pr1-1-9-19/lagoon0"};
+      g.profile.seen={"ufo","region:pr1-4-17-7"};
+    }
     if(sc=="menu_saved"||sc=="menu_overwrite"){g.hasSave=true;g.confirmNew=sc=="menu_overwrite";}
     if(sc=="contracts"){g.screen=SCR_HUB;g.hubTab=TAB_CONTRACTS;}
     if(sc.rfind("airline",0)==0){g.screen=SCR_HUB;g.hubTab=TAB_AIRLINE;}

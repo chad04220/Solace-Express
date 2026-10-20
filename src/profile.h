@@ -33,11 +33,28 @@ struct Profile {
   float add(const std::string& k, float v = 1.f) { return num[k] += v; }
   bool load(const std::string& path);
   bool save(const std::string& path) const;
+  // The islands' stamps are their airports' codes and their landmarks' ids; a region's begin with its id
+  // ("pr1-0-0-17:UMA", "pr1-0-0-17/crater0"), so a code or a name may repeat from one region to the next
+  int islandAirports() const;
+  int islandSites() const;
+  int sitesBeyond() const;                          // landmarks found in the regions beyond the islands
+  std::vector<std::string> regionsLanded() const;   // the regions with an airport stamp, by id
+  std::vector<std::string> regionsExplored() const; // ... those, and those with a landmark found or flown over
+  int regionAirports(const std::string& region) const;
+  int regionSites(const std::string& region) const;
 };
 
-// The landmarks a pilot can find: each one's name and a point at its middle, from the world as it was built (the wind
-// farm, the stone circle, the wreck, the platform, the observatory, the star fort, Lighthouse Key, the racetrack, the
-// dam, the stadium, the container port, the strait bridge). Built on first use for g_world
+struct Airport;
+std::string airportStamp(const Airport& a);   // its key in Profile::airports, in g_world
+// A region's airports, wherever g_world is (its recipe made the first time, and its count kept; 0 for an unknown id)
+int regionAirportCount(const std::string& region);
+
+// The landmarks a pilot can find in g_world: each one's name and a point at its middle. In the islands, from the
+// world as it was built (the wind farm, the stone circle, the wreck, the platform, the observatory, the star fort,
+// Lighthouse Key, the racetrack, the dam, the stadium, the container port, the strait bridge). In a region, the
+// same kinds where it has them, and its own sights (procedural::Recipe::features: craters, summits, lagoons, fjords,
+// the strait). Built on first use for each world
 struct Site { std::string id, name; vec3 pos; float radius; };
 const std::vector<Site>& profileSites();
-void resetProfileSites();   // (a new world: the list is built again)
+void resetProfileSites();   // (the list is built again on its next use)
+int solaceSiteCount();      // the islands' landmarks (-1 until their list has been built)

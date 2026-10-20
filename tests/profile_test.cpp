@@ -45,6 +45,18 @@ struct GameTest {
             q.sites.count("windfarm") && q.seen.count("ufo") && fabsf(q.best["dawnlark"] - 42.5f) < 0.05f && fabsf(q.count("butters") - 3.f) < 1e-3f,
             "The profile is kept and read back; an achievement is earned once, an unknown one never");
     }
+    {   // the islands' stamps apart from the regions': each region's by its id, the regions explored
+      Profile p;
+      p.airports = {"MDB", "FAR", "pr1-0-0-17:UMA", "pr1-0-0-17:UMB", "pr1-1-9-19:ASA"};
+      p.sites = {"windfarm", "pr1-0-0-17/crater0", "pr1-0-0-17/sound1"};
+      p.seen = {"ufo", "region:pr1-4-17-7"};
+      const auto landed = p.regionsLanded(), explored = p.regionsExplored();
+      check(p.islandAirports() == 2 && p.islandSites() == 1 && p.sitesBeyond() == 2 && landed.size() == 2 && explored.size() == 3 &&
+            p.regionAirports("pr1-0-0-17") == 2 && p.regionAirports("pr1-0-0-1") == 0 && p.regionSites("pr1-0-0-17") == 2 &&
+            airportStamp(g_world.airports[0]) == g_world.airports[0].code && regionAirportCount("pr1-0-0-17") >= 2 &&
+            regionAirportCount("pr1-9-9-9") == 0,
+            "The islands' stamps apart from the regions': 2 airports and 1 landmark in the islands, 2 regions landed in, 3 explored");
+    }
     {   // the landmarks
       const auto& sites = profileSites();
       bool inside = true; std::set<std::string> ids;

@@ -161,6 +161,7 @@ private:
 
 // World-explicit variants are required while building a different regional world.
 float airportInfluence(const World& world, float x, float z);
+int solaceAirportCount();   // (the islands' own airports, wherever g_world is)
 void airportGroundsCap(const World& world, float x, float z, float& grounds, float& cap);
 float airportFunnelCeiling(const World& world, float x, float z);
 

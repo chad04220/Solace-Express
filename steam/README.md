@@ -7,7 +7,7 @@ What the Steam release needs from this repository, and the settings to enter on 
 
 | Path | What | Where it goes |
 |---|---|---|
-| `achievements.csv` | The 37 achievements: API name, display name, description, hidden flag, icons | Steamworks > *Stats & Achievements*, one row each |
+| `achievements.csv` | The 41 achievements: API name, display name, description, hidden flag, icons | Steamworks > *Stats & Achievements*, one row each |
 | `achievements/ACH_*.png` | Each achievement's icon (256 px), earned and `_locked` | Uploaded with each achievement |
 | `achievements/contact_sheet.jpg` | Every icon at 64 px, earned over locked | For a look, not for upload |
 | `rich_presence_english.vdf` | The status friends see ("Flying the Skerry Twin from Glacier Station to Solace Capital") | Steamworks > *Community* > *Rich Presence localization* |

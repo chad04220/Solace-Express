@@ -26,8 +26,12 @@ ACH_LEGEND,Living Legend,Complete every legendary contract,0,career,achievements
 ACH_AIRPORTS10,Island Hopper,Land at 10 different airports,0,exploring,achievements/ACH_AIRPORTS10.png,achievements/ACH_AIRPORTS10_locked.png
 ACH_AIRPORTS_ALL,Every Field,Land at every airport in the islands,0,exploring,achievements/ACH_AIRPORTS_ALL.png,achievements/ACH_AIRPORTS_ALL_locked.png
 ACH_SITES5,Sightseer,Find 5 landmarks,0,exploring,achievements/ACH_SITES5.png,achievements/ACH_SITES5_locked.png
-ACH_SITES_ALL,Grand Tour,Find every landmark,0,exploring,achievements/ACH_SITES_ALL.png,achievements/ACH_SITES_ALL_locked.png
+ACH_SITES_ALL,Grand Tour,Find every landmark in the islands,0,exploring,achievements/ACH_SITES_ALL.png,achievements/ACH_SITES_ALL_locked.png
 ACH_PHOTO,Shutterbug,Complete a photo flight,0,exploring,achievements/ACH_PHOTO.png,achievements/ACH_PHOTO_locked.png
+ACH_REGION_FIRST,Beyond the Horizon,Land at an airport beyond the Solace Islands,0,exploring,achievements/ACH_REGION_FIRST.png,achievements/ACH_REGION_FIRST_locked.png
+ACH_REGIONS5,Wayfarer,Land in 5 regions beyond the islands,0,exploring,achievements/ACH_REGIONS5.png,achievements/ACH_REGIONS5_locked.png
+ACH_REGION_ALL,Charted,Land at every airport in a region beyond the islands,0,exploring,achievements/ACH_REGION_ALL.png,achievements/ACH_REGION_ALL_locked.png
+ACH_DISCOVER20,Cartographer,Find 20 landmarks beyond the islands,0,exploring,achievements/ACH_DISCOVER20.png,achievements/ACH_DISCOVER20_locked.png
 ACH_MEDAL,On the Podium,Win a medal in a trial,0,trials,achievements/ACH_MEDAL.png,achievements/ACH_MEDAL_locked.png
 ACH_GOLD,Gold Standard,Win a gold medal in a trial,0,trials,achievements/ACH_GOLD.png,achievements/ACH_GOLD_locked.png
 ACH_GOLD_ALL,Golden Wings,Win gold in every trial,0,trials,achievements/ACH_GOLD_ALL.png,achievements/ACH_GOLD_ALL_locked.png

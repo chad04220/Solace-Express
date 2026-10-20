@@ -1896,7 +1896,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
   flightAch.clear(); flightKm = 0; profileT = 0; pbOld = -1.f; pbNew = false; lastMark = LandingMark(); touchdownApplauded = false;
   trialSplits.clear(); ghostRec.clear(); ghostBest.clear();   // (a trial loads its ghost after: startTrial)
   sightReq = -1; sightAsked = sightDone = false; photoFlashT = -10.f;
-  if ((c.type == CT_PAX || c.type == CT_VIP) && !c.story && !g_world.procedural && c.from != c.to) {   // a landmark near the way: the passengers may ask
+  if ((c.type == CT_PAX || c.type == CT_VIP) && !c.story && c.from != c.to) {   // a landmark near the way: the passengers may ask
     const Airport& A = g_world.airports[c.from]; const Airport& B = g_world.airports[c.to];
     const auto& sites = profileSites(); float best = 12000.f;
     for (int i = 0; i < (int)sites.size(); i++) {
@@ -5568,6 +5568,8 @@ void Game::debugScene(const std::string& name) {
       vec3 p, l;
       if (sscanf(view, "%f,%f,%f,%f,%f,%f", &p.x, &p.y, &p.z, &l.x, &l.y, &l.z) == 6) { dbgCam = true; dbgFollow = false; dbgCamPos = p; dbgCamLook = l; }
     }
+    // REGION_GPS=<range m>: the GPS open over the region (its airports and landmarks)
+    if (const char* gps = getenv("REGION_GPS")) { showMap = true; uiAnim[0x6e61u] = 1.f; gpsRangeTarget = gpsRange = std::max(2000.f, (float)atof(gps)); }
     toasts.clear(); botControl = true;
     printf("Region scene: %s / %s / %zu airports / %zu towns / actual Free Flight\n",
       descriptor->id.c_str(), descriptor->name.c_str(), g_world.airports.size(), g_world.towns.size());

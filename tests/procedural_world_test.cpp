@@ -6,6 +6,7 @@
 #include "../src/scenery.h"
 #include "../src/hive_world_collision.h"
 #include "../src/aircraft.h"
+#include "../src/profile.h"
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -125,6 +126,39 @@ void checkRecipe(const procedural::Descriptor& descriptor) {
     check(airportInfluence(layout, t.x, t.z) <= .02f,
       std::string(t.name) + " recipe town center is outside airport settlement exclusion");
   check(a.memoryBytes() < 256u * 1024u, "analytic recipe stays below 256 KiB");
+  // its sights: two at least, each its own by key and name, on the chart; the lagoons, fjords, sounds and strait on the
+  // water, the capes and islets on their land, the craters' rims and the summits high
+  const auto features = a.features();
+  check(features.size() >= 2, descriptor.id + " has " + std::to_string(features.size()) + " sights of its own (2 or more)");
+  std::set<std::string> keys, names;
+  for (const auto& f : features) {
+    check(keys.insert(f.key).second && names.insert(f.name).second, f.name + " (" + f.key + ") is the only one of its key and name");
+    check(std::isfinite(f.x + f.y + f.z) && std::max(std::abs(f.x), std::abs(f.z)) < 34000.f && f.radius > 0.f, f.name + " lies inside the region");
+    const bool wet = f.key.rfind("lagoon", 0) == 0 || f.key.rfind("fjord", 0) == 0 || f.key.rfind("sound", 0) == 0 || f.key == "strait";
+    if (wet) check(a.natural(f.x, f.z) < 0.f && f.y == 0.f, f.name + " is on the water");
+    else if (f.key.rfind("cape", 0) == 0 || f.key.rfind("islet", 0) == 0) check(a.natural(f.x, f.z) > 0.f, f.name + " is on its land");
+    else check(f.y > 200.f && a.natural(f.x, f.z) > .3f * f.y, f.name + " stands high (" + std::to_string((int)f.y) + " m)");
+  }
+  check(b.features().size() == features.size(), "the same sights from the same descriptor");
+  std::string list;
+  for (const auto& f : features) list += (list.empty() ? "" : ", ") + f.name + " " + std::to_string((int)f.y) + " m";
+  std::printf("SIGHTS %s %s %s: %s\n", descriptor.id.c_str(), procedural::scaleName(descriptor.scale), procedural::archetypeName(descriptor.archetype), list.c_str());
+}
+// The region's landmarks (profile.h): its own sights and the landmarks it has, each its own, named for it, on its chart
+void checkSites() {
+  resetProfileSites();
+  const auto& sites = profileSites();
+  std::set<std::string> ids, names;
+  std::string list;
+  for (const Site& st : sites) {
+    check(st.id.rfind(g_world.regionId + "/", 0) == 0, st.id + " carries its region's id");
+    check(ids.insert(st.id).second && names.insert(st.name).second, st.name + " is the region's only one of its id and name");
+    check(std::isfinite(st.pos.x + st.pos.y + st.pos.z) && std::max(std::abs(st.pos.x), std::abs(st.pos.z)) < procedural::kOceanEdge && st.radius > 0.f,
+      st.name + " lies on the region's chart");
+    list += (list.empty() ? "" : ", ") + st.name;
+  }
+  check(sites.size() >= g_world.regionRecipe->features().size(), "every sight of the region is a landmark to find");
+  std::printf("SITES n=%zu: %s\n", sites.size(), list.c_str());
 }
 void checkAirports() {
   std::set<std::string> codes;
@@ -436,7 +470,7 @@ int main(int argc, char** argv) {
   g_world = std::move(staged);
   std::printf("REGION id=%s name=%s archetype=%s from_cache=%d build_seconds=%.3f\n", id.c_str(), descriptor->name.c_str(),
     procedural::archetypeName(descriptor->archetype), int(loaded), seconds);
-  checkAirports(); checkSettlementsAndRoads(); checkWorldBounds(); checkChartTopologyFlight();
+  checkAirports(); checkSettlementsAndRoads(); checkWorldBounds(); checkChartTopologyFlight(); checkSites();
   g_scenery.clear();
   return finish();
 }

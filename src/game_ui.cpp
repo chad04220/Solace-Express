@@ -269,6 +269,7 @@ static std::string ellipsize(const std::string& str, float width, float size) {
 
 // A key in a key / value list: plain, or in the hub's glass style a small upper-case label
 static std::string upperS(std::string t) { for (char& c : t) c = (char)toupper((unsigned char)c); return t; }
+static std::string lowerS(std::string t) { for (char& c : t) c = (char)tolower((unsigned char)c); return t; }
 // Picks the largest font size (down to minSize) at which the text fits, then ellipsizes if it still doesn't
 static float fitText(float x, float y, float width, float size, float minSize, const std::string& str, vec3 col, float a = 1.f) {
   float sz = size;
@@ -737,6 +738,16 @@ void Game::drawMapView(float x, float y, float w, float h, int from, int to, con
     if (wps) for (auto& wp : *wps) { vec2 p = toS(wp.x, wp.z); g_ren.line(prev.x, prev.y, p.x, p.y, 3 * s, C_ACCENT, 0.9f); g_ren.rect(p.x - 4 * s, p.y - 4 * s, 8 * s, 8 * s, vec3(0.3f, 1, 0.5f), 1, 4 * s); prev = p; }
     vec2 b = toS(g_world.airports[to].x, g_world.airports[to].z);
     g_ren.line(prev.x, prev.y, b.x, b.y, 3 * s, C_ACCENT, 0.9f);
+  }
+  for (const Site& st : profileSites()) {   // the landmarks, small diamonds: gold once found (the passport has them all)
+    const vec2 p = toS(st.pos.x, st.pos.z);
+    if (p.x < ox || p.y < oy || p.x > ox + sz || p.y > oy + sz) continue;
+    const bool got = profile.sites.count(st.id) > 0;
+    const vec3 c = got ? vec3(1.f, 0.82f, 0.35f) : vec3(0.75f);
+    const float r = 3.6f * s, al = got ? 1.f : 0.75f;
+    g_ren.line(p.x - r, p.y, p.x, p.y - r, 2.2f * s, c, al); g_ren.line(p.x, p.y - r, p.x + r, p.y, 2.2f * s, c, al);
+    g_ren.line(p.x + r, p.y, p.x, p.y + r, 2.2f * s, c, al); g_ren.line(p.x, p.y + r, p.x - r, p.y, 2.2f * s, c, al);
+    if (sz > 560 * s) g_ren.text(p.x + r + 3 * s, p.y - 7 * s, 11 * s, st.name, got ? c : C_DIM, al);
   }
   for (size_t i = 0; i < g_world.airports.size(); i++) {
     const Airport& a = g_world.airports[i];
@@ -1763,13 +1774,24 @@ void Game::drawHubLogbook(float x, float y, float w, float h) {
       g_ren.text(px, py, 12 * s, fmt("%02d / %02d ACHIEVEMENTS", (int)profile.ach.size(), kAchievementCount), C_ACCENT, 1, 0, false); py += 26 * s;
       g_ren.rect(px, py, iw, 4 * s, C_DIM, 0.2f, 2 * s);
       g_ren.rect(px, py, std::max(2 * s, iw * profile.ach.size() / (float)kAchievementCount), 4 * s, C_ACCENT, 1, 2 * s); py += 22 * s;
-      const int nAp = (int)profile.airports.size(), nSites = (int)profile.sites.size(), allSites = (int)profileSites().size();
+      const int nAp = (int)profile.airports.size(), nSites = (int)profile.sites.size(), islandSites = profile.islandSites();
+      if (!g_world.procedural) profileSites();   // (the islands' count, below)
       auto progress = [&](const std::string& id) -> std::string {
         if (id == "butter25") return fmt("%d / 25", (int)profile.count("butters"));
         if (id == "airports10") return fmt("%d / 10", std::min(nAp, 10));
-        if (id == "airports_all") return fmt("%d / %d", nAp, (int)g_world.airports.size());
+        if (id == "airports_all") return fmt("%d / %d", profile.islandAirports(), solaceAirportCount());
         if (id == "sites5") return fmt("%d / 5", std::min(nSites, 5));
-        if (id == "sites_all") return fmt("%d / %d", nSites, allSites);
+        if (id == "sites_all") return solaceSiteCount() > 0 ? fmt("%d / %d", islandSites, solaceSiteCount()) : fmt("%d found", islandSites);
+        if (id == "regions5") return fmt("%d / 5", std::min((int)profile.regionsLanded().size(), 5));
+        if (id == "discover20") return fmt("%d / 20", std::min(profile.sitesBeyond(), 20));
+        if (id == "region_all") {   // the region nearest done
+          int best = 0, of = 0;
+          for (const std::string& r : profile.regionsLanded()) {
+            const int got = profile.regionAirports(r), all = regionAirportCount(r);
+            if (all > 0 && (of == 0 || got * of > best * all)) { best = got; of = all; }
+          }
+          return of ? fmt("%d / %d", best, of) : "";
+        }
         if (id == "warp") return fmt("%.0f / 500 km", std::min(profile.count("warpKm"), 500.f));
         if (id == "fleet3") return fmt("%d / 3", std::min((int)career.fleet.size(), 3));
         return "";
@@ -1791,10 +1813,13 @@ void Game::drawHubLogbook(float x, float y, float w, float h) {
         if (!right.empty()) g_ren.text(px + iw - 10 * s, py + 18 * s, 12 * s, right, got ? gold : C_DIM, 1, 2);
         py += 56 * s;
       }
-    } else if (logPage == 2) {   // the passport: every airport landed at, every landmark found, the sightings
-      header(px, py, iw, fmt("AIRPORTS  %d / %d", (int)profile.airports.size(), (int)g_world.airports.size())); py += 30 * s;
+    } else if (logPage == 2) {   // the passport: every airport landed at, every landmark found, the regions, the sightings
+      const bool region = g_world.procedural && g_world.regionRecipe;
+      const std::string here = region ? g_world.regionRecipe->descriptor.name : std::string("the Solace Islands");
+      if (region) { g_ren.text(px, py, 12 * s, "YOU ARE IN THE " + upperS(here), C_ACCENT, 1, 0, false); py += 26 * s; }
+      header(px, py, iw, fmt("AIRPORTS  %d / %d", region ? profile.regionAirports(g_world.regionId) : profile.islandAirports(), (int)g_world.airports.size())); py += 30 * s;
       for (const Airport& a : g_world.airports) {
-        const bool got = profile.airports.count(a.code) > 0;
+        const bool got = profile.airports.count(airportStamp(a)) > 0;
         g_ren.rect(px, py + 3 * s, 10 * s, 10 * s, got ? vec3(1.f, 0.82f, 0.35f) : C_DIM * 0.4f, got ? 1.f : 0.5f, 5 * s);
         g_ren.text(px + 20 * s, py, 14 * s, a.code, got ? vec3(1.f, 0.85f, 0.45f) : C_DIM, 1);
         g_ren.text(px + 74 * s, py, 14 * s, ellipsize(a.name, iw - 170 * s, 14 * s), got ? C_TEXT : C_DIM, got ? 1.f : 0.7f);
@@ -1803,12 +1828,33 @@ void Game::drawHubLogbook(float x, float y, float w, float h) {
       }
       py += 14 * s;
       const auto& sites = profileSites();
-      header(px, py, iw, fmt("LANDMARKS  %d / %d", (int)profile.sites.size(), (int)sites.size())); py += 30 * s;
+      header(px, py, iw, fmt("LANDMARKS  %d / %d", region ? profile.regionSites(g_world.regionId) : profile.islandSites(), (int)sites.size())); py += 30 * s;
       for (const Site& st : sites) {
         const bool got = profile.sites.count(st.id) > 0;
         g_ren.rect(px, py + 3 * s, 10 * s, 10 * s, got ? C_GOOD : C_DIM * 0.4f, got ? 1.f : 0.5f, 2 * s);
         g_ren.text(px + 20 * s, py, 14 * s, ellipsize(st.name, iw - 120 * s, 14 * s), got ? C_TEXT : C_DIM, got ? 1.f : 0.7f);
         g_ren.text(px + iw, py, 12 * s, got ? "FOUND" : "fly over it", got ? C_GOOD : C_DIM * 0.8f, 1, 2, false);
+        py += 22 * s;
+      }
+      py += 14 * s;
+      // the regions beyond the islands: each one flown over, landed in or with a landmark found
+      const auto explored = profile.regionsExplored();
+      header(px, py, iw, fmt("REGIONS BEYOND THE ISLANDS  %d", (int)explored.size())); py += 30 * s;
+      if (explored.empty()) {
+        for (auto& line : wrap("Fly out past the islands in Free Flight. The regions beyond them have their own airports to land at and landmarks to find.", iw - 20 * s, 12 * s)) {
+          g_ren.text(px + 20 * s, py, 12 * s, line, C_DIM, 0.9f); py += 17 * s;
+        }
+      }
+      for (const std::string& id : explored) {
+        const auto d = procedural::find(id);
+        if (!d) continue;
+        const bool current = region && id == g_world.regionId;
+        const int got = profile.regionAirports(id), all = regionAirportCount(id), found = profile.regionSites(id);
+        g_ren.rect(px, py + 3 * s, 10 * s, 10 * s, all > 0 && got >= all ? vec3(1.f, 0.82f, 0.35f) : current ? C_ACCENT : C_DIM * 0.6f, 1.f, 5 * s);
+        g_ren.text(px + 20 * s, py, 14 * s, ellipsize(d->name, iw - 190 * s, 14 * s), C_TEXT, 1);
+        g_ren.text(px + iw, py, 12 * s, fmt("%d / %d airports  %d found", got, all, found), got >= all && all > 0 ? vec3(1.f, 0.82f, 0.35f) : C_DIM, 1, 2, false);
+        py += 18 * s;
+        g_ren.text(px + 20 * s, py, 11 * s, fmt("%s %s%s", procedural::scaleName(d->scale), lowerS(procedural::archetypeName(d->archetype)).c_str(), current ? "  /  you are here" : ""), C_DIM, 0.8f);
         py += 22 * s;
       }
       py += 14 * s;
@@ -3066,6 +3112,16 @@ void Game::drawGps() {
     g_ren.rectOutline(p.x - r, p.y - r, 2 * r, 2 * r, done ? C_DIM : C_GOOD, e, r, 2 * s);
     g_ren.text(p.x + r + 3 * s, p.y - 7 * s, 11 * s, fmt("CP%d", i + 1), done ? C_DIM : C_GOOD, e, 0, false);
   }
+  // landmarks: small diamonds, gold once found, named when the map is close in (the passport lists them all)
+  for (const Site& st : profileSites()) {
+    const vec2 p = toS(st.pos.x, st.pos.z); if (!inside(p, 6 * s)) continue;
+    const bool got = profile.sites.count(st.id) > 0;
+    const vec3 c = got ? vec3(1.f, 0.82f, 0.35f) : vec3(0.8f, 0.85f, 0.9f);
+    const float r = 5 * s, al = got ? 1.f : 0.8f;
+    seg(vec2(p.x - r, p.y), vec2(p.x, p.y - r), 2 * s, c, al); seg(vec2(p.x, p.y - r), vec2(p.x + r, p.y), 2 * s, c, al);
+    seg(vec2(p.x + r, p.y), vec2(p.x, p.y + r), 2 * s, c, al); seg(vec2(p.x, p.y + r), vec2(p.x - r, p.y), 2 * s, c, al);
+    if (range < 12000.f && inside(p, 60 * s)) g_ren.text(p.x + r + 4 * s, p.y - 7 * s, 11 * s, st.name, c, al * e, 0, true);
+  }
   // airports: runway to scale (min length on screen), code labels, destination pulse
   int nearest = g_world.nearestAirport(plane.pos.x, plane.pos.z);
   for (int i = 0; i < (int)g_world.airports.size(); i++) {
@@ -3715,7 +3771,7 @@ void Game::drawFinaleCard() {
   py += 160 * s;
   header(x + 30 * s, py, pw - 60 * s, "STILL OUT THERE"); py += 28 * s;
   const std::string more[] = {"Legendary contracts on the board: the hardest flying in the islands", "Your airline: more routes, better pilots, the Galleon 180",
-                              fmt("%d of %d airports stamped, %d of %d landmarks found", (int)profile.airports.size(), (int)g_world.airports.size(), (int)profile.sites.size(), (int)profileSites().size()),
+                              fmt("%d of %d airports stamped, %d landmarks found in the islands; %d regions beyond them explored", profile.islandAirports(), solaceAirportCount(), profile.islandSites(), (int)profile.regionsExplored().size()),
                               "Trials for gold, the Military board, and Free Flight anywhere on Earth"};
   for (auto& l : more) {
     if (py > y + ph - 90 * s) break;

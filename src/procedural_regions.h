@@ -63,6 +63,13 @@ public:
   // The land alone at x, z (m, the region's chart): the islands and the channels, without the fields' and the towns'
   // levelled ground or the approaches cut below their funnels
   float natural(float x, float z) const;
+  // A sight worth the flight: a volcano's crater, a summit, an atoll's lagoon, a fjord's head, the strait. Its key is
+  // its own within the region (crater0, summit1...); x, z on the region's chart, y the ground to see it from, radius
+  // how far it spreads (m). Worked out from the layout when asked, never kept: the recipe's memory stays as it is
+  struct Feature { std::string key, name; float x, y, z, radius; };
+  std::vector<Feature> features() const;
+  // The region's own name for its places: "Umber" for the Umber Islands
+  const char* prefix() const;
   size_t memoryBytes() const;
 private:
   static constexpr int kCoastSamples = 64;

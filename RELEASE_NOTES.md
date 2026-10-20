@@ -22,6 +22,9 @@
   - a large atoll region has six atolls around a central one with a 1,500 m strip;
   - a large fjord coast has a high plateau strip above its fjords.
 - **Villages are scattered through the hills.** Away from the airfields, every region now has villages and market towns on the gentler ground (two in a small region, four in a medium one, ten in a large one), each with its own streets and buildings.
+- **Every region has its own places to find.** Its volcanoes' craters, its highest summits, the capes at the ends of its long islands, its islets, the sounds between an archipelago's islands, its atolls' lagoons, the heads of its fjords and the strait between its fragments all have names: Mount Halo, Giant Peak, Cape Farewell, Selkie Sound, Pearl Lagoon, Echo Fjord. So do the wind farms, wrecks, offshore platforms, star forts, stone circles and racetracks it has. A small region has two to six to find; a large one has up to fifteen.
+- **They count in your passport.** Fly near a landmark, low enough to make it out, and it's found. Land at a region's airport and it's stamped. The passport shows the region you're in and lists every region you've explored, with how many of its airports you've landed at and how many landmarks you've found. The hub map and the GPS mark every landmark with a diamond, gold once it's found.
+- **Four new achievements:** Beyond the Horizon (land at an airport beyond the Solace Islands), Wayfarer (land in five regions), Charted (land at every airport in one region) and Cartographer (find 20 landmarks beyond the islands). Every Field and Grand Tour still count the islands alone.
 
 ### Worldwide trial boards on Steam
 - **Every trial now has a worldwide leaderboard on Steam,** one for each trial and aircraft, plus one for each day's daily trial. Your best time is uploaded when you finish, and the results card shows your place in the world under your place on the local board.

@@ -291,6 +291,7 @@ static float airportInfluenceFor(const Airport* data, size_t count, float x, flo
 float airportFunnelCeiling(float x, float z) { return airportFunnelCeilingFor(kAirports, std::size(kAirports), x, z); }
 float airportFunnelCeiling(const World& world, float x, float z) { return airportFunnelCeilingFor(world.airports.data(), world.airports.size(), x, z); }
 float airportInfluence(float x, float z) { return airportInfluenceFor(kAirports, std::size(kAirports), x, z); }
+int solaceAirportCount() { return (int)std::size(kAirports); }
 float airportInfluence(const World& world, float x, float z) { return airportInfluenceFor(world.airports.data(), world.airports.size(), x, z); }
 
 void World::build(const std::string& cachePath, const std::string& stamp, bool save) {
