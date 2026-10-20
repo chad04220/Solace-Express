@@ -6,6 +6,7 @@
 #include "test_world.h"
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 
 struct GameTest {
   static int run() {
@@ -54,11 +55,7 @@ struct GameTest {
     {   // this PC's display settings apart (display.cfg in the cache folder, never synced): written beside settings.cfg,
         // and read over it - a synced settings.cfg from another PC doesn't change this one's graphics
       const std::string sd = dir + "/save", cd = dir + "/cache";
-#ifdef _WIN32
-      system(("mkdir " + sd + " 2> NUL & mkdir " + cd + " 2> NUL").c_str());
-#else
-      system(("mkdir -p " + sd + " " + cd).c_str());
-#endif
+      std::filesystem::create_directories(sd); std::filesystem::create_directories(cd);   // (not cmd's mkdir: it reads "/save" as a switch)
       remove((sd + "/settings.cfg").c_str()); remove((cd + "/display.cfg").c_str());
       Game a; a.initHeadless(); a.saveDir = sd; a.cacheDir = cd;
       a.set.quality = 2; a.set.fpsTarget = 144; a.set.uiScale = 1.3f; a.set.master = 0.42f;
