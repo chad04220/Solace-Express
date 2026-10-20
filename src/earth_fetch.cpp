@@ -8,6 +8,9 @@
 #include <cstdlib>
 #include <sys/stat.h>
 #ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX   // (std::max, not windows.h's macro)
+#endif
 #include <windows.h>
 #include <winhttp.h>
 #include <direct.h>
