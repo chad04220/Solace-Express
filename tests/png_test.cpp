@@ -4,6 +4,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "../src/third_party/stb_image.h"
 #include "../src/png_write.h"
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
