@@ -29,7 +29,10 @@ Launch option 2 (optional), *Collect diagnostics*: executable `diagnostics.bat`.
 **Steam Cloud** (*Application* > *Steam Cloud*): byte quota 200 MB, 500 files. Auto-Cloud, root `WinAppDataRoaming`,
 subdirectory `SomniumVolandi`, one rule per pattern: `career.sav`, `career.sav.bak`, `profile.cfg`, `settings.cfg`,
 `joystick.cfg`, `radio_stations.txt`, `ghost_*.bin`. Not the logs, the `crash` folder or `report_*.txt`; nothing in
-`%LOCALAPPDATA%\SomniumVolandi` (the shader and aircraft caches, rebuilt by each PC).
+`%LOCALAPPDATA%\SomniumVolandi` (the shader and aircraft caches, rebuilt by each PC, and `display.cfg`: each PC's own
+quality, resolution, frame rate, window mode and text size, read over the synced `settings.cfg`, so a desktop and a
+Deck keep their own graphics). Photo mode's shots go to `Pictures\Somnium Volandi` and to Steam's screenshots, never
+to the Cloud.
 
 **Steam Input** (*Application* > *Steam Input*): *Opt out* on PC (the game reads XInput pads and DirectInput
 joysticks, throttles and pedals itself, and Steam's remapping would get in the way of the flight gear). On the Steam
@@ -41,8 +44,30 @@ Deck Steam Input stays on and presents an Xbox pad: choose the *Gamepad* templat
 **Rich Presence**: upload `rich_presence_english.vdf`. A translation is another `<language>` file with the same
 tokens; the game needs no new build for it.
 
+**Leaderboards**: nothing to enter. The game creates each board the first time a score is sent to it: one for each
+trial and aircraft (`Gate run - Dawnlark T2`), and one for each day's daily course, whatever the aircraft
+(`Daily gate course - 2026-10-20`, the UTC date). All are sorted ascending (lowest is best) and keep each player's
+best; the gate runs, the daily and the formation run are shown as times, the spot landing and the STOL contest as
+numbers. The trial's results card shows the player's worldwide place. To hide a board, or reset one after a scoring change, use *Stats & Achievements* >
+*Leaderboards*.
+
 **Depots**: the first depot (the app's id + 1), Windows 64-bit, all languages. The content is the release folder as
 the CI makes it, with `steam_api64.dll` added.
+
+## The demo
+
+`SomniumVolandiDemo.exe` is the same game built with `SOMNIUM_DEMO=1` (CMake target `SomniumVolandiDemo`, not built
+by default): the career up to the Private Pilot licence, then a card that says what the full game goes on to; the
+Dawnlark, the Ambler and the Scrubrunner in free flight, the rest of the fleet shown as in the full game; the Military
+board a teaser; no Project NIGHTGLASS. It saves where the full game does, so a career begun in the demo carries on in
+the full game on the same PC. With `-DSOMNIUM_STORE_APPID=<the full game's app id>` its cards have a *Wishlist on
+Steam* button (the overlay's store page; a browser without Steam).
+
+On Steamworks the demo is an app of its own (*Associated Packages & DLC* > *Demos*): launch option
+`SomniumVolandiDemo.exe`, the same Cloud rules if wanted, its own depot (the demo's id + 1). For CI, set the repository
+variable `STEAM_DEMO_APP_ID` too: a release then builds the demo (with `STEAM_APP_ID` as its store page), signs it with
+the game, and uploads it to the demo app's `STEAM_BRANCH`. By hand: `cmake --build build --config Release --target
+SomniumVolandiDemo`, and the release folder with `SomniumVolandiDemo.exe` in place of `SomniumVolandi.exe`.
 
 ## Uploading a build
 
@@ -68,4 +93,8 @@ steamcmd +login <build account> +run_app_build "<repo>\steam\build\app_build.vdf
 3. A friend sees the status change between the menu, the hub and a flight.
 4. Shift+Tab in flight: the overlay opens and the flight pauses.
 5. On a Deck: the first start's name field brings up the keyboard (X brings it up again).
-6. Remove `steam_appid.txt` before any upload (the depot excludes it anyway).
+6. Finish a trial: the results card shows a worldwide place; the board is on the game's community page.
+7. Photo mode (F2), Space: the shot is in the Steam screenshots (F12's library) as well as `Pictures\Somnium Volandi`.
+8. On a Deck's first start: the graphics are set for the Deck (Low, 30 fps), and a desktop's settings synced later
+   don't change them.
+9. Remove `steam_appid.txt` before any upload (the depot excludes it anyway).

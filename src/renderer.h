@@ -1,5 +1,6 @@
 // Somnium Volandi - renderer interface
 #pragma once
+#include "png_write.h"
 #include "aircraft_mesh_asset.h"
 #include "benchmark_metrics.h"
 #include <array>
@@ -96,7 +97,6 @@ std::string meshCacheStamp(const std::string& defines = "");     // fingerprint 
 std::string shaderCacheStamp();   // fingerprint of all shader sources + the driver (current context needed)
 std::string aircraftProgramStamp();   // and of every type's own build (Renderer::buildAfItem): its packed model too
 void compileLogLine(const std::string& line);   // a line in <cache>/compile.log (the launch's helpers: each item's time)
-bool writePNG(const char* path, int w, int h, const std::vector<uint8_t>& rgbBottomUp);
 bool readImage(const char* path, int& w, int& h, std::vector<uint8_t>& rgbaTopDown);   // PNG or JPEG
 GLuint linkProgramCached(const std::string& vs, const std::string& fs, std::string& err, bool* usedSafeGear = nullptr);
 extern std::string g_shaderNotes;          // programs the driver's compiler rejected and what built instead (startup.log)
@@ -154,6 +154,9 @@ struct FrameParams {
   int dispMode = 0, dispCk = 0;   // cockpit display atlases this frame: bit 1 display pages, bit 2 instrument panel (cockpit type)
   float rwyLights = 0;   // airport lighting on (night / low visibility): 0..1   // point / spot lights: radiance, spot cutoff (-2 omni), shadow stop distance (0 none)
   float exposure = 1.0f, rainLens = 0, fade = 1, vignette = 0.6f, gLoad = 0;
+  // photo mode's grade (post_fs.glsl): saturation, contrast, warmth (-1 cool .. 1 warm), and the black bars that frame the
+  // shot (a fraction of the width a side, of the height top and bottom: a letterbox or a square); 1, 1, 0 and none: as is
+  float grade[3] = {1, 1, 0}, bars[2] = {0, 0};
   bool sealedCockpit = false;
   int trafficN = 0; TrafficVisual traffic[kMaxTrafficDrawn];
   bool ufoOn = false; vec3 ufoPos; float ufoRot[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1}, ufoAnim[4] = {0, 0, 0, 0};   // UFO encounter   // XR-30 cockpit view: no sun glare (the pilot sees the sun only on the displays)   // gLoad: g-force tunnel 0..1
@@ -344,6 +347,10 @@ public:
   void rectOutline(float x, float y, float w, float h, vec3 c, float a, float radius, float thickness);
   void glow(float x, float y, float w, float h, vec3 c, float a, float radius, float soft);  // soft halo around a rounded rect
   float text(float x, float y, float size, const std::string& s, vec3 c, float a = 1.0f, int align = 0, bool shadow = true);
+  // a controller button inside a line of text: '\x01' its name '\x02' (spaces in the name as '_': Game::padGlyph), drawn
+  // as the button itself - A, B, X, Y as their coloured discs, the rest as a dark key with its name - wherever text is
+  float glyphWidth(const std::string& name, float size) const;
+  void glyph(float x, float y, float size, const std::string& name, float a);
   float textWidth(const std::string& s, float size) const;
   void image(GLuint tex, float x, float y, float w, float h, float u0 = 0, float v0 = 0, float u1 = 1, float v1 = 1, float a = 1.0f);
   void uiEnd();

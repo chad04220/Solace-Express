@@ -150,6 +150,11 @@ struct GameTest {
     else if (what == "legends") { g.career.finished = true; g.career.license = LIC_ATP; g.career.storyIndex = (int)g_story.size(); g.profile.num["legend.LEG2"] = 1;
       g.screen = SCR_HUB; g.hubTab = TAB_CONTRACTS; g.hubList = 0; g.selContract = 2; g.drawHub(); }
     else if (what == "pause") { g.drawPause(); }
+    else if (what == "credits") { g.profile.welcomed = true; g.showCredits = true; g.creditsByHand = true; g.creditsScroll = getenv("CREDITSAT") ? (float)atof(getenv("CREDITSAT")) : 640.f; g.drawMenu(); }   // (CREDITSAT: how far they have rolled)
+    else if (what == "pausephoto") { g.in.pad = true; g.padActive = true; g.drawPause(); }   // (the pause menu as a controller shows it)
+    else if (what == "demoend" || what == "demomil") {   // the demo's end over the hub, and its Military teaser
+      g.demo = true; g.career.license = what == "demoend" ? LIC_PPL : LIC_STUDENT; g.licenceShown = -1; g.screen = SCR_HUB; g.hubTab = TAB_CONTRACTS; g.hubList = what == "demomil" ? 2 : 0; g.drawHub();
+    }
     else if (what == "menu") { g.drawMenu(); }
     else if (what == "debrief") {   // a story delivery's settlement with eleven lines and a new licence (the review of v3.24.0, R9)
       g.career.storyIndex = 3; g.contract = g_story[3]; g.lastSuccess = true; g.stars = 2; g.debriefTitle = "Delivered";

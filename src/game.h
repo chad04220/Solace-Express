@@ -50,7 +50,7 @@ struct Input {
 enum Action {
   ACT_PITCH_DN = 0, ACT_PITCH_UP, ACT_ROLL_L, ACT_ROLL_R, ACT_YAW_L, ACT_YAW_R, ACT_THR_UP, ACT_THR_DN, ACT_TRIM_UP, ACT_TRIM_DN,
   ACT_FLAPS_DN, ACT_FLAPS_UP, ACT_GEAR, ACT_BRAKE, ACT_PARK, ACT_AP, ACT_STUNT, ACT_LIGHTS, ACT_ENGINE, ACT_TIME,
-  ACT_CAMERA, ACT_HUD, ACT_MAP, ACT_MINIMAP, ACT_RADIO, ACT_ANR, ACT_ZOOM,
+  ACT_CAMERA, ACT_HUD, ACT_MAP, ACT_MINIMAP, ACT_RADIO, ACT_ANR, ACT_ZOOM, ACT_PHOTO,
   ACT_CLOAK, ACT_WEAPONS, ACT_FIRE, ACT_BOMB, ACT_COUNT
 };
 struct ActionInfo { const char* id; const char* name; int group; int key; unsigned pad; };
@@ -58,6 +58,7 @@ extern const ActionInfo kActions[ACT_COUNT];
 extern const char* const kActionGroups[];
 std::string keyName(int vk);
 std::string padName(unsigned bit);
+std::string padGlyph(const std::string& name);   // a button's name as its glyph in drawn text (Renderer::glyph)
 
 struct Settings {
   int quality = 1;   // (the render scale is the renderer's own: Renderer::renderScale)
@@ -97,7 +98,7 @@ struct Settings {
 
 struct TipPt { vec3 p; float age, a; int seg; AirSwirl sw; bool caught = false; };   // wingtip vapour ribbon point (in the air mass; caught: turning round its tip's vortex)
 struct Particle { vec3 p, v; float life, maxLife, size, grow; vec3 col; float alpha; int kind; float drag, buoy; bool instant = false; bool fresh = true;
-                  bool air = false, passed = false, caught = false; AirSwirl sw; };  // instant: no fade-in (trails); air: a parcel of the air (a cloud wisp) the airframe's flow moves (passed: behind its wing; caught: turning round one of its vortices)
+                  bool air = false, passed = false, caught = false; AirSwirl sw; bool gate = false; };  // instant: no fade-in (trails); air: a parcel of the air (a cloud wisp) the airframe's flow moves (passed: behind its wing; caught: turning round one of its vortices); gate: a checkpoint gate's spark (photo mode hides them with the gates)
 
 enum GameScreen { SCR_MENU = 0, SCR_HUB, SCR_FLIGHT, SCR_DEBRIEF, SCR_RESEARCH, SCR_LOADING, SCR_FREE_FLIGHT, SCR_REGION_LOADING };
 enum HubTab { TAB_CONTRACTS = 0, TAB_HANGAR, TAB_AIRLINE, TAB_LOGBOOK, TAB_SETTINGS };
@@ -137,6 +138,7 @@ public:
   void filterControllerFocus(); // once per raw platform poll; a returning controller must first be neutral
   Settings set;
   std::string saveDir;
+  std::string photoDir;   // where the shots go (the platform's Pictures\Somnium Volandi; empty: the save folder's Photos)
   // A tool session (diagnostics.bat's --bench, --shots, --profile, --analyze, --loadshots): its flights - crashes among
   // them - fly a fresh career kept in memory. The player's career is never read for it, and no career, settings or
   // station file is written (the settings are read: the bench measures the player's quality)
@@ -278,7 +280,8 @@ private:
   std::map<std::string, std::vector<float>> trialBestSplits;   // the best run's splits (settings.cfg trialSplits.<key>)
   // the card in the hub after a trial: the score, the medal, the board, the splits; Retry flies it again
   struct TrialResult { int kind = -1, spec = 0, src = 0, medal = 0, rank = 0; float score = -1, best = -1; bool newBest = false;
-                       std::string why; std::vector<float> splits, bestSplits; };
+                       std::string why, board; std::vector<float> splits, bestSplits; };   // board: its Steam leaderboard (steam::submitScore)
+  std::string trialBoard(int kind, int spec) const;   // a trial's worldwide board on Steam: per aircraft; the daily course's per day
   TrialResult trialResult;
   void drawTrialCard();
   void startTrial(int kind, int spec, int src);
@@ -396,6 +399,22 @@ private:
   float photoFlashT = -10.f;            // the photo flight's shot: the screen flashes white
   // the first start's welcome (profile.welcomed): a name, how to fly, the road ahead
   void drawWelcome();
+  // The demo (CMake SOMNIUM_DEMO: the SomniumVolandiDemo build, for Steam Next Fest): the career up to the private
+  // licence, then the end card; free flight in the three trainers (the rest shown, locked); the XR programmes a teaser.
+  // The same save folder: a demo career carries on in the full game
+#ifndef SOMNIUM_DEMO
+#define SOMNIUM_DEMO 0
+#endif
+#ifndef SOMNIUM_STORE_APPID
+#define SOMNIUM_STORE_APPID 0   // (the full game's Steam app id: the demo's store button; 0, none known yet)
+#endif
+  bool demo = SOMNIUM_DEMO != 0;
+  bool demoCraft(int spec) const { return !demo || spec <= 2; }   // (the Dawnlark, the Ambler, the Scrubrunner)
+  bool demoOver() const { return demo && career.license >= LIC_PPL && licenceShown < 0; }
+  void drawDemoEnd();
+  void openStorePage();
+  void drawCredits();                   // the main menu's credits: who made it, and the work it stands on (THIRD_PARTY_NOTICES.md)
+  bool showCredits = false, creditsByHand = false; float creditsScroll = 0.f;
   int welcomeStyle = -1;                // the choice made on it: 0 assisted, 1 realistic (-1 none yet)
   // a lesson failed twice running: the debrief offers it again in calm air (calmRetry: the next start's air only)
   std::map<std::string, int> lessonFails;
@@ -407,6 +426,24 @@ private:
   // values it fills in; an empty token leaves the last one up), the overlay's pause, the Deck's keyboard on the welcome
   void steamPresence(std::string& token, steam::Pairs& values) const;
   void updateSteam(float dt);
+  // Photo mode (game_photo.cpp): the flight frozen where it is, a free camera within reach of the aircraft, a grade and
+  // a frame, and the shot saved without the UI (Pictures\Somnium Volandi; the player's Steam screenshots too)
+  struct Photo {
+    bool on = false, panel = true, markers = false, wasPaused = false, uiDrag = false;
+    int camModeWas = 0, frame = 0, look = 0, capture = 0;
+    vec3 pos; float yaw = 0, pitch = 0, roll = 0, fov = 55.f;
+    float ev = 0.f, vignette = 0.6f, saturation = 1.f, contrast = 1.f, warmth = 0.f;
+    float savedT = -10.f; std::string last;
+  } photo;
+  void enterPhoto();
+  void exitPhoto();
+  void updatePhoto(float dt);
+  void drawPhotoPanel();
+  void photoLook(int look);              // a look: 0 Natural, 1 Vivid, 2 Film, 3 Noir, 4 Golden
+  void photoPanelRect(float& x, float& y, float& w, float& h) const;
+  vec3 photoForward() const;
+  vec3 photoUp() const;
+  std::string savePhoto();               // the frame just drawn, without the UI: its path ("" when it couldn't be written)
   float steamPresenceT = 0.f;
   bool steamKeyboardAsked = false;
   void callout(const std::string& s);   // a line for the voices only: shown elsewhere (the stamp) or not at all
@@ -630,6 +667,12 @@ private:
   int commsEndScreen = -1; float commsEndTime = 0;
   float voiceDuck = 0;   // 0..1: music and engine lowered while someone is talking
   std::string settingsWritten;   // the settings file's last written contents (written again only when changed)
+  // This PC's own display settings (the quality, fullscreen, the render resolution, the frame-rate target, foveation,
+  // the UI scale): display.cfg in the cache folder, never synced, read over settings.cfg's (which Steam Cloud carries
+  // between PCs). A PC without one starts from settings.cfg's; a Steam Deck from settings made for it
+  void loadMachineSettings();
+  std::string machineWritten;
+  bool deckPreset = false;   // (the Deck's settings were just chosen: said once, on the main menu)
   int atcStation(int airport) const { return (airport * 7 + 2) % AtcVoice::kVoices; }   // each airport keeps one voice
   std::vector<std::pair<std::string, std::string>> stations;
   bool settingsFromPause = false;
@@ -654,8 +697,8 @@ private:
   bool gpsMapValid = false; vec2 gpsMapC; float gpsMapHalf = 0; int gpsMapN = 0;   // cached GPS aerial image
   bool uiHidden = false, bumperFired = false; float bumperHold = 0;   // LB + RB held 1 s: hide / show the flight UI
   // bound action state: keyboard key or gamepad button
-  std::string expandHint(const std::string& raw, bool pad = false) const;   // {actionId} tokens -> the bound keys (pad: buttons)
-  std::string actLabel(int a, bool pad) const;   // an action's key, or its gamepad button / stick / trigger
+  std::string expandHint(const std::string& raw, bool pad = false, bool glyph = false) const;   // {actionId} tokens -> the bound keys (pad: buttons; glyph: drawn as them)
+  std::string actLabel(int a, bool pad, bool glyph = false) const;   // an action's key, or its gamepad button / stick / trigger (glyph: drawn as the button)
   bool padActive = false;   // the gamepad was used last (a key press hands back to the keyboard): what prompts name
   bool padPrompts() const { return in.pad && padActive; }
   // input contexts: who gets the input this frame, in priority order (a key-binding capture, a dialog, the pause

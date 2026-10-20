@@ -8,6 +8,19 @@
 #include <unordered_map>
 #include <vector>
 
+// A pad button drawn as its glyph (game.cpp padGlyph: '\x01' + the name, spaces as '_', + '\x02') back to its name, for
+// text matched or written out as words: the voice lines, the problem report
+inline std::string glyphText(const std::string& s) {
+  std::string out; out.reserve(s.size());
+  for (size_t i = 0; i < s.size(); i++) {
+    const size_t e = s[i] == '\x01' ? s.find('\x02', i) : std::string::npos;
+    if (e == std::string::npos) { out += s[i]; continue; }
+    for (size_t k = i + 1; k < e; k++) out += s[k] == '_' ? ' ' : s[k];
+    i = e;
+  }
+  return out;
+}
+
 // The game's voices (assets/voice, imported by tools/voice_import.py from the two voice packs, with the verified
 // binding-independent lesson overrides in lesson_controls.json):
 //  - three tower controllers (the alphabet-and-tower pack): full calls, the fragments the clearance templates are
@@ -33,6 +46,7 @@ public:
   std::function<bool(const Tx&)> valid;   // the game's check, run when a queued transmission is about to start
   // the voice line (or the line assembled from fragments) for a message the game shows; mission picks the
   // instructor or examiner. Lesson hints use resolveLesson, independently of their displayed key/button names.
+  // A pad's button glyphs in the message (padGlyph) are matched by their names; the text kept is the one shown
   bool resolve(const std::string& message, const std::string& mission, bool pad, Tx& out) const;
   // Only indexed, binding-independent lesson recordings are accepted. The displayed hint may name any current
   // bindings; it is retained as transmission text, while the actual spoken words remain available through text().

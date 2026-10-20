@@ -86,11 +86,12 @@ void AtcVoice::cardinal(const std::string& sp, long n, std::vector<std::string>&
   for (auto& sc : scales) if (n >= sc.first) { cardinal(sp, n / sc.first, ids); ids.push_back(atomO(sp, sc.second)); if (n % sc.first) cardinal(sp, n % sc.first, ids); return; }
 }
 
-bool AtcVoice::resolve(const std::string& message, const std::string& mission, bool pad, Tx& out) const {
-  if(resolveRecorded(message,mission,pad,out)) return true;
+bool AtcVoice::resolve(const std::string& shown, const std::string& mission, bool pad, Tx& out) const {
+  const std::string message = glyphText(shown);   // (a pad's glyphs matched as their names)
+  if(resolveRecorded(message,mission,pad,out)) { out.text=shown; return true; }
   for(const auto& cue:cues) if(std::regex_match(message,cue.first)) {
     const auto& c=clips.at(cue.second);
-    out=Tx();out.text=message;out.ids={cue.second};out.prio=c.prio;out.radio=c.speaker=="command";
+    out=Tx();out.text=shown;out.ids={cue.second};out.prio=c.prio;out.radio=c.speaker=="command";
     out.group=c.speaker=="command"?"command."+cue.second:"ops."+cue.second;
     return true;
   }

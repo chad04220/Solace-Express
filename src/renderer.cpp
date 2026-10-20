@@ -2358,6 +2358,8 @@ void Renderer::renderScene(const FrameParams& fpFlat, const std::vector<SpriteVe
   glUniform1f(U(progPost, "uGlassMist"), fp.glassMist);
   glUniform1f(U(progPost, "uFade"), fp.fade);
   glUniform1f(U(progPost, "uVignette"), fp.vignette);
+  glUniform3f(U(progPost, "uGrade"), fp.grade[0], fp.grade[1], fp.grade[2]);
+  glUniform2f(U(progPost, "uBars"), fp.bars[0], fp.bars[1]);
   glUniform1f(U(progPost, "uGLoad"), fp.gLoad);
   float sx = 0, sy = 0; vec3 sp = fp.camPos + fp.sunDir * 10000.f;
   bool vis = fp.sunDir.y > -0.02f && project(fp, sp, sx, sy) && sx > -0.2f * W && sx < 1.2f * W && sy > -0.2f * H && sy < 1.2f * H;
@@ -2434,9 +2436,46 @@ void Renderer::line(float x0, float y0, float x1, float y1, float th, vec3 c, fl
   ui.push_back(q[0]); ui.push_back(q[1]); ui.push_back(q[2]); ui.push_back(q[0]); ui.push_back(q[2]); ui.push_back(q[3]);
 }
 
+// a button's name inside a string ('\x01' name '\x02'): where it ends, and the name with its '_' as spaces
+static bool glyphAt(const std::string& s, size_t i, size_t& end, std::string& name) {
+  if ((unsigned char)s[i] != 1) return false;
+  end = s.find('\x02', i + 1);
+  if (end == std::string::npos) return false;
+  name = s.substr(i + 1, end - i - 1);
+  for (char& c : name) if (c == '_') c = ' ';
+  return true;
+}
+
+float Renderer::glyphWidth(const std::string& name, float size) const {
+  return (name.size() == 1 ? size * 1.04f : textWidth(name, size * 0.6f) + size * 0.62f) + size * 0.16f;
+}
+
+void Renderer::glyph(float x, float y, float size, const std::string& name, float a) {
+  const float top = y + size * 0.04f, h = size * 1.02f, x0 = x + size * 0.08f;
+  if (name.size() == 1) {   // A, B, X, Y: the Xbox layout's colours (the Deck's buttons are laid out the same)
+    const char ch = name[0];
+    const vec3 col = ch == 'A' ? vec3(0.30f, 0.66f, 0.30f) : ch == 'B' ? vec3(0.84f, 0.27f, 0.24f) : ch == 'X' ? vec3(0.22f, 0.47f, 0.85f) :
+                     ch == 'Y' ? vec3(0.92f, 0.72f, 0.16f) : vec3(0.22f, 0.24f, 0.28f);
+    rect(x0, top, h, h, col * 0.55f, a, h * 0.5f);
+    rect(x0 + size * 0.06f, top + size * 0.06f, h - size * 0.12f, h - size * 0.12f, col, a, h * 0.5f);
+    text(x0 + h * 0.5f, top + h * 0.5f - size * 0.36f, size * 0.7f, name, vec3(1, 1, 1), a, 1, false);
+    return;
+  }
+  const float w = textWidth(name, size * 0.6f) + size * 0.62f;   // a bumper, a trigger, a stick, the D-pad: a key
+  rect(x0, top, w, h, vec3(0.62f, 0.66f, 0.72f), 0.85f * a, size * 0.24f);
+  rect(x0 + size * 0.05f, top + size * 0.05f, w - size * 0.1f, h - size * 0.1f, vec3(0.13f, 0.15f, 0.19f), a, size * 0.2f);
+  text(x0 + w * 0.5f, top + h * 0.5f - size * 0.31f, size * 0.6f, name, vec3(0.94f, 0.95f, 0.97f), a, 1, false);
+}
+
 float Renderer::textWidth(const std::string& s, float size) const {
   float sc = size / FONT_EM, w = 0;
-  for (unsigned char ch : s) { if (ch < 32 || ch > 126) ch = '?'; w += FONT_ADV[ch - 32] * sc; }
+  for (size_t i = 0; i < s.size(); i++) {
+    size_t end; std::string name;
+    if (glyphAt(s, i, end, name)) { w += glyphWidth(name, size); i = end; continue; }
+    unsigned char ch = (unsigned char)s[i];
+    if (ch < 32 || ch > 126) ch = '?';
+    w += FONT_ADV[ch - 32] * sc;
+  }
   return w;
 }
 
@@ -2446,7 +2485,10 @@ float Renderer::text(float x, float y, float size, const std::string& s, vec3 c,
   if (align == 1) x -= w * 0.5f; else if (align == 2) x -= w;
   for (int pass = shadow ? 0 : 1; pass < 2; pass++) {
     float cx = x;
-    for (unsigned char ch : s) {
+    for (size_t i = 0; i < s.size(); i++) {
+      size_t end; std::string name;
+      if (glyphAt(s, i, end, name)) { if (pass == 1) glyph(cx, y, size, name, a); cx += glyphWidth(name, size); i = end; continue; }
+      unsigned char ch = (unsigned char)s[i];
       if (ch < 32 || ch > 126) ch = '?';
       int gi = ch - 32;
       if (ch != ' ') {
@@ -2509,37 +2551,6 @@ bool Renderer::screenshotPNG(const char* path) {
   glPixelStorei(GL_PACK_ALIGNMENT, 1);
   glReadPixels(0, 0, W, H, GL_RGB, GL_UNSIGNED_BYTE, px.data());
   return writePNG(path, W, H, px);
-}
-
-// RGB8 image, bottom row first (as glReadPixels returns it), saved as a PNG with stored (uncompressed) deflate blocks
-bool writePNG(const char* path, int W, int H, const std::vector<uint8_t>& px) {
-  std::vector<uint8_t> raw;   // filter byte 0 + RGB row, top row first
-  raw.reserve((size_t)(W * 3 + 1) * H);
-  for (int y = H - 1; y >= 0; y--) { raw.push_back(0); raw.insert(raw.end(), px.begin() + (size_t)y * W * 3, px.begin() + (size_t)(y + 1) * W * 3); }
-  static uint32_t crcT[256]; static bool crcInit = false;
-  if (!crcInit) { for (uint32_t n = 0; n < 256; n++) { uint32_t c = n; for (int k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320u ^ (c >> 1) : c >> 1; crcT[n] = c; } crcInit = true; }
-  auto crc = [&](const uint8_t* d, size_t n, uint32_t c) { c = ~c; for (size_t i = 0; i < n; i++) c = crcT[(c ^ d[i]) & 255] ^ (c >> 8); return ~c; };
-  std::vector<uint8_t> z = {0x78, 0x01};
-  for (size_t o = 0; o < raw.size(); o += 65535) {
-    size_t n = std::min<size_t>(65535, raw.size() - o);
-    z.push_back(o + n == raw.size() ? 1 : 0);
-    z.push_back((uint8_t)(n & 255)); z.push_back((uint8_t)(n >> 8)); z.push_back((uint8_t)(~n & 255)); z.push_back((uint8_t)((~n >> 8) & 255));
-    z.insert(z.end(), raw.begin() + o, raw.begin() + o + n);
-  }
-  uint32_t a = 1, b = 0; for (uint8_t v : raw) { a = (a + v) % 65521; b = (b + a) % 65521; }
-  uint32_t ad = (b << 16) | a; z.push_back(ad >> 24); z.push_back(ad >> 16); z.push_back(ad >> 8); z.push_back(ad);
-  FILE* f = fopen(path, "wb");
-  if (!f) return false;
-  auto be32 = [&](uint32_t v) { uint8_t q[4] = {(uint8_t)(v >> 24), (uint8_t)(v >> 16), (uint8_t)(v >> 8), (uint8_t)v}; fwrite(q, 1, 4, f); };
-  auto chunk = [&](const char* type, const std::vector<uint8_t>& d) {
-    be32((uint32_t)d.size()); fwrite(type, 1, 4, f); if (!d.empty()) fwrite(d.data(), 1, d.size(), f);
-    uint32_t c = crc((const uint8_t*)type, 4, 0); c = crc(d.data(), d.size(), c); be32(c);
-  };
-  const uint8_t sig[8] = {137, 80, 78, 71, 13, 10, 26, 10}; fwrite(sig, 1, 8, f);
-  std::vector<uint8_t> ih = {(uint8_t)(W >> 24), (uint8_t)(W >> 16), (uint8_t)(W >> 8), (uint8_t)W, (uint8_t)(H >> 24), (uint8_t)(H >> 16), (uint8_t)(H >> 8), (uint8_t)H, 8, 2, 0, 0, 0};
-  chunk("IHDR", ih); chunk("IDAT", z); chunk("IEND", {});
-  fclose(f);
-  return true;
 }
 
 // PNG or JPEG into RGBA, top row first (stb_image)

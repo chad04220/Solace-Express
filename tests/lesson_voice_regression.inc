@@ -31,9 +31,11 @@
     q.updateLessonHint();
     const bool queued = q.commsPending.size() == 1 && q.commsPending[0].mission == "L1" && q.commsPending[0].lessonPhase == 0 && q.hint.find("Press B ") != std::string::npos;
     q.in.pad = true; q.padActive = true; q.updateLessonHint();
-    const bool defaultPad = q.hint.find("D-PAD LEFT") != std::string::npos && q.hint.find("hold RT") != std::string::npos;
+    // (the pad's buttons shown as their glyphs, and spoken as their names)
+    const bool defaultPad = q.hint.find(padGlyph("D-PAD LEFT")) != std::string::npos && q.hint.find("hold " + padGlyph("RT")) != std::string::npos &&
+                            glyphText(q.hint).find("D-PAD LEFT") != std::string::npos;
     q.set.padBind[ACT_PARK] = PAD_Y; q.updateLessonHint();
-    const bool remapPad = q.hint.find("Press Y ") != std::string::npos && q.commsPending.size() == 1;
+    const bool remapPad = q.hint.find("Press " + padGlyph("Y") + " ") != std::string::npos && q.commsPending.size() == 1;
     q.padActive = false; q.set.keyBind[ACT_PARK] = 'P'; q.updateLessonHint();
     const bool remapKey = q.hint.find("Press P ") != std::string::npos && q.commsPending.size() == 1;
     const std::string queuedText = q.commsPending.empty() ? "" : q.commsPending[0].text;

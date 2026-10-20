@@ -150,6 +150,7 @@ jobs:
       # unsigned with a warning. Only releases are signed: a branch build's exe never leaves the run's artifacts
       SIGN_ACCOUNT: ${{ secrets.ARTIFACT_SIGNING_ACCOUNT }}
       RELEASING: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != '' }}
+      DEMO_APP: ${{ vars.STEAM_DEMO_APP_ID }}   # (the demo's own Steamworks app: set, a release builds the demo too)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -160,7 +161,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p build/.cmake/api/v1/query && touch build/.cmake/api/v1/query/codemodel-v2   # (the build's description, for the selection)
-          cmake -S . -B build -A x64
+          cmake -S . -B build -A x64 -DSOMNIUM_STORE_APPID=${{ vars.STEAM_APP_ID || '0' }}   # (the demo's Wishlist button)
 
       - name: Pick the tests   # (as the sanitizer job: what changed since the last commit this job passed)
         id: pick
@@ -198,6 +199,13 @@ jobs:
       - name: Stage the executable   # (on its own: the signing signs everything in the folder, and the tests share build/Release)
         shell: bash
         run: mkdir -p build/sign && cp build/Release/SomniumVolandi.exe build/sign/
+
+      - name: Build the demo   # (steam/README.md, "The demo": the same game to the Private Pilot licence; signed with the game)
+        if: env.DEMO_APP != '' && env.RELEASING == 'true'
+        shell: bash
+        run: |
+          cmake --build build --config Release --parallel --target SomniumVolandiDemo
+          cp build/Release/SomniumVolandiDemo.exe build/sign/
 
       - name: Sign in to Azure (code signing)
         if: env.SIGN_ACCOUNT != '' && env.RELEASING == 'true'
@@ -261,6 +269,20 @@ jobs:
           if (Test-Path assets/menu.mp4) { Copy-Item assets/menu.mp4 dist/SomniumVolandi/ }   # the pre-rendered menu montage (diagnostics.bat menu)
           Compress-Archive -Path dist/SomniumVolandi/* -DestinationPath dist/SomniumVolandi-windows-x64.zip -Force
 
+      - name: Package the demo   # (the game's folder with the demo's exe in place of the game's)
+        if: env.DEMO_APP != '' && env.RELEASING == 'true'
+        shell: pwsh
+        run: |
+          Copy-Item -Recurse dist/SomniumVolandi dist/SomniumVolandiDemo
+          Remove-Item dist/SomniumVolandiDemo/SomniumVolandi.exe
+          Copy-Item build/sign/SomniumVolandiDemo.exe dist/SomniumVolandiDemo/
+
+      - uses: actions/upload-artifact@v4
+        if: env.DEMO_APP != '' && env.RELEASING == 'true'
+        with:
+          name: SomniumVolandiDemo-windows-x64
+          path: dist/SomniumVolandiDemo/
+
       - uses: actions/upload-artifact@v4
         with:
           name: SomniumVolandi-windows-x64
@@ -276,7 +298,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: SomniumVolandi-symbols
-          path: build/Release/SomniumVolandi.pdb
+          path: |
+            build/Release/SomniumVolandi.pdb
+            build/Release/SomniumVolandiDemo.pdb
           retention-days: 90
 
   release:   # only once the same source has passed on Windows and under the Linux sanitizers
@@ -333,4 +357,26 @@ jobs:
           buildDescription: ${{ inputs.release_tag || github.ref_name }}
           rootPath: steam-content
           depot1Path: SomniumVolandi
+          releaseBranch: ${{ vars.STEAM_BRANCH || 'beta' }}
+
+      # the demo, to its own app (STEAM_DEMO_APP_ID), when it has one: the same runtime beside its exe
+      - uses: actions/download-artifact@v4
+        if: vars.STEAM_DEMO_APP_ID != ''
+        with:
+          name: SomniumVolandiDemo-windows-x64
+          path: steam-demo/SomniumVolandiDemo
+
+      - name: Add the Steam runtime to the demo
+        if: vars.STEAM_DEMO_APP_ID != ''
+        run: cp steam/redist/steam_api64.dll steam-demo/SomniumVolandiDemo/
+
+      - uses: game-ci/steam-deploy@v3
+        if: vars.STEAM_DEMO_APP_ID != ''
+        with:
+          username: ${{ secrets.STEAM_USERNAME }}
+          configVdf: ${{ secrets.STEAM_CONFIG_VDF }}
+          appId: ${{ vars.STEAM_DEMO_APP_ID }}
+          buildDescription: ${{ inputs.release_tag || github.ref_name }} demo
+          rootPath: steam-demo
+          depot1Path: SomniumVolandiDemo
           releaseBranch: ${{ vars.STEAM_BRANCH || 'beta' }}

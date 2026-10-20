@@ -26,4 +26,11 @@ void presence(const std::string& token, const Pairs& values);
 bool onDeck();
 bool showKeyboard(int x, int y, int w, int h);   // the Deck's (or Big Picture's) floating keyboard over a text field: it types as keys
 bool overlayOpened();                   // the Steam overlay opened since the last call (the flight pauses)
+bool addScreenshot(const std::string& path, int w, int h);   // a photo mode shot into the player's Steam screenshots
+// Trial leaderboards: a score (lowest is best; the board keeps each player's best) sent to the board of that name,
+// found or made first; then, once Steam has answered, where it stands worldwide
+struct BoardScore { bool done = false, failed = false, improved = false; int rank = 0, total = 0; };
+void submitScore(const std::string& board, bool timeMs, int score);
+bool boardScore(const std::string& board, BoardScore& out);   // false: nothing sent to it this session
+bool openStore(unsigned appId);   // the Steam overlay on that game's store page (the demo's wishlist button); false: no overlay
 }

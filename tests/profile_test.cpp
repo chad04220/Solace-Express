@@ -51,6 +51,28 @@ struct GameTest {
       printf("  %zu landmarks:", sites.size()); for (const Site& st : sites) printf(" %s", st.id.c_str()); printf("\n");
       check(sites.size() >= 10 && inside && ids.size() == sites.size(), fmt("%d landmarks to find, each inside the islands, each once", (int)sites.size()));
     }
+    {   // this PC's display settings apart (display.cfg in the cache folder, never synced): written beside settings.cfg,
+        // and read over it - a synced settings.cfg from another PC doesn't change this one's graphics
+      const std::string sd = dir + "/save", cd = dir + "/cache";
+#ifdef _WIN32
+      system(("mkdir " + sd + " 2> NUL & mkdir " + cd + " 2> NUL").c_str());
+#else
+      system(("mkdir -p " + sd + " " + cd).c_str());
+#endif
+      remove((sd + "/settings.cfg").c_str()); remove((cd + "/display.cfg").c_str());
+      Game a; a.initHeadless(); a.saveDir = sd; a.cacheDir = cd;
+      a.set.quality = 2; a.set.fpsTarget = 144; a.set.uiScale = 1.3f; a.set.master = 0.42f;
+      const bool saved = a.saveSettings();
+      // another PC's quality and frame rate arrive in settings.cfg (Steam Cloud); the sound is everyone's
+      std::string t; if (FILE* f = fopen((sd + "/settings.cfg").c_str(), "r")) { char b[256]; while (fgets(b, sizeof b, f)) { std::string l = b;
+        if (l.rfind("quality ", 0) == 0) l = "quality 0\n"; else if (l.rfind("fpsTarget ", 0) == 0) l = "fpsTarget 30\n"; t += l; } fclose(f); }
+      if (FILE* f = fopen((sd + "/settings.cfg").c_str(), "w")) { fputs(t.c_str(), f); fclose(f); }
+      Game b; b.initHeadless(); b.saveDir = sd; b.cacheDir = cd; b.loadSettings();
+      Game c; c.initHeadless(); c.saveDir = sd; c.loadSettings();   // (a PC without its own: the synced file's)
+      check(saved && b.set.quality == 2 && b.set.fpsTarget == 144 && fabsf(b.set.uiScale - 1.3f) < 1e-3f && fabsf(b.set.master - 0.42f) < 1e-3f &&
+            c.set.quality == 0 && c.set.fpsTarget == 30,
+            "This PC's display settings kept apart and read over the synced settings (the sound and the rest from the synced file)");
+    }
     {   // a session in play: a touchdown's stamp and achievements; a landmark found; nothing written without a save folder
       remove("profile.cfg");
       Game g; g.initHeadless(); g.set.traffic = false; g.failuresArmed = false;
@@ -72,6 +94,36 @@ struct GameTest {
         const bool loading = tok.empty();
         g.career.location = loc; g.screen = SCR_FLIGHT;
         check(job && menu && hub && loading, "Steam's status: the job (its aircraft, from, to), the menu, the hub's airport; a loading screen leaves the last up");
+      }
+      {   // photo mode (game_photo.cpp): F2 opens it from the pause menu (or over the flight), the flight frozen under it;
+          // the camera flies where it's sent, never out of reach of the aircraft nor into the ground; F2 again (or Esc)
+          // closes it, back to where it was opened (here the pause menu: this session's aircraft isn't flown)
+        g.camMode = 1; g.paused = true; g.in = Input();
+        g.in.pressed[K_F2] = true; g.update(1.f / 60.f); g.in.endFrame();
+        const bool opened = g.photo.on && g.paused && g.camMode == 0;   // (from the cockpit: the aircraft from outside)
+        g.update(1.f / 60.f); g.in.endFrame();   // (a key already held as photo mode opens waits for its release, as everywhere)
+        const vec3 at = g.plane.pos; const float clock = g.flightClock;
+        std::string tok; steam::Pairs v; g.steamPresence(tok, v);
+        const vec3 p0 = g.photo.pos, f0 = g.photoForward();
+        g.in.down['W'] = true;
+        for (int i = 0; i < 60; i++) { g.update(1.f / 60.f); g.in.endFrame(); }
+        g.in.down['W'] = false;
+        const float moved = dot(g.photo.pos - p0, f0);
+        const bool frozen = length(g.plane.pos - at) < 0.01f && fabsf(g.flightClock - clock) < 1e-4f;
+        g.photo.pos = g.plane.pos + vec3(5000.f, 0, 0); g.update(1.f / 60.f); g.in.endFrame();
+        const bool reach = length(g.photo.pos - g.plane.pos) <= 600.5f;
+        g.photo.pos = vec3(g.plane.pos.x, -50.f, g.plane.pos.z); g.update(1.f / 60.f); g.in.endFrame();
+        const bool ground = g.photo.pos.y >= std::max(g_world.height(g.photo.pos.x, g.photo.pos.z, 6), 0.f);
+        g.in.pressed[K_F2] = true; g.update(1.f / 60.f); g.in.endFrame();
+        const bool closed = !g.photo.on && g.paused && g.camMode == 1;
+        g.in.pressed[K_F2] = true; g.update(1.f / 60.f); g.in.endFrame();
+        g.in.pressed[K_ESC] = true; g.update(1.f / 60.f); g.in.endFrame();
+        const bool esc = !g.photo.on && g.paused && !g.crashed;
+        g.camMode = 0; g.paused = false;
+        printf("  photo mode: moved %.1f m in a second; opened %d, status %s, frozen %d, in reach %d, above the ground %d, closed by F2 %d, by Esc %d\n",
+               moved, opened, tok.c_str(), frozen, reach, ground, closed, esc);
+        check(opened && tok == "#Status_Photo" && moved > 7.f && moved < 11.f && frozen && reach && ground && closed && esc,
+              "Photo mode: opened over the flight (frozen, the aircraft seen from outside), the camera flown by the keys within reach and above the ground, closed by F2 or Esc");
       }
       const int far = g_world.findAirport("FAR");
       g.profileTouchdown(55.f, far);
@@ -187,6 +239,26 @@ struct GameTest {
         if (m > 0.f && (c.timeLimitMin <= 0.f || m <= c.timeLimitMin)) flown++; else which += " " + c.id;
       }
       check(L.size() == 5 && flown == 5, fmt("The five legendary contracts, each flown to its end by the autopilot (and inside its limit)%s", which.c_str()));
+    }
+    {   // the demo (Game::demo, the SomniumVolandiDemo build): three aircraft in free flight; at the private licence its
+        // own card follows the licence's, over the hub every time, Esc to the main menu; the full game goes on
+      const int W0 = g_ren.W, H0 = g_ren.H; g_ren.W = 1920; g_ren.H = 1080;
+      Game g; g.initHeadless(); g.demo = true; g.set.traffic = false;
+      const bool craft = g.demoCraft(0) && g.demoCraft(2) && !g.demoCraft(3) && !g.demoCraft(kNumAircraft - 1);
+      g.career.newGame(); g.screen = SCR_HUB; g.hubTab = TAB_CONTRACTS; g.focusNav = false; g.in = Input();
+      const bool before = !g.demoOver();
+      g.career.license = LIC_PPL; g.licenceShown = LIC_PPL;
+      const bool licenceFirst = !g.demoOver();
+      g.licenceShown = -1;
+      g_ren.uiBegin(); g.drawHub(); g.in.endFrame();
+      const bool over = g.demoOver() && g.screen == SCR_HUB;
+      g.in.pressed[K_ESC] = true; g_ren.uiBegin(); g.drawHub(); g.in.endFrame();
+      const bool menu = g.screen == SCR_MENU && g.demoOver();
+      Game f; f.initHeadless(); f.career.newGame(); f.career.license = LIC_PPL;
+      const bool full = !f.demo && !f.demoOver() && f.demoCraft(kNumAircraft - 1);
+      g_ren.W = W0; g_ren.H = H0; g_ren.uiBegin(); g.focusList.clear();
+      check(craft && before && licenceFirst && over && menu && full,
+            "The demo: three aircraft; its end at the private licence, after the licence's card, Esc to the main menu; the full game goes on");
     }
     printf("%d failures\n", fails);
     return fails ? 1 : 0;

@@ -1,3 +1,36 @@
+## What's new in v3.52.0
+
+### Photo mode
+- **Press F2 in flight, or choose Photo mode in the pause menu.** The flight freezes where it is, and a free camera takes over. Fly it with W A S D, Q and E (Shift goes faster, Ctrl slower) or the left stick and the triggers. Drag the mouse or use the right stick to turn it, [ ] or the bumpers to tilt it, and the wheel to zoom. It can go up to 600 m from the aircraft, and never into the ground.
+- **A panel at the right sets up the shot:**
+  - the lens and the light: field of view, exposure and vignette;
+  - the colour: saturation, contrast and warmth;
+  - the frame: full screen, 2.39 : 1, 1.85 : 1 or square;
+  - five looks to start from: Natural, Vivid, Film, Noir and Golden.
+
+  The gates and the route are hidden unless you turn them back on. H (or Y on a gamepad) hides the panel.
+- **Space (or X on a gamepad) takes the photo.** It's saved as a PNG at full resolution, without the HUD or the panel, to **Pictures\Somnium Volandi**. On Steam it's added to your Steam screenshots too.
+- F2 again, Esc or B goes back to where you were. Steam friends see that you're framing a photo.
+
+### Worldwide trial boards on Steam
+- **Every trial now has a worldwide leaderboard on Steam,** one for each trial and aircraft, plus one for each day's daily trial. Your best time is uploaded when you finish, and the results card shows your place in the world under your place on the local board.
+
+### Made for every screen
+- **Your graphics settings now stay with each PC.** The quality, resolution, frame rate, window mode and text size are kept on the PC itself, so Steam Cloud carries your career, profile and controls between PCs without changing one PC's graphics to suit another.
+- **On a Steam Deck, the first start sets the graphics for the Deck:** Low quality, 30 fps, fullscreen and slightly larger text. The game says so on the main menu, and you can change any of it in Settings.
+- **Prompts on a gamepad show its buttons.** With a controller in hand, the lesson hints, the HUD's prompts, the pause menu and the photo panel draw the button itself (A, B, X and Y in their colours, and the bumpers, triggers and D-pad as badges) instead of naming the key.
+
+### Credits
+- **Credits** on the main menu roll up through who made the game and the work it stands on. The wheel or the right stick scrolls them by hand; Esc, Enter, A or B closes them.
+
+### A demo, ready for Steam Next Fest
+- The same game can now be built as a demo: the career up to the Private Pilot licence, and three aircraft (the Dawnlark, the Ambler and the Scrubrunner) in free flight. When the licence is earned, a card says what the full game goes on to and offers a way to wishlist it. A career started in the demo carries over to the full game. The Military board is a teaser, and Project NIGHTGLASS stays hidden.
+
+### Smaller fixes
+- Screenshots are compressed properly now: a typical 1080p shot is about a quarter of its raw size, written in under a fifth of a second.
+- On the loading screen, the tip sits above the panel instead of over it.
+- The privacy notice (version 3) now covers what the leaderboards and photo mode send to Steam: your trial scores, and the photos you take, which are added to your private Steam screenshots.
+
 ## What's new in v3.51.0
 
 ### Time Warp, up to x16, in your own hands

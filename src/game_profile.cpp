@@ -180,6 +180,7 @@ void Game::steamPresence(std::string& token, steam::Pairs& values) const {
   }
   if (craft.empty()) return;
   values.push_back({"aircraft", craft});
+  if (photo.on) { token = "#Status_Photo"; return; }
   if (militaryFlight) { token = "#Status_Military"; return; }
   if (researchFlight) { token = "#Status_ResearchFlight"; return; }
   if (freeFlight) { token = "#Status_FreeFlight"; return; }
@@ -198,6 +199,10 @@ void Game::steamPresence(std::string& token, steam::Pairs& values) const {
 void Game::updateSteam(float dt) {
   if (headless || diskless || !steam::active()) return;
   steam::tick(dt);
+  if (deckPreset && screen == SCR_MENU) {   // (the Deck's settings, chosen at the first start on it: said once, then kept)
+    deckPreset = false; saveSettings();
+    toast("Steam Deck: the graphics are set for the Deck (Low, 30 fps, larger text) - change them any time in Settings", vec3(0.6f, 1.f, 0.7f), false);
+  }
   if (steam::overlayOpened() && screen == SCR_FLIGHT && !paused && !crashed) { paused = true; settingsFromPause = false; }   // (as Valve asks: the overlay pauses the flight)
   if ((steamPresenceT -= dt) > 0.f) return;
   steamPresenceT = 1.f;

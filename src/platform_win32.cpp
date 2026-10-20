@@ -12,6 +12,7 @@
 #include <shellapi.h>
 #include <psapi.h>
 #include <objbase.h>
+#include <shlobj.h>
 #include <thread>
 #include <atomic>
 #include <memory>
@@ -366,6 +367,14 @@ static std::string userDir() {
   return d;
 }
 
+// Where photo mode's shots go: the player's Pictures\Somnium Volandi, where they would look for them (made on the first
+// shot). Empty when Windows has no Pictures folder for this user: the shots then go to the save folder's Photos
+static std::string photosDir() {
+  char buf[MAX_PATH] = {};
+  if (SHGetFolderPathA(nullptr, CSIDL_MYPICTURES, nullptr, SHGFP_TYPE_CURRENT, buf) != S_OK || !buf[0]) return "";
+  return std::string(buf) + "\\Somnium Volandi";
+}
+
 // Child process: SomniumVolandi.exe --build-shader-cache "<dir>" compiles every program into the binary cache and
 // exits, reporting progress on stdout ("<programs done>" lines, then "m <programs compiled>"). The game runs the long
 // first-time compile this way because NVIDIA's driver holds a process-wide lock while it links the big scene programs: no
@@ -636,6 +645,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   static Game game;
   g_game = &game; s_pacingGame = &game;
   game.saveDir = userDir();
+  game.photoDir = photosDir();
   { char exe[MAX_PATH] = {}; DWORD n = GetModuleFileNameA(nullptr, exe, MAX_PATH);   // pictures etc. live next to the exe
     std::string d(exe, n); size_t sl = d.find_last_of("\\/"); game.assetDir = sl == std::string::npos ? std::string(".") : d.substr(0, sl); }
   {   // crash reports (crash.h): the handlers first, then what the last session left
@@ -696,6 +706,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   joyInit(g_hwnd);   // joysticks, throttles and pedals (joystick_win.cpp); none: the game runs without them
 
   ShowWindow(g_hwnd, SW_SHOW);
+  game.cacheDir = cacheDirFor(game.assetDir, game.saveDir);   // (first: this PC's own display settings are kept there, display.cfg)
   game.loadSettings();   // early, for fullscreen during the intro (Game::init loads them again)
   if (game.set.fullscreen) { toggleFullscreen(); setupPacing(g_hwnd); }
   game.platformPresent = [] { SwapBuffers(g_hdc); pumpB(); };   // (a frame shown from inside a long bake: the research terminal's boot screen)

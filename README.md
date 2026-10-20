@@ -108,6 +108,7 @@ The game shows no key prompts during flight. Open **Controls** from the main men
 | **R** | **Internet radio** | |
 | **N** | **GPS moving map** (mouse wheel or the on-map buttons zoom) | |
 | H | Toggle HUD | |
+| F2 | Photo mode (also in the pause menu): the flight frozen, a free camera, Space takes the photo | |
 | Esc | Pause menu (restart, settings, abandon) | Start |
 | F11 / Alt+Enter | Fullscreen | |
 | F3 | Performance readout (fps, GPU time, resolution) | |
@@ -162,6 +163,10 @@ The job board also has **photo flights** over the landmarks, and passengers some
 
 Trials award gold, silver and bronze, with marks set for the aircraft you fly. After each one, a results card shows the medal, your place on the local board and, on gate runs, every gate's split against your best run; **Retry** flies it again. On a gate run, a marker shows where your best run was at the same moment.
 
+**Photo mode** (F2 in flight, or the pause menu) freezes the flight and hands you a free camera, up to 600 m from the aircraft. Its panel sets the field of view, the exposure and the vignette, the colour (saturation, contrast, warmth), a frame (full, 2.39 : 1, 1.85 : 1 or square) and five looks; the gates and the route are hidden unless you want them. Space (or X on a gamepad) saves the shot without the HUD as a PNG in `Pictures\Somnium Volandi`, and on Steam in your Steam screenshots too.
+
+**Credits** are on the main menu.
+
 The game has its own generative soundtrack: a theme on the main menu, a lighter groove in the hub, a finale theme, and stingers for jobs, licences, achievements and medals. Its volume is in **Settings**, along with an optional quiet ambience for the cruise. The score steps aside whenever the internet radio plays.
 
 ## Flying tips
@@ -188,9 +193,12 @@ Any MP3 or AAC stream over HTTP or HTTPS that Windows Media Foundation can play 
 ## Steam
 
 The same build runs on Steam: when Valve's `steam_api64.dll` is beside the exe (the Steam version has it), the game
-mirrors its achievements to Steam, shows friends what you're flying, pauses a flight when the Steam overlay opens and,
-on a Steam Deck, brings up the on-screen keyboard for your pilot's name. Without the DLL none of that happens and
-nothing else changes. There's no DRM: started outside Steam, the game runs as it always has. `steam/README.md` covers
+mirrors its achievements to Steam, puts each trial on a worldwide leaderboard (your place is on the results card),
+adds photo mode's shots to your Steam screenshots, shows friends what you're flying, pauses a flight when the Steam
+overlay opens and, on a Steam Deck, brings up the on-screen keyboard for your pilot's name and sets the graphics for
+the Deck on the first start. Without the DLL none of that happens and nothing else changes. Each PC keeps its own
+graphics settings (`display.cfg` in `%LOCALAPPDATA%\SomniumVolandi`), so Steam Cloud carries your career and settings
+between PCs without changing one PC's graphics to suit another's. There's no DRM: started outside Steam, the game runs as it always has. `steam/README.md` covers
 the Steamworks settings, the achievement table and icons, and the upload; `startup.log` says whether Steam is on.
 
 ## Crash reports
@@ -240,6 +248,8 @@ build\Release\SomniumVolandi.exe
 cmake -S . -B build-win -DCMAKE_TOOLCHAIN_FILE=cmake-mingw.cmake   # omit the toolchain file on Windows
 cmake --build build-win -j
 ```
+
+The Steam demo (`steam/README.md`, "The demo") is its own target, not built by default: `cmake --build build --config Release --target SomniumVolandiDemo`.
 
 The GitHub Actions workflow (`.github/workflows/build.yml`) builds with MSVC, runs the tests, and uploads `SomniumVolandi-windows-x64` as an artifact on every push. A second job runs the headless tests under AddressSanitizer and UBSan. The sanitizers slow the tests down about tenfold, so this job is split across three runners. The selector deals the tests out by their measured cost (their ctest `COST`). The longest tests, the flight model, the campaign and the game loop, are registered in parts (`--part N`), so no runner waits on a single long test. The tests that fly over the islands don't each generate them: ctest generates them once per run (`tests/test_world.cpp`), and those tests load that copy. Run on its own outside ctest, a test generates its own.
 

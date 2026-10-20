@@ -15,5 +15,6 @@
 		"#Status_FreeFlight"	"Free flight in the %aircraft%"
 		"#Status_Military"	"On a sortie for Defense Command in the %aircraft%"
 		"#Status_ResearchFlight"	"Test-flying the %aircraft%"
+		"#Status_Photo"	"Framing a photo of the %aircraft%"
 	}
 }

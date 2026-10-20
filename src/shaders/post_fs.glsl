@@ -3,6 +3,7 @@
 in vec2 vUV; out vec4 oColor;
 uniform sampler2D uScene; uniform sampler2D uBloom; uniform float uExposure; uniform float uTime; uniform vec2 uRes;
 uniform float uRainLens; uniform vec4 uRainFlow; uniform float uGlassMist; uniform vec2 uSunScreen; uniform float uSunVisible; uniform float uFade; uniform float uVignette; uniform float uGLoad;
+uniform vec3 uGrade; uniform vec2 uBars;   // photo mode: saturation, contrast, warmth; the frame's bars (Game::photo)
 uniform sampler2D uDepthTex; uniform vec2 uDepthUVS;   // scene depth (in the render resolution's corner of its target): the sun glow and lens ghosts only appear when the sun itself is unobstructed
 uniform float uBloomK; uniform sampler2D uRays; uniform vec3 uRayK;   // bloom mix; light-shaft tint and strength
 vec3 aces(vec3 x){ const float a=2.51,b=0.03,c=2.43,d=0.59,e=0.14; return clamp((x*(a*x+b))/(x*(c*x+d)+e), 0.0, 1.0); }
@@ -110,6 +111,12 @@ void main(){
   c = aces(c);
   c = pow(c, vec3(1.0/2.2));
   vec2 vv = vUV - 0.5; c *= 1.0 - dot(vv,vv)*uVignette;
+  if (uGrade != vec3(1.0, 1.0, 0.0)) {   // (photo mode's grade: off, the picture is untouched)
+    c = mix(vec3(dot(c, vec3(0.2126, 0.7152, 0.0722))), c, uGrade.x);
+    c = clamp((c - 0.5)*uGrade.y + 0.5, 0.0, 1.0);
+    c *= vec3(1.0 + 0.10*uGrade.z, 1.0 + 0.02*uGrade.z, 1.0 - 0.12*uGrade.z);
+  }
+  if (abs(vUV.x - 0.5) > 0.5 - uBars.x || abs(vUV.y - 0.5) > 0.5 - uBars.y) c = vec3(0.0);
   if (gL > 0.002) c = gLensColour(c, gL, gX, gRR, gTh, gBeat, gPx);
   c += (h21(vUV*uRes + fract(uTime)*100.0) - 0.5)/255.0*2.0;
   c *= uFade;

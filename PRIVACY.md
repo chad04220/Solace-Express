@@ -1,6 +1,6 @@
 # Somnium Volandi - Privacy Notice
 
-Version 2, 2026. This notice explains what Somnium Volandi ("the game") does with data. The game is made by CDAIII
+Version 3, 2026. This notice explains what Somnium Volandi ("the game") does with data. The game is made by CDAIII
 ("we", "us").
 
 ## The short version
@@ -17,7 +17,8 @@ yourself and, in the Steam version, to Steam (see "Steam" below).
 | `%APPDATA%\SomniumVolandi` | `startup.log`, and `error.log` if a launch failed | Your graphics card and driver name, the audio backend, the names of connected joysticks, and any shader or start-up errors, to help solve problems |
 | `%APPDATA%\SomniumVolandi\crash` | A crash dump and a copy of the log, only if the game crashes | To find what went wrong; see "Crash reports" below |
 | `%APPDATA%\SomniumVolandi` | `report_<time>.txt`, only when you press **Report a problem** in the pause menu | What was happening at that moment (the aircraft, its position, the weather, recent messages), for you to add to and send if you choose |
-| `%LOCALAPPDATA%\SomniumVolandi` | Compiled shaders and built aircraft bodies | To start faster next time |
+| `%LOCALAPPDATA%\SomniumVolandi` | Compiled shaders, built aircraft bodies, and `display.cfg` (this PC's graphics settings) | To start faster next time, and to keep each PC's graphics its own |
+| `Pictures\Somnium Volandi` | The photos you take in photo mode, only when you take one | They're yours to keep and share |
 
 None of this leaves your computer unless you send it. Deleting these folders removes all of it; uninstalling the game
 doesn't delete your career, so you can reinstall without losing it.
@@ -32,7 +33,9 @@ game ships with no stations; you choose every one.
 
 When you play the game from Steam, it tells the Steam client on your computer which achievements you have earned and
 a short status for your friends list (for example "Flying the Skerry Twin from Glacier Station to Solace Capital").
-If you have Steam Cloud turned on, Steam keeps a copy of your career, profile, settings and trial records. Valve
+When you finish a trial it sends your score to that trial's Steam leaderboard, where other players see it next to
+your Steam name; a photo you take in photo mode is also added to your Steam screenshots, which stay private until you
+share them. If you have Steam Cloud turned on, Steam keeps a copy of your career, profile, settings and trial records. Valve
 handles all of that under its own privacy policy; none of it reaches us. Outside Steam, or in the version from our
 own download, the game doesn't talk to Steam at all.
 

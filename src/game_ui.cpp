@@ -528,9 +528,36 @@ void Game::drawLoading() {
     float bx = cx, bwid = 340 * s;
     g_ren.glow(bx, by - 20 * s, bwid, 40 * s, accent, 0.25f * pulse, 4 * s, 16 * s);
     g_ren.rectGrad(bx, by - 20 * s, bwid, 40 * s, accent * 1.05f, accent * 0.6f, 0.95f, 4 * s);
-    g_ren.text(bx + bwid * 0.5f, by - 9 * s, fs(16,12), padPrompts() ? "PRESS  A  TO FLY" : "CLICK OR PRESS ENTER TO FLY", ink, 1, 1, false);
-    g_ren.text(bx + bwid + 20 * s, by - 6 * s, fs(12,10), padPrompts() ? "B  BACK" : "ESC  BACK", dim, 0.9f, 0, false);
+    g_ren.text(bx + bwid * 0.5f, by - 9 * s, fs(16,12), padPrompts() ? "PRESS  " + padGlyph("A") + "  TO FLY" : std::string("CLICK OR PRESS ENTER TO FLY"), ink, 1, 1, false);
+    g_ren.text(bx + bwid + 20 * s, by - 6 * s, fs(12,10), padPrompts() ? padGlyph("B") + "  BACK" : std::string("ESC  BACK"), dim, 0.9f, 0, false);
     g_ren.text(cx+cw,by-6*s,fs(12,10),"100% / FLIGHT READY",accent,1,2,false);
+  }
+  {   // a pilot's tip while it loads: the next one each flight
+    static const char* tips[] = {
+      "Two white and two red PAPI lights by the runway: you're on a 3 degree glidepath.",
+      "Butter landings - under 150 fpm - pay a bonus. Flare as the runway fills the windscreen.",
+      "After landing, taxi clear, hold I to shut down, then set the parking brake (B) for the airmanship bonus.",
+      "High and hot fields need more runway: Summit Pass, at 5,400 ft, takes a STOL aircraft.",
+      "The wind dial shows the crosswind on your nose: amber means strong. Crab in, then kick straight.",
+      "Time Warp (T) goes up to x16, and steps back down by itself near the ground, a checkpoint or trouble.",
+      "Passengers sometimes ask to see a landmark on the way. Fly by it, low, for a tip.",
+      "Photo mode (F2, or the pause menu) freezes the flight: frame the shot, then press Space.",
+      "Every landmark you find goes in your Passport: Logbook > Passport.",
+      "Trials keep a ghost of your best run. Beat it for gold - and a place on the worldwide board on Steam.",
+      "Let go of the controls with assists on and the aircraft holds its bank and its climb.",
+      "Check the range on the engine panel before a long crossing. Fuel is weight: carry what you need.",
+      "The GPS map (N) can pick an airport for the autopilot to land at.",
+      "Rough air? Settings > Flying > Air: Calm takes the edge off the gusts while you learn.",
+    };
+    const int n = (int)(sizeof tips / sizeof tips[0]);
+    static int tip = -1; static float lastT = 1e9f;
+    if (loadT < lastT) tip = (tip + 1) % n;   // (a new load: its elapsed time starts again)
+    lastT = loadT;
+    const float ty = cy - 44 * s, a = clampf(loadT / 0.4f, 0.f, 1.f);   // (just above the flight's panel, over the picture)
+    const std::string t = fitLoading(tips[tip], cw - 90 * s, fs(13,11));
+    g_ren.rect(cx - 18 * s, ty - 9 * s, g_ren.textWidth(t, fs(13,11)) + 86 * s, 32 * s, ink, 0.72f * a, 4 * s);
+    g_ren.text(cx, ty, fs(11,10), "TIP", accent, a, 0, false);
+    g_ren.text(cx + 40 * s, ty - 1 * s, fs(13,11), t, C_TEXT, 0.92f * a, 0, false);
   }
 }
 
@@ -539,9 +566,10 @@ void Game::enterCareerHub() { screen = SCR_HUB; hubTab = TAB_CONTRACTS; hubList 
 void Game::drawMenu() {
   // the first start: the welcome over the menu, the menu under it without the clicks, the keys or the pad
   const bool welcome = !profile.welcomed && !headless && !diskless;   // (never in a tool's session: its pictures show the menu)
+  const bool overlay = welcome || showCredits;   // (the credits the same way: over the menu, the menu taking nothing)
   Input held;
-  if (welcome) { held = in; memset(in.pressed, 0, sizeof(in.pressed)); for (bool& m : in.mPressed) m = false; in.buttonsPressed = 0; in.wheel = 0; in.text.clear(); }
-  struct WelcomeAfter { Game* g; bool on; Input& held; ~WelcomeAfter() { if (!on) return; g->in = held; g_ren.flushUIPublic(); g->drawWelcome(); } } after{this, welcome, held};
+  if (overlay) { held = in; memset(in.pressed, 0, sizeof(in.pressed)); for (bool& m : in.mPressed) m = false; in.buttonsPressed = 0; in.wheel = 0; in.text.clear(); }
+  struct WelcomeAfter { Game* g; bool on, welcome; Input& held; ~WelcomeAfter() { if (!on) return; g->in = held; g_ren.flushUIPublic(); if (welcome) g->drawWelcome(); else g->drawCredits(); } } after{this, overlay, welcome, held};
   float W = (float)g_ren.W, H = (float)g_ren.H;
   float s = std::min(S(), std::min(H / 690.f, W / 1040.f));
   const float x = 48 * s, cw = std::min(370 * s, W * 0.43f), bw = cw - 48 * s;
@@ -551,7 +579,7 @@ void Game::drawMenu() {
   g_ren.text(x, 78 * s, 48 * s, "SOMNIUM", C_TEXT, 1);
   g_ren.text(x, 132 * s, 48 * s, "VOLANDI", C_TEXT, 1);
   g_ren.rect(x, 200 * s, 46 * s, 3 * s, C_ACCENT, 1);
-  g_ren.text(x, 220 * s, 16 * s, "The dream of flight.", C_DIM, 1);
+  g_ren.text(x, 220 * s, 16 * s, demo ? "The dream of flight.   DEMO" : "The dream of flight.", C_DIM, 1);
   float y = 270 * s;
   panel(x, y, cw, (hasSave ? 114 : 86) * s);
   g_ren.text(x + 24 * s, y + 16 * s, 11 * s, hasSave ? (profile.name.empty() ? std::string("CAREER READY") : ellipsize("WELCOME BACK, CAPTAIN " + [&] { std::string u; for (char ch : profile.name) u += (char)toupper((unsigned char)ch); return u; }(), bw, 11 * s)) : std::string("WELCOME ABOARD"), C_ACCENT, 1, 0, false);
@@ -576,11 +604,12 @@ void Game::drawMenu() {
   if (button(x + (cw + 12 * s) * 0.5f, y, (cw - 12 * s) * 0.5f, 40 * s, "Controls")) { screen = SCR_HUB; hubTab = TAB_SETTINGS; settingsPage = 1; }
   y += 52 * s;
   // the research terminal: hidden until the career has earned it (the ATP or the campaign), or it has been found
-  if (career.license >= LIC_ATP || career.finished || profile.has("classified")) {
+  if (!demo && (career.license >= LIC_ATP || career.finished || profile.has("classified"))) {
     if (button(x, y, cw, 36 * s, "Project NIGHTGLASS")) { screen = SCR_RESEARCH; resOpened = realTime; g_audio.trigger(SFX_BEEP); award("classified"); }
     y += 46 * s;
   }
-  if (button(x, y, cw, 36 * s, "Quit to desktop")) quit = true;
+  if (button(x, y, (cw - 12 * s) * 0.5f, 36 * s, "Credits")) { showCredits = true; creditsByHand = false; creditsScroll = 0.f; }
+  if (button(x + (cw + 12 * s) * 0.5f, y, (cw - 12 * s) * 0.5f, 36 * s, "Quit to desktop")) quit = true;
   g_ren.text(x, H - 34 * s, 11 * s, "SOMNIUM VOLANDI " + version + " / CDAIII", C_DIM, 0.8f, 0, false);   // (the version a report names)
   const float fx = x + cw + 76 * s;
   if (W - fx > 220 * s) {
@@ -607,10 +636,10 @@ void Game::drawMenu() {
 void Game::drawHub() {
   // a card over the hub (a new licence, the campaign's end) takes the clicks, the keys and the pad: the hub under it
   // is drawn without them
-  const bool card = licenceShown >= 0 || finaleShown || trialResult.kind >= 0;
+  const bool card = licenceShown >= 0 || finaleShown || trialResult.kind >= 0 || demoOver();
   Input held;
   if (card) { held = in; memset(in.pressed, 0, sizeof(in.pressed)); for (bool& m : in.mPressed) m = false; in.buttonsPressed = 0; in.wheel = 0; }
-  struct CardAfter { Game* g; bool on; Input& held; ~CardAfter() { if (!on) return; g->in = held; g->uiGlass = false; g_ren.flushUIPublic(); if (g->licenceShown >= 0) g->drawLicenceCard(); else if (g->finaleShown) g->drawFinaleCard(); else if (g->trialResult.kind >= 0) g->drawTrialCard(); } } after{this, card, held};
+  struct CardAfter { Game* g; bool on; Input& held; ~CardAfter() { if (!on) return; g->in = held; g->uiGlass = false; g_ren.flushUIPublic(); if (g->licenceShown >= 0) g->drawLicenceCard(); else if (g->finaleShown) g->drawFinaleCard(); else if (g->trialResult.kind >= 0) g->drawTrialCard(); else if (g->demoOver()) g->drawDemoEnd(); } } after{this, card, held};
   if (hubTab == TAB_CONTRACTS && hubList == 2) { FrameParams fp{}; drawMilitary(fp); return; }
   float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
   uiGlass = true;   // (panels and cards in the hub's glass style; reset at the end)
@@ -1448,6 +1477,7 @@ void Game::drawFreeFlightSetup(const FrameParams& fp) {
   const HangarLayout L = hangarLayout(x, y, w, h, s);
   const float lw = L.leftWidth, rx = L.rightX, rw = L.rightWidth;
   freeCraft = validCareerSelection(freeCraft);
+  if (!demoCraft(freeCraft)) freeCraft = 0;
   const int airportCount = (int)g_world.airports.size();
   if (airportCount == 0) { if (button(x, y, 260 * s, 42 * s, "Back to main menu")) cancelFreeFlightSetup(); return; }
   freeAirport = std::clamp(freeAirport, 0, airportCount - 1);
@@ -1468,7 +1498,7 @@ void Game::drawFreeFlightSetup(const FrameParams& fp) {
   if (button(W - 220 * s, 25 * s, 196 * s, 38 * s, "Back to main menu")) { cancelFreeFlightSetup(); uiGlass = false; return; }
   panel(x, y, lw, h); panel(rx, y, rw, h);
   g_ren.text(x + 18 * s, y + 18 * s, 22 * s, "Aircraft", C_TEXT, 1);
-  g_ren.text(x + 18 * s, y + 49 * s, 11 * s, fmt("ALL %d AVAILABLE / FREE", kNumAircraft), C_ACCENT, 1, 0, false);
+  g_ren.text(x + 18 * s, y + 49 * s, 11 * s, demo ? fmt("3 OF %d IN THE DEMO / FREE", kNumAircraft) : fmt("ALL %d AVAILABLE / FREE", kNumAircraft), C_ACCENT, 1, 0, false);
   const float craftTop = y + 78 * s, craftBottom = y + h - 30 * s, craftStep = 68 * s;
   const int craftVisible = std::max(1, (int)((craftBottom - craftTop) / craftStep));
   static int craftFirst = 0, craftSeen = -1, airportFirst = 0, airportSeen = -1;
@@ -1487,9 +1517,10 @@ void Game::drawFreeFlightSetup(const FrameParams& fp) {
     card(x + 10 * s, cy, lw - 20 * s, craftStep - 8 * s, freeCraft == spec, hov || focused, C_ACCENT);
     if (focused) g_ren.rectOutline(x + 8 * s, cy - 2 * s, lw - 16 * s, craftStep - 4 * s, C_ACCENT, 0.85f, 5 * s, 1.5f * s);
     const bool activate = focused && (in.pressed[K_ENTER] || in.pressed[' ']);
-    if ((hov && in.mPressed[0]) || activate) { freeCraft = spec; g_audio.trigger(SFX_CLICK); if (activate) in.pressed[K_ENTER] = in.pressed[' '] = false; }
-    g_ren.text(x + 23 * s, cy + 10 * s, 16 * s, ellipsize(kAircraft[spec].name, lw - 46 * s, 16 * s), C_TEXT, 1);
-    g_ren.text(x + 23 * s, cy + 35 * s, 11 * s, ellipsize(kAircraft[spec].role, lw - 46 * s, 11 * s), C_DIM, 1);
+    const bool locked = !demoCraft(spec);   // (the demo: the rest of the fleet shown, in the full game)
+    if (((hov && in.mPressed[0]) || activate) && !locked) { freeCraft = spec; g_audio.trigger(SFX_CLICK); if (activate) in.pressed[K_ENTER] = in.pressed[' '] = false; }
+    g_ren.text(x + 23 * s, cy + 10 * s, 16 * s, ellipsize(kAircraft[spec].name, lw - 46 * s, 16 * s), locked ? C_DIM : C_TEXT, 1);
+    g_ren.text(x + 23 * s, cy + 35 * s, 11 * s, ellipsize(locked ? std::string("In the full game") : std::string(kAircraft[spec].role), lw - 46 * s, 11 * s), locked ? C_ACCENT : C_DIM, 1);
   }
   g_ren.text(x + 18 * s, y + h - 22 * s, 11 * s, ellipsize(fmt("%02d - %02d / %02d   SCROLL", craftFirst + 1, std::min(kNumAircraft, craftFirst + craftVisible), kNumAircraft), lw - 36 * s, 11 * s), C_DIM, 0.85f, 0, false);
   const AircraftSpec& spec = kAircraft[freeCraft];
@@ -2620,7 +2651,7 @@ void Game::drawHud(const FrameParams& fp) {
       x0 += isz + gap;
     }
     if (engOff && n) {   // (on a dark backing: grey on a bright sky was unreadable)
-      const std::string t = "press " + actLabel(ACT_ENGINE, padPrompts()) + " to restart";
+      const std::string t = "press " + actLabel(ACT_ENGINE, padPrompts(), true) + " to restart";
       const float tw = g_ren.textWidth(t, 12 * s);
       g_ren.rect(W * 0.5f - tw * 0.5f - 10 * s, iy + isz + 20 * s, tw + 20 * s, 22 * s, vec3(0.03f, 0.f, 0.f), 0.75f, 4 * s);
       g_ren.text(W * 0.5f, iy + isz + 24 * s, 12 * s, t, C_TEXT, 0.95f, 1, false);
@@ -3160,7 +3191,7 @@ void Game::drawGps() {
   g_ren.text(px, py, 13 * s, ellipsize(fmt("ELEV %s   WIND %03.0f/%.0fkt", fmtAlt(D.elev).c_str(), wx.windFrom, wx.windSpeed * MS_TO_KT), vw, 13 * s), C_DIM, e); py += 24 * s;
   // autopilot / autoland
   header(px, py, vw, "AUTOPILOT"); py += 24 * s;
-  g_ren.text(px, py, 13 * s, ellipsize(plane.apOn ? plane.apStatus : "OFF  -  " + actLabel(ACT_AP, padPrompts()) + " engages", vw, 13 * s), plane.apOn ? C_GOOD : C_DIM, e); py += 20 * s;
+  g_ren.text(px, py, 13 * s, ellipsize(plane.apOn ? plane.apStatus : "OFF  -  " + actLabel(ACT_AP, padPrompts(), true) + " engages", vw, 13 * s), plane.apOn ? C_GOOD : C_DIM, e); py += 20 * s;
   {
     float bw = 30 * s, bh = 26 * s;
     if (button(px, py, bw, bh, "<")) cycleApDest(-1);
@@ -3204,8 +3235,8 @@ void Game::drawPause() {
     return;
   }
   const bool combatPractice=researchFlight && resCard<0 && specIdx==kSomnus;
-  s = std::min(s, std::min(H / (combatPractice?820.f:freeFlight?600.f:540.f), W / 520.f));
-  float pw = 410 * s, ph = (combatPractice?740.f:freeFlight?510.f:450.f) * s, x = W * 0.5f - pw * 0.5f, y = H * 0.5f - ph * 0.5f;
+  s = std::min(s, std::min(H / (combatPractice?880.f:freeFlight?660.f:600.f), W / 520.f));
+  float pw = 410 * s, ph = (combatPractice?798.f:freeFlight?568.f:508.f) * s, x = W * 0.5f - pw * 0.5f, y = H * 0.5f - ph * 0.5f;
   panel(x, y, pw, ph, 0.95f);
   g_ren.text(x + 30 * s, y + 24 * s, 11 * s, "FLIGHT OPERATIONS / ON HOLD", C_ACCENT, 1, 0, false);
   g_ren.text(x + 30 * s, y + 49 * s, 32 * s, "Flight paused", C_TEXT, 1);
@@ -3224,6 +3255,8 @@ void Game::drawPause() {
   by += bh + 12 * s;
   if (button(x + 30 * s, by, bw * 0.48f, bh, showRadio ? "Hide radio" : "Radio")) showRadio = !showRadio;
   if (button(x + 30 * s + bw * 0.52f, by, bw * 0.48f, bh, uiHidden ? "Show flight UI" : "Hide flight UI")) uiHidden = !uiHidden;   // (also LB+RB held)
+  by += bh + 12 * s;
+  if (button(x + 30 * s, by, bw, bh, in.pad && !set.padBind[ACT_PHOTO] ? std::string("Photo mode") : "Photo mode   " + actLabel(ACT_PHOTO, in.pad, true))) { enterPhoto(); return; }
   by += bh + 12 * s;
   if (freeFlight) {
     if (button(x + 30 * s, by, bw, bh, "Earth destinations / Set route")) { openEarthPicker(); return; }
@@ -3336,7 +3369,8 @@ void Game::drawTrialCard() {
   const float e = realTime - opened, k = clampf(e / 0.35f, 0.f, 1.f), ease = 1.f - (1.f - k) * (1.f - k);
   g_ren.rect(0, 0, W, H, vec3(0, 0, 0), 0.55f * ease);
   const bool splits = !R.splits.empty();
-  const float pw = std::min(620 * s, W - 40 * s), ph = std::min((splits ? 600.f : 440.f) * s, H - 40 * s), x = W * 0.5f - pw * 0.5f, y = H * 0.5f - ph * 0.5f;
+  steam::BoardScore world; const bool worldwide = !R.board.empty() && steam::boardScore(R.board, world);   // (on Steam: the run's worldwide place)
+  const float pw = std::min(620 * s, W - 40 * s), ph = std::min(((splits ? 600.f : 440.f) + (worldwide ? 24.f : 0.f)) * s, H - 40 * s), x = W * 0.5f - pw * 0.5f, y = H * 0.5f - ph * 0.5f;
   const vec3 mc = R.medal == 3 ? vec3(1.f, 0.82f, 0.3f) : R.medal == 2 ? vec3(0.82f, 0.87f, 0.92f) : R.medal == 1 ? vec3(0.86f, 0.56f, 0.3f) : C_DIM;
   if (R.medal > 0) g_ren.glow(x, y, pw, ph, mc, 0.25f * ease, 12 * s, 30 * s);
   g_ren.rect(x, y, pw, ph, svui::ink, 1, 6 * s);   // (opaque: the hub stays under it)
@@ -3368,6 +3402,12 @@ void Game::drawTrialCard() {
   { float m[3]; trialMedalMarks(R.kind, R.spec, m);
     fitText(x + 30 * s, py, pw - 60 * s, 13 * s, 10 * s, fmt("Gold %s    Silver %s    Bronze %s", trialScore(R.kind, m[0]).c_str(), trialScore(R.kind, m[1]).c_str(), trialScore(R.kind, m[2]).c_str()), C_DIM, ease);
     py += 30 * s; }
+  if (worldwide) {
+    const int of = std::max(world.total, world.rank);
+    const std::string t = world.done ? (world.improved ? fmt("Worldwide on Steam: #%d of %d", world.rank, of) : fmt("Worldwide on Steam: your best stands at #%d of %d", world.rank, of))
+                        : world.failed ? std::string("Worldwide on Steam: the score couldn't be sent") : std::string("Worldwide on Steam: sending the score...");
+    g_ren.text(cx, py, 14 * s, t, world.done ? C_ACCENT : C_DIM, ease, 1); py += 24 * s;
+  }
   if (splits) {   // the gates: this run's time at each, and against the best run's (before this one)
     header(x + 30 * s, py, pw - 60 * s, "SPLITS"); py += 28 * s;
     const int n = (int)R.splits.size(), half = (n + 1) / 2;
@@ -3391,6 +3431,164 @@ void Game::drawTrialCard() {
     return;
   }
   if (button(x + pw - 230 * s, by, 200 * s, 46 * s, "Done", true, true) || in.pressed[K_ENTER] || in.pressed[K_ESC]) { R.kind = -1; g_audio.trigger(SFX_CLICK); }
+}
+
+// Photo mode's panel (game_photo.cpp), at the right: the lens, the light, the colour, the frame and the looks, the
+// gates shown or not, the shot. Hidden (H, or Y), only a line says how to bring it back. A shot flashes the screen and
+// names its file for a moment
+void Game::photoPanelRect(float& x, float& y, float& w, float& h) const {
+  const float s = S();
+  w = std::min(380 * s, g_ren.W * 0.45f); h = std::min(600 * s, g_ren.H - 40 * s);
+  x = g_ren.W - w - 20 * s; y = 20 * s;
+}
+
+void Game::drawPhotoPanel() {
+  const float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
+  const float since = realTime - photo.savedT;
+  if (since >= 0.f && since < 0.35f) { const float k = 1.f - since / 0.35f; g_ren.rect(0, 0, W, H, vec3(1, 1, 1), 0.6f * k * k); }
+  if (since >= 0.f && since < 3.5f) {
+    const std::string msg = photo.last.empty() ? std::string("The photo couldn't be saved") : "Saved: " + photo.last + (steam::active() ? "   (and to Steam)" : "");
+    const float a = 1.f - smoothstepf(2.8f, 3.5f, since), tw = std::min(g_ren.textWidth(msg, 14 * s), W - 80 * s);
+    g_ren.rect(W * 0.5f - tw * 0.5f - 14 * s, H - 66 * s, tw + 28 * s, 30 * s, svui::ink, 0.8f * a, 6 * s);
+    g_ren.text(W * 0.5f, H - 59 * s, 14 * s, ellipsize(msg, tw, 14 * s), photo.last.empty() ? C_BAD : C_GOOD, a, 1, false);
+  }
+  if (!photo.panel) {
+    const std::string hint = in.pad ? padGlyph("Y") + " the panel      " + padGlyph("X") + " take the photo      " + padGlyph("B") + " leave" : "H  the panel      Space  take the photo      Esc  leave";
+    g_ren.text(24 * s, H - 34 * s, 13 * s, hint, C_TEXT, 0.55f, 0, true);
+    return;
+  }
+  float x, y, w, h; photoPanelRect(x, y, w, h);
+  panel(x, y, w, h, 0.9f);
+  const float lx = x + 20 * s, cw = w - 40 * s;
+  float py = y + 20 * s;
+  g_ren.text(lx, py, 11 * s, "PHOTO MODE", C_ACCENT, 1, 0, false); py += 18 * s;
+  g_ren.text(lx, py, 22 * s, ellipsize(plane.spec ? plane.spec->name : "", cw, 22 * s), C_TEXT, 1); py += 38 * s;
+  // a row: its name, a track to drag (or step with the D-pad's left and right once it has the focus), its value
+  auto slider = [&](const char* label, float& v, float lo, float hi, float step, const std::string& disp) {
+    const float tx = lx + 108 * s, tw = cw - 108 * s - 64 * s, ty = py + 6 * s;
+    g_ren.text(lx, py + 2 * s, 13 * s, label, C_DIM, 1);
+    const bool hv = hovered(tx - 6 * s, py, tw + 12 * s, 24 * s);
+    const float f = clampf((v - lo) / (hi - lo), 0.f, 1.f);
+    g_ren.rect(tx, ty + 4 * s, tw, 4 * s, C_ACCENT, 0.15f, 2 * s);
+    g_ren.rectGrad(tx, ty + 4 * s, std::max(tw * f, 4 * s), 4 * s, C_ACCENT * 0.6f, C_ACCENT, 1, 2 * s);
+    g_ren.rect(tx + tw * f - 6 * s, ty, 12 * s, 12 * s, hv ? mixc(C_ACCENT, vec3(1, 1, 1), 0.3f) : C_ACCENT, 1, 6 * s);
+    if (hv && in.mDown[0]) v = lo + clampf((in.mx - tx) / tw, 0.f, 1.f) * (hi - lo);
+    int st = 0; focusAdjust(uid(tx, py, std::string("photo:") + label), tx - 6 * s, py, tw + 12 * s, 24 * s, &st);
+    if (st) v = clampf(v + st * step, lo, hi);
+    g_ren.text(lx + cw, py + 2 * s, 13 * s, disp, C_TEXT, 1, 2);
+    py += 32 * s;
+  };
+  header(lx, py, cw, "LENS AND LIGHT"); py += 26 * s;
+  slider("Field of view", photo.fov, 15.f, 100.f, 5.f, fmt("%.0f deg", photo.fov));
+  slider("Exposure", photo.ev, -2.f, 2.f, 0.1f, fmt("%+.1f EV", photo.ev));
+  slider("Vignette", photo.vignette, 0.f, 1.5f, 0.1f, fmt("%.0f%%", photo.vignette / 1.5f * 100.f));
+  header(lx, py, cw, "COLOUR"); py += 26 * s;
+  slider("Saturation", photo.saturation, 0.f, 1.6f, 0.05f, photo.saturation < 0.01f ? std::string("Mono") : fmt("%.0f%%", photo.saturation * 100.f));
+  slider("Contrast", photo.contrast, 0.7f, 1.4f, 0.05f, fmt("%.0f%%", photo.contrast * 100.f));
+  slider("Warmth", photo.warmth, -1.f, 1.f, 0.05f, fabsf(photo.warmth) < 0.01f ? std::string("Neutral") : fmt("%s %.0f", photo.warmth > 0 ? "Warm" : "Cool", fabsf(photo.warmth) * 100.f));
+  {   // the looks: each sets the colour and the vignette at once
+    static const char* looks[5] = {"Natural", "Vivid", "Film", "Noir", "Golden"};
+    const float bw = (cw - 4 * 6 * s) / 5.f;
+    for (int i = 0; i < 5; i++) if (button(lx + i * (bw + 6 * s), py, bw, 28 * s, std::string(looks[i]) + "##look", true, photo.look == i)) photoLook(i);
+    py += 40 * s;
+  }
+  header(lx, py, cw, "FRAME"); py += 26 * s;
+  {
+    static const char* frames[4] = {"Full", "2.39 : 1", "1.85 : 1", "Square"};
+    const float bw = (cw - 3 * 6 * s) / 4.f;
+    for (int i = 0; i < 4; i++) if (button(lx + i * (bw + 6 * s), py, bw, 28 * s, std::string(frames[i]) + "##frame", true, photo.frame == i)) photo.frame = i;
+    py += 36 * s;
+    if (button(lx, py, cw, 28 * s, photo.markers ? "Gates and route: shown##markers" : "Gates and route: hidden##markers", true, photo.markers)) photo.markers = !photo.markers;
+    py += 40 * s;
+  }
+  if (button(lx, py, cw, 40 * s, in.pad ? "Take the photo   " + padGlyph("X") : std::string("Take the photo   (Space)"), true, true)) photo.capture = 1;
+  py += 48 * s;
+  const float hw = (cw - 8 * s) * 0.5f;
+  if (button(lx, py, hw, 30 * s, "Reset camera")) {
+    const float size = plane.spec ? std::max(plane.spec->fusLen, plane.spec->span) : 10.f;
+    photo.pos = plane.pos - plane.forward() * (size * 1.4f + 6.f) + vec3(0, size * 0.3f + 2.f, 0);
+    const vec3 f = normalize(plane.pos - photo.pos);
+    photo.yaw = atan2f(f.x, -f.z); photo.pitch = asinf(clampf(f.y, -1.f, 1.f)); photo.roll = 0.f; photo.fov = set.fov;
+  }
+  if (button(lx + hw + 8 * s, py, hw, 30 * s, "Leave photo mode")) { exitPhoto(); return; }
+  py += 40 * s;
+  const std::string help = in.pad ? "Left stick moves, triggers lower and raise, right stick turns, bumpers tilt. D-pad picks a setting. " + padGlyph("Y") + " hides the panel, " + padGlyph("B") + " leaves."
+                                  : "W A S D move, Q E lower and raise (Shift faster), drag to turn, [ ] tilt, the wheel zooms. H hides the panel, Esc leaves.";
+  for (auto& l : wrap(help, cw, 12 * s)) { if (py > y + h - 16 * s) break; g_ren.text(lx, py, 12 * s, l, C_DIM, 0.85f, 0, false); py += 16 * s; }
+}
+
+// The demo's end (Game::demo): the private licence earned - what the full game goes on to, that the career carries
+// over, and the way to the store page
+void Game::drawDemoEnd() {
+  const float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
+  g_ren.rect(0, 0, W, H, vec3(0, 0, 0), 0.6f);
+  const float pw = std::min(660 * s, W - 40 * s), ph = std::min(380 * s, H - 40 * s), x = W * 0.5f - pw * 0.5f, y = H * 0.5f - ph * 0.5f;
+  g_ren.glow(x, y, pw, ph, C_ACCENT, 0.28f, 12 * s, 30 * s);
+  g_ren.rect(x, y, pw, ph, svui::ink, 1, 6 * s);
+  panel(x, y, pw, ph, 0.97f);
+  float py = y + 28 * s;
+  g_ren.text(x + pw * 0.5f, py, 12 * s, "THE END OF THE DEMO", C_ACCENT, 1, 1, false); py += 24 * s;
+  g_ren.text(x + pw * 0.5f, py, 30 * s, "Private Pilot", C_TEXT, 1, 1); py += 50 * s;
+  const char* body = "You've earned your wings. In the full game the career goes on: the commercial and airline licences, the "
+                     "whole fleet up to the 180-seat Galleon, an airline of your own with hired pilots, the legendary contracts, "
+                     "and the XR research jets for Defense Command.";
+  for (auto& l : wrap(body, pw - 60 * s, 15 * s)) { g_ren.text(x + 30 * s, py, 15 * s, l, C_TEXT, 0.95f); py += 21 * s; }
+  py += 12 * s;
+  for (auto& l : wrap("Your career, your achievements and your pilot profile carry over to the full game.", pw - 60 * s, 14 * s)) { g_ren.text(x + 30 * s, py, 14 * s, l, C_GOOD, 1); py += 20 * s; }
+  const int n = SOMNIUM_STORE_APPID ? 3 : 2;   // (the Wishlist button only with the full game's app id)
+  const float bw = std::min(200 * s, (pw - 60 * s - (n - 1) * 10 * s) / n), by = y + ph - 66 * s;
+  float bx = x + pw * 0.5f - (n * bw + (n - 1) * 10 * s) * 0.5f;
+  if (n == 3) { if (button(bx, by, bw, 46 * s, "Wishlist on Steam", true, true)) openStorePage(); bx += bw + 10 * s; }
+  if (button(bx, by, bw, 46 * s, "Free flight")) { beginFreeFlightSetup(); return; }
+  if (button(bx + bw + 10 * s, by, bw, 46 * s, "Main menu") || in.pressed[K_ESC] || (in.buttonsPressed & PAD_B)) { screen = SCR_MENU; g_audio.trigger(SFX_CLICK); }
+}
+
+void Game::openStorePage() {
+  if (!SOMNIUM_STORE_APPID) return;
+  if (!steam::openStore(SOMNIUM_STORE_APPID) && platformOpen) platformOpen(fmt("https://store.steampowered.com/app/%d/", (int)SOMNIUM_STORE_APPID));
+}
+
+// The credits, from the main menu: they roll up by themselves (the wheel or the right stick takes them by hand); Esc, B,
+// Enter or Close end them. Who made the game, then the work it stands on (THIRD_PARTY_NOTICES.md has the licences)
+void Game::drawCredits() {
+  const float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
+  if (in.pressed[K_ESC] || in.pressed[K_ENTER] || (in.buttonsPressed & (PAD_B | PAD_A))) { showCredits = false; g_audio.trigger(SFX_CLICK); return; }
+  g_ren.rect(0, 0, W, H, svui::ink, 1.f);
+  struct Line { float size; const char* text; int kind; };   // kind 0 a heading, 1 a name, 2 a note, 3 space
+  static const Line lines[] = {
+    {12, "SOMNIUM VOLANDI", 0}, {40, "The dream of flight", 1}, {16, "", 3},
+    {12, "A GAME BY", 0}, {24, "CDAIII", 1}, {16, "", 3},
+    {12, "FLIGHT, WORLD, CAREER, MUSIC AND SOUND", 0}, {17, "Made for this game, in code: the flight model, the islands and their towns,", 2},
+    {17, "the weather, the aircraft, the campaign, the score and every sound but the voices", 2}, {16, "", 3},
+    {12, "VOICES", 0}, {17, "Synthesised for the game with Qwen3-TTS (Apache 2.0)", 2}, {17, "and Kokoro-82M (Apache 2.0) through kokoro-onnx (MIT)", 2}, {16, "", 3},
+    {12, "SURFACES", 0}, {17, "Photographed materials from Poly Haven and ambientCG (CC0)", 2},
+    {17, "Sergej Majboroda, Jenelle van Heerden, Dimitrios Savva, Rico Cilliers, Rob Tuytel, Amal Kumar", 2}, {16, "", 3},
+    {12, "THE NIGHT SKY", 0}, {17, "The Yale Bright Star Catalogue, D. Hoffleit and W. H. Warren Jr.", 2}, {16, "", 3},
+    {12, "TYPE", 0}, {17, "DejaVu Sans, from Bitstream Vera", 2}, {16, "", 3},
+    {12, "IMAGES", 0}, {17, "stb_image, Sean Barrett", 2}, {16, "", 3},
+    {12, "EARTH DATA TOOLS", 0}, {17, "NOAA ETOPO 2022 relief; OurAirports, its contributors", 2}, {16, "", 3},
+    {12, "THE FULL LICENCES", 0}, {17, "THIRD_PARTY_NOTICES.md, beside the game", 2}, {30, "", 3},
+    {28, "Thank you for flying.", 1},
+  };
+  float total = 0; for (const Line& l : lines) total += (l.kind == 3 ? l.size : l.size + 14) * s;
+  float& scroll = creditsScroll;   // (each opening from the bottom: the first lines rise into view)
+  if (in.wheel != 0) { scroll += -in.wheel * 60.f * s; creditsByHand = true; in.wheel = 0; }   // (by hand: the rolling stops)
+  if (in.pad && fabsf(in.ry) > 0.2f) { scroll -= in.ry * 400.f * s * uiDt; creditsByHand = true; }
+  if (!creditsByHand) scroll += 38.f * s * uiDt;
+  scroll = std::clamp(scroll, 0.f, total + H * 0.5f);
+  float py = H - scroll;
+  for (const Line& l : lines) {
+    const float sz = l.size * s;
+    if (l.kind == 3) { py += sz; continue; }
+    if (py > -60 * s && py < H + 20 * s) {
+      const float fade = clampf(std::min(py / (H * 0.15f), (H - py) / (H * 0.15f)), 0.f, 1.f);
+      const vec3 col = l.kind == 0 ? C_ACCENT : l.kind == 1 ? C_TEXT : C_DIM;
+      g_ren.text(W * 0.5f, py, sz, l.text, col, fade, 1, l.kind == 1);
+    }
+    py += sz + 14 * s;
+  }
+  if (button(W - 170 * s, H - 64 * s, 140 * s, 40 * s, "Close", true, true)) { showCredits = false; return; }
+  g_ren.text(30 * s, H - 52 * s, 12 * s, padPrompts() ? padGlyph("B") + "  CLOSE" : std::string("ESC  CLOSE"), C_DIM, 0.8f, 0, false);
 }
 
 // The first start: what to call the pilot, how to fly (assisted or realistic), and the road from the first lesson to
@@ -3470,6 +3668,14 @@ void Game::drawMilitaryLocked() {
     g_ren.text(x + 30 * s, py, 14 * s, l, C_DIM, 1); py += 20 * s;
   }
   py += 16 * s;
+  if (demo) {   // (the demo: a teaser)
+    header(x + 30 * s, py, pw - 60 * s, "IN THE FULL GAME"); py += 30 * s;
+    g_ren.text(x + 30 * s, py, 15 * s, "The XR jets, Defense Command and the research terminal", C_TEXT, 1);
+    const float bx = SOMNIUM_STORE_APPID ? x + pw * 0.5f - 230 * s : x + pw * 0.5f - 110 * s;   // (centred without the Wishlist button)
+    if (button(bx, y + ph - 66 * s, 220 * s, 46 * s, "Back to work") || in.pressed[K_ENTER]) { hubList = 0; g_audio.trigger(SFX_CLICK); }
+    if (SOMNIUM_STORE_APPID && button(x + pw * 0.5f + 10 * s, y + ph - 66 * s, 220 * s, 46 * s, "Wishlist on Steam", true, true)) openStorePage();
+    return;
+  }
   header(x + 30 * s, py, pw - 60 * s, "CLEARANCE"); py += 30 * s;
   g_ren.text(x + 30 * s, py, 15 * s, fmt("Flights in your logbook:  %d of %d", career.flights, kMilitaryFlights), C_TEXT, 1); py += 26 * s;
   g_ren.rect(x + 30 * s, py, pw - 60 * s, 4 * s, C_DIM, 0.2f, 2 * s);

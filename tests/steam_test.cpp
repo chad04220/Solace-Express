@@ -3,7 +3,7 @@
 // and every value a token fills in is one the game sets; without Steam's DLL every call does nothing. On Windows, given
 // the folder of the stand-in DLL (steam_fake_dll.cpp): the real loader against it - started, an achievement waiting
 // for the stats then stored, a batch stored once, an unknown name given up on, the status sent on a change only, the
-// overlay's callback, the Deck's keyboard, shut down
+// overlay's callback, the Deck's keyboard, a trial's leaderboard score and its worldwide place, a screenshot, shut down
 #include "../src/profile.h"
 #include "../src/steam.h"
 #include <cstdio>
@@ -21,6 +21,18 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#define STEAM_LOADER_TEST 1
+static void* holdLib(const std::string& dir) { std::string d = dir; for (char& c : d) if (c == '/') c = '\\'; return (void*)LoadLibraryA((d + "\\steam_api64.dll").c_str()); }
+static void* libFn(void* l, const char* n) { return reinterpret_cast<void*>(GetProcAddress((HMODULE)l, n)); }
+static void dropLib(void* l) { FreeLibrary((HMODULE)l); }
+static std::string loaderDir(const std::string& dir) { std::string d = dir; for (char& c : d) if (c == '/') c = '\\'; return d; }
+#elif defined(SOMNIUM_STEAM_DLOPEN)
+#include <dlfcn.h>
+#define STEAM_LOADER_TEST 1
+static void* holdLib(const std::string& dir) { return dlopen((dir + "/steam_api64.so").c_str(), RTLD_NOW | RTLD_LOCAL); }
+static void* libFn(void* l, const char* n) { return dlsym(l, n); }
+static void dropLib(void* l) { dlclose(l); }
+static std::string loaderDir(const std::string& dir) { return dir; }
 #endif
 
 static std::string slurp(const std::string& path) {
@@ -112,12 +124,11 @@ int main(int argc, char** argv) {
     check(!on && !steam::active() && steam::pending() == 0 && !steam::onDeck() && !steam::showKeyboard(0, 0, 10, 10) && !steam::overlayOpened(),
           "No steam_api64.dll: off, and every call does nothing (" + steam::status() + ")");
   }
-#ifdef _WIN32
+#ifdef STEAM_LOADER_TEST
   if (argc > 1) {   // the loader against the stand-in
-    std::string dir = argv[1];
-    for (char& c : dir) if (c == '/') c = '\\';
-    HMODULE keep = LoadLibraryA((dir + "\\steam_api64.dll").c_str());   // (a hold of the test's own: the log outlives steam::shutdown)
-    auto fn = [&](const char* n) { return reinterpret_cast<void (*)()>(GetProcAddress(keep, n)); };
+    const std::string dir = loaderDir(argv[1]);
+    void* keep = holdLib(argv[1]);   // (a hold of the test's own: the log outlives steam::shutdown)
+    auto fn = [&](const char* n) { return reinterpret_cast<void (*)()>(libFn(keep, n)); };
     auto logOf = reinterpret_cast<const char* (*)()>(fn("FakeSteam_Log"));
     auto clear = reinterpret_cast<void (*)()>(fn("FakeSteam_Clear"));
     auto overlay = reinterpret_cast<void (*)()>(fn("FakeSteam_Overlay"));
@@ -147,10 +158,27 @@ int main(int argc, char** argv) {
     const bool opened = steam::overlayOpened(), again = steam::overlayOpened();
     check(!before && opened && !again && log() == "free;", "The overlay's opening read from its callback, once");
     check(steam::showKeyboard(10, 20, 300, 40) && log() == "kb 0 10 20 300 40;", "The Deck's floating keyboard over the field, one line");
+    {   // a trial's score: the board found (made), the score sent, its worldwide place read; the next one straight to the board
+      const std::string board = "Spot landing - Dawnlark T2";
+      steam::submitScore(board, false, 142);
+      steam::BoardScore b; const bool waiting = steam::boardScore(board, b) && !b.done && !b.failed;
+      steam::tick(0.016f);
+      const bool placed = steam::boardScore(board, b) && b.done && b.rank == 3 && b.total == 42 && b.improved;
+      const std::string first = log();
+      steam::submitScore(board, false, 120); steam::tick(0.016f);
+      const std::string second = log();
+      check(waiting && placed && first.find("find " + board + " 1 1;upload 555 1 142;") != std::string::npos && first.find("bad") == std::string::npos &&
+            second.find("upload 555 1 120;") != std::string::npos && second.find("find") == std::string::npos,
+            "A trial's score: its board found (lowest first), the score kept if best, #3 of 42 worldwide; the next sent straight to the board");
+      steam::BoardScore none;
+      check(!steam::boardScore("A board never sent to", none), "A board this session never sent to has nothing to show");
+    }
+    check(steam::addScreenshot("C:/Photos/shot.png", 1920, 1080) && log() == "shot C:/Photos/shot.png 1920x1080;",
+          "A photo mode shot added to the player's Steam screenshots (Steam makes its thumbnail)");
     steam::shutdown();
     steam::unlock("butter");
     check(!steam::active() && steam::pending() == 0 && log() == "rpclear;shutdown;", "Shut down: the status cleared, Steam's shutdown called, then nothing");
-    FreeLibrary(keep);
+    dropLib(keep);
   }
 #else
   (void)argc; (void)argv;

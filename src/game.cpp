@@ -60,6 +60,7 @@ const ActionInfo kActions[ACT_COUNT] = {
   {"gpsMap", "GPS moving map", 2, 'N', 0},                      {"minimap", "Minimap", 2, K_TAB, 0},
   {"radio", "Internet radio", 2, 'R', 0},                       {"anr", "Headset noise cancelling", 2, 'M', PAD_LS},
   {"zoom", "Cockpit zoom (hold; wheel zooms too)", 2, 'U', 0},
+  {"photo", "Photo mode", 2, K_F2, 0},   // (not a letter: they are all taken, K by the J + K hold)
   {"cloak", "Cloak (or double-tap brake)", 3, 'X', 0},          {"weapons", "Weapons hot / safe", 3, 'Y', PAD_Y},
   {"fire", "Fire lasers (or left mouse)", 3, K_ENTER, PAD_RB},  {"bomb", "Drop bomb (or middle mouse)", 3, K_BACK, PAD_LB},
 };
@@ -93,7 +94,7 @@ unsigned Game::actionCtxMask(int a) {
   switch (a) {
     case ACT_PITCH_DN: case ACT_PITCH_UP: case ACT_ROLL_L: case ACT_ROLL_R: case ACT_YAW_L: case ACT_YAW_R:
     case ACT_THR_UP: case ACT_THR_DN: case ACT_MAP: case ACT_HUD: case ACT_CAMERA: case ACT_ZOOM: case ACT_FIRE: return F | O;
-    case ACT_RADIO: case ACT_ANR: return F | O | P;
+    case ACT_RADIO: case ACT_ANR: case ACT_PHOTO: return F | O | P;   // (photo mode: opened over a flight, the GPS or the pause menu)
     default: return F;
   }
 }
@@ -207,9 +208,9 @@ std::string Game::writeProblemReport() {
   fprintf(f, "Input: gamepad %s, joysticks %d", in.pad ? "connected" : "none", (int)in.joys.size());
   for (const JoyState& j : in.joys) fprintf(f, ", %s", j.name.c_str());
   fprintf(f, "\n\nLast messages:\n");
-  for (const auto& t : toasts) fprintf(f, "  %s\n", t.text.c_str());
+  for (const auto& t : toasts) fprintf(f, "  %s\n", glyphText(t.text).c_str());
   const size_t n = atc.history.size();
-  for (size_t i = n > 12 ? n - 12 : 0; i < n; i++) fprintf(f, "  radio: %s\n", atc.history[i].c_str());
+  for (size_t i = n > 12 ? n - 12 : 0; i < n; i++) fprintf(f, "  radio: %s\n", glyphText(atc.history[i]).c_str());
   fprintf(f, "\nWhat happened? What did you expect instead? (Write below, save, and send this file with startup.log and any\n"
              "crash report from the crash folder.)\n\n");
   fclose(f);
@@ -218,19 +219,20 @@ std::string Game::writeProblemReport() {
 
 // The pad's names follow its bindings; the stick and trigger actions a pad drives without a button binding are named
 // by the stick or trigger; an action the pad has no control for keeps its key (the keyboard still works with a pad).
-std::string Game::actLabel(int a, bool pad) const {
+std::string Game::actLabel(int a, bool pad, bool glyph) const {
   if (pad) {
-    if (set.padBind[a]) return padName(set.padBind[a]);
+    auto g = [&](const std::string& n) { return glyph ? padGlyph(n) : n; };
+    if (set.padBind[a]) return g(padName(set.padBind[a]));
     switch (a) {
-      case ACT_THR_UP: return "RT"; case ACT_THR_DN: return "LT";
-      case ACT_PITCH_UP: case ACT_PITCH_DN: case ACT_ROLL_L: case ACT_ROLL_R: return "LEFT STICK";
+      case ACT_THR_UP: return g("RT"); case ACT_THR_DN: return g("LT");
+      case ACT_PITCH_UP: case ACT_PITCH_DN: case ACT_ROLL_L: case ACT_ROLL_R: return g("LEFT STICK");
     }
   }
   return keyName(set.keyBind[a]);
 }
 // The hint as shown on the active device: bound controls and no "(or gamepad ...)" aside on a pad.
 // Lesson speech is resolved separately by mission and phase, never by these device-specific words.
-std::string Game::expandHint(const std::string& raw, bool pad) const {
+std::string Game::expandHint(const std::string& raw, bool pad, bool glyph) const {
   std::string out;
   for (size_t i = 0; i < raw.size(); i++) {
     size_t e = raw[i] == '{' ? raw.find('}', i) : std::string::npos;
@@ -238,7 +240,7 @@ std::string Game::expandHint(const std::string& raw, bool pad) const {
     if (e != std::string::npos) { std::string id = raw.substr(i + 1, e - i - 1); for (int k = 0; k < ACT_COUNT; k++) if (id == kActions[k].id) a = k; }
     if (pad && raw.compare(i, 13, " (or gamepad ") == 0 && raw.find(')', i) != std::string::npos) { i = raw.find(')', i); continue; }
     if (a < 0) { out += raw[i]; continue; }
-    out += actLabel(a, pad); i = e;
+    out += actLabel(a, pad, glyph); i = e;
   }
   return out;
 }
@@ -256,6 +258,12 @@ void Game::applyQuote(const Contract& c, Career::LaunchPlan& e, bool start) {
   quoteJobKey = key;
   Contract cc = c; int spec = e.spec;
   quoteJob = std::async(std::launch::async, [cc, spec] { float fuel = -1; float m = simulateFlightMinutes(cc, spec, &fuel); return std::make_pair(m, fuel); });
+}
+
+std::string padGlyph(const std::string& name) {
+  std::string n = name;
+  for (char& c : n) if (c == ' ') c = '_';   // (one word: a line wraps around it, never through it)
+  return "\x01" + n + "\x02";
 }
 
 std::string padName(unsigned bit) {
@@ -327,7 +335,7 @@ static std::string joinPath(const std::string& d, const char* f) { return d.empt
 
 void Game::loadSettings() {
   FILE* f = fopen(joinPath(saveDir, "settings.cfg").c_str(), "r");
-  if (!f) { loadJoystickConfig(); return; }
+  if (!f) { loadJoystickConfig(); loadMachineSettings(); return; }
   resDone.clear(); trialBest.clear(); trialBestSplits.clear();   // (read twice at startup: the lists are the file's, not appended to)
   const std::string today = trialKey(TR_DAILY);
   char k[64]; float v;
@@ -395,6 +403,7 @@ void Game::loadSettings() {
   }
   fclose(f);
   loadJoystickConfig();
+  loadMachineSettings();   // (this PC's display settings over the synced file's)
 }
 
 // joystick.cfg: the flight axes and the actions' joystick buttons (joystick.h)
@@ -419,8 +428,43 @@ void Game::loadJoystickConfig() {
 // Written only when something changed (the settings page calls this every frame), through a temp file so an
 // interrupted write never leaves a half-written settings file.
 // (false: the settings file couldn't be written)
+void Game::loadMachineSettings() {
+  if (cacheDir.empty()) return;   // (a test, a tool: the settings file's own)
+  FILE* f = fopen(joinPath(cacheDir, "display.cfg").c_str(), "r");
+  if (!f) {   // a PC's first start (or this one's before display.cfg): a Deck gets settings made for its screen
+    if (steam::onDeck()) {   // (each load until display.cfg is written: the settings file is read again at the start)
+      set.quality = 0; set.resMode = 1; set.fpsTarget = 30; set.fullscreen = true; set.uiScale = 1.15f;
+      deckPreset = true;
+    }
+    return;
+  }
+  char k[64]; float v;
+  while (fscanf(f, "%63s %f", k, &v) == 2) {
+    if (!std::isfinite(v)) continue;
+    const std::string s = k;
+    if (s == "quality") set.quality = (int)clampf(v, 0, 2);
+    else if (s == "fullscreen") set.fullscreen = v != 0;
+    else if (s == "renderRes") set.resMode = std::clamp((int)v, 0, 4);
+    else if (s == "fpsTarget") set.fpsTarget = std::clamp((int)v, 0, 240);
+    else if (s == "foveate") set.foveate = v != 0;
+    else if (s == "uiScale") set.uiScale = clampf(v, 0.8f, 1.4f);
+  }
+  fclose(f);
+}
+
 bool Game::saveSettings() {
   if (diskless) return true;   // (a tool session: the player's settings stay as they were)
+  if (!cacheDir.empty()) {   // this PC's display settings, apart (loadMachineSettings)
+    const std::string m = fmt("quality %d\nfullscreen %d\nrenderRes %d\nfpsTarget %d\nfoveate %d\nuiScale %f\n", set.quality, set.fullscreen, set.resMode, set.fpsTarget, set.foveate, set.uiScale);
+    if (m != machineWritten) {
+      const std::string path = joinPath(cacheDir, "display.cfg"), tmp = path + ".tmp";
+      if (FILE* f = fopen(tmp.c_str(), "w")) {
+        bool ok = fwrite(m.data(), 1, m.size(), f) == m.size();
+        ok = fclose(f) == 0 && ok;
+        if (ok && replaceFile(tmp, path)) machineWritten = m; else remove(tmp.c_str());
+      }
+    }
+  }
   std::string t = fmt("quality %d\nmaster %f\nengineVol %f\nsfxVol %f\nradioVol %f\ninvertPitch %d\nshowHints %d\nmetric %d\nfullscreen %d\nradioStation %d\nmouseSens %f\ntraffic %d\natcVol %f\n",
           set.quality, set.master, set.engineVol, set.sfxVol, set.radioVol, set.invertPitch, set.showHints, set.metric, set.fullscreen, set.radioStation, set.mouseSens, set.traffic, set.atcVol);
   t += fmt("renderRes %d\nfpsTarget %d\nfov %f\nheadLook %d\ncbHud %d\nuiScale %f\nhudCam0 %d\nhudCam1 %d\nhudCam2 %d\nhudCam3 %d\n", set.resMode, set.fpsTarget, set.fov, set.headLook, set.cbHud, set.uiScale, set.hudCam[0], set.hudCam[1], set.hudCam[2], set.hudCam[3]);
@@ -1545,6 +1589,14 @@ std::string Game::trialScore(int kind, float v) const {
   if (kind == TR_FORMATION) return fmt("%.0f s out", v);
   return fmt("%d:%02d.%d", (int)v / 60, (int)v % 60, (int)(v * 10) % 10);
 }
+std::string Game::trialBoard(int kind, int spec) const {
+  if (kind == TR_DAILY) {   // (the same course for everyone that day, in whatever aircraft)
+    char d[16] = ""; const time_t t = time(nullptr);
+    if (const tm* g = gmtime(&t)) strftime(d, sizeof d, "%Y-%m-%d", g);
+    return std::string(trialName(kind)) + " - " + d;
+  }
+  return std::string(trialName(kind)) + " - " + kAircraft[std::clamp(spec, 0, kAircraftCount - 1)].name;
+}
 std::string Game::trialKey(int kind) const {
   if (kind != TR_DAILY) return trialId(kind);
   return fmt("%s.%u", trialId(kind), (unsigned)(time(nullptr) / 86400));   // (today's course: its own board)
@@ -1633,6 +1685,11 @@ void Game::finishTrial(bool success) {
       msg += std::string("  -  ") + names[R.medal];
     }
     saveSettings();
+    if (!botControl && !diskless) {   // the worldwide board on Steam (the times in milliseconds, the rest whole)
+      R.board = trialBoard(kind, specIdx);
+      const bool ms = kind == TR_GATES || kind == TR_DAILY || kind == TR_FORMATION;
+      steam::submitScore(R.board, ms, (int)lroundf(ms ? score * 1000.f : score));
+    }
   }
   if (g_music.owns()) g_music.sting(R.medal > 0 ? STING_MEDAL : score >= 0 ? STING_SUCCESS : STING_FAIL);
   hubMsg = msg; hubMsgTime = 8;
@@ -2199,7 +2256,7 @@ void Game::flightControls(float dt) {
     if (plane.spec->special == 2) toast(flapNotch > 0.99f ? "Pods 90 deg - VTOL hover" : fmt("Pods %d deg", (int)lroundf(flapNotch * 90)), vec3(0.8f, 0.55f, 1));
     else toast(fmt("Flaps %d%%", (int)lroundf(flapNotch * 100)), vec3(0.8f, 0.9f, 1));
     if (plane.spec->special == 2 && flapNotch > 0.99f && !plane.apOn)
-      toast("VTOL: hold " + actLabel(ACT_THR_UP, padActive) + "; release to idle", vec3(0.8f, 0.55f, 1));
+      toast("VTOL: hold " + actLabel(ACT_THR_UP, padActive, true) + "; release to idle", vec3(0.8f, 0.55f, 1));
   };
   if (apNav) flapNotch = c.flaps;   // the autopilot runs the flaps on the approach
   else if (plane.spec->special == 1) flapNotch = 0;   // the XR-30 has no flaps: a delta wing and canards
@@ -2402,7 +2459,7 @@ void Game::updateFlight(float dt) {
     // starter catches: puff of smoke from the exhausts
     vec3 ex = plane.pos + plane.q.rotate(vec3(0.4f, -plane.spec->fusRad * 0.6f, -plane.spec->fusLen * 0.35f));
     for (int i = 0; i < 14; i++) spawn(ex, plane.q.rotate(vec3(0.8f + i * 0.05f, -0.5f, 2.f)) + vec3(0, 0.6f, 0), 2.5f, 0.6f, 1.6f, vec3(0.55f, 0.58f, 0.62f), 0.55f, SPR_SMOKE, 1.5f, 0.3f);
-    if (!takeoffAnnounced && contract.type == CT_LESSON) toast("Engine running. Release the parking brake with " + actLabel(ACT_PARK, padPrompts()) + ".", vec3(0.7f, 1, 0.7f));   // ("B" by default)
+    if (!takeoffAnnounced && contract.type == CT_LESSON) toast("Engine running. Release the parking brake with " + actLabel(ACT_PARK, padPrompts(), true) + ".", vec3(0.7f, 1, 0.7f));   // ("B" by default)
     else if (!takeoffAnnounced) toast("Engine running.", vec3(0.7f, 1, 0.7f));   // (the takeoff clearance is the tower's: updateAtc)
   }
   // gear / flap motor cues
@@ -2627,8 +2684,10 @@ void Game::updateFlight(float dt) {
         vec3 radial = gx * (cosf(a) / 90.f) + gy * (sinf(a) / 90.f);
         vec3 tang = gx * (-sinf(a) / 90.f) + gy * (cosf(a) / 90.f);
         vec3 nrm = normalize(cross(gx, gy));
+        const size_t n0 = particles.size();
         spawn(gc + radial * (rr * 90.f), tang * r.range(6.f, 16.f) + radial * r.range(-8.f, 2.f) + nrm * r.range(-4.f, 4.f), r.range(0.8f, 1.6f), r.range(2.5f, 5.f), -1.5f,
               vec3(0.3f, 1.f, 0.6f) * r.range(2.f, 4.f), 1.f, SPR_SPARK, 0.6f, 0.f);
+        if (particles.size() > n0) particles.back().gate = true;
       }
     }
     float cpDist = length(plane.pos - wp);
@@ -2645,8 +2704,10 @@ void Game::updateFlight(float dt) {
           float a = r.range(0, 6.2832f);
           vec3 radial = gx * (cosf(a) / 90.f) + gy * (sinf(a) / 90.f);
           vec3 nrm = normalize(cross(gx, gy));
+          const size_t n0 = particles.size();
           spawn(gc + radial * 78.f, radial * r.range(30.f, 90.f) + nrm * r.range(-25.f, 25.f) + plane.vel * 0.3f, r.range(0.8f, 1.8f), r.range(3.f, 6.f), -1.5f,
                 (k % 3 ? vec3(0.4f, 1.f, 0.7f) : vec3(1.f, 1.f, 0.8f)) * r.range(2.f, 5.f), 1.f, SPR_SPARK, 1.4f, -3.f);
+          if (particles.size() > n0) particles.back().gate = true;
         }
       }
       wpIndex++; result.wpDone = wpIndex; shake(0.1f);
@@ -2699,16 +2760,16 @@ void Game::updateFlight(float dt) {
       if (onField && wpsLeft && !parkingBrake) {
         if (stillTimer >= 1.25f && stillTimer - dt < 1.25f) {   // (the first line as recorded for the voice)
           toast("Checkpoints remaining - take off again to continue", vec3(1, 0.8f, 0.4f));
-          toast(expandHint("Or set the parking brake ({parkingBrake}) to end the leg here", padPrompts()), vec3(1, 0.8f, 0.4f), false);
+          toast(expandHint("Or set the parking brake ({parkingBrake}) to end the leg here", padPrompts(), true), vec3(1, 0.8f, 0.4f), false);
         }
       } else if (waits) {
         if (!arrivalTold) {
           arrivalTold = true;
           if (ap == contract.to) {
             toast(fmt("Welcome to %s", g_world.airports[ap].name), vec3(0.6f, 1, 0.7f), false);
-            toast(expandHint("Taxi clear of the runway, then set the parking brake ({parkingBrake}) to finish", padPrompts()), vec3(0.85f, 0.95f, 1.f), false);
-            if (contract.payout > 0 && !engineShutDown) toast(expandHint("Shut down first (hold {engine}) for the airmanship bonus", padPrompts()), vec3(0.85f, 0.95f, 1.f), false);
-          } else toast(expandHint(fmt("Landed at %s: set the parking brake ({parkingBrake}) to end the flight here, or take off again", g_world.airports[ap].name), padPrompts()), vec3(1, 0.8f, 0.4f), false);
+            toast(expandHint("Taxi clear of the runway, then set the parking brake ({parkingBrake}) to finish", padPrompts(), true), vec3(0.85f, 0.95f, 1.f), false);
+            if (contract.payout > 0 && !engineShutDown) toast(expandHint("Shut down first (hold {engine}) for the airmanship bonus", padPrompts(), true), vec3(0.85f, 0.95f, 1.f), false);
+          } else toast(expandHint(fmt("Landed at %s: set the parking brake ({parkingBrake}) to end the flight here, or take off again", g_world.airports[ap].name), padPrompts(), true), vec3(1, 0.8f, 0.4f), false);
         }
       } else if (onField && ap == contract.to && !wpsLeft) { endFlight(true, ""); return; }
       else if (onField) { result.divertedTo = ap; endFlight(false, fmt(wpsLeft ? "Leg ended at %s with checkpoints remaining" : "Diverted to %s", g_world.airports[ap].name), OUT_DIVERTED); return; }
@@ -2733,7 +2794,7 @@ void Game::updateFlight(float dt) {
 void Game::updateLessonHint() {
   phase = computePhase();
   if (contract.hints.size() <= (size_t)phase || contract.hints[phase].empty()) return;
-  hint = expandHint(contract.hints[phase], padPrompts());   // every frame: device switches and rebinding stay current
+  hint = expandHint(contract.hints[phase], padPrompts(), true);   // every frame: device switches and rebinding stay current
   if (phase == lastHintPhase) return;
   lastHintPhase = phase;
   const std::string key = contract.id + ".phase" + std::to_string(phase);
@@ -2943,7 +3004,7 @@ void Game::updateCamera(float dt) {
 void Game::gamepadMenus(float dt) {
   if (!windowFocused) return;
   if (fabsf(in.mdx) + fabsf(in.mdy) > 0.5f) padCursorT = -100.f;
-  bool menus = screen != SCR_FLIGHT || paused || crashed;
+  bool menus = (screen != SCR_FLIGHT || paused || crashed) && !photo.on;   // (photo mode's sticks fly its camera)
   if (!in.pad || !menus) { if (padHoldA && !(in.buttons & PAD_A)) { in.mDown[0] = false; padHoldA = false; } return; }
   auto dz = [](float v) { return fabsf(v) < 0.15f ? 0.f : (v - (v > 0 ? 0.15f : -0.15f)) / 0.85f; };
   float sx = dz(in.lx), sy = dz(in.ly);
@@ -3090,7 +3151,7 @@ void Game::launchResearch() {
     plane.ctl.throttle = 0.7f; takeoffAnnounced = true;
     settleAirborneStart();   // (startFlight parked it for a start on the ground)
     camQ = plane.q; camPos = plane.pos + plane.q.rotate(vec3(0, 4, 26));
-  } else if (wr) toast(expandHint("{flapsDown}/{flapsUp}: tilt the four thruster pods fully down for vertical takeoff",padPrompts()), vec3(0.7f, 0.9f, 1));
+  } else if (wr) toast(expandHint("{flapsDown}/{flapsUp}: tilt the four thruster pods fully down for vertical takeoff",padPrompts(),true), vec3(0.7f, 0.9f, 1));
   combatBasePayload=plane.payload; syncCombatPayload();
   prevMach = 0;
 }
@@ -3891,9 +3952,10 @@ FrameParams Game::buildFrame() {
                             : normalize(plane.pos + vec3(0, plane.spec->fusRad * 0.3f, 0) - camPos);
     vec3 upRef = camMode == 1 ? plane.up() : vec3(0, 1, 0);
     if (camMode == 0) upRef = normalize(lerp(vec3(0, 1, 0), camQ.rotate(vec3(0, 1, 0)), 0.3f));
+    if (photo.on) { camPos = photo.pos; fwd = photoForward(); upRef = photoUp(); }   // (photo mode's free camera)
     if (dbgCam && dbgFollow) { dbgCamPos = plane.pos + dbgFollowOff; dbgCamLook = plane.pos; }
     if (dbgCam) { camPos = dbgCamPos; fwd = normalize(dbgCamLook - dbgCamPos); upRef = vec3(0, 1, 0); }
-    if (screen == SCR_FLIGHT && !dbgCam && camMode != 3 && set.camShake > 0.f) {   // (the shake: small turns of the view, 2-5 Hz)
+    if (screen == SCR_FLIGHT && !dbgCam && !photo.on && camMode != 3 && set.camShake > 0.f) {   // (the shake: small turns of the view, 2-5 Hz)
       const float a = (shakeTrauma * shakeTrauma + shakeBuffet) * set.camShake * (camMode == 1 ? 0.7f : 1.f);
       if (a > 1e-4f) {
         const float t = shakeT;
@@ -3913,6 +3975,17 @@ FrameParams Game::buildFrame() {
     if (camMode == 0 && set.speedFov && screen == SCR_FLIGHT && plane.spec)   // (the chase view widens a little with speed: up to 5 deg past cruise)
       fp.fovY += smoothstepf(0.6f, 1.6f, length(plane.vel) / std::max(plane.spec->cruise, 20.f)) * 5.f * DEG;
     if (screen == SCR_LOADING && militaryFlight) militaryLoadingCamera(fp);
+    if (photo.on) {   // (photo mode: its lens, exposure, vignette, grade and frame)
+      fp.fovY = photo.fov * DEG;
+      fp.exposure *= exp2f(photo.ev);
+      fp.vignette = photo.vignette;
+      fp.grade[0] = photo.saturation; fp.grade[1] = photo.contrast; fp.grade[2] = photo.warmth;
+      const float aspect = (float)std::max(g_ren.W, 1) / std::max(g_ren.H, 1);
+      static const float kFrame[4] = {0.f, 2.39f, 1.85f, 1.f};   // (none, the cinema's, the wide screen's, a square)
+      const float want = kFrame[std::clamp(photo.frame, 0, 3)];
+      fp.bars[0] = want > 0.f && want < aspect ? 0.5f * (1.f - want / aspect) : 0.f;
+      fp.bars[1] = want > 0.f && want > aspect ? 0.5f * (1.f - aspect / want) : 0.f;
+    }
     g_audio.setView(fp.camPos,fp.camRight,fp.camUp,-fp.camBack);
     fp.landLight = landingLight && plane.engineRunning ? (0.3f + 0.7f * fp.night) : 0.f;
     fp.landLightPos = plane.pos + plane.forward() * (plane.spec->fusLen * 0.4f);
@@ -4582,13 +4655,15 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
         pl = l; pr = r; pa = fa; pu = uu;
       }
     };
-    // the route: the leg being flown (from the gate just passed), brightest, then on through the next two gates
-    for (int i = std::max(wpIndex, 1) - 1; i < wpIndex + 2; i++) {
+    // the route: the leg being flown (from the gate just passed), brightest, then on through the next two gates (not in
+    // photo mode's shots unless it shows them)
+    const bool markers = !photo.on || photo.markers;
+    for (int i = std::max(wpIndex, 1) - 1; markers && i < wpIndex + 2; i++) {
       vec3 c0, ax0, ay0, c1, ax1, ay1;
       if (ringGeom(i, c0, ax0, ay0) && ringGeom(i + 1, c1, ax1, ay1)) route(c0, ax0, c1, ax1, vec3(0.9f, 0.32f, 1.f), i < wpIndex ? 1.f : i == wpIndex ? 0.75f : 0.4f);
     }
     // checkpoint gates: the active one spins and breathes
-    for (int i = wpIndex; i < (int)contract.wps.size() && i < wpIndex + 3; i++) {
+    for (int i = wpIndex; markers && i < (int)contract.wps.size() && i < wpIndex + 3; i++) {
       vec3 c, ax, ay;
       ringGeom(i, c, ax, ay);
       bool act = i == wpIndex;
@@ -4598,6 +4673,7 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
       if (act) quadAx(add, c, ax * 1.25f, ay * 1.25f, col * 0.35f, 0.2f, SPR_SHOCK, 5.f);   // faint outer halo
     }
     for (const RingBurst& b : bursts) {
+      if (!markers) break;
       float k = b.t / 0.9f, s = 1.f + 2.2f * (1.f - (1.f - k) * (1.f - k));
       quadAx(add, b.c, b.ax * s, b.ay * s, b.col * 3.f, (1.f - k) * (1.f - k), SPR_SHOCK, 5.f);
       if (k < 0.35f) bill(add, b.c, 90.f * (0.5f + k * 3.f), b.col * 2.f * (1.f - k / 0.35f), 1.f, SPR_GLOW, 5.f);
@@ -4653,6 +4729,7 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
   std::sort(order.begin(), order.end(), [](auto& a, auto& b) { return a.first < b.first; });
   for (auto& o : order) {
     const Particle& p = *o.second;
+    if (p.gate && photo.on && !photo.markers) continue;   // (photo mode: the gates' sparks go with the gates)
     float fade = clampf(p.life / p.maxLife, 0, 1);
     float a = p.alpha * (p.kind == SPR_FIRE || p.instant ? fade : fade * smoothstepf(0.f, 0.15f, 1.f - fade + 0.15f));
     if (p.kind == SPR_SPARK) {   // hot embers: streaks along their motion relative to the camera (1/60 s shutter)
@@ -4987,7 +5064,7 @@ void Game::updateComms(float dt) {
     const char* say[4] = {"STALL", "PULL UP", "GEAR!", nullptr};
     for (int i = 0; i < 4; i++) {
       if (w[i] && (!warnWas[i] || realTime - warnLastT[i] > 8.f)) {
-        std::string m = say[i] ? say[i] : "ENGINE OFF - press " + actLabel(ACT_ENGINE, padPrompts()) + " to restart";
+        std::string m = say[i] ? say[i] : "ENGINE OFF - press " + actLabel(ACT_ENGINE, padPrompts(), true) + " to restart";
         AtcVoice::Tx tx;
         if (atc.resolve(m, contract.id, padPrompts(), tx)) { tx.prio = std::max(tx.prio, 95); tx.key = kWarnKey + i; atc.say(tx); }   // (said only while it still holds)
         warnLastT[i] = realTime;
@@ -5156,12 +5233,13 @@ void Game::update(float dt) {
     // Auto (quality_governor.h): the screen's edges coarser first where the card has foveated shading, then the render
     // scale, each step kept only if the GPU's frame time shows it paid; back the other way when there is room
     autoRes.vrs = set.foveate && g_ren.vrsAvailable;
-    if (set.resMode == 1) {
+    if (set.resMode == 1 && !photo.on) {
       // (the GPU budget of the frame-rate target, with 8% to spare)
       autoRes.frame(dt, g_ren.gpuMs, 1000.f / effectiveHz() * 0.92f);
       g_ren.foveation = autoRes.foveation;
       want = autoRes.scale;
     } else { autoRes.reset(); g_ren.foveation = 0.f; }
+    if (photo.on) want = 1.f;   // (photo mode: every pixel at the full resolution, all of it fully shaded)
     want = floorf(want * 20.f + 0.5f) / 20.f;   // 5% steps: the targets are rebuilt only when it changes
     if (fabsf(g_ren.renderScale - want) > 1e-3f) g_ren.setRenderScale(want);
   }
@@ -5176,7 +5254,7 @@ void Game::update(float dt) {
   armInputs();
   // gamepad: both bumpers held together for a second hides the whole flight UI; again brings it back (not while the
   // XR-40's weapons are armed: the bumpers are its triggers then; the pause menu has the same switch)
-  bool bumpersFree = !(screen == SCR_FLIGHT && plane.spec && plane.spec->special == 2 && somnus.armed);
+  bool bumpersFree = !(screen == SCR_FLIGHT && plane.spec && plane.spec->special == 2 && somnus.armed) && !photo.on;
   if (in.pad && bumpersFree && (in.buttons & PAD_LB) && (in.buttons & PAD_RB)) {
     bumperHold += dt;
     if (bumperHold >= 1.f && !bumperFired) { bumperFired = true; uiHidden = !uiHidden; g_audio.trigger(SFX_CLICK); }
@@ -5221,7 +5299,9 @@ void Game::update(float dt) {
   for (size_t i = 0; i < achShow.size() && i < 1; i++) achShow[i].t += dt;   // (the banner on show)
   if (!achShow.empty() && achShow.front().t > 4.5f) achShow.erase(achShow.begin());
   if (screen == SCR_FLIGHT) {
-    if (in.pressed[K_ESC] || (in.buttonsPressed & PAD_START)) {
+    if (photo.on) updatePhoto(dt);   // (photo mode: the flight stays paused under it, and the keys are its own)
+    else if (actPressed(ACT_PHOTO) && !settingsFromPause && !freeRegionMap) enterPhoto();
+    else if (in.pressed[K_ESC] || (in.buttonsPressed & PAD_START)) {
       if (freeRegionMap) freeRegionMap = false;
       else if (showMap) showMap = false; else if (showRadio) showRadio = false;
       else if (paused && settingsFromPause && !(in.buttonsPressed & PAD_START)) settingsFromPause = false;   // B / Esc: back to the pause menu
@@ -5232,8 +5312,8 @@ void Game::update(float dt) {
       if (in.pressed[K_TAB] || (in.buttonsPressed & PAD_RIGHT)) cycleApDest(in.down[K_SHIFT] ? -1 : 1);
       if (in.buttonsPressed & PAD_LEFT) cycleApDest(-1);
       if ((in.pressed[K_ENTER] || (in.buttonsPressed & PAD_A)) && apDest >= 0 && !plane.onGround) engageAutopilot();
-    } else if (actPressed(ACT_MINIMAP)) { showMinimap = !showMinimap; toast(showMinimap ? "Minimap shown" : "Minimap hidden"); }
-    if (actPressed(ACT_HUD)) { hudOn = !hudOn; set.hudCam[std::clamp(camMode, 0, 3)] = hudOn; }
+    } else if (!photo.on && actPressed(ACT_MINIMAP)) { showMinimap = !showMinimap; toast(showMinimap ? "Minimap shown" : "Minimap hidden"); }
+    if (!photo.on && actPressed(ACT_HUD)) { hudOn = !hudOn; set.hudCam[std::clamp(camMode, 0, 3)] = hudOn; }
     if (!paused) {
       int nSim = std::max(1, (int)ceilf(simDt / 0.05f - 1e-4f));
       Input frameIn; bool saved = false;   // key presses act once: the catch-up steps see the held state without the press edges
@@ -5387,6 +5467,11 @@ void Game::render() {
   if(screen==SCR_RESEARCH){g_ren.onMeshProgress=nullptr;g_ren.onMeshBatch=nullptr;}
   if (screen == SCR_RESEARCH && !resWarm) g_ren.bakeYield = nullptr;
   if (sceneOnly) return;
+  if (photo.on && photo.capture && screen == SCR_FLIGHT) {   // (the shot: the scene just drawn, before any of the UI)
+    photo.capture = 0;
+    photo.last = savePhoto(); photo.savedT = realTime;
+    if (!photo.last.empty()) g_audio.trigger(SFX_CHIME, 0.5f);
+  }
   g_ren.uiBegin();
   if (vid > 1) {   // cover the window, cropping the 16:9 picture as needed
     float W = (float)g_ren.W, H = (float)g_ren.H, ar = 16.f / 9.f, sa = W / H;
@@ -5400,6 +5485,7 @@ void Game::render() {
     case SCR_FREE_FLIGHT: drawFreeFlightSetup(fp); break;
     case SCR_HUB: drawHub(); break;
     case SCR_FLIGHT:
+      if (photo.on) { drawPhotoPanel(); break; }   // (photo mode: its own panel, or nothing)
       if (!uiHidden || paused || showMap) {   // (the HUD under the g-force lens, flushed on its own: the map and the pause menu stay clear of it)
         g_ren.flushUIPublic(); g_ren.uiGLoad = fp.gLoad; g_ren.uiTime = fp.time;
         drawHud(fp); g_ren.flushUIPublic(); g_ren.uiGLoad = 0;
@@ -5413,9 +5499,9 @@ void Game::render() {
     case SCR_RESEARCH: drawResearch(fp); break;
     case SCR_LOADING: drawLoading(); break;
   }
-  if (!(uiHidden && screen == SCR_FLIGHT && !paused)) { drawToasts(); drawAchievementBanner(); }
+  if (!(uiHidden && screen == SCR_FLIGHT && !paused) && !photo.on) { drawToasts(); drawAchievementBanner(); }
   drawPadCursor();
-  if (!headless) {   // always-on frame-rate counter, top right
+  if (!headless && !photo.on) {   // always-on frame-rate counter, top right
     float s = S(), fps = 1.f / std::max(fpsAvg, 1e-4f);
     std::string t = fmt("%.0f FPS", fps);
     float ts = 13 * s, tw = g_ren.textWidth(t, ts);
@@ -5423,7 +5509,7 @@ void Game::render() {
     g_ren.rect(g_ren.W - tw - 18 * s, 4 * s, tw + 14 * s, ts + 8 * s, vec3(0, 0, 0), 0.45f, 3 * s);
     g_ren.text(g_ren.W - 11 * s, 7 * s, ts, t, c, 1, 2, false);
   }
-  if (showPerf) {
+  if (showPerf && !photo.on) {
     float s = S();
     std::string t = fmt("%.0f fps  %.1f ms   GPU %s   res %.0f%% (%dx%d)", 1.f / std::max(fpsAvg, 1e-4f), fpsAvg * 1000.f,
                         g_ren.gpuMs > 0 ? fmt("%.1f ms", g_ren.gpuMs).c_str() : "n/a", g_ren.renderScale * 100.f,
@@ -5871,6 +5957,14 @@ void Game::debugScene(const std::string& name) {
     }
     for (int i = 0; i < 30; i++) updateCamera(0.1f);
     for (int i = 0; i < (name == "rings" ? 60 : 42); i++) { realTime += 1 / 30.f; update(1 / 30.f); }
+    if (getenv("PHOTO")) {   // (PHOTO=<look 0-4>: photo mode over the scene; PHOTOFRAME=<0-3>; PHOTOPANEL=0: without its panel; PHOTOSHOT=<folder>: the shot taken, saved there)
+      botControl = false; enterPhoto(); botControl = true;
+      photoLook(atoi(getenv("PHOTO")));
+      if (getenv("PHOTOFRAME")) photo.frame = atoi(getenv("PHOTOFRAME"));
+      if (getenv("PHOTOPANEL")) photo.panel = atoi(getenv("PHOTOPANEL")) != 0;
+      if (getenv("PHOTOSHOT")) { photoDir = getenv("PHOTOSHOT"); photo.capture = 1; }
+      if (getenv("PHOTOPAD")) in.pad = true;   // (PHOTOPAD: the panel's controller prompts)
+    }
     return;
   }
   if (name.compare(0, 8, "airbreak") == 0) {   // XR-30 overstressed at speed: breaks up in the air; airbreak<seconds after>
@@ -6225,7 +6319,8 @@ void Game::debugScene(const std::string& name) {
   if (name == "top") { camMode = 2; camYaw = 0.3f; camPitch = 1.35f; camZoom = 4.f; }
   if (name == "orbit") { camMode = 2; camYaw = 2.3f; camPitch = 0.25f; camZoom = 0.6f; timeOfDay = 9.0f; }
   for (int i = 0; i < 30; i++) updateCamera(0.1f);
-  if (name == "hud") hint = contract.hints.size() ? expandHint(contract.hints[2], padPrompts()) : "";
+  if (name == "hud" && getenv("PADPROMPTS")) { in.pad = true; padActive = true; }   // (PADPROMPTS: the hints as a controller shows them)
+  if (name == "hud") hint = contract.hints.size() ? expandHint(contract.hints[2], padPrompts(), true) : "";
   if (name == "gps" || name == "pause" || name == "minimap") {
     plane.reset(&kAircraft[1], vec3(-4000, 600, 9000), 40, kAircraft[1].maxFuel, 100, true, kAircraft[1].cruise);
     takeoffAnnounced = true; camQ = plane.q; hint.clear(); toasts.clear();

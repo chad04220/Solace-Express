@@ -79,7 +79,7 @@ bool Game::militaryButton(uint32_t id,float x,float y,float w,float h,const std:
 }
 
 void Game::drawMilitary(const FrameParams& fp) {
-  if (career.flights < kMilitaryFlights && career.military.sorties == 0) { drawMilitaryLocked(); return; }   // (cleared with ten flights logged; a record already begun stays open)
+  if (demo || (career.flights < kMilitaryFlights && career.military.sorties == 0)) { drawMilitaryLocked(); return; }   // (the demo: a teaser; else cleared with ten flights logged, and a record already begun stays open)
   if(in.pressed[K_ESC]) { in.pressed[K_ESC]=false;in.pressed[K_ENTER]=false;hubList=0;militaryView.release();return; }
   (void)fp; // The live aircraft is rendered by militaryPreviewCamera before the UI.
   const float s=militaryScale(S()),W=float(g_ren.W),H=float(g_ren.H);
