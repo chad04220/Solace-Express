@@ -534,7 +534,7 @@ void Renderer::drawFarRegions(const FrameParams& fp, bool warm) {
   const bool stagedPriorDrawable = worldStage.active && compatible(worldStage.farProxy) && worldStage.farProxy.ready &&
     worldStage.farProxy.accepted && worldStage.farProxy.vao && worldStage.farProxy.count > 0 && previousFarRegion.regionId == worldStage.farProxy.regionId;
   if (previousFarRegion.regionId != g_world.regionId && !stagedPriorDrawable && compatible(previousFarRegion)) draw(previousFarRegion);
-  if (!warm && horizonContext) {
+  if (!warm && horizonContext && !g_world.earthChart) {   // (the generated regions' silhouettes: never on the real Earth)
     const auto viewer = regionTravel::Chart(activeOrigin).position(fp.camPos);
     const double reach = geo::radius() * (acos(geo::radius() / (geo::radius() + std::max(0., viewer.height))) +
       acos(geo::radius() / (geo::radius() + horizon::kSummitHeight))) + sqrt(2.) * WORLD_HALF;

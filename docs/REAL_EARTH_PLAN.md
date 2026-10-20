@@ -261,6 +261,33 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
 | **E7** career | real airports' boards, travel and long hauls between them, a spatial index for ATC, the GPS and the board; the career keeps Solace as its start | jobs anywhere |
 | **E8** realism | secondary runways, airport layouts by size, rivers, regional building styles, night lights by population, landmarks | polish |
 
+### 6.1 Where it stands
+
+- **E1, E1b:** done. `tools/earth2` builds the dev pack and the fixture; `src/earth_data.*` reads them, with parity
+  tests against the Python sampler (`earth_data`, `earth2_pack`).
+- **E2:** the first part is in. These pieces work:
+  - `World::buildEarth` (`src/world_earth.cpp`) and the lattice and names (`src/earth_charts.*`).
+  - The Free Flight "Real Earth" picker, which searches by ident, name or town.
+  - `earth_chart_test`.
+  - The fixture's chart (Martha's Vineyard) builds in about 8 s; Boston's in about 34 s.
+
+  Changes from section 3.2 so far:
+  - The chart-local `terrainFbm` is scaled down (`World::detailScale`, 0.2 on Earth). Its amplitude comes from the
+    slope and the source's resolution. Geographic noise on the sphere waits for E4, where charts must agree.
+  - The sea also takes class 80 at sea level (salt marsh and estuaries the cover calls water). Inland lakes aren't
+    painted as water yet.
+  - GRIP edges are cut 1.5 km inside the square. Local roads (GRIP class 5) come from a separate `lroads` layer.
+  - Towns: the 24 largest places, merged where they overlap.
+  - The road grid's GPU data is an index list plus a segment table: 40 MB for Boston, down from 136 MB. The forest
+    noise moved to the road grid's second channel, so a texel's first entry has 26 bits.
+
+  Still open in E2:
+  - lakes as water;
+  - Boston's build time, against the 10 s budget (the mask bake ~12 s, the settlements' streets ~5 s, the road grid
+    ~5 s);
+  - towns chosen nearer the start, not only by population;
+  - the overlap-agreement test in section 7.
+
 Decisions taken with the defaults (the owner can change them):
 - The generated regions keep working until E6. In real-Earth play the real world replaces them; they stay available
   as a "Generated Earth" choice in Free Flight.

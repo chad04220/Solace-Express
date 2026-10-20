@@ -1,0 +1,386 @@
+// Somnium Volandi - a chart of the real Earth built from the Earth pack (docs/REAL_EARTH_PLAN.md section 3): the
+// terrain from GLO-90 (or ETOPO where it isn't loaded), less the canopy and the roofs the surface model holds; the sea
+// where the land cover says, its floor from ETOPO shelving away from the coast; the land cover as the ground's
+// lushness, coldness, farmland and forest; the real airports on their own levelled grounds; the towns from GeoNames;
+// the real roads laid on the ground. Then the rest of the World's pipeline as for any chart.
+#include "world.h"
+#include "earth_charts.h"
+#include "region_travel.h"
+#include "scenery.h"
+#include "world_load_progress.h"
+#include <map>
+#include <stdexcept>
+
+namespace {
+constexpr float kAirportMargin = 3000.f;   // (an airport's runway this far inside the square at least)
+constexpr float kRoadMargin = 1500.f;      // (the roads cut this far inside it)
+constexpr size_t kMaxAirports = 40, kMaxTowns = 24;
+constexpr float kEarthDetailScale = 0.2f;  // (World::detailScale: the data has the relief; the detail adds a little)
+
+// What the surface model holds above the ground for each cover class (m): the canopy of a closed or an open forest,
+// the roofs of a built-up area, the scrub of a shrubland
+float canopyOf(int cover) {
+  if (earth::coverClosedForest(cover)) return 12.f;
+  if (earth::coverForest(cover)) return 5.f;
+  if (cover == earth::COVER_BUILT) return 4.f;
+  if (cover == earth::COVER_SHRUBS) return 1.f;
+  return 0.f;
+}
+// How lush the ground grows for each class (hm's third channel, 0 bare .. 1 rainforest)
+float lushOf(int cover, double lat) {
+  if (earth::coverForest(cover)) {
+    const int type = earth::coverForestType(cover);
+    const float tropical = std::fabs(lat) < 23.5 && type == 2 ? 1.f : 0.f;   // (evergreen broadleaf in the tropics)
+    return earth::coverClosedForest(cover) ? 0.86f + 0.12f * tropical : 0.74f + 0.1f * tropical;
+  }
+  switch (cover) {
+    case earth::COVER_CROPLAND: return 0.72f;
+    case earth::COVER_HERBACEOUS: return 0.58f;
+    case earth::COVER_WETLAND: return 0.8f;
+    case earth::COVER_SHRUBS: return 0.4f;
+    case earth::COVER_BUILT: return 0.5f;
+    case earth::COVER_MOSS: return 0.28f;
+    case earth::COVER_BARE: return 0.08f;
+    case earth::COVER_SNOW: return 0.15f;
+    default: return 0.55f;
+  }
+}
+// Runway surfaces: the pack's codes to the game's
+int surfaceOf(int s, int type) {
+  switch (s) {
+    case 1: case 2: return SURF_ASPHALT;
+    case 3: case 5: return SURF_GRASS;
+    case 4: return SURF_GRAVEL;
+    case 6: return SURF_SAND;
+    case 8: return SURF_SNOW;
+    default: return type >= 1 ? SURF_ASPHALT : SURF_GRASS;
+  }
+}
+// A separable box blur of radius r texels, twice (near enough a Gaussian), over an N x N grid
+void blur(std::vector<float>& v, int n, int r) {
+  std::vector<float> tmp(v.size());
+  for (int pass = 0; pass < 2; pass++) {
+    parallelFor(n, [&](int j) {
+      const float* row = &v[(size_t)j * n];
+      float sum = 0; int cnt = 0;
+      for (int i = -r; i <= r; i++) if (i >= 0 && i < n) { sum += row[i]; cnt++; }
+      for (int i = 0; i < n; i++) {
+        tmp[(size_t)j * n + i] = sum / cnt;
+        const int out = i - r, in = i + r + 1;
+        if (out >= 0) { sum -= row[out]; cnt--; }
+        if (in < n) { sum += row[in]; cnt++; }
+      }
+    });
+    parallelFor(n, [&](int i) {
+      float sum = 0; int cnt = 0;
+      for (int j = -r; j <= r; j++) if (j >= 0 && j < n) { sum += tmp[(size_t)j * n + i]; cnt++; }
+      for (int j = 0; j < n; j++) {
+        v[(size_t)j * n + i] = sum / cnt;
+        const int out = j - r, in = j + r + 1;
+        if (out >= 0) { sum -= tmp[(size_t)out * n + i]; cnt--; }
+        if (in < n) { sum += tmp[(size_t)in * n + i]; cnt++; }
+      }
+    });
+  }
+}
+// The lat/lon box the chart's square lies in, with a margin
+earth::Box chartBox(const regionTravel::Chart& chart, float half) {
+  earth::Box b{90, 180, -90, -180};
+  for (int k = 0; k <= 16; k++) {
+    const float t = -half + 2.f * half * k / 16.f;
+    for (const vec3& p : {vec3(t, 0, -half), vec3(t, 0, half), vec3(-half, 0, t), vec3(half, 0, t)}) {
+      const geo::Position g = chart.position(p);
+      b.south = std::min(b.south, g.latitude); b.north = std::max(b.north, g.latitude);
+      b.west = std::min(b.west, g.longitude); b.east = std::max(b.east, g.longitude);
+    }
+  }
+  b.south -= 0.02; b.north += 0.02; b.west -= 0.03; b.east += 0.03;
+  return b;
+}
+} // namespace
+
+void World::buildEarth(const procedural::Descriptor& chartDesc, const std::string& cachePath, const std::string& stamp, bool save) {
+  generationCheckpoint();
+  auto pack = earthCharts::pack();
+  if (!pack) throw std::runtime_error("The real Earth needs its data pack: " + earthCharts::packError());
+  regionRecipe.reset();
+  procedural = true; repeating = false; regionId = chartDesc.id; detailScale = kEarthDetailScale;
+  auto data = std::make_shared<earthCharts::ChartData>();
+  data->descriptor = chartDesc; data->pack = pack;
+  const regionTravel::Chart chart(chartDesc.origin);
+  const earth::Box box = chartBox(chart, WORLD_HALF);
+  earth::Sampler sampler(pack, box, true);
+  data->fineTiles = sampler.fineTiles();
+
+  // ---- the airports: OurAirports' in the square, each on its main runway, the biggest first, none on another's grounds
+  struct Candidate { earth::AirportRecord rec; float x, z, heading, length, width, elev; int size; };
+  std::vector<Candidate> cands;
+  for (auto& a : pack->airports(box)) {
+    if (a.runways.empty()) continue;
+    const earth::Runway& r = a.runways[0];
+    Candidate c; c.size = std::clamp(a.type, 0, 2);
+    if (r.endsKnown) {
+      const vec3 p1 = chart.local({r.lat1, r.lon1, 0}), p2 = chart.local({r.lat2, r.lon2, 0});
+      c.x = 0.5f * (p1.x + p2.x); c.z = 0.5f * (p1.z + p2.z);
+      c.heading = wrapDeg360(atan2f(p2.x - p1.x, -(p2.z - p1.z)) / DEG);
+      c.length = std::max(length(vec3(p2.x - p1.x, 0, p2.z - p1.z)), 300.f);
+    } else {
+      const vec3 p = chart.local({a.lat, a.lon, 0});
+      c.x = p.x; c.z = p.z;
+      // the runway's true heading, or failing that its number's (magnetic: near enough for a strip without one), turned
+      // into the chart's (its north at the field, which the chart's -z is not quite, away from the origin)
+      float hd = r.hasHeading ? r.heading : 0.f;
+      if (!r.hasHeading) { const int n = atoi(r.ident1.c_str()); if (n >= 1 && n <= 36) hd = n * 10.f; }
+      hd += (float)chart.bearing(vec3(c.x, 0, c.z), {a.lat + 0.05, a.lon, 0}).value_or(0.0);
+      c.heading = wrapDeg360(hd); c.length = std::max(r.length, 300.f);
+    }
+    if (std::max(std::fabs(c.x), std::fabs(c.z)) > WORLD_HALF - kAirportMargin - 0.5f * c.length) continue;
+    c.width = r.width > 5.f ? std::min(r.width, 75.f) : (c.size == 2 ? 45.f : c.size == 1 ? 30.f : 20.f);
+    // the runway's height: the ground's along it (the median of nine points: a stray canopy or a ditch doesn't count)
+    float hs[9];
+    const float hd = c.heading * DEG;
+    for (int k = 0; k < 9; k++) {
+      const float t = (k / 8.f - 0.5f) * c.length * 0.9f;
+      const geo::Position g = chart.position(vec3(c.x + sinf(hd) * t, 0, c.z - cosf(hd) * t));
+      hs[k] = sampler.elevation(g.latitude, g.longitude);
+    }
+    std::sort(hs, hs + 9);
+    c.elev = std::max(hs[4], 1.5f);
+    c.rec = std::move(a);
+    cands.push_back(std::move(c));
+  }
+  std::sort(cands.begin(), cands.end(), [](const Candidate& a, const Candidate& b) {
+    return a.size != b.size ? a.size > b.size : a.length != b.length ? a.length > b.length : a.rec.ident < b.rec.ident; });
+  std::vector<Candidate> chosen;
+  for (auto& c : cands) {
+    if (chosen.size() >= kMaxAirports) break;
+    bool clear = true;
+    for (const auto& o : chosen) {
+      const float reach = 0.5f * (c.length + o.length) + 1400.f;
+      if (hypotf(c.x - o.x, c.z - o.z) < reach) { clear = false; break; }
+    }
+    if (clear) chosen.push_back(std::move(c));
+  }
+  data->codes.reserve(chosen.size()); data->names.reserve(chosen.size()); data->blurbs.reserve(chosen.size());
+  for (const auto& c : chosen) {
+    data->codes.push_back(c.rec.ident);
+    data->names.push_back(c.rec.name);
+    std::string where = c.rec.municipality;
+    if (!c.rec.country.empty()) where += (where.empty() ? "" : ", ") + c.rec.country;
+    data->blurbs.push_back(where);
+    data->airports.push_back(c.rec);
+  }
+  airports.clear();
+  for (size_t i = 0; i < chosen.size(); i++) {
+    const auto& c = chosen[i];
+    Airport a{data->codes[i].c_str(), data->names[i].c_str(), c.x, c.z, c.elev, c.heading, c.length, c.width,
+              surfaceOf(c.rec.runways[0].surface, c.size), c.size, data->blurbs[i].c_str()};
+    a.hospital = c.size >= 1;
+    airports.push_back(a);
+  }
+
+  // ---- the towns: GeoNames' places in the square, the biggest first, a smaller one close by taken in by it
+  struct Place { std::string name; float x, z, r; int kind; uint32_t pop; };
+  std::vector<Place> places;
+  for (const auto& p : pack->places(box)) {
+    const vec3 at = chart.local({p.lat, p.lon, 0});
+    if (std::max(std::fabs(at.x), std::fabs(at.z)) > WORLD_HALF - 2500.f) continue;
+    if (sampler.cover(p.lat, p.lon) == earth::COVER_SEA) continue;
+    Place pl; pl.name = p.name; pl.x = at.x; pl.z = at.z; pl.pop = p.population;
+    pl.kind = p.population >= 100000 ? 2 : p.population >= 5000 ? 1 : 0;
+    pl.r = std::clamp(12.f * powf((float)std::max<uint32_t>(p.population, 300), 0.45f), 150.f, 1800.f);
+    places.push_back(pl);
+  }
+  std::sort(places.begin(), places.end(), [](const Place& a, const Place& b) { return a.pop != b.pop ? a.pop > b.pop : a.name < b.name; });
+  std::vector<Place> kept;
+  for (const auto& p : places) {
+    if (kept.size() >= kMaxTowns) break;
+    bool free = true;
+    for (const auto& k : kept) if (hypotf(p.x - k.x, p.z - k.z) < std::max(1.15f * (k.r + p.r), 1500.f)) { free = false; break; }
+    for (const auto& a : airports) if (free && hypotf(p.x - a.x, p.z - a.z) < 0.5f * a.length + p.r + 500.f) free = false;
+    if (free) kept.push_back(p);
+  }
+  data->towns.reserve(kept.size());
+  for (const auto& p : kept) data->towns.push_back(p.name);
+  towns.clear();
+  for (size_t i = 0; i < kept.size(); i++) towns.push_back(Town{data->towns[i].c_str(), kept[i].x, kept[i].z, kept[i].r, kept[i].kind});
+  earthChart = data;
+
+  // the cache: the chart, the pack's content and the build (and the GLO-90 tiles it found: a chart built before its
+  // fine tiles were downloaded is built again once they are)
+  uint64_t h = 1469598103934665603ull;
+  const std::string key = chartDesc.id + ":earth-" + std::to_string(earthCharts::kGeneratorVersion) + ":" + pack->contentId() +
+    ":fine" + std::to_string(data->fineTiles) + ":" + stamp;
+  for (unsigned char ch : key) { h ^= ch; h *= 1099511628211ull; }
+  char cacheStamp[64]; snprintf(cacheStamp, sizeof(cacheStamp), "earth-%016llx", (unsigned long long)h);
+  buildConfigured(cachePath, cacheStamp, save);
+}
+
+// hm from the pack: (base height, detail amplitude, lushness, coldness) per texel, and the land cover kept for the mask
+void World::buildEarthTerrain() {
+  auto& data = *earthChart;
+  const int N = HM_N;
+  const size_t NN = (size_t)N * N;
+  const regionTravel::Chart chart(data.descriptor.origin);
+  earth::Sampler sampler(data.pack, chartBox(chart, WORLD_HALF), true);
+  std::vector<float> elev(NN), bathy(NN, 0.f), lat(NN);
+  std::vector<uint8_t> sea(NN, 0), fine(NN, 0);
+  data.cover.assign(NN, 0);
+  const bool reports = this == &g_world;
+  std::atomic<int> rows{0};
+  parallelFor(N, [&](int j) {
+    for (int i = 0; i < N; i++) {
+      const size_t k = (size_t)j * N + i;
+      const float x = -WORLD_HALF + (i + 0.5f) * HM_TEXEL, z = -WORLD_HALF + (j + 0.5f) * HM_TEXEL;
+      const geo::Position g = chart.position(vec3(x, 0, z));
+      const float e = sampler.elevation(g.latitude, g.longitude);
+      int c = sampler.cover(g.latitude, g.longitude);
+      elev[k] = e; lat[k] = (float)g.latitude; fine[k] = sampler.fine(g.latitude, g.longitude);
+      // the sea: the cover's open sea, and its water at the sea's level - the harbours, the estuaries, the salt ponds
+      // behind the dunes (water at a lake's height stays the lake it is)
+      const bool isSea = (c == earth::COVER_SEA && e <= 2.f) || (c == earth::COVER_WATER && e <= 1.5f) ||
+                         (c == earth::COVER_UNKNOWN && e <= 0.f);
+      sea[k] = isSea;
+      if (isSea) bathy[k] = sampler.coarseElevation(g.latitude, g.longitude);
+      data.cover[k] = (uint8_t)c;
+    }
+    if (reports) worldLoadProgress(.02f + .14f * float(rows.fetch_add(1) + 1) / N);
+  });
+  generationCheckpoint();
+  // the canopy and the roofs the surface model holds, blurred across the classes' edges
+  std::vector<float> canopy(NN);
+  for (size_t k = 0; k < NN; k++) canopy[k] = sea[k] ? 0.f : canopyOf(data.cover[k]);
+  blur(canopy, N, 3);
+  // how far each sea texel is from the land (m, a chamfer distance): the floor shelves away from the coast
+  std::vector<float> toLand(NN, 1e9f);
+  for (size_t k = 0; k < NN; k++) if (!sea[k]) toLand[k] = 0.f;
+  const float T = HM_TEXEL, D = T * 1.41421356f;
+  for (int j = 0; j < N; j++) for (int i = 0; i < N; i++) {
+    float& d = toLand[(size_t)j * N + i];
+    if (i > 0) d = std::min(d, toLand[(size_t)j * N + i - 1] + T);
+    if (j > 0) { d = std::min(d, toLand[(size_t)(j - 1) * N + i] + T); if (i > 0) d = std::min(d, toLand[(size_t)(j - 1) * N + i - 1] + D); if (i + 1 < N) d = std::min(d, toLand[(size_t)(j - 1) * N + i + 1] + D); }
+  }
+  for (int j = N - 1; j >= 0; j--) for (int i = N - 1; i >= 0; i--) {
+    float& d = toLand[(size_t)j * N + i];
+    if (i + 1 < N) d = std::min(d, toLand[(size_t)j * N + i + 1] + T);
+    if (j + 1 < N) { d = std::min(d, toLand[(size_t)(j + 1) * N + i] + T); if (i + 1 < N) d = std::min(d, toLand[(size_t)(j + 1) * N + i + 1] + D); if (i > 0) d = std::min(d, toLand[(size_t)(j + 1) * N + i - 1] + D); }
+  }
+  generationCheckpoint();
+  hm.assign(NN * 4, 0.f);
+  std::vector<float> lush(NN);
+  for (size_t k = 0; k < NN; k++) {
+    float* t = &hm[k * 4];
+    if (sea[k]) {
+      t[0] = std::min(std::clamp(bathy[k], -200.f, -1.f), -0.8f - 0.004f * std::min(toLand[k], 5e4f));
+      t[1] = 0.f;
+    } else {
+      t[0] = std::max(elev[k] - canopy[k], 0.6f);   // (land never below the sea: the sea is everywhere y = 0)
+      t[1] = data.cover[k] == earth::COVER_WATER ? 0.f : 1.f;   // (the amplitude itself below: lakes lie flat)
+    }
+    lush[k] = sea[k] ? 0.f : lushOf(data.cover[k], lat[k]);
+  }
+  blur(lush, N, 1);
+  // the detail's amplitude from the lie of the land: rougher ground more of it; where the fine data isn't there (ETOPO
+  // only, 0.9 km) much more, standing in for the relief it hasn't got
+  parallelFor(N, [&](int j) {
+    for (int i = 0; i < N; i++) {
+      const size_t k = (size_t)j * N + i;
+      float* t = &hm[k * 4];
+      if (t[1] <= 0.f) continue;
+      const int i0 = std::max(i - 1, 0), i1 = std::min(i + 1, N - 1), j0 = std::max(j - 1, 0), j1 = std::min(j + 1, N - 1);
+      const float gx = (hm[((size_t)j * N + i1) * 4] - hm[((size_t)j * N + i0) * 4]) / ((i1 - i0) * HM_TEXEL);
+      const float gz = (hm[((size_t)j1 * N + i) * 4] - hm[((size_t)j0 * N + i) * 4]) / ((j1 - j0) * HM_TEXEL);
+      const float slope = sqrtf(gx * gx + gz * gz);
+      t[1] = fine[k] ? 8.f + 14.f * smoothstepf(0.03f, 0.4f, slope) : 14.f + 60.f * smoothstepf(0.02f, 0.3f, slope);
+      t[1] *= smoothstepf(0.6f, 3.f, t[0]);   // (the shore's flats: little)
+    }
+  });
+  // lushness and coldness: the cover, the latitude and the height (the snowline about 5 km up in the tropics, at sea
+  // level past 75 degrees)
+  for (size_t k = 0; k < NN; k++) {
+    float* t = &hm[k * 4];
+    t[2] = lush[k];
+    const float alat = std::fabs(lat[k]);
+    const float snowline = 5200.f * std::clamp(1.f - (alat - 20.f) / 55.f, 0.f, 1.f);
+    const float coldLat = 0.85f * smoothstepf(52.f, 72.f, alat);
+    const float coldHigh = smoothstepf(snowline - 900.f, snowline, t[0]);
+    t[3] = std::max({coldLat, coldHigh, data.cover[k] == earth::COVER_SNOW ? 1.f : 0.f});
+    if (sea[k]) t[3] = coldLat;
+  }
+  generationCheckpoint();
+  // the airports' grounds: levelled to the runway's height, and the approaches kept clear of the ground (computeTexel's
+  // rules, at a real approach surface's 1 in 20)
+  parallelFor(N, [&](int j) {
+    for (int i = 0; i < N; i++) {
+      float* t = &hm[((size_t)j * N + i) * 4];
+      const float x = -WORLD_HALF + (i + 0.5f) * HM_TEXEL, z = -WORLD_HALF + (j + 0.5f) * HM_TEXEL;
+      for (const Airport& a : airports) {
+        const float hd = a.heading * DEG, dx = x - a.x, dz = z - a.z;
+        const float u = fabsf(dx * sinf(hd) - dz * cosf(hd)), v = fabsf(dx * cosf(hd) + dz * sinf(hd));
+        const float d = u - a.length * 0.5f;
+        if (d > 0 && d < 7000) {
+          const float halfw = 250.f + 0.18f * d;
+          const float wc = (1.f - smoothstepf(halfw, halfw + 900.f, v)) * (1.f - smoothstepf(5000.f, 7000.f, d));
+          const float cap = a.elev + 10.f + 0.05f * d;
+          if (t[0] > cap) { t[0] = lerpf(t[0], cap, wc); t[1] = lerpf(t[1], std::min(t[1], 4.f), wc); }
+        }
+        const float hu = a.length * 0.5f + 260.f, hv = a.size == 2 ? 420.f : 240.f;
+        const float du = std::max(0.f, u - hu), dv = std::max(0.f, v - hv);
+        const float w = 1.f - smoothstepf(0.f, 550.f, sqrtf(du * du + dv * dv));
+        if (w <= 0.f) continue;
+        t[0] = lerpf(t[0], a.elev, w);
+        t[1] *= 1.f - w;
+        t[2] = lerpf(t[2], std::max(t[2], 0.5f), w);
+      }
+    }
+  });
+}
+
+// The pack's roads in the square, each laid on the ground (graded, bridged over water) as the network's own are
+RoadNetwork World::buildEarthRoads() const {
+  RoadNetwork net;
+  const auto& data = *earthChart;
+  const regionTravel::Chart chart(data.descriptor.origin);
+  for (const Town& t : towns) net.nodes.push_back({t.x, t.z, t.kind, 0});
+  for (const Airport& a : airports) net.nodes.push_back({a.x, a.z, 3, 0});
+  const auto edges = data.pack->roads(chartBox(chart, WORLD_HALF - kRoadMargin), false);
+  const float lim = WORLD_HALF - kRoadMargin;
+  for (const auto& e : edges) {
+    generationCheckpoint();
+    RoadClass cls = e.cls == 1 ? RC_HIGHWAY : e.cls == 2 || e.cls == 3 ? RC_ROAD : e.cls == 5 ? RC_TRACK : RC_LANE;
+    std::vector<vec2> run;
+    auto flush = [&]() {
+      if (run.size() >= 2) {
+        float len = 0; for (size_t k = 1; k < run.size(); k++) len += length(run[k] - run[k - 1]);
+        if (len >= 60.f) {
+          const float h0 = groundHeight(run.front().x, run.front().y), h1 = groundHeight(run.back().x, run.back().y);
+          RoadPath p = layRoad(*this, cls, run, std::max(h0, 0.6f), std::max(h1, 0.6f), {}, true);
+          if (p.pts.size() >= 2) net.paths.push_back(std::move(p));
+        }
+      }
+      run.clear();
+    };
+    for (const auto& ll : e.pts) {
+      const vec3 p = chart.local({ll.first, ll.second, 0});
+      if (std::max(std::fabs(p.x), std::fabs(p.z)) > lim) { flush(); continue; }
+      if (!run.empty() && length(vec2(p.x, p.z) - run.back()) < 1.f) continue;
+      run.push_back(vec2(p.x, p.z));
+    }
+    flush();
+    if (net.paths.size() >= 60000) break;   // (RoadSegment's 16-bit path index)
+  }
+  return net;
+}
+
+void earthCharts::maskFields(const ChartData& chart, std::vector<float>& forest, std::vector<float>& farm) {
+  const int N = HM_N;
+  const size_t NN = (size_t)N * N;
+  forest.assign(NN, 0.f); farm.assign(NN, 0.f);
+  if (chart.cover.size() != NN) return;
+  for (size_t k = 0; k < NN; k++) {
+    const int c = chart.cover[k];
+    forest[k] = earth::coverClosedForest(c) ? 1.f : earth::coverForest(c) ? 0.6f : c == earth::COVER_WETLAND || c == earth::COVER_SHRUBS ? 0.25f : 0.f;
+    farm[k] = c == earth::COVER_CROPLAND ? 1.f : c == earth::COVER_HERBACEOUS ? 0.35f : 0.f;
+  }
+  blur(forest, N, 2); blur(farm, N, 2);
+}

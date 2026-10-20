@@ -3,8 +3,8 @@
 //! baked beside it. Assembled after the scene uniforms (uData). Never part of the aircraft bodies' bake (PART_BAKE): its
 //! declarations would change their cache key, and the bake reads no ground.
 #ifndef PART_BAKE
-// uRoadGrid: R32UI per mask texel - the baked forest noise (top 7 bits), how many road entries reach the texel (next
-// 6), the first of them (low 19); the entries are uData's rows from 1 on, two texels each (Renderer's upload):
+// uRoadGrid: RG32UI per mask texel - r: how many road entries reach the texel (top 6 bits) and the first of them (low
+// 26); g: the baked forest noise (0..127). The entries are uData's rows from 1 on, two texels each (Renderer's upload):
 // (a.x, a.z, b.x, b.z), (a.h, b.h, distance along the road at a, class + 8 x flags + 128 x banks-only + 256 x path);
 // flags 1 a bridge's span (the ground below left alone, no paint), 2 by an airfield's grounds (painted on the ground as
 // it is), 4 and 8 its end a or b at a bridge (the platform stopping square at the joint); banks-only: none from this
@@ -35,14 +35,18 @@ float lakeMaskAt(vec2 p){
   return (m[0]*(1.0 - t.x) + m[1]*t.x)*(1.0 - t.y) + (m[2]*(1.0 - t.x) + m[3]*t.x)*t.y;
 }
 float lakeGround(vec2 p, float g){ return lakeMaskAt(p) > 0.5 ? max(g, lakeLevel()) : g; }
-float forestTexel(ivec2 i){ return float(texelFetch(uRoadGrid, clamp(i, ivec2(0), ivec2(MASKN-1)), 0).r >> 25u)/127.0; }
+float forestTexel(ivec2 i){ return float(texelFetch(uRoadGrid, clamp(i, ivec2(0), ivec2(MASKN-1)), 0).g)/127.0; }
 float forestAt(vec2 p){
   if (uUnwrappedWorld != 0 && max(abs(p.x), abs(p.y)) > WH) return 0.0;
   vec2 f = (p + WH)/MTEX - 0.5; vec2 fl = floor(f); ivec2 i = ivec2(fl); vec2 t = f - fl;
   float a = forestTexel(i), b = forestTexel(i + ivec2(1,0)), c = forestTexel(i + ivec2(0,1)), d = forestTexel(i + ivec2(1,1));
   return ((a*(1.0-t.x)+b*t.x)*(1.0-t.y) + (c*(1.0-t.x)+d*t.x)*t.y)*0.875;
 }
-vec4 roadTexel(int i){ return texelFetch(uData, ivec2(i & 4095, 1 + (i >> 12)), 0); }
+// a texel's entries (one float each, four to a texel, from row 1): the segment's index, 2^23 added from where the
+// texel's paving ones end; the segments (two texels each) from the row texel 3 of row 0 names (road_network.h roadEntryRows)
+int roadEntry(int k){ vec4 t = texelFetch(uData, ivec2((k >> 2) & 4095, 1 + (k >> 14)), 0); return int(t[k & 3]); }
+int roadSegmentRow(){ return 1 + int(texelFetch(uData, ivec2(3, 0), 0).x); }
+vec4 roadTexel(int row0, int i){ return texelFetch(uData, ivec2(i & 4095, row0 + (i >> 12)), 0); }
 uint roadHead(vec2 p){ if (uUnwrappedWorld != 0 && max(abs(p.x), abs(p.y)) > WH) return 0u; return texelFetch(uRoadGrid, clamp(ivec2(floor((wrapW(p) + WH)/MTEX)), ivec2(0), ivec2(MASKN-1)), 0).r; }
 float roadHalfPlatform(int c){ return c == 0 ? 16.0 : c == 1 ? 6.5 : c == 2 ? 4.0 : c == 3 ? 2.8 : c == 4 ? 6.0 : c == 5 ? 13.0 : c == 6 ? 16.0 : 7.5; }   // (road_network.h roadSpec)
 float roadHalfPaved(int c){ return c == 0 ? 12.4 : c == 1 ? 4.6 : c == 2 ? 2.9 : c == 3 ? 1.9 : c == 4 ? 3.5 : c == 5 ? 11.0 : c == 6 ? 7.5 : 6.0; }
@@ -53,14 +57,15 @@ float roadBankMax(int c){ return c == 4 || c == 6 ? 20.0 : c == 3 || c == 5 || c
 // exactly.
 float roadGrade(vec2 p, float g){
   uint h = roadHead(p);
-  int n = int((h >> 19u) & 63u);
+  int n = int(h >> 26u);
   if (n == 0) return g;
-  int e0 = int(h & 0x7FFFFu);
+  int e0 = int(h & 0x3FFFFFFu), s0 = roadSegmentRow();
   float W = 0.0, hs = 0.0, ws = 0.0;
   for (int k = 0; k < 63; k++) {
     if (k >= n) break;
-    vec4 a = roadTexel(2*(e0 + k)), b = roadTexel(2*(e0 + k) + 1);
-    int code = int(b.w);
+    int ev = roadEntry(e0 + k), seg = ev & 0x7FFFFF;
+    vec4 a = roadTexel(s0, 2*seg), b = roadTexel(s0, 2*seg + 1);
+    int code = int(b.w) + (ev >> 23)*128;
     if ((code & 24) != 0) continue;
     vec2 ab = a.zw - a.xy; float L2 = max(dot(ab, ab), 1e-3), L = sqrt(L2), tr = dot(p - a.xy, ab)/L2, t = clamp(tr, 0.0, 1.0);
     float d = length(a.xy + ab*t - p), P = roadHalfPlatform(code & 7);
@@ -91,17 +96,18 @@ struct RoadHit { bool on; float across, along; vec2 dir; int cls; bool junction;
 RoadHit noRoad(){ RoadHit r; r.on = false; r.across = 1e9; r.along = 0.0; r.dir = vec2(1.0, 0.0); r.cls = 1; r.junction = false; r.edge = 1e9; r.nr = vec3(0.0, 1.0, 0.0); return r; }
 RoadHit roadQuery(vec2 p){
   RoadHit r = noRoad();
-  uint h = roadHead(p); int n = int((h >> 19u) & 63u);
+  uint h = roadHead(p); int n = int(h >> 26u);
   if (n == 0) return r;
-  int e0 = int(h & 0x7FFFFu), path = -1;
+  int e0 = int(h & 0x3FFFFFFu), path = -1, s0 = roadSegmentRow();
   float best = 1e9, other = 1e9;   // (other: the nearest platform of any road but the nearest's)
   for (int k = 0; k < 63; k++) {
     if (k >= n) break;
-    vec4 b = roadTexel(2*(e0 + k) + 1);
+    int ev = roadEntry(e0 + k), seg = ev & 0x7FFFFF;
+    if ((ev >> 23) != 0) break;   // (the rest only bank the ground here)
+    vec4 b = roadTexel(s0, 2*seg + 1);
     int code = int(b.w);
-    if ((code & 128) != 0) break;   // (the rest only bank the ground here)
     if ((code & 8) != 0) continue;   // (a bridge's span)
-    vec4 a = roadTexel(2*(e0 + k));
+    vec4 a = roadTexel(s0, 2*seg);
     int c = code & 7, pid = code >> 8;
     vec2 ab = a.zw - a.xy; float L = max(length(ab), 1e-3), tr = dot(p - a.xy, ab)/(L*L), t = clamp(tr, 0.0, 1.0);
     if (((code & 32) != 0 && tr < 0.0) || ((code & 64) != 0 && tr > 1.0)) continue;   // (past an end at a bridge: under its deck)
@@ -126,7 +132,9 @@ vec3 roadNormal(RoadHit r, vec3 n){ return normalize(mix(n, r.nr, 1.0 - smoothst
 // (the bake: inert stand-ins, so the world library still compiles as assembled; nothing it runs calls them, and the
 // pruner drops them with everything else unreachable)
 float forestAt(vec2 p){ return 0.0; }
-vec4 roadTexel(int i){ return vec4(0.0); }
+vec4 roadTexel(int row0, int i){ return vec4(0.0); }
+int roadEntry(int k){ return 0; }
+int roadSegmentRow(){ return 0; }
 uint roadHead(vec2 p){ return 0u; }
 float roadHalfPlatform(int c){ return 0.0; }
 float roadHalfPaved(int c){ return 0.0; }

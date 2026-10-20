@@ -12,6 +12,7 @@
 #include <map>
 #include "world.h"
 #include "procedural_regions.h"
+#include "earth_data.h"
 #include "region_travel.h"
 #include "aircraft.h"
 #include "breakup.h"
@@ -194,6 +195,12 @@ private:
   std::vector<procedural::Descriptor> freeRegions;
   int freeRegion = 0;
   bool freeRegionMap = false;
+  // Free Flight on the real Earth (earth_charts.h): the airport picker, what's typed into it, the matches, and the
+  // airport chosen (started at once its chart is loaded)
+  bool freeEarthPicker = false;
+  std::string earthQuery, earthResultsFor = "\x01", freeEarthIdent;
+  std::vector<earth::AirportRecord> earthResults;
+  int earthPick = 0;
   procedural::Descriptor loadingRegion;
   GameScreen regionAfterLoad = SCR_FREE_FLIGHT;
   std::future<std::vector<uint8_t>> regionJob;
@@ -254,6 +261,8 @@ private:
   void updateRegionLoading(float dt);
   void drawRegionLoading();
   void drawRegionPicker();
+  void drawEarthAirportPicker();
+  void chooseEarthAirport(const earth::AirportRecord& airport);
   void beginFreeFlightSetup();
   // the main menu into the career: its hub on the work tab and list, nothing chosen (never the tab the menu's own
   // Settings or Controls button, or an earlier visit, left it on)

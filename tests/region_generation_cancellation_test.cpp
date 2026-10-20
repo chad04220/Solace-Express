@@ -95,7 +95,7 @@ void cachePublicationTests() {
   bool intendedReplacement = false;
   if (FILE* f = fopen(cache.c_str(), "rb")) {
     uint32_t magic = 0; char stamp[64] = {}; uint64_t count = 0; float payload = 0.f;
-    intendedReplacement = fread(&magic, sizeof(magic), 1, f) == 1 && magic == 0x574c4436u &&
+    intendedReplacement = fread(&magic, sizeof(magic), 1, f) == 1 && magic == 0x574c4437u &&
       fread(stamp, 1, sizeof(stamp), f) == sizeof(stamp) && memcmp(stamp, "second", 7) == 0 &&
       fread(&count, sizeof(count), 1, f) == 1 && count == 1 &&
       fread(&payload, sizeof(payload), 1, f) == 1 && payload == 22.f;

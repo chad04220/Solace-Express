@@ -71,7 +71,7 @@ int main() {
     check(radius[c].empty() || pct(radius[c], 0.05f) >= (c == RC_HIGHWAY ? 0.75f : 0.85f), "bends no tighter than the class's radius off the climbs");
   }
   // ---- every segment listed under the texel at its middle (unless that texel's list is full: a junction's), the lists
-  // all within the 19 bits a texel's first entry has - past them a texel lists nothing, and its roads lie on the ground
+  // all within the bits a texel's first entry has - past them a texel lists nothing, and its roads lie on the ground
   // as it is
   {
     const RoadGrid& g = w.roadGrid;
@@ -83,8 +83,9 @@ int main() {
       for (uint32_t k = RoadGrid::first(h), e = k + RoadGrid::count(h); k < e && !found; k++) found = g.list[k] == si;
       unlisted += !found;
     }
-    printf("the texels' lists: %zu entries of %u; %d segments unlisted\n", g.list.size(), 0x7FFFFu, unlisted);
-    check(unlisted == 0 && g.list.size() + 63 <= 0x7FFFFu, "every segment listed where it lies, the lists within their bits");
+    uint32_t fullest = 0; for (uint32_t h : g.head) fullest = std::max(fullest, RoadGrid::count(h));
+    printf("the texels' lists: %zu entries of %u, the fullest %u long; %d segments unlisted\n", g.list.size(), RoadGrid::kFirstMask, fullest, unlisted);
+    check(unlisted == 0 && g.list.size() + 63 <= RoadGrid::kFirstMask, "every segment listed where it lies, the lists within their bits");
   }
   // ---- the bed: level across the platform, the banks a cut or fill could stand at; where no other road is near
   std::vector<float> tilt[RC_COUNT], bank[RC_COUNT];

@@ -1,6 +1,7 @@
 // Somnium Volandi - menus, hub screens and flight HUD
 #include "aero.h"
 #include "game.h"
+#include "earth_charts.h"
 #include "menu_layout.h"
 #include "hangar_catalog.h"
 #include "ui_identity.h"
@@ -1574,12 +1575,70 @@ void Game::drawRegionPicker() {
   }
 }
 
+// Free Flight on the real Earth: an airport chosen by typing its code or its name (or from the largest, with nothing
+// typed); its chart is loaded and the flight starts there (earth_charts.h)
+void Game::drawEarthAirportPicker() {
+  const float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
+  const float x = 48 * s, w = W - 96 * s;
+  auto pack = earthCharts::pack();
+  g_ren.rect(0, 0, W, H, C_PANEL, .97f);
+  g_ren.text(x, 24 * s, 27 * s, "THE REAL EARTH", C_TEXT, 1);
+  if (button(W - 225 * s, 23 * s, 177 * s, 35 * s, "Back to aircraft") || (in.pressed[K_ESC] && earthQuery.empty())) {
+    freeEarthPicker = false; in.pressed[K_ESC] = false; return;
+  }
+  if (!pack) { g_ren.text(x, 70 * s, 14 * s, "No Earth pack: " + earthCharts::packError(), C_WARN, 1); return; }
+  g_ren.text(x, 67 * s, 13 * s, fmt("Real terrain, coasts, land cover, airports, towns and roads from the Earth pack: %zu airports. Type a code or a name.",
+                                   pack->airportCount()), C_DIM, 1);
+  // the query: typed, Backspace takes a letter off, Esc clears it
+  for (char ch : in.text) if (earthQuery.size() < 40 && ch >= 32 && ch < 127) earthQuery += ch;
+  if (in.pressed[K_BACK] && !earthQuery.empty()) earthQuery.pop_back();
+  if (in.pressed[K_ESC] && !earthQuery.empty()) { earthQuery.clear(); in.pressed[K_ESC] = false; }
+  if (earthResultsFor != earthQuery) { earthResults = earthCharts::searchAirports(earthQuery, 40); earthResultsFor = earthQuery; earthPick = 0; }
+  const float by = 100 * s;
+  g_ren.rect(x, by, std::min(w, 620 * s), 40 * s, C_PANEL2, .95f, 4 * s);
+  g_ren.rectOutline(x, by, std::min(w, 620 * s), 40 * s, C_ACCENT, .7f, 4 * s, 1.5f * s);
+  const bool caret = fmodf(realTime, 1.f) < .55f;
+  g_ren.text(x + 14 * s, by + 10 * s, 18 * s, earthQuery.empty() ? std::string(caret ? "|" : "") + "  (the largest airports)" : earthQuery + (caret ? "|" : ""),
+             earthQuery.empty() ? C_DIM : C_TEXT, 1);
+  const float ly = by + 58 * s, step = 44 * s;
+  const int visible = std::max(1, (int)((H - ly - 30 * s) / step)), n = (int)earthResults.size();
+  if (in.pressed[K_DOWN]) earthPick = std::min(earthPick + 1, std::max(0, n - 1));
+  if (in.pressed[K_UP]) earthPick = std::max(earthPick - 1, 0);
+  const int first = std::clamp(earthPick - visible + 1, 0, std::max(0, n - visible));
+  if (n == 0) g_ren.text(x, ly, 14 * s, "No airport matches.", C_DIM, 1);
+  for (int i = first; i < std::min(n, first + visible); ++i) {
+    const auto& a = earthResults[i];
+    const float ry = ly + (i - first) * step;
+    const bool hov = hovered(x, ry, w, step - 6 * s);
+    card(x, ry, w, step - 6 * s, i == earthPick, hov, C_ACCENT);
+    if (hov && in.mPressed[0]) { earthPick = i; chooseEarthAirport(a); return; }
+    static const char* kinds[] = {"Airfield", "Regional", "International"};
+    const float len = a.runways.empty() ? 0.f : a.runways[0].length;
+    g_ren.text(x + 12 * s, ry + 9 * s, 15 * s, a.ident, C_ACCENT, 1);
+    g_ren.text(x + 110 * s, ry + 6 * s, 14 * s, ellipsize(a.name, w * .55f, 14 * s), C_TEXT, 1);
+    g_ren.text(x + 110 * s, ry + 24 * s, 11 * s, ellipsize(a.municipality + (a.country.empty() ? "" : ", " + a.country), w * .55f, 11 * s), C_DIM, 1);
+    g_ren.text(x + w - 16 * s, ry + 12 * s, 12 * s, fmt("%s / %.0f m", kinds[std::clamp(a.type, 0, 2)], len), C_DIM, 1, 2);
+  }
+  if ((in.pressed[K_ENTER] || (in.buttonsPressed & PAD_A)) && earthPick < n) { in.pressed[K_ENTER] = false; chooseEarthAirport(earthResults[earthPick]); }
+}
+
+void Game::chooseEarthAirport(const earth::AirportRecord& airport) {
+  const auto chart = earthCharts::chartForAirport(airport.ident);
+  if (!chart) return;
+  g_audio.trigger(SFX_CLICK);
+  freeEarthPicker = false; freeEarthIdent = airport.ident;
+  chooseFreeRegion(*chart);
+  loadFreeRegion(freeRegion);
+}
+
 void Game::drawFreeFlightSetup(const FrameParams& fp) {
   (void)fp;
   initFreeRegions();
   if (freeRegionMap) { drawRegionPicker(); return; }
+  if (freeEarthPicker) { drawEarthAirportPicker(); return; }
   const float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
   const float x = 24 * s, y = 126 * s, w = W - 48 * s, h = H - 146 * s;
+  const bool realEarth = earthCharts::pack() != nullptr;
   const HangarLayout L = hangarLayout(x, y, w, h, s);
   const float lw = L.leftWidth, rx = L.rightX, rw = L.rightWidth;
   freeCraft = validCareerSelection(freeCraft);
@@ -1590,8 +1649,9 @@ void Game::drawFreeFlightSetup(const FrameParams& fp) {
   uiGlass = true;
   g_ren.rectGrad(0, 0, W, 110 * s, C_PANEL, vec3(0.007f, 0.018f, 0.032f), 0.96f);
   g_ren.text(x, 22 * s, 28 * s, "FREE FLIGHT", C_TEXT, 1);
-  g_ren.text(x, 61 * s, 14 * s, "Fly Solace or generated Earth destinations. No fees, missions or career changes.", C_DIM, 1);
-  const float selectW = std::max(240 * s, W - 490 * s);
+  g_ren.text(x, 61 * s, 14 * s, realEarth ? "Fly Solace, the real Earth or generated destinations. No fees, missions or career changes." :
+             "Fly Solace or generated Earth destinations. No fees, missions or career changes.", C_DIM, 1);
+  const float selectW = std::max(240 * s, W - (realEarth ? 640 : 490) * s);
   if (button(x, 86 * s, 30 * s, 28 * s, "<")) freeRegion = (freeRegion + (int)freeRegions.size() - 1) % (int)freeRegions.size();
   if (button(x + selectW - 30 * s, 86 * s, 30 * s, 28 * s, ">")) freeRegion = (freeRegion + 1) % (int)freeRegions.size();
   const auto& region = freeRegions[freeRegion];
@@ -1601,6 +1661,9 @@ void Game::drawFreeFlightSetup(const FrameParams& fp) {
     loadFreeRegion(freeRegion); uiGlass = false; return;
   }
   if (button(x + selectW + 174 * s, 86 * s, 180 * s, 28 * s, "Choose on Earth map")) { freeRegionMap = true; uiGlass = false; return; }
+  if (realEarth && button(x + selectW + 366 * s, 86 * s, 138 * s, 28 * s, "Real Earth", true, earthCharts::isEarthId(region.id))) {
+    freeEarthPicker = true; earthPick = 0; uiGlass = false; return;
+  }
   if (button(W - 220 * s, 25 * s, 196 * s, 38 * s, "Back to main menu")) { cancelFreeFlightSetup(); uiGlass = false; return; }
   panel(x, y, lw, h); panel(rx, y, rw, h);
   g_ren.text(x + 18 * s, y + 18 * s, 22 * s, "Aircraft", C_TEXT, 1);

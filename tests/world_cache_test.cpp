@@ -21,7 +21,7 @@ int main() {
   World a; a.build(path, "stampA");
   CHECK(!a.fromCache, "first build generates");
   World b; b.build(path, "stampA");
-  bool same = b.fromCache && a.hm == b.hm && a.mask == b.mask && a.tpV0 == b.tpV0 && a.roadGrid.head == b.roadGrid.head &&
+  bool same = b.fromCache && a.hm == b.hm && a.mask == b.mask && a.tpV0 == b.tpV0 && a.roadGrid.head == b.roadGrid.head && a.roadGrid.forest == b.roadGrid.forest &&
               a.roadGrid.list == b.roadGrid.list && a.roadGrid.nearHead == b.roadGrid.nearHead && a.roadGrid.nearList == b.roadGrid.nearList &&
               a.roadGrid.segs.size() == b.roadGrid.segs.size() && a.roads.paths.size() == b.roads.paths.size() && a.roads.nodes.size() == b.roads.nodes.size();
   for (size_t i = 0; same && i < a.roadGrid.segs.size(); i++) same = !memcmp(&a.roadGrid.segs[i], &b.roadGrid.segs[i], sizeof(RoadSegment));
@@ -48,7 +48,7 @@ int main() {
     // the road network: its nodes, its paths (each a class/from/to header, its points, its bridge flags), then the grid
     skip(sizeof(RoadNode));
     { uint64_t np; memcpy(&np, &good[off], 8); off += 8; for (uint64_t k = 0; k < np; k++) { off += 12; skip(sizeof(RoadPoint)); skip(1); } }
-    skip(sizeof(RoadSegment)); skip(4); skip(4); skip(4); skip(4);
+    skip(sizeof(RoadSegment)); skip(4); skip(1); skip(4); skip(4); skip(4);   // (segments, heads, forest noise, list, the coarse index)
     uint64_t n0; memcpy(&n0, &good[off], 8);
     std::vector<char> t(good.begin(), good.begin() + off);
     uint64_t zero = 0; t.insert(t.end(), (char*)&zero, (char*)&zero + 8);

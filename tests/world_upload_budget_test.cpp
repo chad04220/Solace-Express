@@ -22,7 +22,7 @@ void remove(GLsizei n, const GLuint* ids, std::set<GLuint>& objects) {
   for (int i = 0; i < n; ++i) check(objects.erase(ids[i]) == 1, "deleted a live object's name twice");
 }
 size_t texelBytes(GLenum format, GLenum type) {
-  return (format == GL_RGBA ? 4 : 1) * (type == GL_UNSIGNED_BYTE ? 1 : 4);
+  return (format == GL_RGBA ? 4 : format == GL_RG_INTEGER || format == GL_RG ? 2 : 1) * (type == GL_UNSIGNED_BYTE ? 1 : 4);
 }
 void fakeGL() {
   glGenTextures = [](GLsizei n, GLuint* ids) { generate(n, ids, textures); };

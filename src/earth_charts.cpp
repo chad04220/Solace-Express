@@ -1,0 +1,128 @@
+// Somnium Volandi - charts on the real Earth: the lattice, their names, the pack (earth_charts.h)
+#include "earth_charts.h"
+#include <cctype>
+#include <cstdlib>
+
+namespace earthCharts {
+namespace {
+std::mutex g_lock;
+std::shared_ptr<const earth::Pack> g_pack;
+std::string g_error;
+bool g_opened = false;
+
+std::string lower(std::string s) { for (auto& c : s) c = (char)std::tolower((unsigned char)c); return s; }
+int latIndex(double lat) { return (int)std::lround(std::clamp(lat, -89.0, 89.0) * kLattice); }
+int lonIndex(double lon) {
+  int i = (int)std::lround(lon * kLattice);
+  const int full = 360 * kLattice;
+  i = ((i + full / 2) % full + full) % full - full / 2;   // [-180, 180)
+  return i;
+}
+std::string chartId(int la, int lo) { return std::string(kIdPrefix) + std::to_string(la) + ":" + std::to_string(lo); }
+uint64_t fnv(const std::string& s) { uint64_t h = 1469598103934665603ull; for (unsigned char c : s) { h ^= c; h *= 1099511628211ull; } return h; }
+
+// The name a chart goes by: the largest place within 30 km of its origin, else its main airport's town, else where
+// it is
+std::string nameFor(double lat, double lon) {
+  auto p = pack();
+  if (p) {
+    const double dLat = 0.3, dLon = 0.3 / std::max(0.2, std::cos(lat * geo::kDegrees));
+    const earth::Box box{lat - dLat, lon - dLon, lat + dLat, lon + dLon};
+    const geo::Position at{lat, lon, 0};
+    const earth::PlaceRecord* best = nullptr;
+    auto places = p->places(box);
+    for (const auto& pl : places)
+      if (geo::surfaceDistance(at, {pl.lat, pl.lon, 0}) < 30000. && (!best || pl.population > best->population)) best = &pl;
+    if (best) return best->name;
+    for (const auto& a : p->airports(box)) if (!a.municipality.empty()) return a.municipality;
+  }
+  char b[64];
+  snprintf(b, sizeof(b), "%.2f%c %.2f%c", std::abs(lat), lat >= 0 ? 'N' : 'S', std::abs(lon), lon >= 0 ? 'E' : 'W');
+  return b;
+}
+} // namespace
+
+std::shared_ptr<const earth::Pack> pack() {
+  std::lock_guard<std::mutex> g(g_lock);
+  if (!g_opened) {
+    g_opened = true;
+    const char* env = getenv("EARTH_PACK");
+    const std::string dir = env && *env ? env : "earth";
+    std::string why;
+    g_pack = earth::Pack::open(dir, &why);
+    if (!g_pack) g_error = why;
+  }
+  return g_pack;
+}
+std::string packError() { pack(); std::lock_guard<std::mutex> g(g_lock); return g_error; }
+void usePack(std::shared_ptr<const earth::Pack> p) {
+  std::lock_guard<std::mutex> g(g_lock);
+  g_pack = std::move(p); g_opened = true; g_error = g_pack ? std::string() : "no Earth pack";
+}
+
+bool isEarthId(const std::string& id) { return id.compare(0, 6, kIdPrefix) == 0; }
+
+static procedural::Descriptor descriptorAt(int la, int lo) {
+  procedural::Descriptor d;
+  d.id = chartId(la, lo);
+  d.origin = {double(la) / kLattice, double(lo) / kLattice, 0.0};
+  d.name = nameFor(d.origin.latitude, d.origin.longitude);
+  d.seed = fnv(d.id);
+  d.generatorVersion = procedural::kGeneratorVersion;   // (the far terrain's identity checks: one with the regions')
+  d.address = geo::positionTile(d.origin, procedural::kAddressLevel).tile;
+  d.archetype = procedural::Archetype::ContinentalFragments;
+  d.scale = procedural::Scale::Large;
+  d.authored = false;
+  return d;
+}
+
+procedural::Descriptor chartAt(double lat, double lon) { return descriptorAt(latIndex(lat), lonIndex(lon)); }
+
+std::optional<procedural::Descriptor> find(const std::string& id) {
+  if (!isEarthId(id) || id.size() > 32) return std::nullopt;
+  const char* s = id.c_str() + 6;
+  char* end = nullptr;
+  const long la = strtol(s, &end, 10);
+  if (end == s || *end != ':') return std::nullopt;
+  const char* t = end + 1;
+  const long lo = strtol(t, &end, 10);
+  if (end == t || *end != '\0') return std::nullopt;
+  if (la < -89L * kLattice || la > 89L * kLattice || lo < -180L * kLattice || lo >= 180L * kLattice) return std::nullopt;
+  if (chartId((int)la, (int)lo) != id) return std::nullopt;   // (canonical only: no leading zeros or signs)
+  return descriptorAt((int)la, (int)lo);
+}
+
+std::optional<procedural::Descriptor> chartForAirport(const std::string& ident) {
+  for (const auto& a : searchAirports(ident, 1)) {
+    if (lower(a.ident) != lower(ident)) break;
+    double lat = a.lat, lon = a.lon;
+    if (!a.runways.empty() && a.runways[0].endsKnown) { lat = 0.5 * (a.runways[0].lat1 + a.runways[0].lat2); lon = 0.5 * (a.runways[0].lon1 + a.runways[0].lon2); }
+    return chartAt(lat, lon);
+  }
+  return std::nullopt;
+}
+
+std::vector<earth::AirportRecord> searchAirports(const std::string& query, size_t limit) {
+  std::vector<earth::AirportRecord> out;
+  auto p = pack();
+  const std::string q = lower(query);
+  if (!p) return out;
+  const earth::Box all = p->box();
+  std::vector<earth::AirportRecord> named;
+  for (auto& a : p->airports(all)) {
+    if (q.empty()) { named.push_back(std::move(a)); continue; }   // (nothing typed: the largest first)
+    const std::string ident = lower(a.ident);
+    if (ident == q || lower(a.iata) == q) { out.push_back(std::move(a)); continue; }
+    if (lower(a.name).find(q) != std::string::npos || lower(a.municipality).find(q) != std::string::npos) named.push_back(std::move(a));
+  }
+  auto bigger = [](const earth::AirportRecord& x, const earth::AirportRecord& y) {
+    const float lx = x.runways.empty() ? 0.f : x.runways[0].length, ly = y.runways.empty() ? 0.f : y.runways[0].length;
+    return x.type != y.type ? x.type > y.type : lx != ly ? lx > ly : x.ident < y.ident;
+  };
+  std::sort(out.begin(), out.end(), bigger);
+  std::sort(named.begin(), named.end(), bigger);
+  for (auto& a : named) { if (out.size() >= limit) break; out.push_back(std::move(a)); }
+  if (out.size() > limit) out.resize(limit);
+  return out;
+}
+} // namespace earthCharts

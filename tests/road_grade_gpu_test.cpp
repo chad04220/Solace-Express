@@ -114,7 +114,7 @@ int main() {
   };
   // the road network, as the renderer uploads it (unit 4 the grid, unit 5 the entries); the samples on unit 6
   texture(4, GL_R32UI, RoadGrid::N, RoadGrid::N, GL_RED_INTEGER, GL_UNSIGNED_INT, grid.head.data());
-  std::vector<float> rows(ROAD_DATA_W * 4, 0.f); { const std::vector<float> e = roadEntryRows(grid); rows.insert(rows.end(), e.begin(), e.end()); }
+  std::vector<float> rows(ROAD_DATA_W * 4, 0.f); { int segRow = 0; const std::vector<float> e = roadEntryRows(grid, &segRow); rows[12] = (float)segRow; rows.insert(rows.end(), e.begin(), e.end()); }
   texture(5, GL_RGBA32F, ROAD_DATA_W, (int)(rows.size() / 4 / ROAD_DATA_W), GL_RGBA, GL_FLOAT, rows.data());
   texture(6, GL_RGBA32F, W, H, GL_RGBA, GL_FLOAT, s.data());
   GLuint target = texture(0, GL_RGBA32F, W, H, GL_RGBA, GL_FLOAT, nullptr), fbo, vao;

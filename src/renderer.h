@@ -248,7 +248,7 @@ public:
   using FarTerrainVertex = horizon::Vertex;
   struct WorldUploadData {
     std::vector<V4> data;
-    std::vector<uint32_t> roadHead;
+    std::vector<uint32_t> roadHead;   // (two words a texel: roadGridTexels)
     std::vector<std::vector<uint8_t>> minimapLevels, roadLod, coastLod;
     std::vector<EVert> bridgeVertices;
     std::vector<BridgeMeshRange> bridgeRanges;
@@ -615,6 +615,7 @@ private:
   static std::vector<V4> prepareWorldData(const World& world);
   static std::vector<std::vector<uint8_t>> prepareRoadLod(const World& world);
   static std::vector<std::vector<uint8_t>> prepareCoastLod(const World& world);
+  static std::vector<uint32_t> roadGridTexels(const World& world);
   struct WorldUploadSlice {
     unsigned texture = 0; int level = 0, width = 0, height = 0, row = 0;
     GLenum internalFormat = 0, format = 0, type = 0;

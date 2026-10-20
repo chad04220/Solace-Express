@@ -99,6 +99,7 @@ public:
   static std::shared_ptr<Pack> open(const std::string& dir, std::string* error = nullptr);
   ~Pack();
   const std::string& dir() const { return dir_; }
+  const std::string& contentId() const { return contentId_; }   // (a hash of pack.idx: every file's SHA-256)
   Box box() const { return box_; }
   bool hasCover() const { return hasCover_; }
   bool hasLocalRoads() const { return hasLocalRoads_; }
@@ -122,7 +123,7 @@ public:
   struct Impl;
 private:
   Pack() = default;
-  std::string dir_;
+  std::string dir_, contentId_;
   Box box_;
   bool hasCover_ = false, hasLocalRoads_ = false;
   std::unique_ptr<Impl> impl_;

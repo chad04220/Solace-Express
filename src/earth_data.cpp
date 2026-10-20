@@ -334,6 +334,12 @@ std::shared_ptr<Pack> Pack::open(const std::string& dir, std::string* error) {
   pack->dir_ = dir;
   pack->impl_ = std::make_unique<Impl>();
   std::string text(idx.begin(), idx.end());
+  {
+    uint64_t h = 1469598103934665603ull;
+    for (unsigned char c : text) { h ^= c; h *= 1099511628211ull; }
+    char b[24]; snprintf(b, sizeof(b), "%016llx", (unsigned long long)h);
+    pack->contentId_ = b;
+  }
   size_t at = 0;
   bool header = false, ended = false;
   while (at < text.size()) {

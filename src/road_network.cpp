@@ -699,7 +699,7 @@ RoadNetwork buildRoadNetwork(const World& world) {
   return net;
 }
 
-RoadPath layRoad(const World& world, RoadClass cls, const std::vector<vec2>& line, float h0, float h1, const std::vector<RoadPin>& pins) {
+RoadPath layRoad(const World& world, RoadClass cls, const std::vector<vec2>& line, float h0, float h1, const std::vector<RoadPin>& pins, bool bridges) {
   generationCheckpoint();
   RoadPath path; path.cls = cls;
   if (line.size() < 2) return path;
@@ -729,7 +729,7 @@ RoadPath layRoad(const World& world, RoadClass cls, const std::vector<vec2>& lin
   for (const vec2& p : pts) path.pts.push_back({p.x, p.y, 0.f});
   if (path.pts.size() < 2) return path;
   profile(world, path, h0, h1, held);
-  path.bridge.assign(path.pts.size() - 1, 0);
+  if (!bridges) path.bridge.assign(path.pts.size() - 1, 0);
   return path;
 }
 
@@ -799,10 +799,29 @@ static void buildRoadGridImpl(const World* world, const RoadNetwork& net, RoadGr
   // the texels each segment's reach (its platform and widest banks) overlaps: a capsule against each texel's square
   const float T = 2.f * WORLD_HALF / RoadGrid::N;
   std::vector<std::vector<uint32_t>> at((size_t)RoadGrid::N * RoadGrid::N);
+  // On the real Earth (a chart from the Earth pack, its roads by the thousand) each segment is listed only as far as its
+  // banks can reach: the natural ground across the road, either side, at its ends and its middle, sets how far it can
+  // be from the road's height there - the bank's width being 2 m of run for each metre of that (roads.glsl roadGrade),
+  // at least 4 m, at most the class's - and a little more besides. Elsewhere the class's widest bank, as ever
+  const bool tight = world && world->earthChart;
+  auto reachOf = [&](const RoadSegment& s) {
+    const float P = roadSpec(s.cls).halfPlatform, most = roadBankMax(s.cls);
+    if (!tight || (s.flags & RS_BRIDGE) || most < ROAD_BANK_MAX) return P + most;   // (a street's, a track's: narrow anyway)
+    const float dx = s.bx - s.ax, dz = s.bz - s.az, L = std::max(hypotf(dx, dz), 1e-3f), nx = -dz / L, nz = dx / L;
+    float need = 4.f;
+    for (float t : {0.f, 1.f}) {
+      const float x = s.ax + dx * t, z = s.az + dz * t, h = s.ah + (s.bh - s.ah) * t;
+      for (float off : {P + 6.f, P + 20.f, P + most}) for (float side : {-1.f, 1.f}) {
+        const float g = world->naturalHeight(x + nx * off * side, z + nz * off * side);
+        need = std::max(need, std::min(fabsf(g - h) * ROAD_BANK_RUN, most));
+      }
+    }
+    return P + std::min(need + 6.f, most);
+  };
   for (size_t si = 0; si < grid.segs.size(); si++) {
     generationCheckpoint();
     const RoadSegment& s = grid.segs[si];
-    const float R = roadSpec(s.cls).halfPlatform + roadBankMax(s.cls);
+    const float R = reachOf(s);
     const int i0 = RoadGrid::cell(std::min(s.ax, s.bx) - R), i1 = RoadGrid::cell(std::max(s.ax, s.bx) + R);
     const int j0 = RoadGrid::cell(std::min(s.az, s.bz) - R), j1 = RoadGrid::cell(std::max(s.az, s.bz) + R);
     const float dx = s.bx - s.ax, dz = s.bz - s.az, L2 = std::max(dx * dx + dz * dz, 1e-6f);
@@ -821,8 +840,8 @@ static void buildRoadGridImpl(const World* world, const RoadNetwork& net, RoadGr
     const int ci = (int)(c % RoadGrid::N), cj = (int)(c / RoadGrid::N);
     std::stable_partition(at[c].begin(), at[c].end(), [&](uint32_t si) { return pavesTexel(grid.segs[si], ci, cj); });
     const size_t n = std::min<size_t>(at[c].size(), 63);   // (never more than a few dozen: junctions of three roads)
-    if (grid.list.size() + n > 0x7FFFFu) break;            // (the 19 bits a texel's first entry has: roads_test watches)
-    grid.head[c] = (uint32_t)n << 19 | (uint32_t)grid.list.size();
+    if (grid.list.size() + n > RoadGrid::kFirstMask) break;   // (the bits a texel's first entry has: roads_test watches)
+    grid.head[c] = (uint32_t)n << RoadGrid::kFirstBits | (uint32_t)grid.list.size();
     grid.list.insert(grid.list.end(), at[c].begin(), at[c].begin() + n);
   }
   // the coarse index
@@ -925,7 +944,7 @@ float roadEdgeDistance(const RoadGrid& grid, float x, float z, int* seg) {
   return best > 500.f ? 1e9f : best;
 }
 
-std::vector<float> roadEntryRows(const RoadGrid& grid) {
+std::vector<float> roadEntryRows(const RoadGrid& grid, int* segmentRow) {
   generationCheckpoint();
   // each texel's entries after its last paving one: only the ground's banks read them (whatever the list's order - a
   // grid built by buildRoadGrid lists the paving ones first)
@@ -938,14 +957,21 @@ std::vector<float> roadEntryRows(const RoadGrid& grid) {
     for (uint32_t k = k0; k < k0 + n; k++) if (pavesTexel(grid.segs[grid.list[k]], (int)(c % RoadGrid::N), (int)(c / RoadGrid::N))) last = k + 1;
     for (uint32_t k = last; k < k0 + n; k++) banksOnly[k] = 1;
   }
+  const size_t row = ROAD_DATA_W * 4;
   std::vector<float> d;
-  d.reserve(grid.list.size() * 8 + ROAD_DATA_W * 4);
+  d.reserve(grid.list.size() + grid.segs.size() * 8 + 2 * row);
   for (size_t k = 0; k < grid.list.size(); k++) {
-    if ((k & 1023u) == 0) generationCheckpoint();
-    const RoadSegment& r = grid.segs[grid.list[k]];
-    const float e[8] = {r.ax, r.az, r.bx, r.bz, r.ah, r.bh, r.along, (float)(r.cls + 8 * r.flags + 128 * banksOnly[k] + 256 * r.path)};
+    if ((k & 4095u) == 0) generationCheckpoint();
+    d.push_back((float)(grid.list[k] + (banksOnly[k] ? (1u << 23) : 0u)));   // (exact: below 2^24)
+  }
+  d.resize((d.size() + row - 1) / row * row, 0.f);
+  if (segmentRow) *segmentRow = (int)(d.size() / row);
+  for (size_t si = 0; si < grid.segs.size(); si++) {
+    if ((si & 4095u) == 0) generationCheckpoint();
+    const RoadSegment& r = grid.segs[si];
+    const float e[8] = {r.ax, r.az, r.bx, r.bz, r.ah, r.bh, r.along, (float)(r.cls + 8 * r.flags + 256 * r.path)};
     d.insert(d.end(), e, e + 8);
   }
-  d.resize((d.size() + ROAD_DATA_W * 4 - 1) / (ROAD_DATA_W * 4) * (ROAD_DATA_W * 4), 0.f);
+  d.resize((d.size() + row - 1) / row * row, 0.f);
   return d;
 }

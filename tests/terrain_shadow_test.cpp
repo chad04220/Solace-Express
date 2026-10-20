@@ -66,7 +66,7 @@ int main() {
   glGenTextures(1, &grid); glActiveTexture(GL_TEXTURE0 + 4); glBindTexture(GL_TEXTURE_2D, grid);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_R32UI, RoadGrid::N, RoadGrid::N, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, g_world.roadGrid.head.data());
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  std::vector<float> rows(ROAD_DATA_W * 4, 0.f); { const std::vector<float> e = roadEntryRows(g_world.roadGrid); rows.insert(rows.end(), e.begin(), e.end()); }
+  std::vector<float> rows(ROAD_DATA_W * 4, 0.f); { int segRow = 0; const std::vector<float> e = roadEntryRows(g_world.roadGrid, &segRow); rows[12] = (float)segRow; rows.insert(rows.end(), e.begin(), e.end()); }
   glGenTextures(1, &data); glActiveTexture(GL_TEXTURE0 + 5); glBindTexture(GL_TEXTURE_2D, data);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, ROAD_DATA_W, (GLsizei)(rows.size() / 4 / ROAD_DATA_W), 0, GL_RGBA, GL_FLOAT, rows.data());
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);

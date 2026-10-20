@@ -741,6 +741,7 @@ procedural::Descriptor Game::chartRegion() const {
 // where the Earth goes on past the islands' sea
 void Game::updateHorizon() {
   if (!g_ren.ok || screen != SCR_FLIGHT || g_world.repeating) return;
+  if (g_world.earthChart) return;   // (the real Earth: no generated regions on its horizon)
   const procedural::Descriptor region = chartRegion();
   vec3 camera = dbgCam ? dbgCamPos : camPos;
   if (!std::isfinite(camera.x) || !std::isfinite(camera.y) || !std::isfinite(camera.z)) camera = plane.pos;
@@ -845,6 +846,10 @@ void Game::updateRegionLoading(float dt) {
     regionLoadStage = 3;
     if (g_ren.ok) g_ren.reloadWorld(map);
     freeAirport = freeLaunchPending ? std::clamp(freeAirport, 0, (int)g_world.airports.size() - 1) : 0;
+    if (!freeEarthIdent.empty()) {   // (the real Earth: the airport chosen, its chart now loaded)
+      if (g_world.earthChart) freeAirport = std::max(0, g_world.findAirport(freeEarthIdent.c_str()));
+      freeEarthIdent.clear();
+    }
     crashed = completed = landed = false;
     dbgCam = dbgFollow = false;
     wreck.clear(); debris.clear(); pops.clear(); particles.clear(); pits.clear();
@@ -5633,7 +5638,9 @@ void Game::debugScene(const std::string& name) {
       std::this_thread::sleep_for(std::chrono::milliseconds(10)); updateRegionLoading(.01f);
     }
     if (!regionError.empty()) throw std::runtime_error(regionError);
-    freeCraft = 0; freeAirport = 0; freeAirborne = true; launchFreeFlight();
+    freeCraft = 0; freeAirport = 0; freeAirborne = true;
+    if (const char* code = getenv("REGION_AIRPORT")) freeAirport = std::max(0, g_world.findAirport(code));   // (REGION_AIRPORT=<code>: start there)
+    launchFreeFlight();
     camMode = 2; camYaw = .65f; camPitch = .2f; camZoom = 3.f; hudOn = false;
     if (ocean) {
       // Explicit review fixture beyond the land chart, looking east away from it.

@@ -777,7 +777,7 @@ void Renderer::bakeTerrainShadow(const FrameParams& fp) {
   glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE);
   GLuint p = progTShBake;
   glUseProgram(p);
-  glUniform1i(U(p, "uUnwrappedWorld"), g_world.repeating ? 0 : 1);
+  glUniform1i(U(p, "uUnwrappedWorld"), g_world.repeating ? 0 : 1); glUniform1f(U(p, "uDetailScale"), g_world.detailScale);
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texHM); glUniform1i(U(p, "uHM"), 0);
   glActiveTexture(GL_TEXTURE0 + 4); glBindTexture(GL_TEXTURE_2D, texRoadId); glUniform1i(U(p, "uRoadGrid"), 4);   // (the roads graded in)
   glActiveTexture(GL_TEXTURE0 + 5); glBindTexture(GL_TEXTURE_2D, texData); glUniform1i(U(p, "uData"), 5);
@@ -827,7 +827,7 @@ void Renderer::renderDisplays(const FrameParams& fp, bool panel, int half) {
   }
   GLuint p = progDisp;
   glUseProgram(p);
-  glUniform1i(U(p, "uUnwrappedWorld"), g_world.repeating ? 0 : 1);
+  glUniform1i(U(p, "uUnwrappedWorld"), g_world.repeating ? 0 : 1); glUniform1f(U(p, "uDetailScale"), g_world.detailScale);
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texHM); glUniform1i(U(p, "uHM"), 0);
   glActiveTexture(GL_TEXTURE0 + 4); glBindTexture(GL_TEXTURE_2D, texRoadId); glUniform1i(U(p, "uRoadGrid"), 4);
   glActiveTexture(GL_TEXTURE0 + 5); glBindTexture(GL_TEXTURE_2D, texData); glUniform1i(U(p, "uData"), 5);
@@ -890,7 +890,7 @@ void Renderer::renderMap(float cx, float cz, float half, int N) {
   glViewport(0, 0, N, N); glDisable(GL_BLEND);
   GLuint p = progMap;
   glUseProgram(p);
-  glUniform1i(U(p, "uUnwrappedWorld"), g_world.repeating ? 0 : 1);
+  glUniform1i(U(p, "uUnwrappedWorld"), g_world.repeating ? 0 : 1); glUniform1f(U(p, "uDetailScale"), g_world.detailScale);
   glUniform1i(U(p, "uProceduralWorld"), g_world.procedural ? 1 : 0);
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texHM); glUniform1i(U(p, "uHM"), 0);
   glActiveTexture(GL_TEXTURE0 + 1); glBindTexture(GL_TEXTURE_2D_ARRAY, texAlb); glUniform1i(U(p, "uAlb"), 1);
@@ -927,7 +927,7 @@ void Renderer::renderMap(float cx, float cz, float half, int N) {
 // Pack the shader world table without depending on the active world or a GL context.
 std::vector<Renderer::V4> Renderer::prepareWorldData(const World& world) {
   generationCheckpoint();
-  std::vector<V4> d(384, V4{0, 0, 0, 0});   // ([0, 3): the reservoir's lake, below; [3, 64): unused, the old roads' segments once)
+  std::vector<V4> d(384, V4{0, 0, 0, 0});   // ([0, 3): the reservoir's lake, below; 3: where the road segments start; [4, 64): unused)
   for (int i = 0; i < (int)world.boxes.size() && i < 128; i++) {
     const Box& b = world.boxes[i];
     d[64 + i] = {b.c.x, b.c.y, b.c.z, (float)b.airport};
@@ -957,10 +957,12 @@ std::vector<Renderer::V4> Renderer::prepareWorldData(const World& world) {
     }
     if (first >= 0) { d[384 + ap] = {lo.x, lo.y, lo.z, (float)first}; d[400 + ap] = {hi.x, hi.y, hi.z, (float)count}; }
   }
-  // rows 1.. : the road network's entries (roads.glsl roadTexel)
+  // rows 1.. : the road network's entries, then its segments from the row texel 3 names (roads.glsl roadEntry)
   const int W = ROAD_DATA_W;
   d.resize(W, V4{0, 0, 0, 0});
-  const std::vector<float> rows = roadEntryRows(world.roadGrid);
+  int segmentRow = 0;
+  const std::vector<float> rows = roadEntryRows(world.roadGrid, &segmentRow);
+  d[3] = {(float)segmentRow, 0.f, 0.f, 0.f};
   for (size_t i = 0; i < rows.size(); i += 4) {
     if (i % 4096 == 0) generationCheckpoint();
     d.push_back({rows[i], rows[i + 1], rows[i + 2], rows[i + 3]});
@@ -983,6 +985,18 @@ std::vector<Renderer::V4> Renderer::prepareWorldData(const World& world) {
   return d;
 }
 
+// The road grid's texels as uploaded (RG32UI, roads.glsl uRoadGrid): each texel's list word and its forest noise
+std::vector<uint32_t> Renderer::roadGridTexels(const World& world) {
+  const size_t n = (size_t)MASK_N * MASK_N;
+  std::vector<uint32_t> out(n * 2, 0);
+  const auto& g = world.roadGrid;
+  for (size_t i = 0; i < n; i++) {
+    out[2 * i] = i < g.head.size() ? g.head[i] : 0u;
+    out[2 * i + 1] = i < g.forest.size() ? g.forest[i] : 0u;
+  }
+  return out;
+}
+
 void Renderer::uploadWorldData() {
   glActiveTexture(GL_TEXTURE0);
   // heightmap
@@ -998,9 +1012,8 @@ void Renderer::uploadWorldData() {
   // the road network's grid with the forest noise (common.glsl uRoadId: R32UI, read with texelFetch alone)
   if (!texRoadId) glGenTextures(1, &texRoadId); glBindTexture(GL_TEXTURE_2D, texRoadId);
   {
-    std::vector<uint32_t> head = g_world.roadGrid.head;
-    head.resize((size_t)MASK_N * MASK_N, 0);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R32UI, MASK_N, MASK_N, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, head.data());
+    const std::vector<uint32_t> head = roadGridTexels(g_world);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32UI, MASK_N, MASK_N, 0, GL_RG_INTEGER, GL_UNSIGNED_INT, head.data());
   }
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -1047,8 +1060,7 @@ Renderer::WorldUploadData Renderer::prepareWorldUpload(const World& world) {
   generationCheckpoint();
   out.data = prepareWorldData(world);
   generationCheckpoint();
-  out.roadHead = world.roadGrid.head;
-  out.roadHead.resize(size_t(MASK_N) * MASK_N, 0);
+  out.roadHead = roadGridTexels(world);
   generationCheckpoint();
   out.roadLod = prepareRoadLod(world);
   generationCheckpoint();
@@ -1094,7 +1106,7 @@ bool Renderer::beginWorldUpload(const World& world, WorldUploadData&& data) {
   worldUploadFrames = 0;
   if (!ok) { worldStageError = "Renderer is not initialized"; return false; }
   if (world.hm.size() != size_t(HM_N) * HM_N * 4 || world.mask.size() != size_t(MASK_N) * MASK_N * 4 ||
-      data.roadHead.size() != size_t(MASK_N) * MASK_N || data.data.empty() || data.data.size() % ROAD_DATA_W ||
+      data.roadHead.size() != size_t(MASK_N) * MASK_N * 2 || data.data.empty() || data.data.size() % ROAD_DATA_W ||
       data.minimapLevels.empty() || data.roadLod.empty() || data.bridgeRanges.size() != world.bridges.size()) {
     worldStageError = "Incomplete candidate world upload data"; return false;
   }
@@ -1125,7 +1137,7 @@ bool Renderer::beginWorldUpload(const World& world, WorldUploadData&& data) {
   };
   slice(0, 0, HM_N, HM_N, GL_RGBA32F, GL_RGBA, GL_FLOAT, sizeof(float) * 4, world.hm.data());
   slice(1, 0, MASK_N, MASK_N, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, 4, world.mask.data());
-  slice(2, 0, MASK_N, MASK_N, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, sizeof(uint32_t), stage.data.roadHead.data());
+  slice(2, 0, MASK_N, MASK_N, GL_RG32UI, GL_RG_INTEGER, GL_UNSIGNED_INT, sizeof(uint32_t) * 2, stage.data.roadHead.data());
   for (int level = 0; level < HMAX_LEVELS; ++level)
     slice(3, level, HMAX_N >> level, HMAX_N >> level, GL_R32F, GL_RED, GL_FLOAT, sizeof(float), world.hmax[level].data());
   slice(4, 0, ROAD_DATA_W, int(stage.data.data.size() / ROAD_DATA_W), GL_RGBA32F, GL_RGBA, GL_FLOAT, sizeof(V4), stage.data.data.data());
@@ -1640,7 +1652,7 @@ void Renderer::reportGLError(int stampIdx) {
 
 void Renderer::setRT(GLuint p, const FrameParams& fp) {
   glUseProgram(p);
-  glUniform1i(U(p, "uUnwrappedWorld"), g_world.repeating ? 0 : 1);
+  glUniform1i(U(p, "uUnwrappedWorld"), g_world.repeating ? 0 : 1); glUniform1f(U(p, "uDetailScale"), g_world.detailScale);
   glUniform1i(U(p, "uProceduralWorld"), g_world.procedural ? 1 : 0);
   glUniform1f(U(p, "uPlanetR"), fp.pano > 0.f ? 0.f : planetRadius());   // (the round world: planet.h; a panorama feed's camera keeps it flat)
   glUniform1f(U(p, "uSunDim"), fp.sunDim);
@@ -1896,7 +1908,7 @@ void Renderer::cloudPass(const FrameParams& fp) {
     glViewport(0, 0, cw, ch);
     GLuint p = progCloudAcc;
     glUseProgram(p);
-  glUniform1i(U(p, "uUnwrappedWorld"), g_world.repeating ? 0 : 1);
+  glUniform1i(U(p, "uUnwrappedWorld"), g_world.repeating ? 0 : 1); glUniform1f(U(p, "uDetailScale"), g_world.detailScale);
     const GLuint tex[5] = {texCloud, texCloudT, texCloudD, texCloudAcc[cloudAccIdx], texCloudAccD[cloudAccIdx]};
     const char* nm[5] = {"uCur", "uCurT", "uCurD", "uHist", "uHistD"};
     for (int i = 0; i < 5; i++) { glActiveTexture(GL_TEXTURE0 + i); glBindTexture(GL_TEXTURE_2D, tex[i]); glUniform1i(U(p, nm[i]), i); }

@@ -2,6 +2,7 @@
 #include "scenery.h"
 #include "airport_layout.h"
 #include "entities.h"
+#include "earth_charts.h"
 #include <cstring>
 #include <mutex>
 #include <unordered_map>
@@ -181,16 +182,25 @@ void World::bakeMask() {
   generationPhase(GenerationPhase::Mask);
   mask.assign((size_t)MASK_N * MASK_N * 4, 0);
   if (roadGrid.head.empty()) roadGrid.head.assign((size_t)MASK_N * MASK_N, 0);
+  roadGrid.forest.assign((size_t)MASK_N * MASK_N, 0);
+  // the real Earth: its woods and its fields where the land cover has them (earth_charts.h maskFields), not the noise's
+  std::vector<float> earthForest, earthFarm;
+  if (earthChart) earthCharts::maskFields(*earthChart, earthForest, earthFarm);
+  const bool earth = !earthForest.empty();
   parallelFor(MASK_N, [&](int j) {
     for (int i = 0; i < MASK_N; i++) {
       float x = -WORLD_HALF + (i + 0.5f) * MASK_TEXEL, z = -WORLD_HALF + (j + 0.5f) * MASK_TEXEL;
       float b[4]; sampleBase(x, z, b);
       int rs = -1; const float re = roadEdgeDistance(roadGrid, x, z, &rs), rd = re + 6.f;   // (as roadDistance measures it)
       const bool raceGround = rs >= 0 && re < 250.f && roadGrid.segs[rs].cls >= RC_CIRCUIT;   // (the racetrack's: meadow, no wood, no crops)
-      // forest-patch noise baked once instead of evaluating 3 octaves of value noise at every ray-march step: the top 7
-      // bits of the texel's road word
-      uint32_t& head = roadGrid.head[(size_t)j * MASK_N + i];
-      head = (head & 0x1FFFFFFu) | (raceGround ? 0u : (uint32_t)lroundf(clampf(coverFbm(x / 1400.f + 3.1f, z / 1400.f, 3) / 0.875f, 0, 1) * 127.f) << 25);
+      // forest-patch noise baked once instead of evaluating 3 octaves of value noise at every ray-march step: the road
+      // grid's second channel
+      float forestNoise = clampf(coverFbm(x / 1400.f + 3.1f, z / 1400.f, 3) / 0.875f, 0, 1);
+      if (earth) {   // (the cover's woods, their edges ragged by the noise: in a closed forest well over the trees' threshold)
+        const float f = earthForest[(size_t)j * MASK_N + i];
+        forestNoise = clampf(0.08f + 0.55f * f + 0.32f * (coverFbm(x / 260.f + 3.1f, z / 260.f, 3) / 0.875f - 0.5f) + 0.12f * f * forestNoise, 0, 1);
+      }
+      roadGrid.forest[(size_t)j * MASK_N + i] = raceGround ? 0 : (uint8_t)lroundf(forestNoise * 127.f);
       // the settlements (settlements.h, their lots): their ground as far as their buildings and gardens - the woods
       // and the fields come up to the last houses, and fill the gaps between the streets - its core urban
       float dens = 0, urban = 0;
@@ -207,7 +217,9 @@ void World::bakeMask() {
       bool land = b[0] > 2.5f;
       dens *= (1.f - smoothstepf(0.02f, 0.12f, ai)) * (land ? 1.f : 0.f) * (b[1] < 90.f ? 1.f : 0.f);
       float a = 0;
-      if (b[0] > 0.5f) {
+      if (earth && b[0] > 0.5f) {   // (the cover's fields, never under a town or on an airfield)
+        a = smoothstepf(0.15f, 0.6f, earthFarm[(size_t)j * MASK_N + i]) * (1.f - smoothstepf(0.04f, 0.3f, dens)) * (1.f - smoothstepf(0.01f, 0.1f, ai)) * smoothstepf(0.6f, 2.f, b[0]);
+      } else if (b[0] > 0.5f) {
         a = smoothstepf(4.f, 15.f, b[0]) * smoothstepf(420.f, 260.f, b[0]) * smoothstepf(0.4f, 0.6f, b[2]) * smoothstepf(45.f, 25.f, b[1]) *
             smoothstepf(0.32f, 0.5f, valueNoise(x / 3000.f + 7.7f, z / 3000.f - 3.3f)) * (1.f - smoothstepf(0.04f, 0.3f, dens)) * (1.f - smoothstepf(0.01f, 0.1f, ai)) *
             (raceGround ? 0.f : 1.f);
@@ -258,7 +270,7 @@ float World::forestAt(float x, float z) const {
   // Even a distant ocean coordinate must never overflow a float-to-int cast.
   int i0 = (int)std::clamp(flx, -1.f, float(MASK_N)), j0 = (int)std::clamp(flz, -1.f, float(MASK_N));
   float tx = fx - flx, tz = fz - flz;
-  auto at = [&](int i, int j) { i = std::clamp(i, 0, MASK_N - 1); j = std::clamp(j, 0, MASK_N - 1); return (roadGrid.head[(size_t)j * MASK_N + i] >> 25) / 127.f; };
+  auto at = [&](int i, int j) { i = std::clamp(i, 0, MASK_N - 1); j = std::clamp(j, 0, MASK_N - 1); return roadGrid.forest[(size_t)j * MASK_N + i] / 127.f; };
   float a = at(i0, j0), b = at(i0 + 1, j0), c = at(i0, j0 + 1), d = at(i0 + 1, j0 + 1);
   return ((a * (1 - tx) + b * tx) * (1 - tz) + (c * (1 - tx) + d * tx) * tz) * 0.875f;
 }

@@ -8,6 +8,7 @@
 #include <memory>
 
 namespace procedural { struct Descriptor; class Recipe; }
+namespace earthCharts { struct ChartData; }
 struct WorldSceneryState;
 
 static const float WORLD_HALF = 40000.0f;  // the islands span [-40km, 40km] on x and z
@@ -99,12 +100,19 @@ public:
   std::vector<Town> towns;
   bool procedural = false;
   bool repeating = false; // the old wrapping chart (above): no World built repeats
+  // The procedural detail's share of its amplitude (hm's second channel, common.glsl uDetailScale): all of it on the
+  // islands and the generated regions; little on the real Earth, whose data has the relief already - the channel
+  // keeps its meaning there (how rough and natural the ground is: the scenery grows on it), only less of it is added
+  float detailScale = 1.f;
   float wrap(float v) const { return repeating ? wrapCoord(v) : v; }
   float nearPoint(float v, float ref) const { return repeating ? nearCopy(v, ref) : v; }
   std::string regionId = "solace";
   // Owns procedural names/geometry for every Airport and Town pointer. Copies share immutable storage.
   std::shared_ptr<const procedural::Recipe> regionRecipe;
   std::shared_ptr<WorldSceneryState> sceneryState; // baked placement data belongs to this chart
+  // A chart of the real Earth (earth_charts.h, docs/REAL_EARTH_PLAN.md): its pack, its names, the records behind its
+  // airports and its land cover. Owns the storage every Airport's and Town's name points into, as regionRecipe does
+  std::shared_ptr<earthCharts::ChartData> earthChart;
   std::vector<Box> boxes;
   std::vector<float> hm;     // RGBA per texel: base height, detail amplitude, lushness, coldness
   // The road network (road_network.h): its paths (bridges, traffic) and the grid the terrain grades and the ground
@@ -127,6 +135,10 @@ public:
   void build(const std::string& cachePath = std::string(), const std::string& stamp = std::string(), bool save = true);
   void buildProcedural(const procedural::Descriptor& region, const std::string& cachePath = std::string(),
                        const std::string& stamp = std::string(), bool save = true);
+  // A chart of the real Earth (an "earth:" descriptor, earth_charts.h) from the Earth pack: its terrain, coasts, land
+  // cover, airports, towns and roads from the data (world_earth.cpp). buildProcedural sends such a descriptor here
+  void buildEarth(const procedural::Descriptor& chart, const std::string& cachePath = std::string(),
+                  const std::string& stamp = std::string(), bool save = true);
   bool loadCache(const std::string& path, const std::string& stamp);
   bool fromCache = false;   // the last build() read its cache (else it generated, and saved, the world)
   void saveCache(const std::string& path, const std::string& stamp) const;
@@ -157,6 +169,8 @@ public:
   int nearestAirport(float x, float z, float* distOut = nullptr) const;
 private:
   void buildConfigured(const std::string& cachePath, const std::string& stamp, bool save);
+  void buildEarthTerrain();             // (world_earth.cpp: hm from the pack, the airports' grounds flattened)
+  RoadNetwork buildEarthRoads() const;  // (the pack's roads, laid on that ground)
 };
 
 // World-explicit variants are required while building a different regional world.

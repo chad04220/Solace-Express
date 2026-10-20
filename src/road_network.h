@@ -56,9 +56,11 @@ RoadNetwork buildRoadNetwork(const World& world);
 // A road of class cls along a line laid out already (a settlement's street, settlements.cpp): its corners rounded, its
 // points spaced and its profile graded as the network's own are, its ends at h0 and h1 - and wherever a pin is, a
 // point exactly there held at the pin's height (where it crosses a road built before it: the two meet level). Never a
-// bridge.
+// bridge, unless asked (a real road from the Earth pack crossing a river or a bay: its spans over the water, and over a
+// gully, bridged as the network's own are)
 struct RoadPin { float x, z, h; };
-RoadPath layRoad(const World& world, RoadClass cls, const std::vector<vec2>& line, float h0, float h1, const std::vector<RoadPin>& pins);
+RoadPath layRoad(const World& world, RoadClass cls, const std::vector<vec2>& line, float h0, float h1, const std::vector<RoadPin>& pins,
+                 bool bridges = false);
 // Whether a stretch of road (A to B, of class cls) runs by an airfield's grounds - its platform or banks would reach
 // them: there it lies on the ground as it is, painted, never graded (an airfield's terrain is never reshaped), its
 // profile held on that ground
@@ -84,17 +86,19 @@ struct RoadSegment { float ax, az, bx, bz, ah, bh, along; uint16_t path; uint8_t
 struct RoadGrid {
   static const int N = 2048;                        // (the mask's texels: scenery.h MASK_N)
   std::vector<RoadSegment> segs;
-  // per texel, uploaded as it is (R32UI, common.glsl): the mask's forest noise in the top 7 bits (World::bakeMask), how
-  // many entries in the next 6, the first of them in the low 19
+  // per texel, uploaded with the forest noise beside it (RG32UI, roads.glsl uRoadGrid): how many entries in the top 6
+  // bits, the first of them in the low 26 (the real Earth's charts list millions: 19 bits held half a million)
   std::vector<uint32_t> head;
+  std::vector<uint8_t> forest;                      // per texel: the mask's baked forest noise, 0..127 (World::bakeMask)
   std::vector<uint32_t> list;                       // the entries: segment indices
   // a coarser index for the nearest road further off (scenery: what stands well away from one): 500 m cells, each
   // listing the segments within 500 m of it
   static const int NC = 160;
   std::vector<uint32_t> nearHead, nearList;         // (first << 8 | count; count < 256)
   static int cell(float v);
-  static uint32_t count(uint32_t h) { return (h >> 19) & 63u; }
-  static uint32_t first(uint32_t h) { return h & 0x7FFFFu; }
+  static constexpr uint32_t kFirstBits = 26, kFirstMask = (1u << kFirstBits) - 1u;
+  static uint32_t count(uint32_t h) { return h >> kFirstBits; }
+  static uint32_t first(uint32_t h) { return h & kFirstMask; }
 };
 void buildRoadGrid(const RoadNetwork& net, RoadGrid& grid);   // original Solace airport bounds
 void buildRoadGrid(const World& world, const RoadNetwork& net, RoadGrid& grid);
@@ -103,8 +107,11 @@ void buildRoadGrid(const World& world, const RoadNetwork& net, RoadGrid& grid);
 float roadGrade(const RoadGrid& grid, float x, float z, float g);
 // The nearest road within 500 m: how far its platform's edge is (negative: on it), the segment (-1 and 1e9: none)
 float roadEdgeDistance(const RoadGrid& grid, float x, float z, int* seg = nullptr);
-// The grid's entries as the shaders read them (roads.glsl roadTexel): two RGBA32F texels each, in list order - rows 1..
-// of a 4096-wide uData (row 0 is the caller's own); the floats of those rows, padded to whole rows. The second's w:
-// class + 8 x flags + 128 x (none from here on in its texel's list paves the texel: only roadGrade reads on) + 256 x path
+// The grid as the shaders read it (roads.glsl roadEntry, roadSegment), rows 1.. of a 4096-wide RGBA32F uData (row 0 is
+// the caller's own): first the entries, in list order, one float each, four to a texel - the segment's index, plus 2^23
+// where none from here on in its texel's list paves the texel (only roadGrade reads on); then, from *segmentRow (counted
+// from row 1: the caller puts it in row 0's texel 3), each segment once, in two texels: (a.x, a.z, b.x, b.z),
+// (a.h, b.h, distance along the road at a, class + 8 x flags + 256 x path). The floats of those rows, padded to rows.
+// (An entry once carried its segment's eight floats: the real Earth's charts list millions)
 static const int ROAD_DATA_W = 4096;
-std::vector<float> roadEntryRows(const RoadGrid& grid);
+std::vector<float> roadEntryRows(const RoadGrid& grid, int* segmentRow = nullptr);

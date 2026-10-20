@@ -20,6 +20,7 @@ uniform sampler2D uHM;
 // World topology must not invalidate the aircraft-only bake program/cache.
 uniform int uUnwrappedWorld; // one nonrepeating chart during Earth free flight
 uniform int uProceduralWorld; // authored-place-only features stay on Solace
+uniform float uDetailScale = 1.0;   // the procedural detail's share of its amplitude (World::detailScale: the real Earth's is small)
 #endif
 uniform vec4 uCrater[24]; uniform int uCraterN;  // impact craters: x, z, radius, depth (negative depth: dark-energy blast)
 uniform vec3 uCraterB;   // circle (x, z, radius) around every crater's influence
@@ -103,6 +104,20 @@ vec4 maskTexel(vec2 p){ return texelFetch(uMask, clamp(ivec2(floor((wrapW(p) + W
 #endif
 float roadGrade(vec2 p, float g);   // the ground with the roads built into it (roads.glsl)
 float lakeGround(vec2 p, float g);  // and the Fjordhaven reservoir's lake (roads.glsl)
+#ifndef PART_BAKE
+float groundH(vec2 p, int oct){ p = wrapW(p); vec4 b = baseAt(p); return lakeGround(p, roadGrade(p, b.y < 0.01 ? b.x : b.x + b.y*uDetailScale*terrainFbm(p/2200.0, oct))); }
+// Terrain height: the bare heightfield (trees, rocks and buildings are separate entities) with the roads and the lake
+// built into it, plus impact craters
+float terrainH(vec2 p, int oct){
+  COST(0);
+  p = wrapW(p);
+  vec4 b = baseAt(p);
+  float g = lakeGround(p, roadGrade(p, b.y < 0.01 ? b.x : b.x + b.y*uDetailScale*terrainFbm(p/2200.0, oct)));
+  if (uCraterN > 0 && g > 0.3) g += craterH(p);
+  return g;
+}
+
+#else
 float groundH(vec2 p, int oct){ p = wrapW(p); vec4 b = baseAt(p); return lakeGround(p, roadGrade(p, b.y < 0.01 ? b.x : b.x + b.y*terrainFbm(p/2200.0, oct))); }
 // Terrain height: the bare heightfield (trees, rocks and buildings are separate entities) with the roads and the lake
 // built into it, plus impact craters
@@ -115,6 +130,7 @@ float terrainH(vec2 p, int oct){
   return g;
 }
 
+#endif
 // Scene / atmosphere uniforms
 uniform vec3 uSunDir; uniform vec3 uSunCol; uniform float uNight; uniform float uTime;
 uniform float uCloudCover; uniform float uCloudBase; uniform float uFogB; uniform float uWet; uniform float uSnow;

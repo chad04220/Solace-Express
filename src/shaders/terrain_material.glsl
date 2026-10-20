@@ -322,11 +322,12 @@ void runwayMaterial(int ai, vec2 uv, inout Mat m, vec3 pw, vec2 footprint, out b
 // straights one long segment each, its bends many short ones. 0 where its neighbours aren't listed (a long straight's
 // middle)
 float circuitBend(vec2 p, float along){
-  uint h = roadHead(p); int n = int((h >> 19u) & 63u), e0 = int(h & 0x7FFFFu);
+  uint h = roadHead(p); int n = int(h >> 26u), e0 = int(h & 0x3FFFFFFu), s0 = roadSegmentRow();
   vec2 d0 = vec2(0.0), d1 = vec2(0.0);
   for (int k = 0; k < 63; k++) {
     if (k >= n) break;
-    vec4 a = roadTexel(2*(e0 + k)), b = roadTexel(2*(e0 + k) + 1);
+    int seg = roadEntry(e0 + k) & 0x7FFFFF;
+    vec4 a = roadTexel(s0, 2*seg), b = roadTexel(s0, 2*seg + 1);
     if ((int(b.w) & 7) != 6) continue;
     vec2 ab = a.zw - a.xy; float L = max(length(ab), 1e-3);
     if (along - 15.0 >= b.z && along - 15.0 <= b.z + L) d0 = ab/L;
@@ -576,7 +577,7 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
     float lm = lakeMaskAt(p.xz);
     if (lm > 0.0) {
       vec2 pw = wrapW(p.xz);
-      float nat = base.y < 0.01 ? base.x : base.x + base.y*terrainFbm(pw/2200.0, 7);
+      float nat = base.y < 0.01 ? base.x : base.x + base.y*uDetailScale*terrainFbm(pw/2200.0, 7);
       float level = lakeLevel(), lake = step(0.5, lm)*(1.0 - step(level, nat));
       m.alb *= 1.0 - 0.35*(1.0 - smoothstep(level, level + 1.5, nat))*(1.0 - lake);
       if (lake > 0.0) {

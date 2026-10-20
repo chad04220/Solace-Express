@@ -170,6 +170,9 @@ struct GameTest {
       g.demo = true; g.career.license = what == "demoend" ? LIC_PPL : LIC_STUDENT; g.licenceShown = -1; g.screen = SCR_HUB; g.hubTab = TAB_CONTRACTS; g.hubList = what == "demomil" ? 2 : 0; g.drawHub();
     }
     else if (what == "menu") { g.drawMenu(); }
+    else if (what == "earthpicker") {   // Free Flight's real-Earth airport picker (EQ: what's typed)
+      g.screen = SCR_FREE_FLIGHT; g.freeEarthPicker = true; g.earthQuery = getenv("EQ") ? getenv("EQ") : ""; g.drawFreeFlightSetup(FrameParams{});
+    }
     else if (what == "debrief") {   // a story delivery's settlement with eleven lines and a new licence (the review of v3.24.0, R9)
       g.career.storyIndex = 3; g.contract = g_story[3]; g.lastSuccess = true; g.stars = 2; g.debriefTitle = "Delivered";
       g.result.landed = true; g.touchdownFpm = 240; g.flightClock = 1312; g.licenseBefore = LIC_STUDENT; g.career.license = LIC_PPL;

@@ -2,11 +2,13 @@
 #include "world.h"
 #include "world_load_progress.h"
 #include "procedural_regions.h"
+#include "earth_charts.h"
 #include "regional_surface.h"
 #include <cstdio>
 #include <cstring>
 #include "scenery.h"
 #include <deque>
+#include <chrono>
 #ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -302,6 +304,7 @@ float airportInfluence(const World& world, float x, float z) { return airportInf
 void World::build(const std::string& cachePath, const std::string& stamp, bool save) {
   generationCheckpoint();
   procedural = false; repeating = false; regionId = "solace"; regionRecipe.reset();   // (one place on the Earth: world.h)
+  earthChart.reset(); detailScale = 1.f;
   airports.assign(std::begin(kAirports), std::end(kAirports));
   towns.assign(kTowns, kTowns + kNumTowns);
   for (auto& a : airports) a.hospital = !strcmp(a.code, "CAP") || !strcmp(a.code, "NPT") || !strcmp(a.code, "PVI");
@@ -312,6 +315,8 @@ void World::buildProcedural(const procedural::Descriptor& region, const std::str
                             const std::string& stamp, bool save) {
   generationCheckpoint();
   if (region.authored) { build(cachePath, stamp, save); return; }
+  if (earthCharts::isEarthId(region.id)) { buildEarth(region, cachePath, stamp, save); return; }
+  earthChart.reset(); detailScale = 1.f;
   regionRecipe = std::make_shared<const procedural::Recipe>(region);
   procedural = true; repeating = false; regionId = region.id;
   airports = regionRecipe->airports; towns = regionRecipe->towns;
@@ -334,7 +339,13 @@ void World::buildConfigured(const std::string& cachePath, const std::string& sta
   // the loading screen's progress (world_load_progress.h) follows the active world alone: a region generated in the
   // background for Earth free flight must not move it
   const bool reports = this == &g_world;
-  auto loadStage = [reports](float done, const char* next) { if (reports) worldLoadStage(done, next); };
+  // (EARTH_TIMING=1: each stage's time on stderr - the real Earth's charts' budget)
+  static const bool timing = getenv("EARTH_TIMING") != nullptr;
+  auto stageClock = std::chrono::steady_clock::now();
+  auto loadStage = [reports, &stageClock](float done, const char* next) {
+    if (timing) { const auto now = std::chrono::steady_clock::now(); fprintf(stderr, "  %6.2f s  then %s\n", std::chrono::duration<double>(now - stageClock).count(), next); stageClock = now; }
+    if (reports) worldLoadStage(done, next);
+  };
   auto loadProgress = [reports](float done) { if (reports) worldLoadProgress(done); };
   if (reports) { g_worldLoadProgress = 0.f; g_worldLoadTask = "Reading island cache"; }
   roads = RoadNetwork(); roadGrid = RoadGrid(); bridges.clear(); settlements.clear(); farms.clear(); reservoir = Reservoir(); lake = LakeMask();   // (the natural ground first: the roads are routed over it)
@@ -354,40 +365,44 @@ void World::buildConfigured(const std::string& cachePath, const std::string& sta
   setStage(2);
   generationPhase(GenerationPhase::Terrain);
   loadStage(.02f,"Sampling island terrain");
-  std::atomic<int> sampledRows{0};
-  hm.resize((size_t)HM_N * HM_N * 4);
   sceneryInit();
-  parallelFor(HM_N, [&](int j) {   // rows are independent; spread over every core
-    for (int i = 0; i < HM_N; i++) {
-      float x = -WORLD_HALF + (i + 0.5f) * HM_TEXEL, z = -WORLD_HALF + (j + 0.5f) * HM_TEXEL;
-      float* texel = &hm[((size_t)j * HM_N + i) * 4];
-      if (procedural) regionRecipe->sample(x, z, texel);
-      else computeTexel(x, z, texel);
-    }
-    loadProgress(.02f+.12f*float(sampledRows.fetch_add(1)+1)/HM_N);
-  });
-  // Smooth the ground heights with a separable 1-2-1 filter (twice): bilinear interpolation of the raw samples leaves
-  // visible creases along the grid on big smooth landforms (volcano flanks, ridges, sea cliffs) - a faceted, low-poly
-  // look. Flat areas (airport grounds, the sea floor plateau) are unchanged by it.
-  {
-    loadStage(.14f,"Smoothing terrain / four row passes");
-    std::atomic<int> smoothRows{0};
-    std::vector<float> tmp((size_t)HM_N * HM_N);
-    for (int pass = 0; pass < 2; pass++) {
-      parallelFor(HM_N, [&](int j) {
-        for (int i = 0; i < HM_N; i++) {
-          int i0 = std::max(i - 1, 0), i1 = std::min(i + 1, HM_N - 1);
-          const float* r = &hm[(size_t)j * HM_N * 4];
-          tmp[(size_t)j * HM_N + i] = (r[i0 * 4] + 2.f * r[i * 4] + r[i1 * 4]) * 0.25f;
-        }
-        loadProgress(.14f+.12f*float(smoothRows.fetch_add(1)+1)/(4*HM_N));
-      });
-      parallelFor(HM_N, [&](int j) {
-        int j0 = std::max(j - 1, 0), j1 = std::min(j + 1, HM_N - 1);
-        for (int i = 0; i < HM_N; i++)
-          hm[((size_t)j * HM_N + i) * 4] = (tmp[(size_t)j0 * HM_N + i] + 2.f * tmp[(size_t)j * HM_N + i] + tmp[(size_t)j1 * HM_N + i]) * 0.25f;
-        loadProgress(.14f+.12f*float(smoothRows.fetch_add(1)+1)/(4*HM_N));
-      });
+  if (earthChart) {   // (the real Earth: the data, no grid smoothing - world_earth.cpp)
+    buildEarthTerrain();
+  } else {
+    std::atomic<int> sampledRows{0};
+    hm.resize((size_t)HM_N * HM_N * 4);
+    parallelFor(HM_N, [&](int j) {   // rows are independent; spread over every core
+      for (int i = 0; i < HM_N; i++) {
+        float x = -WORLD_HALF + (i + 0.5f) * HM_TEXEL, z = -WORLD_HALF + (j + 0.5f) * HM_TEXEL;
+        float* texel = &hm[((size_t)j * HM_N + i) * 4];
+        if (procedural) regionRecipe->sample(x, z, texel);
+        else computeTexel(x, z, texel);
+      }
+      loadProgress(.02f+.12f*float(sampledRows.fetch_add(1)+1)/HM_N);
+    });
+    // Smooth the ground heights with a separable 1-2-1 filter (twice): bilinear interpolation of the raw samples leaves
+    // visible creases along the grid on big smooth landforms (volcano flanks, ridges, sea cliffs) - a faceted, low-poly
+    // look. Flat areas (airport grounds, the sea floor plateau) are unchanged by it.
+    {
+      loadStage(.14f,"Smoothing terrain / four row passes");
+      std::atomic<int> smoothRows{0};
+      std::vector<float> tmp((size_t)HM_N * HM_N);
+      for (int pass = 0; pass < 2; pass++) {
+        parallelFor(HM_N, [&](int j) {
+          for (int i = 0; i < HM_N; i++) {
+            int i0 = std::max(i - 1, 0), i1 = std::min(i + 1, HM_N - 1);
+            const float* r = &hm[(size_t)j * HM_N * 4];
+            tmp[(size_t)j * HM_N + i] = (r[i0 * 4] + 2.f * r[i * 4] + r[i1 * 4]) * 0.25f;
+          }
+          loadProgress(.14f+.12f*float(smoothRows.fetch_add(1)+1)/(4*HM_N));
+        });
+        parallelFor(HM_N, [&](int j) {
+          int j0 = std::max(j - 1, 0), j1 = std::min(j + 1, HM_N - 1);
+          for (int i = 0; i < HM_N; i++)
+            hm[((size_t)j * HM_N + i) * 4] = (tmp[(size_t)j0 * HM_N + i] + 2.f * tmp[(size_t)j * HM_N + i] + tmp[(size_t)j1 * HM_N + i]) * 0.25f;
+          loadProgress(.14f+.12f*float(smoothRows.fetch_add(1)+1)/(4*HM_N));
+        });
+      }
     }
   }
   loadStage(.26f,"Resolving inland drainage");
@@ -416,7 +431,7 @@ void World::buildConfigured(const std::string& cachePath, const std::string& sta
   // the roads, routed over the finished natural ground (World::height grades them in from here on)
   generationPhase(GenerationPhase::Roads);
   loadStage(.34f,"Routing roads over terrain");
-  roads = buildRoadNetwork(*this);
+  roads = earthChart ? buildEarthRoads() : buildRoadNetwork(*this);
   // the settlements grown over the ground and along those roads, and their streets added to the network
   generationPhase(GenerationPhase::Settlements);
   loadStage(.46f,"Laying out settlements");
@@ -461,7 +476,7 @@ void World::buildConfigured(const std::string& cachePath, const std::string& sta
 // The generated world on disk: its height and mask textures, height bounds and terrain envelope, stamped with the
 // build that made them (any other build generates again)
 namespace {
-const uint32_t kWorldMagic = 0x574c4436u;   // "WLD6": the road network, its grid (each texel's paving entries first) and the forest noise in one R32UI texel; the reservoir
+const uint32_t kWorldMagic = 0x574c4437u;   // "WLD7": the road network, its grid (each texel's paving entries first; 26-bit firsts) and the forest noise beside it; the reservoir
 bool replaceCacheFile(const std::string& from, const std::string& to) {
 #ifdef _WIN32
   return MoveFileExA(from.c_str(), to.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
@@ -529,8 +544,8 @@ bool World::loadCache(const std::string& path, const std::string& stamp) {
   uint32_t magic = 0; char st[64] = {};
   bool ok = fread(&magic, 4, 1, f) == 1 && magic == kWorldMagic && fread(st, 1, 64, f) == 64 && stamp == std::string(st, strnlen(st, 64));
   ok = ok && getVec(f, w.hm, (uint64_t)HM_N * HM_N * 4) && getVec(f, w.mask, (uint64_t)MASK_N * MASK_N * 4);
-  ok = ok && getRoads(f, w.roads) && getVecUpTo(f, w.roadGrid.segs, 1u << 20) && getVec(f, w.roadGrid.head, (uint64_t)RoadGrid::N * RoadGrid::N) &&
-       getVecUpTo(f, w.roadGrid.list, 0x80000u) && getVec(f, w.roadGrid.nearHead, (uint64_t)RoadGrid::NC * RoadGrid::NC) && getVecUpTo(f, w.roadGrid.nearList, 1u << 24);
+  ok = ok && getRoads(f, w.roads) && getVecUpTo(f, w.roadGrid.segs, 1u << 23) && getVec(f, w.roadGrid.head, (uint64_t)RoadGrid::N * RoadGrid::N) && getVec(f, w.roadGrid.forest, (uint64_t)RoadGrid::N * RoadGrid::N) &&
+       getVecUpTo(f, w.roadGrid.list, (uint64_t)RoadGrid::kFirstMask + 64) && getVec(f, w.roadGrid.nearHead, (uint64_t)RoadGrid::NC * RoadGrid::NC) && getVecUpTo(f, w.roadGrid.nearList, 1u << 24);
   // (every entry names a segment, every texel's entries lie in the list: the terrain indexes them unchecked)
   for (size_t i = 0; ok && i < w.roadGrid.list.size(); i++) ok = w.roadGrid.list[i] < w.roadGrid.segs.size();
   for (size_t i = 0; ok && i < w.roadGrid.nearList.size(); i++) ok = w.roadGrid.nearList[i] < w.roadGrid.segs.size();
@@ -579,7 +594,7 @@ void World::saveCache(const std::string& path, const std::string& stamp) const {
   char st[64] = {}; strncpy(st, stamp.c_str(), 63);
   fwrite(&kWorldMagic, 4, 1, f); fwrite(st, 1, 64, f);
   putVec(f, hm); putVec(f, mask);
-  putRoads(f, roads); putVec(f, roadGrid.segs); putVec(f, roadGrid.head); putVec(f, roadGrid.list); putVec(f, roadGrid.nearHead); putVec(f, roadGrid.nearList);
+  putRoads(f, roads); putVec(f, roadGrid.segs); putVec(f, roadGrid.head); putVec(f, roadGrid.forest); putVec(f, roadGrid.list); putVec(f, roadGrid.nearHead); putVec(f, roadGrid.nearList);
   for (int L = 0; L < HMAX_LEVELS; L++) putVec(f, hmax[L]);
   putVec(f, tpV0);
   for (int L = 0; L < TP_LEVELS; L++) putVec(f, tpM[L]);
@@ -873,7 +888,7 @@ void World::sampleBase(float x, float z, float out[4]) const {
 float World::naturalHeight(float x, float z, int octaves) const {
   x = wrap(x); z = wrap(z);
   float b[4]; sampleBase(x, z, b);
-  return b[1] < 0.01f ? b[0] : b[0] + b[1] * terrainFbm(x / DETAIL_SCALE, z / DETAIL_SCALE, octaves);
+  return b[1] < 0.01f ? b[0] : b[0] + b[1] * detailScale * terrainFbm(x / DETAIL_SCALE, z / DETAIL_SCALE, octaves);
 }
 
 float World::height(float x, float z, int octaves) const {

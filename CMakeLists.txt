@@ -36,7 +36,7 @@ add_custom_target(aircraft_geometry_gen DEPENDS ${AIRCRAFT_GEOMETRY_GEN})
 # renderer, the UI, the audio): each compiled once, as object libraries, for every program that links them besides the
 # game itself, which keeps its own build (on MSVC it links the static runtime, with its own flags). Before this every
 # test compiled the shared sources itself: the islands' five 39 times over (the review of v3.44.0, ENG-1).
-set(ENVIRONMENT_SOURCES src/geo.cpp src/earth_data.cpp src/region_travel.cpp src/procedural_regions.cpp src/distant_regions.cpp src/regional_surface.cpp src/world.cpp src/road_network.cpp src/bridges.cpp src/settlements.cpp src/road_furniture.cpp src/landmarks.cpp src/road_traffic.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp)
+set(ENVIRONMENT_SOURCES src/geo.cpp src/earth_data.cpp src/earth_charts.cpp src/world_earth.cpp src/region_travel.cpp src/procedural_regions.cpp src/distant_regions.cpp src/regional_surface.cpp src/world.cpp src/road_network.cpp src/bridges.cpp src/settlements.cpp src/road_furniture.cpp src/landmarks.cpp src/road_traffic.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp)
 set(CORE_ONLY_SOURCES
   src/aircraft.cpp src/aircraft_perf.cpp src/aircraft_stunt.cpp src/aero.cpp src/aero_strips.cpp src/aero_wake.cpp src/breakup.cpp src/models.cpp src/career.cpp src/profile.cpp src/weather.cpp src/hive_combat.cpp src/hive_loadout.cpp src/hive_world_collision.cpp)
 set(CORE_SOURCES ${ENVIRONMENT_SOURCES} ${CORE_ONLY_SOURCES})
@@ -134,6 +134,7 @@ add_executable(geo_flight_test tests/geo_flight_test.cpp ${CORE_OBJS})
 # the real Earth's data reader against the fixture (docs/REAL_EARTH_PLAN.md section 2), plain and under fast math
 add_executable(earth_data_test tests/earth_data_test.cpp src/earth_data.cpp)
 add_executable(earth_data_fastmath_test tests/earth_data_test.cpp src/earth_data.cpp)
+add_executable(earth_chart_test tests/earth_chart_test.cpp ${CORE_OBJS})
 if(MSVC)
   target_compile_options(geo_fastmath_test PRIVATE /fp:fast)
   target_compile_options(earth_data_fastmath_test PRIVATE /fp:fast)
@@ -358,6 +359,7 @@ add_test(NAME earth_geodesy COMMAND geo_test)
 add_test(NAME earth_geodesy_fastmath COMMAND geo_fastmath_test)
 add_test(NAME earth_rebase_flight COMMAND geo_flight_test)
 add_test(NAME earth_data COMMAND earth_data_test ${CMAKE_SOURCE_DIR}/tests/fixtures/earth2 WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+add_test(NAME earth_chart COMMAND earth_chart_test ${CMAKE_SOURCE_DIR}/tests/fixtures/earth2 WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 add_test(NAME earth_data_fastmath COMMAND earth_data_fastmath_test ${CMAKE_SOURCE_DIR}/tests/fixtures/earth2 WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/earth_data_fastmath)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/earth_data_fastmath)
 add_test(NAME menu_plan_cache COMMAND menu_plan_cache_test)
