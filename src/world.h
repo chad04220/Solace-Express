@@ -103,6 +103,9 @@ class World {
 public:
   std::vector<Airport> airports;
   std::vector<ExtraRunway> extraRunways;   // (the real Earth's: above; none elsewhere)
+  // The way houses are built here (the scenery shader's uStyle): 0 the islands' and the generated regions' own, else a
+  // real-Earth chart's by its country (earthCharts::buildingStyleOf)
+  int buildingStyle = 0;
   std::vector<Town> towns;
   bool procedural = false;
   bool repeating = false; // the old wrapping chart (above): no World built repeats

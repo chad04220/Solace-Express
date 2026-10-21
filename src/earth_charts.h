@@ -63,6 +63,12 @@ struct ChartAirports {
 };
 std::shared_ptr<const ChartAirports> chartAirports(const procedural::Descriptor& chart, const std::shared_ptr<const earth::Pack>& pack,
                                                    const earth::Sampler* sampler = nullptr);
+// The way a country builds its houses (World::buildingStyle, the scenery shader's uStyle): 1 North America and the
+// suburbs like it (Australia, New Zealand), 2 western and central Europe, 3 the Mediterranean and Latin America's
+// colonial towns, 4 the Nordic countries, 5 the tropics, 6 East Asia, 7 the dry lands; a country not named, by its
+// latitude (the tropics, else 2). country: ISO 3166-1 alpha-2, as OurAirports and GeoNames give it
+enum BuildingStyle { STYLE_ISLANDS = 0, STYLE_NORTH_AMERICA, STYLE_EUROPE, STYLE_MEDITERRANEAN, STYLE_NORDIC, STYLE_TROPICS, STYLE_EAST_ASIA, STYLE_DRY };
+int buildingStyleOf(const std::string& country, double lat, double lon);
 // The land cover as the mask's two fields, per mask texel (World::bakeMask): how wooded (0 open .. 1 closed forest)
 // and how farmed (cropland 1, grassland a little), blurred across the cover's 330 m cells
 void maskFields(const ChartData& chart, std::vector<float>& forest, std::vector<float>& farm);

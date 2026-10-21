@@ -5898,6 +5898,7 @@ void Game::debugScene(const std::string& name) {
     }
     if (getenv("REGION_ALT")) plane.pos.y = std::max(plane.pos.y, (float)atof(getenv("REGION_ALT")));
     if (getenv("REGION_TOD")) timeOfDay = (float)atof(getenv("REGION_TOD"));   // (REGION_TOD=<hours>: the time of day there)
+    if (getenv("REGION_STYLE")) g_world.buildingStyle = atoi(getenv("REGION_STYLE"));   // (REGION_STYLE=<n>: its houses built another way)
     for (int i = 0; i < 8; ++i) updateCamera(.1f);
     // REGION_VIEW="x,y,z,lookx,looky,lookz": a fixed camera over the region (its overview, for a review shot)
     if (const char* view = getenv("REGION_VIEW")) {

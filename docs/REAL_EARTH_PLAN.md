@@ -553,8 +553,24 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
     6/24. Each is level at its airport's height, answers with its airport and its own surface, and has nothing of the
     scenery standing on it. Rendered from 1.5 km and 300 m, the airport shows both runways on one levelled ground.
 
-  Still open in E8: airport layouts by size, rivers (GRIP has none; a rivers dataset), regional building styles, and
-  real landmarks.
+- **E8, fourth pass: regional building styles** (`World::buildingStyle`, `earthCharts::buildingStyleOf`). A chart takes
+  the country most of its airports are in, and that country a way of building. There are seven:
+  - North America and the suburbs like it (Australia, New Zealand);
+  - western and central Europe;
+  - the Mediterranean, with Latin America's colonial towns;
+  - the Nordic countries;
+  - the tropics;
+  - East Asia;
+  - the dry lands, the American south-west among them.
+  A country not named takes the tropics' style within 25° of the equator, else Europe's.
+  - The scenery shader (`uStyle`, `styledWall`, `styledRoof`) gives a house its region's shares of brick, weatherboard
+    and render, and of tiles, slate, shingles and sheet metal, each in its own colours. Examples: New England's boards
+    under grey shingles, the Mediterranean's white and ochre under terracotta, Nordic red and yellow boarding. The
+    islands and the generated regions keep their own (style 0, the code as it was).
+  - `REGION_STYLE=<n>` builds a region scene's houses another way, for review. Oak Bluffs from 260 m in four styles
+    shows the roofs change from grey shingle to terracotta to red and black to tin.
+
+  Still open in E8: airport layouts by size, rivers (GRIP has none; a rivers dataset), and real landmarks.
 
 Decisions taken with the defaults (the owner can change them):
 - The generated regions keep working until E6. In real-Earth play the real world replaces them; they stay available

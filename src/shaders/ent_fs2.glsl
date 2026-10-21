@@ -97,6 +97,42 @@ vec3 triSFrame(vec3 p, vec3 n, int frame, int layer, float sc, float bump, inout
 }
 vec2 octEnc(vec3 n){ n /= abs(n.x) + abs(n.y) + abs(n.z); vec2 e = n.y >= 0.0 ? n.xz : (1.0 - abs(n.zx))*vec2(n.x >= 0.0 ? 1.0 : -1.0, n.z >= 0.0 ? 1.0 : -1.0); return e; }
 vec3 pal(float s, vec3 a, vec3 b, vec3 c, vec3 d){ float k = fract(s)*4.0; return k < 1.0 ? a : k < 2.0 ? b : k < 3.0 ? c : d; }
+// The real Earth's ways of building a house (uStyle > 0, earth_charts.h BuildingStyle; 0 is the islands' own, below):
+// a region's shares of brick, weatherboard and render on the walls, and of tiles, slate, shingles and sheet metal on
+// the roofs, each in its own colours - 1 North America's boards and shingles, 2 Europe's brick and render under clay
+// tiles, 3 the Mediterranean's white and ochre under terracotta, 4 the Nordic countries' red and yellow boarding,
+// 5 the tropics' bright render under tin and tile, 6 East Asia's pale render under grey tiles, 7 the dry lands' sand
+void styledWall(int style, float s1, float s2, out int layer, out vec3 tint, out float tsc){
+  float brick = style == 1 ? 0.2 : style == 2 ? 0.5 : style == 3 ? 0.08 : style == 7 ? 0.1 : 0.05;
+  float boards = brick + (style == 1 ? 0.6 : style == 2 ? 0.05 : style == 4 ? 0.75 : style == 5 ? 0.1 : style == 6 ? 0.2 : 0.0);
+  layer = M_PLASTER; tsc = 2.5;
+  if (s1 < brick) { layer = M_BRICK; tint = style == 7 ? vec3(0.95, 0.82, 0.62) : mix(vec3(1.0), vec3(0.82, 0.68, 0.6), s2); }
+  else if (s1 < boards) {
+    layer = M_SIDING; tsc = 3.0;
+    tint = style == 4 ? pal(s2, vec3(0.55, 0.16, 0.11), vec3(0.95, 0.94, 0.9), vec3(0.93, 0.78, 0.42), vec3(0.62, 0.66, 0.66))
+         : style == 6 ? pal(s2, vec3(0.6, 0.58, 0.55), vec3(0.45, 0.38, 0.32), vec3(0.8, 0.8, 0.78), vec3(0.55, 0.6, 0.62))
+         : pal(s2, vec3(0.96, 0.96, 0.94), vec3(0.78, 0.84, 0.88), vec3(0.95, 0.9, 0.72), vec3(0.74, 0.8, 0.72));
+  }
+  else tint = style == 3 ? pal(s2, vec3(0.98, 0.97, 0.94), vec3(0.97, 0.9, 0.76), vec3(0.93, 0.78, 0.55), vec3(0.95, 0.85, 0.8))
+            : style == 5 ? pal(s2, vec3(0.6, 0.88, 0.85), vec3(0.98, 0.78, 0.8), vec3(0.98, 0.92, 0.6), vec3(0.97, 0.97, 0.95))
+            : style == 7 ? pal(s2, vec3(0.9, 0.82, 0.66), vec3(0.95, 0.9, 0.8), vec3(0.85, 0.72, 0.55), vec3(0.97, 0.95, 0.9))
+            : style == 6 ? pal(s2, vec3(0.94, 0.94, 0.92), vec3(0.85, 0.85, 0.84), vec3(0.9, 0.87, 0.8), vec3(0.78, 0.78, 0.76))
+            : pal(s2, vec3(0.97, 0.95, 0.9), vec3(0.95, 0.9, 0.82), vec3(0.88, 0.88, 0.86), vec3(0.92, 0.84, 0.72));
+}
+void styledRoof(int style, float s2, float s3, out int layer, out vec3 tint, out float metal){
+  float tiles = style == 1 ? 0.15 : style == 2 ? 0.65 : style == 3 ? 0.92 : style == 4 || style == 5 ? 0.45 : style == 6 ? 0.7 : 0.3;
+  float slate = tiles + (style == 1 ? 0.05 : style == 2 ? 0.35 : style == 3 ? 0.08 : style == 4 ? 0.3 : style == 7 ? 0.7 : 0.0);
+  metal = 0.0;
+  if (s3 < tiles) {
+    layer = M_TILES;
+    tint = style == 6 ? pal(s2, vec3(0.45, 0.48, 0.55), vec3(0.35, 0.36, 0.4), vec3(0.4, 0.5, 0.48), vec3(0.3, 0.3, 0.33))
+         : style == 2 || style == 4 ? pal(s2, vec3(0.85, 0.5, 0.38), vec3(0.6, 0.35, 0.28), vec3(0.32, 0.3, 0.3), vec3(0.75, 0.42, 0.32))
+         : mix(vec3(1.0, 0.75, 0.6), vec3(0.85, 0.52, 0.38), s2);
+  }
+  else if (s3 < slate) { layer = M_SLATE; tint = style == 7 ? vec3(0.9, 0.82, 0.68) : vec3(0.72, 0.74, 0.8); }
+  else if (style == 5 || style == 6) { layer = M_CORRUGATED; metal = 0.4; tint = pal(s2, vec3(0.62, 0.35, 0.22), vec3(0.7, 0.72, 0.74), vec3(0.55, 0.2, 0.15), vec3(0.3, 0.5, 0.45)); }
+  else { layer = M_SHINGLES; tint = pal(s2, vec3(0.42, 0.42, 0.45), vec3(0.5, 0.36, 0.3), vec3(0.3, 0.36, 0.32), vec3(0.58, 0.56, 0.54)); }
+}
 // A window's light coming on at dusk (Phase D): each at its own moment as the dark falls - its key in [0, 1) - a few
 // at first, every one by full dark, and on near its full brightness once it is
 float duskOn(float key){ return step(key, uNight*1.6 - 0.15)*smoothstep(0.02, 0.3, uNight); }
@@ -780,7 +816,8 @@ void main(){
     if (part == P_WALL) {
       int layer = M_PLASTER; float tsc = 2.5; vec3 tint = vec3(1.0);
       if (uKind == K_HOUSE || uKind == K_HIP || uKind == K_LHOUSE || uKind == K_FARM) {
-        if (s1 < 0.3) { layer = M_BRICK; tint = mix(vec3(1.0), vec3(0.85, 0.75, 0.7), s2); }
+        if (uStyle > 0) styledWall(uStyle, s1, s2, layer, tint, tsc);
+        else if (s1 < 0.3) { layer = M_BRICK; tint = mix(vec3(1.0), vec3(0.85, 0.75, 0.7), s2); }
         else if (s1 < 0.55 || uKind == K_FARM) { layer = M_SIDING; tint = pal(s2, vec3(0.95, 0.95, 0.92), vec3(0.75, 0.85, 0.9), vec3(0.95, 0.88, 0.7), vec3(0.7, 0.8, 0.7)); tsc = 3.0; }
         else tint = pal(s2, vec3(0.97, 0.95, 0.9), vec3(0.98, 0.88, 0.7), vec3(0.92, 0.78, 0.66), vec3(0.88, 0.9, 0.86));
       } else if (uKind == K_TOWNHOUSE) {
@@ -805,6 +842,7 @@ void main(){
       int layer = M_TILES; vec3 tint = vec3(1.0); float tsc = 3.0;
       if (uKind == K_BARN || uKind == K_WAREHOUSE) { layer = M_CORRUGATED; tint = uKind == K_BARN ? pal(s2, vec3(0.55, 0.15, 0.1), vec3(0.4, 0.42, 0.45), vec3(0.6, 0.6, 0.62), vec3(0.3, 0.32, 0.3)) : vec3(0.8); metal = 0.5; }
       else if (uKind == K_CHURCH) { layer = M_SLATE; tint = lp.y > 18.0*vInst.z ? vec3(0.45, 0.75, 0.62) : vec3(0.8, 0.82, 0.88); metal = lp.y > 18.0*vInst.z ? 0.3 : 0.0; }
+      else if (uStyle > 0) styledRoof(uStyle, s2, s3, layer, tint, metal);
       else if (s3 < 0.4) { layer = M_TILES; tint = mix(vec3(1.0, 0.8, 0.7), vec3(0.75, 0.5, 0.42), s2); }
       else if (s3 < 0.65) { layer = M_SLATE; tint = vec3(0.75, 0.77, 0.84); }
       else { layer = M_SHINGLES; tint = pal(s2, vec3(0.45, 0.45, 0.48), vec3(0.5, 0.36, 0.3), vec3(0.32, 0.38, 0.32), vec3(0.6, 0.58, 0.55)); }

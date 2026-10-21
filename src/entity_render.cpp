@@ -607,6 +607,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
       glUniform3f(glGetUniformLocation(p, "uCamV"), cam.x, cam.y, cam.z);
       glUniform1f(glGetUniformLocation(p, "uPlanetR"), fp.pano > 0.f ? 0.f : planetRadius());   // (the round world: planet.h)
       glUniform1f(glGetUniformLocation(p, "uNight"), fp.night);
+      glUniform1i(glGetUniformLocation(p, "uStyle"), g_world.buildingStyle);
       glUniform1f(glGetUniformLocation(p, "uRwyLights"), fp.rwyLights);
       glUniform1f(glGetUniformLocation(p, "uWet"), fp.wet);
       glUniform1f(glGetUniformLocation(p, "uSnow"), fp.snow);

@@ -5,6 +5,7 @@ in vec3 vW; in vec3 vL; in vec3 vLN; in vec4 vAux; in vec3 vC; flat in vec4 vIns
 uniform sampler2DArray uAlb; uniform sampler2DArray uNrm;
 uniform sampler2DArray uEnvAlb; uniform sampler2DArray uEnvNrm; uniform int uEnvMaterials;
 uniform int uKind; uniform int uLod; uniform int uShadowPass; uniform vec3 uCam; uniform float uRwyLights; uniform float uNight; uniform float uWet; uniform float uSnow; uniform float uTime;
+uniform int uStyle;   // (the way houses are built here: World::buildingStyle, earth_charts.h BuildingStyle; 0 the islands')
 const int M_GRASS=0, M_FOREST=1, M_ROCK=2, M_SAND=3, M_SNOW=4, M_ASPHALT=5, M_GRAVEL=6, M_DIRT=7;
 const int M_CONCRETE=8, M_TILES=9, M_SLATE=10, M_PLASTER=11, M_BRICK=12, M_LEAVES=13, M_NEEDLES=14, M_PAINT=15;
 const int M_METAL=16, M_CORRUGATED=22, M_BARK=25, M_PLANKS=26, M_LITTER=27, M_SHINGLES=28, M_SIDING=29;

@@ -325,6 +325,13 @@ void World::buildEarth(const procedural::Descriptor& chartDesc, const std::strin
     airports.push_back(a);
   }
   extraRunways = picked->extras;
+  {   // the way houses are built here: the country most of its airports are in (the chart's own airport with none)
+    std::map<std::string, int> count;
+    for (const auto& r : data->airports) count[r.country]++;
+    std::string country; int most = 0;
+    for (const auto& [c, n] : count) if (n > most) { most = n; country = c; }
+    buildingStyle = earthCharts::buildingStyleOf(country, chartDesc.origin.latitude, chartDesc.origin.longitude);
+  }
 
   // ---- the towns: GeoNames' places in the square, the most telling first - the bigger and the nearer the chart's
   // centre, where the flight starts (a place's people over 1 + (its distance / 15 km)^2: a city counts from anywhere in

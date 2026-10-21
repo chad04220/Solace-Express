@@ -97,6 +97,21 @@ float lushOf(int cover, double lat) {
 
 bool isEarthId(const std::string& id) { return id.compare(0, 6, kIdPrefix) == 0; }
 
+int buildingStyleOf(const std::string& country, double lat, double lon) {
+  auto in = [&](const char* list) {   // (two letters at a time)
+    for (const char* c = list; c[0] && c[1]; c += 2) if (country.size() == 2 && country[0] == c[0] && country[1] == c[1]) return true;
+    return false;
+  };
+  if (country == "US" && lon < -103.0 && lat < 36.5) return STYLE_DRY;   // (the south-west: stucco and adobe)
+  if (in("USCAAUNZ")) return STYLE_NORTH_AMERICA;
+  if (in("NOSEFIISFOGLEELV")) return STYLE_NORDIC;
+  if (in("JPCNKRKPTWHKMOMN")) return STYLE_EAST_ASIA;
+  if (in("SAAEQAKWOMBHYEIRIQEGLYDZMATNJOILSYPKAFTMUZKZEHMRNETDSDML")) return STYLE_DRY;
+  if (in("ESPTITGRMTCYHRMEALMKTRMCADSMVALBMXARCLUYPE")) return STYLE_MEDITERRANEAN;
+  if (in("GBIENLBEDEFRLUCHATDKPLCZSKHUSIROBGRSUABYLTMDBARS")) return STYLE_EUROPE;
+  return std::fabs(lat) < 25.0 ? STYLE_TROPICS : STYLE_EUROPE;
+}
+
 static procedural::Descriptor descriptorAt(int la, int lo) {
   procedural::Descriptor d;
   d.id = chartId(la, lo);
