@@ -422,6 +422,9 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
       in a few round trips. Sea and empty tiles are never fetched; their index says so.
     - A piece that won't come throws, saying why, and isn't asked for again for 30 s, so offline the charts fail fast
       rather than hammering. What has been flown before still reads offline.
+    - The cache folder holds 2 GB at most (`earth::setStreamCacheLimit`). Past that, when the pack opens, the pieces
+      read longest ago go first, down to three quarters of it; a read touches its piece. A fetch's leftover part is
+      removed.
     - The fetch is an HTTP range over WinHTTP (one session, its connections reused; the range header added to the
       request so it survives the release's redirect), or curl's `-r` elsewhere. GitHub's release downloads answer
       ranges with 206 (checked).
@@ -434,6 +437,7 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
       ranges:
       - every tile of every layer comes out as the whole pack has it;
       - opened again, it reads from what it kept and fetches nothing;
+      - over its limit, the cache is trimmed, and what went is fetched again, the same;
       - a chart built streamed (KMVY) is the whole pack's: its ground, airports, towns and roads;
       - with the source gone, what was kept reads, and a tile not kept throws with the source's 404, and isn't
         asked for again at once.

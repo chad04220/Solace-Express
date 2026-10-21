@@ -1,7 +1,8 @@
 // The real Earth streamed (earth_data.h, earth_install.h), with no network: the fixture packaged as the global build
 // is (tools/earth2 package), installed streamed from a file address - the core alone - and read from there through
 // curl's ranges (earthFetch::fetchRange). Every tile of every layer comes out as the whole pack has it, each piece kept
-// in the cache folder once it has come; opened again, it reads them from there and fetches nothing. A chart built from
+// in the cache folder once it has come; opened again, it reads them from there and fetches nothing - and past the
+// cache's limit, it is trimmed, what was read longest ago first, and fetched again when wanted. A chart built from
 // the streamed pack is the chart built from the whole one. With the source gone, what was kept still reads; a piece
 // not kept throws, saying why (the source gone: streamStats().gone), and isn't asked for again at once.
 #include "../src/earth_install.h"
@@ -84,6 +85,21 @@ int main(int argc, char** argv) {
     int tiles = 0;
     check(pack && sameTiles(*whole, *pack, tiles) && fetches.load() == 0 && pack->streamStats().kept > 0,
           fmt("opened again: the same, from what was kept, %d fetched", fetches.load()));
+  }
+  {   // past the cache's limit: trimmed when the pack opens, the pieces read longest ago first, to three quarters of it -
+      // and what went fetched again when it is wanted, the same
+    uint64_t kept = 0;
+    { auto pack = earth::Pack::open(install.string()); kept = pack ? pack->streamStats().kept : 0; }
+    const uint64_t limit = kept / 2;
+    earth::setStreamCacheLimit(limit);
+    fetches = 0;
+    auto pack = earth::Pack::open(install.string(), &why);
+    const uint64_t trimmed = pack ? pack->streamStats().kept : 0;
+    int tiles = 0;
+    const bool same = pack && sameTiles(*whole, *pack, tiles);
+    check(kept > 0 && trimmed <= limit / 4 * 3 && trimmed > 0 && same && fetches.load() > 0,
+          fmt("trimmed to its limit (%.0f of %.0f kB kept), what went fetched again, the same (%d fetched)", trimmed / 1e3, kept / 1e3, fetches.load()));
+    earth::setStreamCacheLimit(2ull << 30);
   }
   {   // a chart built from the streamed pack (fetching what isn't kept: the cache folder emptied) is the whole pack's
     fs::remove_all(install / "streamed");

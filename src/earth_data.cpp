@@ -244,6 +244,7 @@ std::string tilePiece(const std::string& rel, int lat, int lon);
 
 std::mutex g_fetchLock;
 RangeFetch g_fetch;
+std::atomic<uint64_t> g_cacheLimit{2ull << 30};
 
 // f(0) .. f(n - 1), on up to 8 threads when parallel (a streamed pack's pieces, fetched side by side: a chart's thirty
 // in a few round trips rather than one after another), the first exception thrown rethrown here
@@ -317,7 +318,11 @@ struct Pack::Impl {
   bool piece(const std::string& name, const Remote& r, uint64_t at, uint64_t n, std::vector<uint8_t>& out, std::string& why) {
     const std::string path = joinPath(cache, name);
     long long have = -1;
-    if (fileSize(path, have) && have == (long long)n && readFile(path, out) && out.size() == n) return true;
+    if (fileSize(path, have) && have == (long long)n && readFile(path, out) && out.size() == n) {
+      std::error_code ec;   // (read now: the last to go when the folder is trimmed)
+      std::filesystem::last_write_time(std::filesystem::u8path(path), std::filesystem::file_time_type::clock::now(), ec);
+      return true;
+    }
     const auto now = std::chrono::steady_clock::now();
     {
       std::lock_guard<std::mutex> g(lock);
@@ -435,6 +440,7 @@ std::string tilePiece(const std::string& rel, int lat, int lon) { return rel.sub
 
 void setRangeFetch(RangeFetch fetch) { std::lock_guard<std::mutex> g(g_fetchLock); g_fetch = std::move(fetch); }
 bool hasRangeFetch() { std::lock_guard<std::mutex> g(g_fetchLock); return (bool)g_fetch; }
+void setStreamCacheLimit(uint64_t bytes) { g_cacheLimit = bytes; }
 
 Pack::~Pack() = default;
 
@@ -509,9 +515,23 @@ std::shared_ptr<Pack> Pack::open(const std::string& dir, std::string* error) {
       if (bundle) { im.remote[rel] = it->second; im.stats.remote += it->second.bytes; }   // (a GLO-90 tile not here: the fetcher's to bring, as any)
     }
     im.cache = joinPath(dir, "streamed");
+    // what is kept: a part a fetch left (never renamed in) removed; past the limit, the pieces read longest ago
+    struct Kept { std::filesystem::file_time_type at; uint64_t bytes; std::filesystem::path path; };
+    std::vector<Kept> kept;
     std::error_code ec;
-    for (auto e = std::filesystem::recursive_directory_iterator(std::filesystem::u8path(im.cache), ec); !ec && e != std::filesystem::recursive_directory_iterator(); e.increment(ec))
-      if (e->is_regular_file(ec)) im.stats.kept += (uint64_t)e->file_size(ec);
+    for (auto e = std::filesystem::recursive_directory_iterator(std::filesystem::u8path(im.cache), ec); !ec && e != std::filesystem::recursive_directory_iterator(); e.increment(ec)) {
+      if (!e->is_regular_file(ec)) continue;
+      if (e->path().extension() == ".part") { std::filesystem::remove(e->path(), ec); continue; }
+      kept.push_back({e->last_write_time(ec), (uint64_t)e->file_size(ec), e->path()});
+      im.stats.kept += kept.back().bytes;
+    }
+    if (im.stats.kept > g_cacheLimit.load()) {
+      std::sort(kept.begin(), kept.end(), [](const Kept& a, const Kept& b) { return a.at < b.at; });
+      for (const Kept& k : kept) {
+        if (im.stats.kept <= g_cacheLimit.load() / 4 * 3) break;
+        if (std::filesystem::remove(k.path, ec)) im.stats.kept -= k.bytes;
+      }
+    }
   }
   auto table = [&](const char* name, const char* magic, std::vector<uint8_t>& out) -> bool {
     if (!im.files.count(name)) return true;

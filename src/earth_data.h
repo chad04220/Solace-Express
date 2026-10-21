@@ -100,6 +100,9 @@ struct RoadEdge {
 using RangeFetch = std::function<bool(const std::string& url, uint64_t offset, uint64_t length, std::vector<uint8_t>& out, std::string* error)>;
 void setRangeFetch(RangeFetch fetch);
 bool hasRangeFetch();
+// The most a streamed pack keeps in its cache folder (2 GB unless set): past it, when the pack opens, the pieces read
+// longest ago go first, down to three quarters of it - fetched again if they are wanted again
+void setStreamCacheLimit(uint64_t bytes);
 
 class Pack {
 public:
