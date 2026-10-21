@@ -1,9 +1,12 @@
 // The real Earth's pack installed from the game (earth_install.h), with no network: the fixture's pack put in zips as
 // the global build's are (tools/earth2 package, several of them) and fetched from a file address through curl. The
 // pack installs whole and opens where it went; installed again it replaces the folder there; a missing source or a
-// damaged zip fails and leaves the pack in place as it was. The zip reader refuses a compressed zip, a name that would
-// step out of its folder and a checksum that disagrees. The source is read from earth-source.txt beside the game.
+// damaged zip fails and leaves the pack in place as it was. Tried again, a download goes on from where it stopped -
+// the zips unpacked kept, one broken off halfway carried on from its part - unless the list has changed. The zip
+// reader refuses a compressed zip, a name that would step out of its folder and a checksum that disagrees. The source
+// is read from earth-source.txt beside the game.
 #include "../src/earth_install.h"
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -72,19 +75,73 @@ int main(int argc, char** argv) {
     const bool kept = finish(in) == earthInstall::Installer::FAILED && earth::Pack::open(install.string());
     check(kept, "a missing source fails, the pack kept: " + in.status());
   }
-  // a damaged zip (a byte of its data changed, its checksum not): failed, the pack kept
+  // a damaged zip (a byte of its data changed, its checksum not): failed, the pack kept, the zips before it kept
+  const std::string name2 = "earth-pack-02-of-" + std::string(zips < 10 ? "0" : "") + std::to_string(zips) + ".zip";
+  const std::string name3 = "earth-pack-03-of-" + std::string(zips < 10 ? "0" : "") + std::to_string(zips) + ".zip";
   {
     const fs::path bad = root / "bad";
     fs::create_directories(bad);
     for (const auto& e : fs::directory_iterator(dist)) fs::copy_file(e.path(), bad / e.path().filename());
-    const fs::path second = bad / ("earth-pack-02-of-" + std::string(zips < 10 ? "0" : "") + std::to_string(zips) + ".zip");
-    std::string z = slurp(second);
+    std::string z = slurp(bad / name2);
     const bool found = z.size() > 4000;
     if (found) z[z.size() / 2] ^= 0x5a;
-    spit(second, z);
+    spit(bad / name2, z);
     earthInstall::Installer in("file://" + bad.string() + "/", work.string(), install.string());
-    const bool kept = found && finish(in) == earthInstall::Installer::FAILED && earth::Pack::open(install.string()) && !fs::exists(work);
-    check(kept, "a damaged zip fails, the pack kept, nothing of the download left: " + in.status());
+    const bool kept = found && finish(in) == earthInstall::Installer::FAILED && earth::Pack::open(install.string()) &&
+                      !fs::exists(work / name2) && slurp(work / "unpacked.txt").find("earth-pack-01") == 0;
+    check(kept, "a damaged zip fails, the pack kept, the zip before it kept unpacked: " + in.status());
+  }
+  // tried again from the good source (the same list): the zips already unpacked not fetched again
+  std::vector<std::string> fetched;
+  auto counting = [&](const std::string& url, const std::string& path, std::string* error, const std::atomic<bool>* cancel) {
+    fetched.push_back(url.substr(url.rfind('/') + 1));
+    return earthFetch::downloadResuming(url, path, error, cancel);
+  };
+  {
+    earthInstall::Installer in(source, work.string(), install.string(), counting);
+    const bool done = finish(in) == earthInstall::Installer::DONE && earth::Pack::open(install.string()) && !fs::exists(work);
+    bool skipped = std::find(fetched.begin(), fetched.end(), name2) != fetched.end();
+    for (const auto& f : fetched) skipped &= f.find("earth-pack-01") != 0;
+    check(done && skipped && (int)fetched.size() == zips, fmt("tried again: carried on from the damaged one, %zu fetched (the list and %d zips)", fetched.size(), zips - 1));
+  }
+  // a download broken off halfway through a zip: tried again, that zip carried on from its part (curl -C -)
+  {
+    bool broke = false;
+    auto breaking = [&](const std::string& url, const std::string& path, std::string* error, const std::atomic<bool>* cancel) {
+      if (url.size() > name3.size() && url.compare(url.size() - name3.size(), name3.size(), name3) == 0) {
+        const std::string all = slurp(dist / name3);
+        spit(path + ".part", all.substr(0, all.size() / 2));
+        if (error) *error = "the download broke off";
+        broke = true;
+        return false;
+      }
+      return earthFetch::downloadResuming(url, path, error, cancel);
+    };
+    {
+      earthInstall::Installer in(source, work.string(), install.string(), breaking);
+      const bool failed = finish(in) == earthInstall::Installer::FAILED && broke && fs::exists(work / (name3 + ".part"));
+      check(failed, "broken off halfway through the third zip, its part kept: " + in.status());
+    }
+    fetched.clear();
+    earthInstall::Installer in(source, work.string(), install.string(), counting);
+    const bool done = finish(in) == earthInstall::Installer::DONE && earth::Pack::open(install.string());
+    check(done && !fetched.empty() && fetched.size() == (size_t)zips - 1 && fetched[1] == name3,
+          fmt("tried again: the third zip carried on from its half, whole (%zu fetched)", fetched.size()));
+  }
+  // the list changed since (the pack built again): what was kept begun again
+  {
+    auto breaking = [&](const std::string& url, const std::string& path, std::string* error, const std::atomic<bool>* cancel) {
+      if (url.find(name3) != std::string::npos) { if (error) *error = "broke off"; return false; }
+      return earthFetch::downloadResuming(url, path, error, cancel);
+    };
+    { earthInstall::Installer in(source, work.string(), install.string(), breaking); finish(in); }
+    std::string list = slurp(dist / "SHA256SUMS");
+    list[0] = list[0] == '0' ? '1' : '0';   // (another hash at the top: another pack)
+    spit(dist / "SHA256SUMS", list);
+    fetched.clear();
+    earthInstall::Installer in(source, work.string(), install.string(), counting);
+    const bool done = finish(in) == earthInstall::Installer::DONE && earth::Pack::open(install.string());
+    check(done && (int)fetched.size() == zips + 1, fmt("the list changed: every zip fetched again (%zu)", fetched.size()));
   }
   // the zip reader: a compressed zip, a name stepping out, refused (nothing written outside)
   {

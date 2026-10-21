@@ -51,9 +51,14 @@ std::string glo90Url(int lat, int lon) {
   return "https://copernicus-dem-90m.s3.amazonaws.com/" + name + "/" + name + ".tif";
 }
 
-bool download(const std::string& url, const std::string& path, std::string* error, const std::atomic<bool>* cancel) {
-  auto fail = [&](const std::string& why) { if (error) *error = why; std::remove((path + ".part").c_str()); return false; };
+namespace {
+// a download into path (written beside it, renamed in when whole); resume: a part already there added to, and kept when
+// it fails
+bool fetch(const std::string& url, const std::string& path, std::string* error, const std::atomic<bool>* cancel, bool resume) {
   const std::string part = path + ".part";
+  auto fail = [&](const std::string& why) { if (error) *error = why; if (!resume) std::remove(part.c_str()); return false; };
+  long long have = 0;
+  if (resume) { struct stat st; if (stat(part.c_str(), &st) == 0) have = (long long)st.st_size; }
 #ifdef _WIN32
   const std::wstring wurl = wide(url);
   URL_COMPONENTS u = {}; u.dwStructSize = sizeof u;
@@ -62,17 +67,25 @@ bool download(const std::string& url, const std::string& path, std::string* erro
   if (!WinHttpCrackUrl(wurl.c_str(), 0, 0, &u)) return fail("not an address: " + url);
   HINTERNET session = WinHttpOpen(L"SomniumVolandi/1", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
   if (!session) return fail("no network session");
-  WinHttpSetTimeouts(session, 10000, 10000, 20000, 30000);
+  WinHttpSetTimeouts(session, 10000, 10000, 20000, resume ? 60000 : 30000);
   HINTERNET connect = WinHttpConnect(session, host, u.nPort, 0);
   HINTERNET request = connect ? WinHttpOpenRequest(connect, L"GET", rest, nullptr, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
                                                    u.nScheme == INTERNET_SCHEME_HTTPS ? WINHTTP_FLAG_SECURE : 0) : nullptr;
   auto close = [&] { if (request) WinHttpCloseHandle(request); if (connect) WinHttpCloseHandle(connect); WinHttpCloseHandle(session); };
-  if (!request || !WinHttpSendRequest(request, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0) ||
+  const std::wstring range = have > 0 ? L"Range: bytes=" + std::to_wstring(have) + L"-" : std::wstring();
+  if (!request || !WinHttpSendRequest(request, range.empty() ? WINHTTP_NO_ADDITIONAL_HEADERS : range.c_str(), range.empty() ? 0 : (DWORD)-1L,
+                                      WINHTTP_NO_REQUEST_DATA, 0, 0, 0) ||
       !WinHttpReceiveResponse(request, nullptr)) { close(); return fail("no answer from " + url); }
   DWORD status = 0, size = sizeof status;
   WinHttpQueryHeaders(request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX, &status, &size, WINHTTP_NO_HEADER_INDEX);
-  if (status != 200) { close(); return fail("HTTP " + std::to_string(status) + " from " + url); }
-  FILE* f = fopen(part.c_str(), "wb");
+  const bool more = have > 0 && status == 206;   // (the rest of it, after the part)
+  if (have > 0 && status == 416) {   // (nothing past the part's end: it was whole)
+    close(); std::remove(path.c_str());
+    if (!MoveFileA(part.c_str(), path.c_str())) return fail("can't place " + path);
+    return true;
+  }
+  if (status != 200 && !more) { close(); return fail("HTTP " + std::to_string(status) + " from " + url); }
+  FILE* f = fopen(part.c_str(), more ? "ab" : "wb");
   if (!f) { close(); return fail("can't write " + part); }
   std::vector<char> buf(1 << 16);
   bool ok = true;
@@ -91,12 +104,22 @@ bool download(const std::string& url, const std::string& path, std::string* erro
 #else
   // (curl, as the shell finds it: the paths and the address are the game's own, quoted)
   auto quote = [](const std::string& s) { std::string q = "'"; for (char c : s) { if (c == '\'') q += "'\\''"; else q += c; } return q + "'"; };
+  (void)have;
   if (cancel && cancel->load()) return fail("cancelled");
-  const std::string cmd = "curl -sfL --max-time 180 -o " + quote(part) + " " + quote(url) + " 2>/dev/null";
+  const std::string cmd = std::string("curl -sfL ") + (resume ? "-C - --speed-time 60 --speed-limit 1024 " : "--max-time 180 ") +
+                          "-o " + quote(part) + " " + quote(url) + " 2>/dev/null";
   if (std::system(cmd.c_str()) != 0 || !exists(part)) return fail("no download from " + url);
   if (std::rename(part.c_str(), path.c_str()) != 0) return fail("can't place " + path);
   return true;
 #endif
+}
+} // namespace
+
+bool download(const std::string& url, const std::string& path, std::string* error, const std::atomic<bool>* cancel) {
+  return fetch(url, path, error, cancel, false);
+}
+bool downloadResuming(const std::string& url, const std::string& path, std::string* error, const std::atomic<bool>* cancel) {
+  return fetch(url, path, error, cancel, true);
 }
 
 Glo90Fetcher::Glo90Fetcher(std::string dir, Transfer transfer) : dir_(std::move(dir)), transfer_(std::move(transfer)) {

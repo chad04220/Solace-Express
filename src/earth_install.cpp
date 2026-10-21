@@ -4,6 +4,8 @@
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
+#include <set>
+#include <sstream>
 #include <vector>
 
 namespace fs = std::filesystem;
@@ -149,15 +151,26 @@ void Installer::say(const std::string& s, const std::string& partial) { std::loc
 
 void Installer::run() {
   std::error_code ec;
-  const fs::path staging = fs::path(work_) / "staging";
-  // (a failure keeps nothing of the download: the work folder, maybe gigabytes of it, removed)
-  auto fail = [&](const std::string& why) { fs::remove_all(work_, ec); say(why); state_ = FAILED; };
+  const fs::path staging = fs::path(work_) / "staging", marker = fs::path(work_) / "unpacked.txt";
+  // (a failure keeps what came: tried again, the download goes on from the zip it broke off in - its part, the zips
+  // unpacked before it. keep false: begun again from nothing, the work folder removed)
+  auto fail = [&](const std::string& why, bool keep) { if (!keep) fs::remove_all(work_, ec); say(why); state_ = FAILED; };
+  auto slurp = [](const fs::path& p) { std::string s; if (FILE* f = fopen(p.string().c_str(), "rb")) { char b[4096]; size_t n; while ((n = fread(b, 1, sizeof b, f)) > 0) s.append(b, n); fclose(f); } return s; };
   fs::create_directories(work_, ec);
-  const std::string sums = (fs::path(work_) / "SHA256SUMS").string();
+  // the list, fetched each time: a download begun from another (the pack since built again) is begun again
+  const fs::path sums = fs::path(work_) / "SHA256SUMS", fresh = fs::path(work_) / "SHA256SUMS.new";
   std::string why;
-  if (!transfer_(source_ + "SHA256SUMS", sums, &why, &cancel_)) return fail("The Earth pack couldn't be fetched: " + why);
+  if (!transfer_(source_ + "SHA256SUMS", fresh.string(), &why, &cancel_)) return fail("The Earth pack couldn't be fetched: " + why, true);
+  if (slurp(fresh) != slurp(sums)) {
+    fs::remove_all(staging, ec); fs::remove(marker, ec);
+    for (const auto& e : fs::directory_iterator(work_, ec)) {
+      const std::string n = e.path().filename().string();
+      if (n.size() > 4 && (n.compare(n.size() - 4, 4, ".zip") == 0 || n.compare(n.size() - 5, 5, ".part") == 0)) fs::remove(e.path(), ec);
+    }
+  }
+  fs::rename(fresh, sums, ec);
   std::vector<std::string> zips;
-  if (FILE* f = fopen(sums.c_str(), "r")) {
+  if (FILE* f = fopen(sums.string().c_str(), "r")) {
     char line[512];
     while (fgets(line, sizeof line, f)) {
       char hash[129] = {}, name[256] = {};
@@ -165,37 +178,47 @@ void Installer::run() {
     }
     fclose(f);
   }
-  if (zips.empty()) return fail("The Earth pack's list is empty or damaged");
-  fs::remove_all(staging, ec);
+  if (zips.empty()) return fail("The Earth pack's list is empty or damaged", false);
+  std::set<std::string> unpacked;
+  if (fs::exists(staging, ec)) {
+    std::istringstream in(slurp(marker));
+    for (std::string line; std::getline(in, line);) if (!line.empty()) unpacked.insert(line);
+  } else fs::remove(marker, ec);
   fs::create_directories(staging, ec);
   for (size_t i = 0; i < zips.size(); i++) {
-    if (cancel_) return fail("Cancelled");
+    if (unpacked.count(zips[i])) { progress_ = float(i + 1) / float(zips.size()); continue; }
+    if (cancel_) return fail("Cancelled", true);
     const std::string zip = (fs::path(work_) / zips[i]).string();
     say("Downloading the Earth pack: " + zips[i] + " (" + std::to_string(i + 1) + " of " + std::to_string(zips.size()) + ")", zip + ".part");
-    if (!transfer_(source_ + zips[i], zip, &why, &cancel_)) return fail("The Earth pack couldn't be downloaded: " + why);
+    if (!transfer_(source_ + zips[i], zip, &why, &cancel_))
+      return fail("The Earth pack couldn't be downloaded: " + why + " (tried again, it goes on from there)", true);
     say("Unpacking " + zips[i]);
-    if (!unzipStored(zip, staging.string(), &why)) return fail("The Earth pack couldn't be unpacked: " + why);
+    if (!unzipStored(zip, staging.string(), &why)) {
+      fs::remove(zip, ec);   // (that one fetched again: the rest kept)
+      return fail("The Earth pack couldn't be unpacked: " + why, true);
+    }
     fs::remove(zip, ec);
+    if (FILE* f = fopen(marker.string().c_str(), "a")) { fprintf(f, "%s\n", zips[i].c_str()); fclose(f); }
     progress_ = float(i + 1) / float(zips.size());
   }
   say("Checking the Earth pack");
-  const fs::path unpacked = staging / "earth";
-  { std::string bad; if (!earth::Pack::open(unpacked.string(), &bad)) return fail("The Earth pack is incomplete: " + bad); }
+  const fs::path whole = staging / "earth";
+  { std::string bad; if (!earth::Pack::open(whole.string(), &bad)) return fail("The Earth pack is incomplete: " + bad, false); }
   // in place: a folder there before (a pack that wouldn't open) set aside, and put back if the new one can't go there
   const fs::path old = install_ + ".old";
   fs::remove_all(old, ec);
   fs::create_directories(fs::path(install_).parent_path(), ec);
   const bool hadOne = fs::exists(install_, ec);
-  if (hadOne) { fs::rename(install_, old, ec); if (ec) return fail("The old Earth folder couldn't be moved aside: " + ec.message()); }
-  fs::rename(unpacked, install_, ec);
+  if (hadOne) { fs::rename(install_, old, ec); if (ec) return fail("The old Earth folder couldn't be moved aside: " + ec.message(), true); }
+  fs::rename(whole, install_, ec);
   if (ec) {
     const std::string why = ec.message();
     if (hadOne) fs::rename(old, install_, ec);
-    return fail("The Earth pack couldn't be put in place: " + why);
+    return fail("The Earth pack couldn't be put in place: " + why, true);
   }
   fs::remove_all(old, ec);
   fs::remove_all(staging, ec);
-  fs::remove(sums, ec);
+  fs::remove(sums, ec); fs::remove(marker, ec);
   fs::remove(work_, ec);   // (only when empty)
   say("The real Earth is installed");
   state_ = DONE;

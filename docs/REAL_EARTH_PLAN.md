@@ -389,11 +389,19 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
     - The result must open as a pack before it is moved into the user's folder (`%APPDATA%\SomniumVolandi\earth`).
       A folder already there is set aside and put back if the move fails. The game then opens the pack without a
       restart.
-    - A failure says why, removes the download, and offers to try again. The pack already there is never touched.
+    - A failure says why and offers to try again. The pack already there is never touched.
+    - **Tried again, it goes on from where it stopped** (`earthFetch::downloadResuming`: an HTTP range on WinHTTP,
+      curl's `-C -` elsewhere, no time limit but a stall). The zips already unpacked are kept, listed in
+      `unpacked.txt`, and the zip it broke off in is carried on from its part. A damaged zip is fetched again alone.
+      A changed `SHA256SUMS` (the pack built again) begins it all again; so does a result that won't open as a pack.
     - The workflow makes the `earth` release when it is named and isn't there.
     - `earth_install_test` packages the fixture in four zips and installs it from a file address through curl: whole,
       and again over the last. It also checks that a missing source and a damaged zip each fail and leave the pack as
-      it was, and that the zip reader refuses compressed zips and escaping names.
+      it was, and that the zip reader refuses compressed zips and escaping names. Then the resuming:
+      - after the damaged zip, the next try fetches only it and the zips after;
+      - a download broken off halfway through the third zip carries on from its half;
+      - a changed list fetches every zip again.
+      `earth_fetch_test` checks a part carried on from byte for byte, and a failed one's part kept.
   - **The global build** (`.github/workflows/earth-pack.yml`, run by hand).
     - The sources go into the Actions cache once: ETOPO's GeoTIFF (read as it is, the same samples as the grid it was
       converted to), CGLS-LC100, GRIP4's seven regions, OurAirports, GeoNames and the GLO-90 listing.
@@ -418,7 +426,6 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
 
   Still open in E5:
   - **A first global run** and its size, then the `earth` release it fills.
-  - **Resuming a download.** A broken download starts again from the first zip.
   - **The far terrain** doesn't read GLO-90 yet.
 
 - **E6:** the first part is in. These pieces work:

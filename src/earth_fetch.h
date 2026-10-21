@@ -19,6 +19,10 @@ std::string glo90Url(int lat, int lon);
 // A whole download of url into path, or false with the reason: WinHTTP on Windows, curl elsewhere (as the shell finds
 // it). Gives up when *cancel is set, between the response's chunks
 bool download(const std::string& url, const std::string& path, std::string* error = nullptr, const std::atomic<bool>* cancel = nullptr);
+// The same, carrying on where a download into path broke off: its part file (path + ".part") kept when it fails, and
+// added to the next time (an HTTP range; curl's -C -) - the Earth pack's zips, gigabytes each (earth_install.h). No
+// time limit but a stall: under a kilobyte a second for a minute
+bool downloadResuming(const std::string& url, const std::string& path, std::string* error = nullptr, const std::atomic<bool>* cancel = nullptr);
 
 class Glo90Fetcher {
 public:

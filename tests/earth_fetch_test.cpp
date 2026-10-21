@@ -108,6 +108,23 @@ int main(int argc, char** argv) {
     struct stat st; check(stat("earth_fetch_test_cache/copy.bin", &st) == 0 && st.st_size == 100000, "every byte");
     check(!earthFetch::download("file://" + here + "/earth_fetch_test_cache/none.bin", "earth_fetch_test_cache/none.bin", &e) &&
           !exists("earth_fetch_test_cache/none.bin") && !exists("earth_fetch_test_cache/none.bin.part") && !e.empty(), "a missing one: false, nothing left behind (" + e + ")");
+    // resuming (the Earth pack's zips): a part already there carried on from, byte for byte; a failed one's part kept
+    {
+      FILE* src = fopen("earth_fetch_test_cache/source.bin", "rb"); FILE* half = fopen("earth_fetch_test_cache/resumed.bin.part", "wb");
+      for (int i = 0; i < 40000; i++) fputc(fgetc(src), half);
+      fclose(half); fclose(src);
+    }
+    e.clear();
+    bool same = earthFetch::downloadResuming("file://" + here + "/earth_fetch_test_cache/source.bin", "earth_fetch_test_cache/resumed.bin", &e) &&
+                !exists("earth_fetch_test_cache/resumed.bin.part");
+    if (FILE* a = fopen("earth_fetch_test_cache/resumed.bin", "rb")) {
+      for (int i = 0; i < 100000 && same; i++) same = fgetc(a) == (i & 255);
+      same = same && fgetc(a) == EOF; fclose(a);
+    } else same = false;
+    check(same, "a download carried on from its part, every byte as it should be " + e);
+    if (FILE* p = fopen("earth_fetch_test_cache/gone.bin.part", "wb")) { fputs("kept", p); fclose(p); }
+    check(!earthFetch::downloadResuming("file://" + here + "/earth_fetch_test_cache/none.bin", "earth_fetch_test_cache/gone.bin", &e) &&
+          exists("earth_fetch_test_cache/gone.bin.part"), "a failed one carried on from: its part kept for the next try");
   } else puts("Earth fetch: no curl here, the download itself not tried");
   if (std::system("rm -rf earth_fetch_test_cache")) {}
   printf("earth_fetch_test: %s\n", failed ? "FAILED" : "passed");
