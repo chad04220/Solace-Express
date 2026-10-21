@@ -374,6 +374,9 @@ if(NOT WIN32)
   # the pack installed from the game (src/earth_install.h): the fixture packaged by tools/earth2, fetched by curl from a file
   add_executable(earth_install_test tests/earth_install_test.cpp ${CORE_OBJS})
   add_test(NAME earth_install COMMAND earth_install_test ${CMAKE_SOURCE_DIR}/tests/fixtures/earth2 ${CMAKE_SOURCE_DIR} WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+  # the pack streamed (src/earth_data.h): installed streamed from a file, its tiles read through curl's ranges
+  add_executable(earth_stream_test tests/earth_stream_test.cpp ${CORE_OBJS})
+  add_test(NAME earth_stream COMMAND earth_stream_test ${CMAKE_SOURCE_DIR}/tests/fixtures/earth2 ${CMAKE_SOURCE_DIR} WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 endif()
 add_test(NAME earth_data_fastmath COMMAND earth_data_fastmath_test ${CMAKE_SOURCE_DIR}/tests/fixtures/earth2 WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/earth_data_fastmath)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/earth_data_fastmath)

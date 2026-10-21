@@ -164,9 +164,6 @@ std::shared_ptr<const earthCharts::ChartAirports> earthCharts::chartAirports(con
                                                                             const earth::Sampler* given) {
   const regionTravel::Chart chart(chartDesc.origin);
   const earth::Box box = chartBox(chart, WORLD_HALF);
-  std::optional<earth::Sampler> own;
-  if (!given) own.emplace(pack, box, true);
-  const earth::Sampler& sampler = given ? *given : *own;
   struct Candidate { earth::AirportRecord rec; float x, z, heading, length, width, elev; int size; };
   // (where its main runway lies on the chart, and which way)
   auto placeRunway = [&](const earth::AirportRecord& a, Candidate& c) {
@@ -195,16 +192,20 @@ std::shared_ptr<const earthCharts::ChartAirports> earthCharts::chartAirports(con
     Candidate c;
     placeRunway(a, c);
     if (std::max(std::fabs(c.x), std::fabs(c.z)) > WORLD_HALF - kAirportMargin - 0.5f * c.length) continue;
-    // the runway's height: the ground's along it (the median of nine points: a stray canopy or a ditch doesn't count)
-    float hs[9];
-    const float hd = c.heading * DEG;
-    for (int k = 0; k < 9; k++) {
-      const float t = (k / 8.f - 0.5f) * c.length * 0.9f;
-      const geo::Position g = chart.position(vec3(c.x + sinf(hd) * t, 0, c.z - cosf(hd) * t));
-      hs[k] = sampler.elevation(g.latitude, g.longitude);
-    }
-    std::sort(hs, hs + 9);
-    c.elev = std::max(hs[4], 1.5f);
+    // the runway's height: the ground's along it (the median of nine points: a stray canopy or a ditch doesn't count).
+    // Asked about without the chart's sampler - the career's boards and travel, on the game's thread - the airport's
+    // own elevation, and nothing of the ground read (a streamed pack's tiles never fetched there)
+    if (given) {
+      float hs[9];
+      const float hd = c.heading * DEG;
+      for (int k = 0; k < 9; k++) {
+        const float t = (k / 8.f - 0.5f) * c.length * 0.9f;
+        const geo::Position g = chart.position(vec3(c.x + sinf(hd) * t, 0, c.z - cosf(hd) * t));
+        hs[k] = given->elevation(g.latitude, g.longitude);
+      }
+      std::sort(hs, hs + 9);
+      c.elev = std::max(hs[4], 1.5f);
+    } else c.elev = std::max(a.hasElevation ? a.elevation : 0.f, 1.5f);
     c.rec = std::move(a);
     cands.push_back(std::move(c));
   }

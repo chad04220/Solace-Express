@@ -50,9 +50,9 @@ offline (tools/earth, Python + NumPy, in CI)                 at run time (src/ea
 
 | Layer | Source | Licence | Resolution in game | Where it lives |
 |---|---|---|---|---|
-| Base elevation, land and sea floor | NOAA ETOPO 2022 30″ surface | CC0 | 30″ (≈ 0.9 km), 1° tiles | the base pack |
+| Base elevation, land and sea floor | NOAA ETOPO 2022 30″ surface | CC0 | 30″ (≈ 0.9 km), 1° tiles | the base pack, streamed by tile |
 | Fine elevation, land | Copernicus DEM GLO-90 (3″) | free, any use, with attribution | 3″ (≈ 90 m) | fetched on demand from the AWS open data bucket (`copernicus-dem-90m`), cached |
-| Land cover | Copernicus Global Land Service LC100 2019 (discrete map) | CC BY 4.0 | 1/336° (≈ 330 m) by majority, 1° tiles | the base pack |
+| Land cover | Copernicus Global Land Service LC100 2019 (discrete map) | CC BY 4.0 | 1/336° (≈ 330 m) by majority, 1° tiles | the base pack, streamed by tile |
 | Airports, runways | OurAirports | public domain | points, runway ends | the base pack |
 | Towns and cities | GeoNames `cities500` | CC BY 4.0 | points, population | the base pack |
 | Roads | GRIP4 (GLOBIO) | CC BY 4.0 working assumption (see `EARTH_DATA_SOURCES.md`) | polylines, simplified to 15-30 m | the base pack |
@@ -408,7 +408,38 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
     - A chart built before its tiles came is built again with them: its cache key counts them.
   - **Finding the pack.** The game looks beside the executable, then in the user's and the cache's folders, then in
     the working folder (`earthCharts::setSearch`).
-  - **Installing from the game** (`src/earth_install.*`). With no pack, Free Flight offers "Download the real Earth".
+  - **Streamed, by default** (`earth::Pack`, `earthFetch::fetchRange`). The whole pack is several GB, so the game
+    installs only its core and reads the land from the release as it is flown.
+    - `package` makes the first zip the core: the index, the manifest, the airports and places, the GLO-90 bitmap,
+      the licences, and `stream.idx`. That file gives, for every bundle, its zip and the offset of its bytes there. The
+      zips are stored, so a range of a zip is the file. They are named for the pack (the start of `pack.idx`'s
+      SHA-256), so a pack built again is never read at another's offsets.
+    - A streamed install holds the core and `stream.txt`, naming the source. `Pack::open` takes a bundle that isn't
+      on disk from `stream.idx`. When a tile of it is first read, the bundle's header and index come in one range
+      (2.4 kB), then the tile's bytes in another, outside the pack's lock. Each piece is kept in `earth/streamed`
+      and checked like any tile (inflate and CRC); a damaged one is dropped and fetched again when next wanted.
+    - A Sampler, or a box's roads, fetches its tiles on up to eight threads side by side: a chart's 25 or so pieces
+      in a few round trips. Sea and empty tiles are never fetched; their index says so.
+    - A piece that won't come throws, saying why, and isn't asked for again for 30 s, so offline the charts fail fast
+      rather than hammering. What has been flown before still reads offline.
+    - The fetch is an HTTP range over WinHTTP (one session, its connections reused; the range header added to the
+      request so it survives the release's redirect), or curl's `-r` elsewhere. GitHub's release downloads answer
+      ranges with 206 (checked).
+    - Nothing reads tiles on the game's thread: `chartAirports` without the chart's sampler (the career's boards and
+      travel) takes each airport's own elevation rather than the ground's.
+    - A source that answers 404 (the pack built again since) sets `streamStats().gone`. The real-Earth screen then
+      offers to get it again. The workflow keeps the previous pack's zips for streamed copies of it and removes older
+      ones.
+    - `earth_stream_test` packages the fixture, installs it streamed from a file address, and reads it through curl's
+      ranges:
+      - every tile of every layer comes out as the whole pack has it;
+      - opened again, it reads from what it kept and fetches nothing;
+      - a chart built streamed (KMVY) is the whole pack's: its ground, airports, towns and roads;
+      - with the source gone, what was kept reads, and a tile not kept throws with the source's 404, and isn't
+        asked for again at once.
+  - **Installing from the game** (`src/earth_install.*`). With no pack, Free Flight offers "Get the real Earth": the
+    core alone, streamed as above. The real-Earth screen offers "Keep all of it offline", the whole download; it
+    replaces the streamed copy.
     - The zips listed in `SHA256SUMS` come from the release `earth` of the game's repository, or from the address on
       the first line of `earth-source.txt` beside the game. They download one after another over the fetcher's own
       transfer. The button shows the share done; the line under the title shows the zip and its megabytes so far.
@@ -430,7 +461,9 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
       - after the damaged zip, the next try fetches only it and the zips after;
       - a download broken off halfway through the third zip carries on from its half;
       - a changed list fetches every zip again.
-      `earth_fetch_test` checks a part carried on from byte for byte, and a failed one's part kept.
+      Streamed, it fetches the list and the core alone, with no bundle on disk; installed whole over that, nothing is
+      streamed. `earth_fetch_test` checks a part carried on from byte for byte, and a failed one's part kept.
+      `earth2_pack_test.py` checks that each bundle's range in its zip, as `stream.idx` gives it, is the bundle.
   - **The global build** (`.github/workflows/earth-pack.yml`, run by hand).
     - The sources go into the Actions cache once: ETOPO's GeoTIFF (read as it is, the same samples as the grid it was
       converted to), CGLS-LC100, GRIP4's seven regions, OurAirports, GeoNames and the GLO-90 listing.
@@ -448,14 +481,16 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
       files, so the sources stay well under the Actions cache's 10 GB. The New England part builds in 92 s, down
       from 146.
     - `index` writes the pack's index from the parts and `verify` checks it. `package` puts the pack in zips under
-      2 GB, stored, each unpacking into `earth/`.
+      2 GB, stored, each unpacking into `earth/`: the core first, then the bundles, with `stream.idx` in the core.
     - The zips are kept as the run's artifacts and attached to a release only when one is named.
     - A three-block part of New England (40-50° N, 80-50° W) builds here in about 3 minutes (44 s of rasters,
       2.5 minutes of roads) at a peak of 2.2 GB. It writes 42 MB, 30 MB of it the New England block's local roads.
 
   Still open in E5:
-  - **A first global run** and its size, then the `earth` release it fills.
-  - **The far terrain** doesn't read GLO-90 yet.
+  - **A first global run** and its size, then the `earth` release it fills (the owner's call: its Actions time and
+    the publishing).
+  - **The far terrain and GLO-90: left as it is.** A far patch's finest vertices are 870 m apart, near ETOPO's own
+    30″, so GLO-90 would add little but aliasing.
 
 - **E6:** the first part is in. These pieces work:
   - **Solace on the real Earth.** A Free Flight out of the islands with the pack there goes on into the real

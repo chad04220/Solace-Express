@@ -5,6 +5,7 @@
 // without one (a chart's build samples millions of points).
 #pragma once
 #include "common.h"
+#include <functional>
 #include <map>
 
 namespace earth {
@@ -93,9 +94,20 @@ struct RoadEdge {
   std::vector<std::pair<double, double>> pts;   // (lat, lon), junction to junction
 };
 
+// How a streamed pack's pieces are fetched: the bytes [offset, offset + length) of the file at url, into out (exactly
+// those), or false with the reason ("HTTP 404" in it when the file is gone). The game sets it (earthFetch::fetchRange);
+// without one a streamed pack reads only the pieces it holds already
+using RangeFetch = std::function<bool(const std::string& url, uint64_t offset, uint64_t length, std::vector<uint8_t>& out, std::string* error)>;
+void setRangeFetch(RangeFetch fetch);
+bool hasRangeFetch();
+
 class Pack {
 public:
-  // The pack in dir (its pack.idx); nullptr, with the reason, when there is none or it can't be read
+  // The pack in dir (its pack.idx); nullptr, with the reason, when there is none or it can't be read.
+  // A streamed pack (earth_install.h) holds its index, tables and licences, and of its bundles none or some: stream.txt
+  // names the address its zips are at, stream.idx where each bundle lies in them. A bundle not on disk is read from
+  // there as it is wanted - its header and index, then each tile - every piece kept in the cache folder (dir/streamed)
+  // once it has come. A piece that won't come throws (the reason said) and isn't asked for again for 30 s
   static std::shared_ptr<Pack> open(const std::string& dir, std::string* error = nullptr);
   ~Pack();
   const std::string& dir() const { return dir_; }
@@ -120,6 +132,12 @@ public:
   size_t airportCount() const;
   size_t placeCount() const;
   size_t cachedBytes() const;
+  // Streaming: whether any bundle is read from the source, and what has come so far this session (gone: the source
+  // answered that a zip isn't there - the pack built again since this one was installed)
+  // kept: the cache folder's bytes (those fetched before, and this session's); remote: the bundles' bytes at the source
+  bool streamed() const;
+  struct StreamStats { int fetched = 0, failed = 0; uint64_t bytes = 0, kept = 0, remote = 0; bool gone = false; std::string lastError; };
+  StreamStats streamStats() const;
   struct Impl;
 private:
   Pack() = default;

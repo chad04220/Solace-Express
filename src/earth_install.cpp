@@ -133,8 +133,8 @@ bool unzipStored(const std::string& zip, const std::string& dir, std::string* er
   return true;
 }
 
-Installer::Installer(std::string source, std::string workDir, std::string installDir, earthFetch::Glo90Fetcher::Transfer transfer)
-    : source_(std::move(source)), work_(std::move(workDir)), install_(std::move(installDir)), transfer_(std::move(transfer)) {
+Installer::Installer(std::string source, std::string workDir, std::string installDir, bool whole, earthFetch::Glo90Fetcher::Transfer transfer)
+    : source_(std::move(source)), work_(std::move(workDir)), install_(std::move(installDir)), whole_(whole), transfer_(std::move(transfer)) {
   if (source_.empty() || source_.back() != '/') source_ += '/';
   say("Fetching the Earth pack's list");
   worker_ = std::thread([this] { run(); });
@@ -179,6 +179,7 @@ void Installer::run() {
     fclose(f);
   }
   if (zips.empty()) return fail("The Earth pack's list is empty or damaged", false);
+  if (!whole_) zips.resize(1);   // (streamed: the core alone, the first)
   std::set<std::string> unpacked;
   if (fs::exists(staging, ec)) {
     std::istringstream in(slurp(marker));
@@ -189,7 +190,8 @@ void Installer::run() {
     if (unpacked.count(zips[i])) { progress_ = float(i + 1) / float(zips.size()); continue; }
     if (cancel_) return fail("Cancelled", true);
     const std::string zip = (fs::path(work_) / zips[i]).string();
-    say("Downloading the Earth pack: " + zips[i] + " (" + std::to_string(i + 1) + " of " + std::to_string(zips.size()) + ")", zip + ".part");
+    say(whole_ ? "Downloading the Earth pack: " + zips[i] + " (" + std::to_string(i + 1) + " of " + std::to_string(zips.size()) + ")" :
+                 "Downloading the real Earth's index and tables (the land itself comes as you fly)", zip + ".part");
     if (!transfer_(source_ + zips[i], zip, &why, &cancel_))
       return fail("The Earth pack couldn't be downloaded: " + why + " (tried again, it goes on from there)", true);
     say("Unpacking " + zips[i]);
@@ -203,6 +205,10 @@ void Installer::run() {
   }
   say("Checking the Earth pack");
   const fs::path whole = staging / "earth";
+  if (!whole_) {   // (streamed: where the rest is, for the pack to read it from)
+    if (!fs::exists(whole / "stream.idx", ec)) return fail("This Earth pack can't be streamed (it is an older build): download all of it", false);
+    if (FILE* f = fopen((whole / "stream.txt").string().c_str(), "w")) { fprintf(f, "%s\n", source_.c_str()); fclose(f); }
+  } else fs::remove(whole / "stream.txt", ec);
   { std::string bad; if (!earth::Pack::open(whole.string(), &bad)) return fail("The Earth pack is incomplete: " + bad, false); }
   // in place: a folder there before (a pack that wouldn't open) set aside, and put back if the new one can't go there
   const fs::path old = install_ + ".old";
@@ -220,7 +226,7 @@ void Installer::run() {
   fs::remove_all(staging, ec);
   fs::remove(sums, ec); fs::remove(marker, ec);
   fs::remove(work_, ec);   // (only when empty)
-  say("The real Earth is installed");
+  say(whole_ ? "The real Earth is installed, all of it" : "The real Earth is installed: the land comes as you fly");
   state_ = DONE;
 }
 } // namespace earthInstall

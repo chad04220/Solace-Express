@@ -23,6 +23,10 @@ bool download(const std::string& url, const std::string& path, std::string* erro
 // added to the next time (an HTTP range; curl's -C -) - the Earth pack's zips, gigabytes each (earth_install.h). No
 // time limit but a stall: under a kilobyte a second for a minute
 bool downloadResuming(const std::string& url, const std::string& path, std::string* error = nullptr, const std::atomic<bool>* cancel = nullptr);
+// The bytes [offset, offset + length) of the file at url, into out - exactly those, or false with the reason ("HTTP 404
+// from ..." when it isn't there): a streamed Earth pack's pieces (earth::setRangeFetch), each a range of a zip of the
+// release. An HTTP range over WinHTTP on Windows, its session kept so its connections are reused; curl's -r elsewhere
+bool fetchRange(const std::string& url, uint64_t offset, uint64_t length, std::vector<uint8_t>& out, std::string* error = nullptr);
 
 class Glo90Fetcher {
 public:

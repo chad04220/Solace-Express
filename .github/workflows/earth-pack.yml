@@ -170,8 +170,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view "${{ inputs.release_tag }}" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1 ||
-            gh release create "${{ inputs.release_tag }}" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --latest=false \
+          tag="${{ inputs.release_tag }}"
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1 ||
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --latest=false \
               --title "The real Earth (data pack)" \
-              --notes "The real Earth's data pack, which the game downloads from its Free Flight screen. Built by the Earth pack workflow from ETOPO 2022, Copernicus GLO-90 (fetched as flown), CGLS-LC100, GRIP4, OurAirports and GeoNames; their licences are in the pack's licenses folder."
-          gh release upload "${{ inputs.release_tag }}" dist/* --clobber --repo "$GITHUB_REPOSITORY"
+              --notes "The real Earth's data pack. The game installs its first zip, the core (the index, the airports, the places), from its Free Flight screen and streams the land from the others as it is flown; or downloads them all, to fly with no connection. Built by the Earth pack workflow from ETOPO 2022, Copernicus GLO-90 (fetched as flown), CGLS-LC100, GRIP4, OurAirports and GeoNames; their licences are in the pack's licenses folder."
+          # (the zips are named for the pack they hold: the last pack's are kept - a streamed copy of it reads from
+          # them until it is got again - and any before that removed)
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern SHA256SUMS --output prev.sums 2>/dev/null || : > prev.sums
+          gh release upload "$tag" dist/* --clobber --repo "$GITHUB_REPOSITORY"
+          keep=$(awk '{print $2}' prev.sums dist/SHA256SUMS | sort -u)
+          for asset in $(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name'); do
+            case "$asset" in
+              earth-pack-*.zip) echo "$keep" | grep -qxF "$asset" || gh release delete-asset "$tag" "$asset" --yes --repo "$GITHUB_REPOSITORY" ;;
+            esac
+          done

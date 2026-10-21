@@ -1200,8 +1200,9 @@ const std::vector<Game::BeyondAirport>& Game::beyondAirports() {
 }
 
 // The real Earth's pack installed from the game (earth_install.h): its zips from the source beside the game names (a
-// release of the game's own otherwise), downloaded and unpacked in the user's folder, there beside where they go
-bool Game::startEarthInstall() {
+// release of the game's own otherwise), downloaded and unpacked in the user's folder, there beside where they go -
+// the core alone, the land streamed as it is flown, unless whole (every zip: to fly with no connection)
+bool Game::startEarthInstall(bool whole) {
   if (diskless || saveDir.empty() || (earthInstaller && earthInstaller->state() == earthInstall::Installer::RUNNING)) return false;
 #ifdef _WIN32
   const std::string sep = "\\";
@@ -1209,14 +1210,16 @@ bool Game::startEarthInstall() {
   const std::string sep = "/";
 #endif
   earthInstaller.reset();
-  earthInstaller = std::make_unique<earthInstall::Installer>(earthInstall::sourceFor(assetDir), saveDir + sep + "earth-download", saveDir + sep + "earth");
+  earthInstaller = std::make_unique<earthInstall::Installer>(earthInstall::sourceFor(assetDir), saveDir + sep + "earth-download", saveDir + sep + "earth", whole);
   return true;
 }
 void Game::updateEarthInstall() {
   if (!earthInstaller || earthInstaller->state() != earthInstall::Installer::DONE) return;
   earthInstaller.reset();
   earthCharts::reopen();   // (the user's earth folder is among those the game looks in)
-  if (earthCharts::pack()) toast("The real Earth is installed: fly it from Free Flight, or out beyond the islands", vec3(.6f, 1.f, .8f), false);
+  if (auto pack = earthCharts::pack())
+    toast(pack->streamed() ? "The real Earth is ready: its land comes as you fly. Fly it from Free Flight, or out beyond the islands" :
+                             "The real Earth is installed: fly it from Free Flight, or out beyond the islands", vec3(.6f, 1.f, .8f), false);
   else toast("The real Earth was installed but doesn't open: " + earthCharts::packError(), vec3(1.f, .5f, .35f), false);
 }
 

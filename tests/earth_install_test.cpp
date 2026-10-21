@@ -1,10 +1,11 @@
 // The real Earth's pack installed from the game (earth_install.h), with no network: the fixture's pack put in zips as
-// the global build's are (tools/earth2 package, several of them) and fetched from a file address through curl. The
-// pack installs whole and opens where it went; installed again it replaces the folder there; a missing source or a
-// damaged zip fails and leaves the pack in place as it was. Tried again, a download goes on from where it stopped -
-// the zips unpacked kept, one broken off halfway carried on from its part - unless the list has changed. The zip
-// reader refuses a compressed zip, a name that would step out of its folder and a checksum that disagrees. The source
-// is read from earth-source.txt beside the game.
+// the global build's are (tools/earth2 package, several of them, named for the pack) and fetched from a file address
+// through curl. Whole, the pack installs and opens where it went; installed again it replaces the folder there; a
+// missing source or a damaged zip fails and leaves the pack in place as it was. Tried again, a download goes on from
+// where it stopped - the zips unpacked kept, one broken off halfway carried on from its part - unless the list has
+// changed. The zip reader refuses a compressed zip, a name that would step out of its folder and a checksum that
+// disagrees. The source is read from earth-source.txt beside the game. Streamed (the default), only the core comes
+// (earth_stream_test reads the rest from the source).
 #include "../src/earth_install.h"
 #include <algorithm>
 #include <chrono>
@@ -47,6 +48,9 @@ int main(int argc, char** argv) {
   for (const auto& e : fs::directory_iterator(dist)) zips += e.path().extension() == ".zip";
   check(zips >= 3, "in several zips (" + std::to_string(zips) + ")");
   const std::string source = "file://" + dist.string() + "/";
+  std::vector<std::string> names;   // (SHA256SUMS's order: the core first)
+  { std::istringstream in(slurp(dist / "SHA256SUMS")); for (std::string h, n; in >> h >> n;) names.push_back(n); }
+  check((int)names.size() == zips && names[0].find("-01-of-") != std::string::npos, "SHA256SUMS lists them, the core first");
 
   // the source: earth-source.txt beside the game when there is one
   check(earthInstall::sourceFor(root.string()) == earthInstall::kDefaultSource, "no earth-source.txt: the game's own release");
@@ -55,29 +59,29 @@ int main(int argc, char** argv) {
 
   // installed: whole, opening where it went, the work folder gone
   {
-    earthInstall::Installer in(earthInstall::sourceFor(root.string()), work.string(), install.string());
+    earthInstall::Installer in(earthInstall::sourceFor(root.string()), work.string(), install.string(), true);
     const bool done = finish(in) == earthInstall::Installer::DONE && in.progress() == 1.f;
     check(done, "installed: " + in.status());
     auto pack = earth::Pack::open(install.string(), &why);
-    check(pack && pack->airportCount() == original->airportCount(), "the installed pack opens, its airports all there " + why);
+    check(pack && pack->airportCount() == original->airportCount() && !pack->streamed() && !fs::exists(install / "stream.txt"),
+          "the installed pack opens, its airports all there, nothing streamed " + why);
     check(!fs::exists(work) && !fs::exists(install.string() + ".old"), "nothing left of the download");
   }
   // installed again: the folder there replaced, what else it held gone
   spit(install / "stray.txt", "left over");
   {
-    earthInstall::Installer in(source, work.string(), install.string());
+    earthInstall::Installer in(source, work.string(), install.string(), true);
     const bool done = finish(in) == earthInstall::Installer::DONE && !fs::exists(install / "stray.txt") && earth::Pack::open(install.string());
     check(done, "installed again over the last: " + in.status());
   }
   // a source with nothing there: failed, the pack in place untouched
   {
-    earthInstall::Installer in("file://" + (root / "nowhere").string() + "/", work.string(), install.string());
+    earthInstall::Installer in("file://" + (root / "nowhere").string() + "/", work.string(), install.string(), true);
     const bool kept = finish(in) == earthInstall::Installer::FAILED && earth::Pack::open(install.string());
     check(kept, "a missing source fails, the pack kept: " + in.status());
   }
   // a damaged zip (a byte of its data changed, its checksum not): failed, the pack kept, the zips before it kept
-  const std::string name2 = "earth-pack-02-of-" + std::string(zips < 10 ? "0" : "") + std::to_string(zips) + ".zip";
-  const std::string name3 = "earth-pack-03-of-" + std::string(zips < 10 ? "0" : "") + std::to_string(zips) + ".zip";
+  const std::string name1 = names[0], name2 = names.size() > 1 ? names[1] : "", name3 = names.size() > 2 ? names[2] : "";
   {
     const fs::path bad = root / "bad";
     fs::create_directories(bad);
@@ -86,9 +90,9 @@ int main(int argc, char** argv) {
     const bool found = z.size() > 4000;
     if (found) z[z.size() / 2] ^= 0x5a;
     spit(bad / name2, z);
-    earthInstall::Installer in("file://" + bad.string() + "/", work.string(), install.string());
+    earthInstall::Installer in("file://" + bad.string() + "/", work.string(), install.string(), true);
     const bool kept = found && finish(in) == earthInstall::Installer::FAILED && earth::Pack::open(install.string()) &&
-                      !fs::exists(work / name2) && slurp(work / "unpacked.txt").find("earth-pack-01") == 0;
+                      !fs::exists(work / name2) && slurp(work / "unpacked.txt").find(name1) == 0;
     check(kept, "a damaged zip fails, the pack kept, the zip before it kept unpacked: " + in.status());
   }
   // tried again from the good source (the same list): the zips already unpacked not fetched again
@@ -98,10 +102,10 @@ int main(int argc, char** argv) {
     return earthFetch::downloadResuming(url, path, error, cancel);
   };
   {
-    earthInstall::Installer in(source, work.string(), install.string(), counting);
+    earthInstall::Installer in(source, work.string(), install.string(), true, counting);
     const bool done = finish(in) == earthInstall::Installer::DONE && earth::Pack::open(install.string()) && !fs::exists(work);
     bool skipped = std::find(fetched.begin(), fetched.end(), name2) != fetched.end();
-    for (const auto& f : fetched) skipped &= f.find("earth-pack-01") != 0;
+    for (const auto& f : fetched) skipped &= f != name1;
     check(done && skipped && (int)fetched.size() == zips, fmt("tried again: carried on from the damaged one, %zu fetched (the list and %d zips)", fetched.size(), zips - 1));
   }
   // a download broken off halfway through a zip: tried again, that zip carried on from its part (curl -C -)
@@ -118,12 +122,12 @@ int main(int argc, char** argv) {
       return earthFetch::downloadResuming(url, path, error, cancel);
     };
     {
-      earthInstall::Installer in(source, work.string(), install.string(), breaking);
+      earthInstall::Installer in(source, work.string(), install.string(), true, breaking);
       const bool failed = finish(in) == earthInstall::Installer::FAILED && broke && fs::exists(work / (name3 + ".part"));
       check(failed, "broken off halfway through the third zip, its part kept: " + in.status());
     }
     fetched.clear();
-    earthInstall::Installer in(source, work.string(), install.string(), counting);
+    earthInstall::Installer in(source, work.string(), install.string(), true, counting);
     const bool done = finish(in) == earthInstall::Installer::DONE && earth::Pack::open(install.string());
     check(done && !fetched.empty() && fetched.size() == (size_t)zips - 1 && fetched[1] == name3,
           fmt("tried again: the third zip carried on from its half, whole (%zu fetched)", fetched.size()));
@@ -134,14 +138,32 @@ int main(int argc, char** argv) {
       if (url.find(name3) != std::string::npos) { if (error) *error = "broke off"; return false; }
       return earthFetch::downloadResuming(url, path, error, cancel);
     };
-    { earthInstall::Installer in(source, work.string(), install.string(), breaking); finish(in); }
+    { earthInstall::Installer in(source, work.string(), install.string(), true, breaking); finish(in); }
     std::string list = slurp(dist / "SHA256SUMS");
     list[0] = list[0] == '0' ? '1' : '0';   // (another hash at the top: another pack)
     spit(dist / "SHA256SUMS", list);
     fetched.clear();
-    earthInstall::Installer in(source, work.string(), install.string(), counting);
+    earthInstall::Installer in(source, work.string(), install.string(), true, counting);
     const bool done = finish(in) == earthInstall::Installer::DONE && earth::Pack::open(install.string());
     check(done && (int)fetched.size() == zips + 1, fmt("the list changed: every zip fetched again (%zu)", fetched.size()));
+  }
+  // streamed (the default): the list and the core alone - the index, the tables, stream.idx, and stream.txt naming the
+  // source - no bundle on disk, and the pack opens, streamed; installed whole over it, nothing streamed again
+  {
+    const fs::path streamed = user / "streamed";
+    fetched.clear();
+    earthInstall::Installer in(source, (root / "swork").string(), streamed.string(), false, counting);
+    const bool done = finish(in) == earthInstall::Installer::DONE && in.progress() == 1.f;
+    bool bundles = false;
+    for (const auto& e : fs::recursive_directory_iterator(streamed)) bundles |= e.path().extension() == ".svb";
+    auto pack = earth::Pack::open(streamed.string(), &why);
+    check(done && fetched.size() == 2 && fetched[1] == name1 && !bundles && slurp(streamed / "stream.txt").find(source) == 0,
+          fmt("streamed: the list and the core alone (%zu fetched), no bundle on disk, stream.txt naming the source: ", fetched.size()) + in.status());
+    check(pack && pack->streamed() && pack->airportCount() == original->airportCount() && pack->streamStats().remote > 0,
+          "the streamed pack opens, its airports all there, its bundles at the source " + why);
+    earthInstall::Installer again(source, (root / "swork").string(), streamed.string(), true);
+    auto whole = finish(again) == earthInstall::Installer::DONE ? earth::Pack::open(streamed.string()) : nullptr;
+    check(whole && !whole->streamed() && !fs::exists(streamed / "stream.txt"), "installed whole over it: nothing streamed " + again.status());
   }
   // the zip reader: a compressed zip, a name stepping out, refused (nothing written outside)
   {

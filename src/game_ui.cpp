@@ -1603,10 +1603,26 @@ void Game::drawEarthAirportPicker() {
     freeEarthPicker = false; in.pressed[K_ESC] = false; return;
   }
   if (!pack) { g_ren.text(x, 70 * s, 14 * s, "No Earth pack: " + earthCharts::packError(), C_WARN, 1); return; }
-  if (flying) g_ren.text(x, 67 * s, 13 * s, fmt("The autopilot holds the course there; the charts ahead prepare as you fly. %s, %.0f km range at the fuel aboard.",
+  // a streamed pack: what it has kept here, and all of it for flying with no connection (earth_install.h)
+  const auto* install = earthInstaller.get();
+  const bool installing = install && install->state() == earthInstall::Installer::RUNNING;
+  if (!flying && (pack->streamed() || install) && !diskless && !saveDir.empty()) {
+    const auto st = pack->streamStats();
+    const float bw = 300 * s, bx = W - 225 * s - 12 * s - bw;
+    // (the source built again since this copy came: its pieces gone, the copy got again, streamed as before)
+    const std::string label = installing ? fmt("Getting it %.0f%%", install->progress() * 100.f) : st.gone ? "Get it again" :
+                              pack->streamed() ? fmt("Keep all of it offline (%.1f GB)", st.remote / 1e9) : "Downloaded";
+    if (button(bx, 23 * s, bw, 35 * s, label, !installing && pack->streamed(), st.gone) && startEarthInstall(!st.gone)) g_audio.trigger(SFX_CLICK);
+    if (installing) g_ren.rect(bx + 4 * s, 23 * s + 33 * s, (bw - 8 * s) * std::clamp(install->progress(), 0.f, 1.f), 2 * s, C_ACCENT, 0.9f);
+  }
+  if (install) g_ren.text(x, 67 * s, 13 * s, ellipsize(install->status(), w, 13 * s), install->state() == earthInstall::Installer::FAILED ? C_WARN : C_ACCENT, 1);
+  else if (pack->streamed() && pack->streamStats().gone)
+    g_ren.text(x, 67 * s, 13 * s, "The real Earth was built again since this copy came: get it again (above), and fly on.", C_WARN, 1);
+  else if (flying) g_ren.text(x, 67 * s, 13 * s, fmt("The autopilot holds the course there; the charts ahead prepare as you fly. %s, %.0f km range at the fuel aboard.",
                                                plane.spec ? plane.spec->name : "", plane.spec ? plane.nominalRangeKm() : 0.f), C_DIM, 1);
-  else g_ren.text(x, 67 * s, 13 * s, fmt("Real terrain, coasts, land cover, airports, towns and roads from the Earth pack: %zu airports. Type a code or a name.",
-                                   pack->airportCount()), C_DIM, 1);
+  else g_ren.text(x, 67 * s, 13 * s, fmt(pack->streamed() ? "Real terrain, land cover, airports, towns and roads: %zu airports, the land streamed as you fly (%.0f MB kept here). Type a code or a name." :
+                                                         "Real terrain, coasts, land cover, airports, towns and roads from the Earth pack: %zu airports. Type a code or a name.",
+                                   pack->airportCount(), pack->streamStats().kept / 1e6), C_DIM, 1);
   // the query: typed, Backspace takes a letter off, Esc clears it
   for (char ch : in.text) if (earthQuery.size() < 40 && ch >= 32 && ch < 127) earthQuery += ch;
   if (in.pressed[K_BACK] && !earthQuery.empty()) earthQuery.pop_back();
@@ -1682,7 +1698,7 @@ void Game::drawFreeFlightSetup(const FrameParams& fp) {
     g_ren.text(x, 61 * s, 14 * s, ellipsize(install->status(), W - 48 * s, 14 * s), failed ? C_WARN : C_ACCENT, 1);
   } else {
     g_ren.text(x, 61 * s, 14 * s, realEarth ? "Fly Solace, the real Earth or generated destinations. No fees, missions or career changes." :
-               offerInstall ? "Fly Solace or generated Earth destinations. No fees, missions or career changes. The real Earth: download it here." :
+               offerInstall ? "Fly Solace or generated Earth destinations. No fees, missions or career changes. The real Earth: get it here, its land streamed as you fly." :
                "Fly Solace or generated Earth destinations. No fees, missions or career changes. (The real Earth: its pack in an earth folder beside the game.)", C_DIM, 1);
   }
   const float selectW = std::max(240 * s, W - (realEarth || offerInstall ? 800 : 490) * s);
@@ -1701,8 +1717,8 @@ void Game::drawFreeFlightSetup(const FrameParams& fp) {
   if (offerInstall) {
     const bool running = install && install->state() == earthInstall::Installer::RUNNING;
     const float bx = x + selectW + 366 * s, bw = 300 * s;
-    const std::string label = running ? fmt("Downloading the real Earth %.0f%%", install->progress() * 100.f) :
-                              install ? "Try the download again" : "Download the real Earth";
+    const std::string label = running ? fmt("Getting the real Earth %.0f%%", install->progress() * 100.f) :
+                              install ? "Try again" : "Get the real Earth";
     if (button(bx, 86 * s, bw, 28 * s, label, !running, !install) && startEarthInstall()) g_audio.trigger(SFX_CLICK);
     if (running) g_ren.rect(bx + 4 * s, 110 * s, (bw - 8 * s) * std::clamp(install->progress(), 0.f, 1.f), 2 * s, C_ACCENT, 0.9f);
   }

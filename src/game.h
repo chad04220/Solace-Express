@@ -266,7 +266,7 @@ private:
   // The real Earth's pack fetched and installed from the Free Flight screen when it isn't there (earth_install.h): into
   // the user's folder's earth, where the game looks for it, and opened from there when whole
   std::unique_ptr<earthInstall::Installer> earthInstaller;
-  bool startEarthInstall();   // false: no folder of the user's to put it in (a diskless run)
+  bool startEarthInstall(bool whole = false);   // (streamed unless whole) false: no folder of the user's to put it in (a diskless run)
   void updateEarthInstall();
   bool earthSceneryDraining = false, earthFacilitiesPending = false, earthPromotionDeferred = false;
   void retireEarthPrefetch(); // never joins a running job on the flight thread

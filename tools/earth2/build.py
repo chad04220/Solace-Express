@@ -17,13 +17,15 @@ A pack too big for one machine is built in parts (.github/workflows/earth-pack.y
 10-degree blocks, or the global tables alone (--only), into one folder; --part NAME records what a part wrote in
 parts/NAME.json instead of the index, and `index` then writes the index of them all. `package` puts a pack in zips
 of at most --max-bytes each (a release's files are under 2 GB), stored, not compressed again, each unpacking into an
-earth folder; the first holds the index and the tables, and SHA256SUMS lists them all.
+earth folder; the first, the core, holds the index, the tables and stream.idx (where each bundle lies in the others,
+for the game to stream them), and SHA256SUMS lists them all.
 """
 import argparse
 import hashlib
 import json
 import os
 import shutil
+import struct
 import sys
 import time
 import zipfile
@@ -346,29 +348,50 @@ def verify(root):
 
 
 def package(root, dist, max_bytes=1900000000):
-    """The zips of a pack (see the module's notes); returns their names."""
+    """The zips of a pack (see the module's notes); returns their names, the core's first.
+
+    The first zip is the core: the index, the manifest, the tables, the licences and stream.idx, which says where each
+    of the other files lies in the zips after it - its zip, and the offset of its bytes there (stored, so a range of the
+    zip is the file). The game installs the core alone and fetches a bundle's tiles from those ranges as it wants them;
+    or every zip, for the whole pack. The zips are named for the pack (the start of pack.idx's SHA-256), so a pack built
+    again never has its pieces read at another's offsets."""
     listed = []
     for line in open(os.path.join(root, "pack.idx")).read().split("\n"):
         if line.startswith("file "):
             listed.append(line.split(" ")[1])
-    first = ["pack.idx", "manifest.json"] + [r for r in listed if "/" not in r or r.startswith("licenses/")]
-    rest = sorted(r for r in listed if r not in first)
-    bins, size = [[]], 0
-    for rel in first + rest:
+    core = ["pack.idx", "manifest.json"] + [r for r in listed if "/" not in r or r.startswith("licenses/")]
+    rest = sorted(r for r in listed if r not in core)
+    bins, size = [], 0
+    for rel in rest:
         n = os.path.getsize(os.path.join(root, rel))
-        if bins[-1] and rel not in first and size + n > max_bytes:
+        if not bins or (bins[-1] and size + n > max_bytes):
             bins.append([])
             size = 0
         bins[-1].append(rel)
         size += n
+    pack_id = sha256(os.path.join(root, "pack.idx"))[:12]
+    total = 1 + len(bins)
+    names = ["earth-pack-%s-%02d-of-%02d.zip" % (pack_id, k + 1, total) for k in range(total)]
     os.makedirs(dist, exist_ok=True)
-    names = []
-    for k, rels in enumerate(bins):
-        name = "earth-pack-%02d-of-%02d.zip" % (k + 1, len(bins))
-        with zipfile.ZipFile(os.path.join(dist, name), "w", zipfile.ZIP_STORED, allowZip64=True) as z:
+    stream = []
+    for name, rels in zip(names[1:], bins):
+        path = os.path.join(dist, name)
+        with zipfile.ZipFile(path, "w", zipfile.ZIP_STORED, allowZip64=True) as z:
             for rel in rels:
                 z.write(os.path.join(root, rel), "earth/" + rel)
-        names.append(name)
+        with zipfile.ZipFile(path) as z, open(path, "rb") as f:   # (each file's bytes: past its local header)
+            for info in z.infolist():
+                f.seek(info.header_offset)
+                head = f.read(30)
+                name_len, extra_len = struct.unpack("<HH", head[26:30])
+                stream.append((info.filename[len("earth/"):], name, info.header_offset + 30 + name_len + extra_len, info.file_size))
+    index = "somnium-stream 1\n"
+    index += "".join("zip %s %d\n" % (n, os.path.getsize(os.path.join(dist, n))) for n in names[1:])
+    index += "".join("file %s %s %d %d\n" % s for s in stream) + "end\n"
+    with zipfile.ZipFile(os.path.join(dist, names[0]), "w", zipfile.ZIP_STORED, allowZip64=True) as z:
+        for rel in core:
+            z.write(os.path.join(root, rel), "earth/" + rel)
+        z.writestr("earth/stream.idx", index)
     with open(os.path.join(dist, "SHA256SUMS"), "w") as f:
         for name in names:
             f.write("%s  %s\n" % (sha256(os.path.join(dist, name)), name))

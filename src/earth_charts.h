@@ -54,7 +54,8 @@ struct ChartData {
 };
 // The airports a chart has, as World::buildEarth lays them: OurAirports' in its square, each on its main runway, the
 // biggest first, none on another's grounds - or, with none there, the nearest beyond it. Without the rest of the chart:
-// the career's boards and travel read them (procedural::airportOf). sampler: the chart's own (nullptr: one made here)
+// the career's boards and travel read them (procedural::airportOf). sampler: the chart's own, its runways' heights the
+// ground's along them (nullptr: each airport's own elevation, and nothing of the ground read)
 struct ChartAirports {
   std::vector<std::string> codes, names, blurbs;
   std::vector<earth::AirportRecord> records;

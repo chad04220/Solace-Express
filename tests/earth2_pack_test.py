@@ -148,7 +148,26 @@ def test_parts_index():
         for n in names:
             zipfile.ZipFile(os.path.join(dist, n)).extractall(unpacked)
         first = zipfile.ZipFile(os.path.join(dist, names[0])).namelist()
-        check("earth/pack.idx" in first and "earth/manifest.json" in first, "the index in the first zip")
+        check("earth/pack.idx" in first and "earth/manifest.json" in first and "earth/stream.idx" in first and
+              not any(n.endswith(".svb") for n in first), "the core in the first zip: the index, no bundle")
+        check(all(n.startswith("earth-pack-" + build.sha256(os.path.join(root, "pack.idx"))[:12] + "-") for n in names),
+              "the zips named for the pack")
+        # stream.idx: each bundle's bytes where it says, in the zip it names (the range the game fetches)
+        lines = zipfile.ZipFile(os.path.join(dist, names[0])).read("earth/stream.idx").decode().split("\n")
+        check(lines[0] == "somnium-stream 1" and "end" in lines, "stream.idx's header and end")
+        streamed, zips_listed = {}, {}
+        for line in lines:
+            f = line.split(" ")
+            if f[0] == "zip":
+                zips_listed[f[1]] = int(f[2])
+            elif f[0] == "file":
+                with open(os.path.join(dist, f[2]), "rb") as z:
+                    z.seek(int(f[3]))
+                    streamed[f[1]] = z.read(int(f[4]))
+        bundles = [r for r in manifest["files"] if r.endswith(".svb")]
+        check(sorted(streamed) == sorted(bundles) and
+              all(streamed[r] == open(os.path.join(root, r), "rb").read() for r in bundles), "each bundle's range in its zip is the bundle")
+        check(zips_listed == {n: os.path.getsize(os.path.join(dist, n)) for n in names[1:]}, "and each zip's size")
         check(not build.verify(os.path.join(unpacked, "earth")), "the zips unpack into a pack that verifies")
         sums = open(os.path.join(dist, "SHA256SUMS")).read().split("\n")
         check(all(any(line.endswith("  " + n) for line in sums) for n in names), "SHA256SUMS lists every zip")

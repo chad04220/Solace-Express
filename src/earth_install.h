@@ -5,6 +5,10 @@
 // there to prove it whole, then moved into place in the user's folder, where the game looks for it
 // (earthCharts::setSearch). A download that breaks off goes on from there when tried again: the zips already unpacked
 // are kept (unpacked.txt beside them), the one it broke off in carried on from its part - unless the list has changed.
+//
+// Streamed (the default): the first zip alone - the core: the index, the tables, the licences and stream.idx - with
+// stream.txt beside them naming the source, so the pack reads each bundle's tiles from the zips there as it wants them
+// (earth::Pack). Whole: every zip, for flying with no connection.
 #pragma once
 #include "earth_fetch.h"
 #include <atomic>
@@ -25,8 +29,10 @@ class Installer {
 public:
   enum State { RUNNING, DONE, FAILED };
   // from source (an address ending in /), working in workDir (the zips and the staging folder: removed once it is in
-  // place, kept when it fails, to go on from), into installDir (replaced only once the new pack has opened)
-  Installer(std::string source, std::string workDir, std::string installDir, earthFetch::Glo90Fetcher::Transfer transfer = earthFetch::downloadResuming);
+  // place, kept when it fails, to go on from), into installDir (replaced only once the new pack has opened); whole:
+  // every zip, else the core alone, the rest streamed
+  Installer(std::string source, std::string workDir, std::string installDir, bool whole = false,
+            earthFetch::Glo90Fetcher::Transfer transfer = earthFetch::downloadResuming);
   ~Installer();   // (stops a download under way, between its chunks)
   State state() const { return state_.load(); }
   std::string status() const;   // what it is doing, or why it failed
@@ -35,6 +41,7 @@ private:
   void run();
   void say(const std::string& s, const std::string& partial = "");
   std::string source_, work_, install_;
+  bool whole_ = false;
   earthFetch::Glo90Fetcher::Transfer transfer_;
   std::atomic<State> state_{RUNNING};
   std::atomic<float> progress_{0.f};

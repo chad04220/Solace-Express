@@ -2,10 +2,15 @@
 // The formats are tools/earth2's (svb.py, tables.py, roads.py, glo90.py); tests/earth_data_test.cpp reads the
 // test fixture with both and compares.
 #include "earth_data.h"
+#include <atomic>
 #include <cerrno>
+#include <chrono>
+#include <exception>
+#include <filesystem>
 #include <list>
 #include <stdexcept>
 #include <sys/stat.h>
+#include <thread>
 #include <unordered_map>
 
 namespace earth {
@@ -225,12 +230,38 @@ std::string joinPath(const std::string& a, const std::string& b) {
 }
 
 struct Entry { uint64_t offset; uint32_t size, rawSize, crc; uint16_t kind; int16_t constant; };
+struct Remote { std::string zip; uint64_t offset = 0, bytes = 0; };   // (stream.idx: a file's place at the source)
 struct Bundle {
-  std::string path;
+  std::string path, rel;
   int layer = 0, type = 0, south = 0, west = 0, spd = 0, apron = 0;
   Entry entries[kTiles];
   FILE* file = nullptr;
+  bool streamed = false; Remote remote;   // (not on disk: read from the source, piece by piece)
 };
+// a streamed bundle's pieces in the cache folder: its header and index, and each tile's stored bytes
+std::string headPiece(const std::string& rel) { return rel.substr(0, rel.size() - 4) + ".head"; }
+std::string tilePiece(const std::string& rel, int lat, int lon);
+
+std::mutex g_fetchLock;
+RangeFetch g_fetch;
+
+// f(0) .. f(n - 1), on up to 8 threads when parallel (a streamed pack's pieces, fetched side by side: a chart's thirty
+// in a few round trips rather than one after another), the first exception thrown rethrown here
+template <class F> void eachOf(size_t n, bool parallel, F&& f) {
+  if (!parallel || n < 2) { for (size_t k = 0; k < n; k++) f(k); return; }
+  std::atomic<size_t> next{0};
+  std::exception_ptr first;
+  std::mutex errors;
+  std::vector<std::thread> pool;
+  for (size_t w = 0; w < std::min<size_t>(8, n); w++)
+    pool.emplace_back([&] {
+      for (size_t k; (k = next++) < n;) {
+        try { f(k); } catch (...) { std::lock_guard<std::mutex> g(errors); if (!first) first = std::current_exception(); }
+      }
+    });
+  for (auto& t : pool) t.join();
+  if (first) std::rethrow_exception(first);
+}
 
 // A cache of decoded tiles, least recently used dropped first once its bytes pass the limit
 template <class T> struct Lru {
@@ -266,9 +297,13 @@ uint64_t tileKey(int layer, int lat, int lon) { return (uint64_t)layer << 32 | (
 } // namespace
 
 struct Pack::Impl {
-  std::mutex lock;   // (the files, the caches, the bundle map)
+  std::mutex lock;   // (the files, the caches, the bundle map, the streaming's record)
   std::map<std::string, std::unique_ptr<Bundle>> bundles;   // by relative path, opened when first read
-  std::map<std::string, long long> files;                   // pack.idx: relative path -> bytes
+  std::map<std::string, long long> files;                   // pack.idx: relative path -> bytes (those on disk)
+  std::map<std::string, Remote> remote;                     // a streamed pack's files not on disk, at the source
+  std::string source, cache;                                // (stream.txt's address; dir/streamed)
+  std::map<std::string, std::chrono::steady_clock::time_point> failedAt;   // (a piece that wouldn't come, and when)
+  Pack::StreamStats stats;
   Lru<RasterTile> rasters{192u << 20};
   Lru<std::vector<RoadEdge>> roads{256u << 20};
   Lru<Glo90Tile> glo90{160u << 20};
@@ -276,45 +311,115 @@ struct Pack::Impl {
   std::string glo90Cache;
   ~Impl() { for (auto& b : bundles) if (b.second && b.second->file) fclose(b.second->file); }
 
-  // The bundle holding a layer's tile (nullptr when the pack has no such file)
-  Bundle* bundle(const std::string& dir, int layer, int lat, int lon) {
+  // A piece of a bundle at the source (its header and index, or a tile's stored bytes): the cache folder's copy, else
+  // fetched and kept there - written beside its place and renamed in, so a reader never meets half of one. Called
+  // without the lock (a fetch takes a round trip or two)
+  bool piece(const std::string& name, const Remote& r, uint64_t at, uint64_t n, std::vector<uint8_t>& out, std::string& why) {
+    const std::string path = joinPath(cache, name);
+    long long have = -1;
+    if (fileSize(path, have) && have == (long long)n && readFile(path, out) && out.size() == n) return true;
+    const auto now = std::chrono::steady_clock::now();
+    {
+      std::lock_guard<std::mutex> g(lock);
+      auto f = failedAt.find(name);
+      if (f != failedAt.end() && now - f->second < std::chrono::seconds(30)) { why = stats.lastError; return false; }
+    }
+    RangeFetch fetch;
+    { std::lock_guard<std::mutex> g(g_fetchLock); fetch = g_fetch; }
+    bool ok = false;
+    if (!fetch) why = "nothing here to fetch it with";
+    else {
+      ok = fetch(source + r.zip, r.offset + at, n, out, &why) && out.size() == n;
+      if (!ok && why.empty()) why = "a short answer from " + source + r.zip;
+    }
+    if (ok) {
+      static std::atomic<unsigned> serial{0};
+      std::error_code ec;
+      std::filesystem::create_directories(std::filesystem::u8path(path).parent_path(), ec);
+      const std::string part = path + "." + std::to_string(serial++) + ".part";
+      if (FILE* f = fopen(part.c_str(), "wb")) {
+        const bool wrote = fwrite(out.data(), 1, out.size(), f) == out.size();
+        if (fclose(f) == 0 && wrote) { std::remove(path.c_str()); if (std::rename(part.c_str(), path.c_str()) != 0) std::remove(part.c_str()); }
+        else std::remove(part.c_str());
+      }
+    }
+    std::lock_guard<std::mutex> g(lock);
+    if (ok) { stats.fetched++; stats.bytes += n; stats.kept += n; failedAt.erase(name); }
+    else { stats.failed++; stats.lastError = why; stats.gone = stats.gone || why.find("HTTP 404") != std::string::npos; failedAt[name] = now; }
+    return ok;
+  }
+
+  // The bundle holding a layer's tile (nullptr when the pack has no such file). g holds the lock; a streamed bundle's
+  // header is fetched with it let go
+  Bundle* bundle(const std::string& dir, int layer, int lat, int lon, std::unique_lock<std::mutex>& g) {
     static const char* names[] = {"", "elev", "cover", "roads", "lroads"};
     const int south = floorDiv(lat, kBlock) * kBlock, west = floorDiv(lon, kBlock) * kBlock;
     const std::string rel = std::string(names[layer]) + "/" + cornerName(south, west) + ".svb";
     auto it = bundles.find(rel);
     if (it != bundles.end()) return it->second.get();
-    if (!files.count(rel)) { bundles[rel] = nullptr; return nullptr; }
     auto b = std::make_unique<Bundle>();
-    b->path = joinPath(dir, rel);
-    b->file = fopen(b->path.c_str(), "rb");
+    b->path = joinPath(dir, rel); b->rel = rel;
     uint8_t head[kHeader + kEntry * kTiles];
-    if (!b->file || fread(head, 1, sizeof(head), b->file) != sizeof(head) || memcmp(head, "SVB2", 4) != 0 || u16(head + 4) != 1)
-      throw std::runtime_error(b->path + ": not an Earth pack bundle");
+    long long fsize = 0;
+    if (files.count(rel)) {
+      fsize = files[rel];
+      b->file = fopen(b->path.c_str(), "rb");
+      if (!b->file || fread(head, 1, sizeof(head), b->file) != sizeof(head)) throw std::runtime_error(b->path + ": not an Earth pack bundle");
+    } else if (remote.count(rel)) {
+      b->streamed = true; b->remote = remote[rel];
+      fsize = (long long)b->remote.bytes;
+      std::vector<uint8_t> got;
+      std::string why;
+      g.unlock();
+      const bool ok = piece(headPiece(rel), b->remote, 0, sizeof(head), got, why);
+      g.lock();
+      if (auto again = bundles.find(rel); again != bundles.end()) return again->second.get();   // (another thread's)
+      if (!ok) throw std::runtime_error("The real Earth's data here couldn't be fetched (" + rel + "): " + why);
+      memcpy(head, got.data(), sizeof(head));
+    } else { bundles[rel] = nullptr; return nullptr; }
+    auto bad = [&](const std::string& why) {
+      if (b->streamed) std::remove(joinPath(cache, headPiece(rel)).c_str());   // (fetched again when next wanted)
+      return std::runtime_error(b->path + ": " + why);
+    };
+    if (memcmp(head, "SVB2", 4) != 0 || u16(head + 4) != 1) throw bad("not an Earth pack bundle");
     b->layer = head[6]; b->type = head[7]; b->south = i16(head + 8); b->west = i16(head + 10);
     b->spd = u16(head + 12); b->apron = u16(head + 14);
-    if (u32(head + 16) != kTiles || b->south != south || b->west != west) throw std::runtime_error(b->path + ": bundle header doesn't match its name");
+    if (u32(head + 16) != kTiles || b->south != south || b->west != west) throw bad("bundle header doesn't match its name");
     if ((b->layer == LAYER_ELEV && (b->type != TYPE_INT16 || b->spd != kElevSamples || b->apron != kApron)) ||
         (b->layer == LAYER_COVER && (b->type != TYPE_UINT8 || b->spd != kCoverSamples || b->apron != kApron)) ||
         ((layer == LAYER_ROADS || layer == LAYER_LOCAL_ROADS) && b->type != TYPE_BLOB))
-      throw std::runtime_error(b->path + ": bundle of an unexpected layout");
-    const long long fsize = files[rel];
+      throw bad("bundle of an unexpected layout");
     for (int i = 0; i < kTiles; i++) {
       const uint8_t* e = head + kHeader + kEntry * i;
       Entry& en = b->entries[i];
       en.offset = u64(e); en.size = u32(e + 8); en.rawSize = u32(e + 12); en.crc = u32(e + 16); en.kind = u16(e + 20); en.constant = i16(e + 22);
       if (en.kind > KIND_CONSTANT || (en.kind == KIND_ZLIB && (en.offset < sizeof(head) || (long long)(en.offset + en.size) > fsize)))
-        throw std::runtime_error(b->path + ": bundle index out of range");
+        throw bad("bundle index out of range");
     }
     Bundle* raw = b.get();
     bundles[rel] = std::move(b);
     return raw;
   }
 
-  // A tile's raw bytes (checked), with its entry; false when absent
-  bool tileBytes(Bundle* b, int lat, int lon, Entry& en, std::vector<uint8_t>& raw) {
+  // A tile's raw bytes (checked), with its entry; false when absent. g holds the lock; a streamed tile is fetched
+  // with it let go
+  bool tileBytes(Bundle* b, int lat, int lon, Entry& en, std::vector<uint8_t>& raw, std::unique_lock<std::mutex>& g) {
     en = b->entries[(lat - b->south) * kBlock + (lon - b->west)];
     if (en.kind != KIND_ZLIB) return en.kind == KIND_CONSTANT;
     std::vector<uint8_t> stored(en.size);
+    if (b->streamed) {
+      const std::string name = tilePiece(b->rel, lat, lon);
+      std::string why;
+      g.unlock();
+      const bool ok = piece(name, b->remote, en.offset, en.size, stored, why);
+      raw.resize(en.rawSize);
+      const bool good = ok && inflate(stored.data(), stored.size(), raw.data(), raw.size()) && crc32(raw.data(), raw.size()) == en.crc;
+      if (ok && !good) std::remove(joinPath(cache, name).c_str());
+      g.lock();
+      if (!ok) throw std::runtime_error("The real Earth's data here couldn't be fetched (" + name + "): " + why);
+      if (!good) throw std::runtime_error(b->path + ": damaged tile " + cornerName(lat, lon) + " (fetched again when next wanted)");
+      return true;
+    }
     if (fseek(b->file, (long)en.offset, SEEK_SET) != 0 || fread(stored.data(), 1, stored.size(), b->file) != stored.size())
       throw std::runtime_error(b->path + ": short read");
     raw.resize(en.rawSize);
@@ -323,6 +428,13 @@ struct Pack::Impl {
     return true;
   }
 };
+
+namespace {
+std::string tilePiece(const std::string& rel, int lat, int lon) { return rel.substr(0, rel.size() - 4) + "/" + cornerName(lat, lon); }
+} // namespace
+
+void setRangeFetch(RangeFetch fetch) { std::lock_guard<std::mutex> g(g_fetchLock); g_fetch = std::move(fetch); }
+bool hasRangeFetch() { std::lock_guard<std::mutex> g(g_fetchLock); return (bool)g_fetch; }
 
 Pack::~Pack() = default;
 
@@ -342,6 +454,7 @@ std::shared_ptr<Pack> Pack::open(const std::string& dir, std::string* error) {
   }
   size_t at = 0;
   bool header = false, ended = false;
+  std::vector<std::pair<std::string, long long>> missing;   // (listed, not on disk: at the source, if it is streamed)
   while (at < text.size()) {
     size_t nl = text.find('\n', at);
     if (nl == std::string::npos) nl = text.size();
@@ -358,8 +471,8 @@ std::shared_ptr<Pack> Pack::open(const std::string& dir, std::string* error) {
       char rel[512]; long long bytes = 0; char digest[80];
       if (sscanf(line.c_str() + 5, "%511s %lld %79s", rel, &bytes, digest) != 3) return fail(dir + ": bad file line");
       long long actual = -1;
-      if (!fileSize(joinPath(dir, rel), actual) || actual != bytes) return fail(dir + ": " + rel + " is missing or of the wrong size");
-      pack->impl_->files[rel] = bytes;
+      if (!fileSize(joinPath(dir, rel), actual) || actual != bytes) missing.push_back({rel, bytes});
+      else pack->impl_->files[rel] = bytes;
       const std::string r = rel;
       if (r.compare(0, 6, "cover/") == 0) pack->hasCover_ = true;
       if (r.compare(0, 7, "lroads/") == 0) pack->hasLocalRoads_ = true;
@@ -367,6 +480,39 @@ std::shared_ptr<Pack> Pack::open(const std::string& dir, std::string* error) {
   }
   if (!header || !ended) return fail(dir + ": incomplete pack.idx");
   Impl& im = *pack->impl_;
+  if (!missing.empty()) {   // a streamed pack: its bundles at the source stream.txt names, where stream.idx says
+    std::vector<uint8_t> source, map;
+    std::map<std::string, Remote> at;
+    if (readFile(joinPath(dir, "stream.txt"), source) && readFile(joinPath(dir, "stream.idx"), map)) {
+      std::string src(source.begin(), source.end());
+      src = src.substr(0, src.find_first_of("\r\n"));
+      if (!src.empty() && src.back() != '/') src += '/';
+      im.source = src;
+      const std::string m(map.begin(), map.end());
+      bool first = true;
+      for (size_t p = 0; p < m.size();) {
+        size_t nl = m.find('\n', p);
+        if (nl == std::string::npos) nl = m.size();
+        const std::string line = m.substr(p, nl - p);
+        p = nl + 1;
+        if (first) { if (line != "somnium-stream 1") break; first = false; continue; }
+        char rel[512], zip[256]; unsigned long long offset = 0, bytes = 0;
+        if (line.compare(0, 5, "file ") == 0 && sscanf(line.c_str() + 5, "%511s %255s %llu %llu", rel, zip, &offset, &bytes) == 4)
+          at[rel] = Remote{zip, offset, bytes};
+      }
+    }
+    for (const auto& [rel, bytes] : missing) {
+      auto it = at.find(rel);
+      const bool bundle = rel.size() > 4 && rel.compare(rel.size() - 4, 4, ".svb") == 0, tif = rel.compare(0, 6, "glo90/") == 0;
+      if (im.source.empty() || it == at.end() || it->second.bytes != (uint64_t)bytes || !(bundle || tif))
+        return fail(dir + ": " + rel + " is missing or of the wrong size");
+      if (bundle) { im.remote[rel] = it->second; im.stats.remote += it->second.bytes; }   // (a GLO-90 tile not here: the fetcher's to bring, as any)
+    }
+    im.cache = joinPath(dir, "streamed");
+    std::error_code ec;
+    for (auto e = std::filesystem::recursive_directory_iterator(std::filesystem::u8path(im.cache), ec); !ec && e != std::filesystem::recursive_directory_iterator(); e.increment(ec))
+      if (e->is_regular_file(ec)) im.stats.kept += (uint64_t)e->file_size(ec);
+  }
   auto table = [&](const char* name, const char* magic, std::vector<uint8_t>& out) -> bool {
     if (!im.files.count(name)) return true;
     if (!readFile(joinPath(dir, name), out) || out.size() < 32 + 8 * (size_t)kCells || memcmp(out.data(), magic, 4) != 0 || u32(out.data() + 4) != 1) return false;
@@ -393,12 +539,13 @@ std::shared_ptr<Pack> Pack::open(const std::string& dir, std::string* error) {
 namespace {
 std::shared_ptr<const RasterTile> loadRaster(Pack::Impl& im, const std::string& dir, int layer, int lat, int lon) {
   const uint64_t key = tileKey(layer, lat, lon);
-  std::lock_guard<std::mutex> g(im.lock);
+  std::unique_lock<std::mutex> g(im.lock);
   if (auto t = im.rasters.get(key)) return t;
-  Bundle* b = im.bundle(dir, layer, lat, lon);
+  Bundle* b = im.bundle(dir, layer, lat, lon, g);
   if (!b) return nullptr;
   Entry en; std::vector<uint8_t> raw;
-  if (!im.tileBytes(b, lat, lon, en, raw)) return nullptr;
+  if (!im.tileBytes(b, lat, lon, en, raw, g)) return nullptr;
+  if (auto t = im.rasters.get(key)) return t;   // (another thread's, while this one fetched)
   auto t = std::make_shared<RasterTile>();
   t->lat = lat; t->lon = lon; t->n = b->spd;
   const size_t count = (size_t)t->width() * t->width();
@@ -488,13 +635,14 @@ std::shared_ptr<const RasterTile> Pack::coverTile(int lat, int lon) const {
 std::shared_ptr<const std::vector<RoadEdge>> Pack::roadTile(int lat, int lon, bool local) const {
   const int layer = local ? LAYER_LOCAL_ROADS : LAYER_ROADS;
   const uint64_t key = tileKey(layer, lat, lon);
-  std::lock_guard<std::mutex> g(impl_->lock);
+  std::unique_lock<std::mutex> g(impl_->lock);
   if (auto t = impl_->roads.get(key)) return t;
-  Bundle* b = impl_->bundle(dir_, layer, lat, lon);
+  Bundle* b = impl_->bundle(dir_, layer, lat, lon, g);
   std::shared_ptr<const std::vector<RoadEdge>> t;
   Entry en; std::vector<uint8_t> raw;
-  if (b && impl_->tileBytes(b, lat, lon, en, raw) && en.kind == KIND_ZLIB) t = decodeRoads(raw, b->path);
+  if (b && impl_->tileBytes(b, lat, lon, en, raw, g) && en.kind == KIND_ZLIB) t = decodeRoads(raw, b->path);
   else t = std::make_shared<std::vector<RoadEdge>>();
+  if (auto again = impl_->roads.get(key)) return again;
   impl_->roads.put(key, t, Lru<std::vector<RoadEdge>>::sizeOf(*t));
   return t;
 }
@@ -502,8 +650,11 @@ std::shared_ptr<const std::vector<RoadEdge>> Pack::roadTile(int lat, int lon, bo
 std::vector<RoadEdge> Pack::roads(const Box& box, bool local) const {
   std::vector<RoadEdge> out;
   std::unordered_map<uint64_t, bool> seen;
-  forCells(box, [&](int la, int lo, int) {
-    auto t = roadTile(la, lo, local);
+  std::vector<std::pair<int, int>> cells;
+  forCells(box, [&](int la, int lo, int) { cells.push_back({la, lo}); });
+  std::vector<std::shared_ptr<const std::vector<RoadEdge>>> tiles(cells.size());
+  eachOf(cells.size(), streamed(), [&](size_t k) { tiles[k] = roadTile(cells[k].first, cells[k].second, local); });
+  for (const auto& t : tiles) {
     for (const RoadEdge& e : *t) {
       if (seen.count(e.id)) continue;
       double s = 90, w = 180, n = -90, ea = -180;
@@ -512,7 +663,7 @@ std::vector<RoadEdge> Pack::roads(const Box& box, bool local) const {
       seen[e.id] = true;
       out.push_back(e);
     }
-  });
+  }
   return out;
 }
 
@@ -587,6 +738,8 @@ size_t Pack::cachedBytes() const {
   std::lock_guard<std::mutex> g(impl_->lock);
   return impl_->rasters.bytes + impl_->roads.bytes + impl_->glo90.bytes;
 }
+bool Pack::streamed() const { return !impl_->remote.empty(); }
+Pack::StreamStats Pack::streamStats() const { std::lock_guard<std::mutex> g(impl_->lock); return impl_->stats; }
 
 std::string glo90Name(int lat, int lon) {
   char b[64];
@@ -741,12 +894,15 @@ Sampler::Sampler(std::shared_ptr<const Pack> pack, const Box& box, bool fine) : 
   const int lon1 = (int)std::ceil(box.east);
   nLat_ = lat1 - lat0_ + 1; nLon_ = lon1 - lon0_ + 1;
   elev_.resize((size_t)nLat_ * nLon_); cover_.resize(elev_.size()); fine_.resize(elev_.size());
-  for (int a = 0; a < nLat_; a++) for (int b = 0; b < nLon_; b++) {
-    const int lat = lat0_ + a, lon = ((lon0_ + b + 180) % 360 + 360) % 360 - 180;
-    const size_t i = (size_t)a * nLon_ + b;
+  auto place = [&](size_t i, int& lat, int& lon) { lat = lat0_ + (int)(i / nLon_); lon = ((lon0_ + (int)(i % nLon_) + 180) % 360 + 360) % 360 - 180; };
+  eachOf(elev_.size(), pack_->streamed(), [&](size_t i) {   // (a streamed pack's: fetched side by side)
+    int lat, lon; place(i, lat, lon);
     elev_[i] = pack_->elevTile(lat, lon);
     cover_[i] = pack_->coverTile(lat, lon);
-    if (fine && pack_->glo90Listed(lat, lon)) { fine_[i] = pack_->glo90Tile(lat, lon); fineCount_ += fine_[i] != nullptr; }
+  });
+  for (size_t i = 0; fine && i < fine_.size(); i++) {
+    int lat, lon; place(i, lat, lon);
+    if (pack_->glo90Listed(lat, lon)) { fine_[i] = pack_->glo90Tile(lat, lon); fineCount_ += fine_[i] != nullptr; }
   }
 }
 

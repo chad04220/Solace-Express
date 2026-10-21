@@ -7,6 +7,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <sys/stat.h>
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 #ifdef _WIN32
 #ifndef NOMINMAX
 #define NOMINMAX   // (std::max, not windows.h's macro)
@@ -117,6 +120,74 @@ bool fetch(const std::string& url, const std::string& path, std::string* error, 
 
 bool download(const std::string& url, const std::string& path, std::string* error, const std::atomic<bool>* cancel) {
   return fetch(url, path, error, cancel, false);
+}
+
+bool fetchRange(const std::string& url, uint64_t offset, uint64_t length, std::vector<uint8_t>& out, std::string* error) {
+  auto fail = [&](const std::string& why) { if (error) *error = why; out.clear(); return false; };
+  out.clear();
+  if (length == 0) return true;
+#ifdef _WIN32
+  static HINTERNET session = [] {
+    HINTERNET h = WinHttpOpen(L"SomniumVolandi/1", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+    if (h) WinHttpSetTimeouts(h, 10000, 10000, 20000, 30000);
+    return h;
+  }();
+  if (!session) return fail("no network session");
+  const std::wstring wurl = wide(url);
+  URL_COMPONENTS u = {}; u.dwStructSize = sizeof u;
+  wchar_t host[256] = {}, rest[2048] = {};
+  u.lpszHostName = host; u.dwHostNameLength = 256; u.lpszUrlPath = rest; u.dwUrlPathLength = 2048;
+  if (!WinHttpCrackUrl(wurl.c_str(), 0, 0, &u)) return fail("not an address: " + url);
+  HINTERNET connect = WinHttpConnect(session, host, u.nPort, 0);
+  HINTERNET request = connect ? WinHttpOpenRequest(connect, L"GET", rest, nullptr, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
+                                                   u.nScheme == INTERNET_SCHEME_HTTPS ? WINHTTP_FLAG_SECURE : 0) : nullptr;
+  auto close = [&] { if (request) WinHttpCloseHandle(request); if (connect) WinHttpCloseHandle(connect); };
+  // (added to the request itself: kept when the release's address redirects to where its file is)
+  const std::wstring range = L"Range: bytes=" + std::to_wstring(offset) + L"-" + std::to_wstring(offset + length - 1);
+  if (!request || !WinHttpAddRequestHeaders(request, range.c_str(), (DWORD)-1L, WINHTTP_ADDREQ_FLAG_ADD | WINHTTP_ADDREQ_FLAG_REPLACE) ||
+      !WinHttpSendRequest(request, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0) ||
+      !WinHttpReceiveResponse(request, nullptr)) { close(); return fail("no answer from " + url); }
+  DWORD status = 0, size = sizeof status;
+  WinHttpQueryHeaders(request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX, &status, &size, WINHTTP_NO_HEADER_INDEX);
+  // (206, the range; a 200 is the whole file, which will do only when the range is its start)
+  if (status != 206 && !(status == 200 && offset == 0)) { close(); return fail("HTTP " + std::to_string(status) + " from " + url); }
+  out.reserve((size_t)length);
+  std::vector<uint8_t> buf(1 << 16);
+  while (out.size() < length) {
+    DWORD got = 0;
+    if (!WinHttpReadData(request, buf.data(), (DWORD)std::min<uint64_t>(buf.size(), length - out.size()), &got)) { close(); return fail("the answer from " + url + " broke off"); }
+    if (got == 0) break;
+    out.insert(out.end(), buf.begin(), buf.begin() + got);
+  }
+  close();
+  if (out.size() != length) return fail("a short answer from " + url);
+  return true;
+#else
+  // (curl, as the shell finds it, into a file of its own; its status said back)
+  static std::atomic<unsigned> serial{0};
+  auto quote = [](const std::string& s) { std::string q = "'"; for (char c : s) { if (c == '\'') q += "'\\''"; else q += c; } return q + "'"; };
+  char tmp[64];
+  snprintf(tmp, sizeof tmp, "/sv-range-%d-%u.part", (int)getpid(), serial++);
+  const std::string part = (getenv("TMPDIR") && *getenv("TMPDIR") ? std::string(getenv("TMPDIR")) : std::string("/tmp")) + tmp;
+  const std::string cmd = "curl -sL --max-time 60 -r " + std::to_string(offset) + "-" + std::to_string(offset + length - 1) +
+                          " -o " + quote(part) + " -w '%{http_code}' " + quote(url) + " 2>/dev/null";
+  std::string code;
+  if (FILE* p = popen(cmd.c_str(), "r")) { char b[32]; while (fgets(b, sizeof b, p)) code += b; pclose(p); }
+  FILE* f = fopen(part.c_str(), "rb");
+  if (f) {
+    out.resize((size_t)length);
+    const size_t got = fread(out.data(), 1, out.size(), f);
+    const bool more = fgetc(f) != EOF;
+    fclose(f);
+    out.resize(got);
+    if (more) out.clear();
+  }
+  std::remove(part.c_str());
+  const bool fileUrl = url.compare(0, 7, "file://") == 0;   // (curl says 000 for a file address)
+  if (!fileUrl && code != "206" && !(code == "200" && offset == 0)) return fail("HTTP " + (code.empty() ? std::string("?") : code) + " from " + url);
+  if (out.size() != length) return fail(fileUrl && !f ? "HTTP 404 from " + url : "a short answer from " + url);
+  return true;
+#endif
 }
 bool downloadResuming(const std::string& url, const std::string& path, std::string* error, const std::atomic<bool>* cancel) {
   return fetch(url, path, error, cancel, true);
