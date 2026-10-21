@@ -534,8 +534,27 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
   - `airport_slots_test`: forty airports. The 8 nearest of each parity are chosen, nearest first, each with its
     runway, size and buildings, and the far end's come in as the camera goes there.
 
-  Still open in E8: secondary runways, airport layouts by size, rivers (GRIP has none; a rivers dataset), regional
-  building styles, and real landmarks.
+- **E8, third pass: the airports' other runways** (`World::extraRunways`). A real airport's main runway is its
+  `Airport`; the others come from OurAirports with both ends known, 250 m or more, not on the water, up to five each.
+  Each is laid on the chart by its ends; the main one over again, ends swapped, is left out.
+  - **The ground.** Each gets a strip of level ground at its airport's height and its approach funnels, in the
+    chart's terrain and in every rule the scenery and roads read (`airportGroundsCap`, `airportFunnelCeiling`,
+    `airportInfluence`, `airportExclusion`). The charts' content version is 3.
+  - **Flying.** `World::onRunway` answers on them with their airport, which is what landing and arrival read, and
+    gives the runway's own surface to the wheels' friction.
+  - **The look.** The 8 nearest the camera are painted by an overlay of their own after their airport
+    (`extraRunwayMaterial`). The runway shader's pinned functions stay as they were. The overlay draws pavement or
+    strip, edge and centre lines, threshold bars, designators, touchdown wear and the pools of the edge lights. It
+    stops at the main runway, whose markings run on through a crossing. Their edge lights and threshold bars stand
+    on their airport's height, and no light stands on a runway it crosses.
+  - **The layout.** None of the airport's buildings stands on them: the layout is made for the main runway, and what
+    falls within 20 m of another is left out. The GPS map draws them beside their main runways.
+  - `earth_chart_test`: the fixture's chart has 8 of them, among them Martha's Vineyard's 15/33 (1,004 m) across its
+    6/24. Each is level at its airport's height, answers with its airport and its own surface, and has nothing of the
+    scenery standing on it. Rendered from 1.5 km and 300 m, the airport shows both runways on one levelled ground.
+
+  Still open in E8: airport layouts by size, rivers (GRIP has none; a rivers dataset), regional building styles, and
+  real landmarks.
 
 Decisions taken with the defaults (the owner can change them):
 - The generated regions keep working until E6. In real-Earth play the real world replaces them; they stay available

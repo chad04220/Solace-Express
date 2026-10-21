@@ -3,6 +3,7 @@
 // pick up the items that fall inside them.
 #include "airport_layout.h"
 #include "entities.h"
+#include <algorithm>
 #include <cstring>
 
 namespace {
@@ -313,4 +314,16 @@ void airportItems(int ai, std::vector<AptItem>& out) {
   if (L.paved) paved(P, a, L); else strip(P, a, L);
   P.rs = 0xA17F93C5u ^ (uint32_t)(ai * 747796405u);
   groundLife(P, a, L);
+  // (the real Earth: nothing of the layout on its other runways, nor within 20 m of one - it was laid out by the main)
+  const auto& extras = sceneryWorld().extraRunways;
+  out.erase(std::remove_if(out.begin(), out.end(), [&](const AptItem& it) {
+    const float reach = hypotf(kEntInfo[it.kind].hx * it.e.sx, kEntInfo[it.kind].hz * it.e.sz) + 20.f;
+    for (const ExtraRunway& r : extras) {
+      if (r.airport != ai) continue;
+      const float hd = r.heading * DEG, dx = it.e.x - r.x, dz = it.e.z - r.z;
+      const float u = fabsf(dx * sinf(hd) - dz * cosf(hd)), v = fabsf(dx * cosf(hd) + dz * sinf(hd));
+      if (u < r.length * 0.5f + reach && v < r.width * 0.5f + reach) return true;
+    }
+    return false;
+  }), out.end());
 }

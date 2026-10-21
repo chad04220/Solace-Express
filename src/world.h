@@ -55,6 +55,11 @@ struct Airport {
   int rwyNumber(bool reverse) const { int n = (int)lroundf(wrapDeg360(heading + (reverse ? 180 : 0)) / 10.0f); return n == 0 ? 36 : n; }
 };
 
+// A real airport's other runways (World::buildEarth, from OurAirports' ends): its main one is the Airport's own. Its
+// centre, heading (degrees true of its first end toward its second), length and width (m), surface (SURF_), and the
+// airport it belongs to (World::airports: onRunway answers with that one, whose height its ground is levelled to)
+struct ExtraRunway { int airport; float x, z, heading, length, width; int surface; };
+
 struct Town { const char* name; float x, z, r; int kind; };  // kind 0 village, 1 town, 2 city
 
 struct Box { vec3 c, h; int airport; int kind; };  // kind 0 hangar 1 tower 2 terminal 3 shed 4 fuel tank 5 radome
@@ -97,6 +102,7 @@ struct LakeMask { float x0 = 0, z0 = 0, cell = 8.f; int n = 0; std::vector<float
 class World {
 public:
   std::vector<Airport> airports;
+  std::vector<ExtraRunway> extraRunways;   // (the real Earth's: above; none elsewhere)
   std::vector<Town> towns;
   bool procedural = false;
   bool repeating = false; // the old wrapping chart (above): no World built repeats
@@ -181,8 +187,9 @@ public:
   // Pure raw authored recipe for distant silhouettes only; no World arrays or
   // road/settlement generation. The normal Solace build remains unchanged.
   static void sampleAuthoredBase(float x, float z, float out[4]);
-  // Returns airport index if (x,z) lies on a runway (with margin), else -1
-  int onRunway(float x, float z, float margin = 0) const;
+  // Returns airport index if (x,z) lies on a runway (with margin) - its main one, or one of its others - else -1; surface:
+  // that runway's own (SURF_)
+  int onRunway(float x, float z, float margin = 0, int* surface = nullptr) const;
   float distanceKm(int a, int b) const;
   int nearestAirport(float x, float z, float* distOut = nullptr) const;
 private:

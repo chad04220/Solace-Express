@@ -6,6 +6,7 @@
 #include "../src/earth_charts.h"
 #include "../src/region_travel.h"
 #include "../src/scenery.h"
+#include "../src/entities.h"
 #include <chrono>
 #include <map>
 
@@ -88,6 +89,41 @@ int main(int argc, char** argv) {
       const float d = std::fabs(std::remainder(w.airports[at].heading - north - r.heading, 180.f));
       check(d < 1.5f, fmt("%s's runway on its real heading (%.1f true, the chart's %.1f less north %.1f)", ident.c_str(), r.heading, w.airports[at].heading, north));
     }
+  }
+  {   // the airports' other runways (World::extraRunways): each level at its airport's height along it, onRunway
+      // answering with that airport and the runway's own surface, and nothing of the scenery standing on it (its chunks
+      // made from this World, as a chart's staged scenery is)
+    int levelled = 0, answered = 0, clear = 0;
+    Scenery scenery(0, &w);
+    for (const ExtraRunway& r : w.extraRunways) {
+      const Airport& a = w.airports[r.airport];
+      const float hd = r.heading * DEG, s = sinf(hd), c = cosf(hd);
+      bool level = true;
+      for (float t : {-0.45f, 0.f, 0.45f}) level &= std::abs(w.height(r.x + s * t * r.length, r.z - c * t * r.length) - a.elev) < 1.f;
+      levelled += level;
+      int surface = -1;
+      answered += w.onRunway(r.x + s * 0.3f * r.length, r.z - c * 0.3f * r.length, 0.f, &surface) == r.airport && surface == r.surface;
+      bool free = true;
+      for (float t = -0.5f; t <= 0.5f; t += 0.05f) {
+        const float x = r.x + s * t * r.length, z = r.z - c * t * r.length;
+        const Scenery::Chunk* ch = scenery.ensure(Scenery::chunkOf(x), Scenery::chunkOf(z), 2);
+        for (int k = 0; ch && k < EK_COUNT; k++)
+          for (uint32_t q = ch->off[k]; q < ch->off[k + 1]; q++) {
+            const Ent& e = ch->ents[q];
+            const float dx = e.x - r.x, dz = e.z - r.z;
+            const bool on = fabsf(dx * s - dz * c) < r.length * 0.5f - 10.f && fabsf(dx * c + dz * s) < r.width * 0.5f;
+            if (on && free) printf("  on %s's other runway: %s at %.0f %.0f\n", a.code, kEntInfo[k].name, e.x, e.z);
+            free &= !on;
+          }
+      }
+      clear += free;
+      printf("  %-5s's other runway %5.0f m x %3.0f m  heading %5.1f  surface %d  at %7.0f %7.0f\n", a.code, r.length, r.width, r.heading, r.surface, r.x, r.z);
+    }
+    const int n = (int)w.extraRunways.size();
+    if (ident == "KMVY") check(n > 0, "the airports' other runways");
+    check(levelled == n, fmt("each other runway level at its airport's height (%d of %d)", levelled, n));
+    check(answered == n, fmt("onRunway answers each with its airport and its own surface (%d of %d)", answered, n));
+    check(clear == n, fmt("nothing of the scenery on any (%d of %d clear)", clear, n));
   }
   for (const Town& t : w.towns) printf("  town %-28s %d r %4.0f at %7.0f %7.0f ground %.1f\n", t.name, t.kind, t.r, t.x, t.z, w.height(t.x, t.z));
   // every height finite, the sea below 0 and the land above it

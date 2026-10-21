@@ -977,9 +977,25 @@ Renderer::AirportSlots Renderer::airportSlots(const World& world, float cx, floa
 void Renderer::setAirportSlots(GLuint p, const World& world, float cx, float cz) {
   const AirportSlots S = airportSlots(world, cx, cz);
   glUniform1i(U(p, "uApCount"), S.n);
-  if (S.n == 0) return;
-  glUniform4fv(U(p, "uAp"), S.n, S.ap); glUniform4fv(U(p, "uApDim"), S.n, S.dim);
-  glUniform4fv(U(p, "uApBox"), 2 * S.n, S.box);
+  if (S.n > 0) {
+    glUniform4fv(U(p, "uAp"), S.n, S.ap); glUniform4fv(U(p, "uApDim"), S.n, S.dim);
+    glUniform4fv(U(p, "uApBox"), 2 * S.n, S.box);
+  }
+  // the airports' other runways (the real Earth's, World::extraRunways): the 8 nearest, painted over their grounds
+  std::vector<int> near(world.extraRunways.size());
+  for (size_t i = 0; i < near.size(); i++) near[i] = (int)i;
+  const size_t n = std::min<size_t>(8, near.size());
+  auto far = [&](int i) { return hypotf(world.extraRunways[i].x - cx, world.extraRunways[i].z - cz); };
+  std::partial_sort(near.begin(), near.begin() + n, near.end(), [&](int a, int b) { const float da = far(a), db = far(b); return da != db ? da < db : a < b; });
+  float xr[32], dim[32];
+  for (size_t k = 0; k < n; k++) {
+    const ExtraRunway& r = world.extraRunways[near[k]];
+    const Airport& a = world.airports[r.airport];
+    xr[k * 4] = r.x; xr[k * 4 + 1] = r.z; xr[k * 4 + 2] = a.elev; xr[k * 4 + 3] = r.heading * DEG;
+    dim[k * 4] = r.length; dim[k * 4 + 1] = r.width; dim[k * 4 + 2] = (float)r.surface; dim[k * 4 + 3] = (float)a.size;
+  }
+  glUniform1i(U(p, "uXrCount"), (int)n);
+  if (n > 0) { glUniform4fv(U(p, "uXr"), (GLsizei)n, xr); glUniform4fv(U(p, "uXrDim"), (GLsizei)n, dim); }
 }
 
 // Pack the shader world table without depending on the active world or a GL context.

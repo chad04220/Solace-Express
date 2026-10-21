@@ -317,6 +317,53 @@ void runwayMaterial(int ai, vec2 uv, inout Mat m, vec3 pw, vec2 footprint, out b
   }
 }
 
+#ifndef PART_BAKE
+// The real Earth's airports' other runways (World::extraRunways; the 8 nearest the camera, Renderer::setAirportSlots):
+// painted after their airport, over its grounds, as its main runway is (runwayMaterial, kept as it is) without the
+// blast pads and aprons - the pavement or the strip, its edge and centre lines, threshold bars, designators and
+// touchdown wear, and the pools of its edge lights after dark
+int extraRunwayAt(vec2 p, out vec2 uv, out vec2 along){
+  for (int i = 0; i < 8; i++){
+    if (i >= uXrCount) break;
+    vec4 a = uXr[i]; vec4 d = uXrDim[i];
+    vec2 dp = p - a.xy; float s = sin(a.w), c = cos(a.w);
+    float u = dp.x*s - dp.y*c, v = dp.x*c + dp.y*s;
+    if (abs(u) < d.x*0.5 + 6.0 && abs(v) < d.y*0.5 + 3.0) { uv = vec2(u, v); along = vec2(s, -c); return i; }
+  }
+  along = vec2(1.0, 0.0); return -1;
+}
+void extraRunwayMaterial(int xi, vec2 uv, inout Mat m, vec3 pw, vec2 footprint){
+  vec4 d = uXrDim[xi]; float len = d.x, wid = d.y, hl = len*0.5; int surf = int(d.z), size = int(d.w);
+  float u = uv.x, v = uv.y, au = abs(u);
+  vec3 nTS;
+  int layer = surf == 0 ? (size == 2 ? M_CONCRETE : M_ASPHALT) : surf == 1 ? M_GRASS : surf == 2 ? M_GRAVEL : surf == 3 ? M_SNOW : M_SAND;
+  vec4 t = matSample(pw.xz, layer, surf == 0 ? 7.0 : 5.0, nTS);
+  m.alb = t.rgb; m.rough = t.a; m.nrm = nTS; m.metal = 0.0;
+  if (surf == 1) m.alb *= vec3(1.12, 1.18, 0.82)*(0.84 + 0.16*(1.0 - terrainStripeCoverage((v + wid*0.5)/4.5, 0.5, footprint.y/4.5)));
+  if (surf == 0) {
+    float tz = smoothstep(hl - 80.0, hl - 200.0, au)*smoothstep(hl - 650.0, hl - 300.0, au);
+    float tyre = tz*smoothstep(wid*0.3, 0.0, abs(abs(v) - 3.5))*(0.5 + 0.5*vnoise(vec2(u*0.05, v*2.0)));
+    m.alb *= 1.0 - 0.55*tyre; m.rough = mix(m.rough, 0.45, tyre);
+    float paint = 0.0;
+    if (au < hl - 70.0) paint = terrainLineCoverage(v, 0.45, footprint.y)*terrainStripeCoverage(u/50.0, 0.6, footprint.x/50.0);
+    paint = max(paint, terrainLineCoverage(abs(v) - (wid*0.5 - 1.0), 0.45, footprint.y));
+    if (au > hl - 50.0 && au < hl - 12.0 && abs(v) < wid*0.5 - 3.0) paint = max(paint, terrainStripeCoverage((v + wid*0.5)/3.6, 0.5, footprint.y/3.6));
+    if (au > hl - 380.0 && au < hl - 320.0) paint = max(paint, terrainLineCoverage(abs(v) - wid*0.25, 2.5, footprint.y));
+    float hdg = uXr[xi].w*57.29578;
+    int n0 = int(floor(mod(hdg, 360.0)/10.0 + 0.5)); if (n0 == 0) n0 = 36;
+    int n1 = int(floor(mod(hdg + 180.0, 360.0)/10.0 + 0.5)); if (n1 == 0) n1 = 36;
+    if (u < -hl + 100.0 && u > -hl + 55.0) paint = max(paint, rwyDigits(vec2(v, u - (-hl + 78.0)), n0));
+    if (u > hl - 100.0 && u < hl - 55.0) paint = max(paint, rwyDigits(vec2(-v, -(u - (hl - 78.0))), n1));
+    m.alb = mix(m.alb, vec3(0.86), paint*0.92); m.rough = mix(m.rough, 0.55, paint);
+  }
+  if (uRwyLights > 0.01) {
+    float lh = 0.35, ku = clamp(floor((u + hl)/60.0 + 0.5), 0.0, floor(len/60.0));
+    float du = u - (-hl + ku*60.0), dv = abs(v) - (wid*0.5 + 1.5), d2 = du*du + dv*dv + lh*lh;
+    m.emit += m.alb*vec3(1.0, 0.93, 0.78)*lh/(d2*sqrt(d2))*uRwyLights*6.0;
+  }
+}
+#endif
+
 // The circuit's bend at a point along it (road_network.h RC_CIRCUIT, the only one): how fast it turns over the 30 m
 // about `along` (1/m; + to the right, the side of positive across), from its own segments listed with the point - its
 // straights one long segment each, its bends many short ones. 0 where its neighbours aren't listed (a long straight's
@@ -614,6 +661,16 @@ Mat terrainMaterial(vec3 p, vec3 n, float t, vec4 base, vec2 pixelDx, vec2 pixel
       m.rough = mix(m.rough, 0.95, rough*grounds);
     }
   }
+#ifndef PART_BAKE
+  // ---- the real Earth's airports' other runways, over their grounds - though not over the main runway itself, whose
+  // markings run on through a crossing
+  vec2 xuv = vec2(0.0), xalong = vec2(1.0, 0.0); int xi = (uDbg & 2048) == 0 ? extraRunwayAt(p.xz, xuv, xalong) : -1;
+  if (xi >= 0 && ai >= 0 && abs(auv.x) < uApDim[ai].x*0.5 && abs(auv.y) < uApDim[ai].y*0.5) xi = -1;
+  if (xi >= 0) {
+    vec2 xacross = vec2(-xalong.y, xalong.x);
+    extraRunwayMaterial(xi, xuv, m, p, vec2(abs(dot(pixelDx, xalong)) + abs(dot(pixelDy, xalong)), abs(dot(pixelDx, xacross)) + abs(dot(pixelDy, xacross))));
+  }
+#endif
   // ---- impact crater: churned earth, scorched blast ring, smouldering embers in the pit
   int ci = uCraterN > 0 ? craterAt(p.xz, 2.6) : -1;
   if (ci >= 0) {

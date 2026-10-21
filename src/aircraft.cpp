@@ -604,9 +604,9 @@ void Plane::substep(float dt, const Weather& wx, float time) {
       // a belly landing (gear up or stuck) is survivable: on a paved runway, wings level, at approach speed and
       // sinking gently, the aircraft skids on its belly and nose and stops; it is damaged, not wrecked
       if ((c.kind == 3 || c.kind == 5 || c.kind == 6 || c.kind == 7) && !wheels && !s.taildragger && s.special == 0) {   // (a low wing's tips touch too: they scrape along with the belly)
-        int rw = g_world.onRunway(pw.x, pw.z, 4);
+        int surface = 0, rw = g_world.onRunway(pw.x, pw.z, 4, &surface);
         bool gentle = -vc.y < 2.5f && fabsf(bankDeg()) < 8.f && spd < s.vref * 1.35f && fabsf(pitchDeg()) < 12.f;
-        if (ev.bellyLanding || (rw >= 0 && !surfaceRough(g_world.airports[rw].surface) && gentle)) { ev.bellyLanding = true; bellySkid = true; }
+        if (ev.bellyLanding || (rw >= 0 && !surfaceRough(surface) && gentle)) { ev.bellyLanding = true; bellySkid = true; }
       }
       if (c.kind == 4 && wheels && spd > 5) { ev.tailStrike = true; }
       else if (spd > 2.5f && !bellySkid) {
@@ -634,8 +634,8 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     }
     if (c.kind <= 2) {
       anyWheel = true;
-      int rw = g_world.onRunway(pw.x, pw.z, 2);
-      float rough = rw >= 0 ? (surfaceRough(g_world.airports[rw].surface) ? 0.6f : 0.f) : 1.f;
+      int surface = 0, rw = g_world.onRunway(pw.x, pw.z, 2, &surface);   // (the runway's own surface: an airport's others may differ)
+      float rough = rw >= 0 ? (surfaceRough(surface) ? 0.6f : 0.f) : 1.f;
       roughSum += rough;
       if (rw < 0) {
         float dA; int ai = g_world.nearestAirport(pw.x, pw.z, &dA);

@@ -8,7 +8,7 @@
 
 namespace earthCharts {
 constexpr int kLattice = 32;                  // a chart's origin snaps to 1/32 of a degree each way
-constexpr uint32_t kGeneratorVersion = 2;     // the real Earth's charts' content (their cache, never an id): 2, the built-up districts
+constexpr uint32_t kGeneratorVersion = 3;     // the real Earth's charts' content (their cache, never an id): 2, the built-up districts; 3, the airports' other runways
 constexpr const char* kIdPrefix = "earth:";
 
 // The Earth pack the game reads: EARTH_PACK when set, else "earth" beside the game's working folder (opened when
@@ -59,6 +59,7 @@ struct ChartAirports {
   std::vector<std::string> codes, names, blurbs;
   std::vector<earth::AirportRecord> records;
   std::vector<Airport> airports;   // (their code, name and blurb point into the vectors above)
+  std::vector<ExtraRunway> extras;   // (their other runways, each with its airport's index above)
 };
 std::shared_ptr<const ChartAirports> chartAirports(const procedural::Descriptor& chart, const std::shared_ptr<const earth::Pack>& pack,
                                                    const earth::Sampler* sampler = nullptr);

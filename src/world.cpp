@@ -250,8 +250,35 @@ static void airportLimits(const Airport* data, size_t count, float x, float z, f
   }
 }
 
+// An airport's other runways (World::extraRunways: the real Earth's) as a runway is read above, at their airport's
+// height: the strip of level ground along each that World::buildEarthTerrain lays, and their approach funnels.
+// funnelCeiling as airportFunnelCeilingFor's; influence the stronger of the two, as airportInfluenceFor's
+static void extraRunwayLimits(const World& world, float x, float z, float& grounds, float& cap, float& funnelCeiling, float& influence) {
+  for (const ExtraRunway& r : world.extraRunways) {
+    const float elev = world.airports[r.airport].elev;
+    const float hd = r.heading * DEG, dx = x - r.x, dz = z - r.z;
+    const float u = fabsf(dx * sinf(hd) - dz * cosf(hd)), v = fabsf(dx * cosf(hd) + dz * sinf(hd));
+    const float d = u - r.length * 0.5f;
+    if (d > 0 && d < 7000) {
+      const float halfw = 250.f + 0.18f * d;
+      const float wc = (1.f - smoothstepf(halfw, halfw + 900.f, v)) * (1.f - smoothstepf(5000.f, 7000.f, d));
+      const float c = elev + 10.f + (elev > 600 ? 0.045f : 0.032f) * d;
+      if (wc > 0.001f) cap = std::min(cap, c);
+      if (wc >= 0.9f) funnelCeiling = std::min(funnelCeiling, c);
+      influence = std::max(influence, wc);
+    }
+    const float du = std::max(0.f, u - (r.length * 0.5f + 150.f)), dv = std::max(0.f, v - (r.width * 0.5f + 90.f));
+    const float g = 1.f - smoothstepf(0.f, 400.f, sqrtf(du * du + dv * dv));
+    grounds = std::max(grounds, g); influence = std::max(influence, g);
+  }
+}
+
 void airportGroundsCap(float x, float z, float& grounds, float& cap) { airportLimits(kAirports, std::size(kAirports), x, z, grounds, cap); }
-void airportGroundsCap(const World& world, float x, float z, float& grounds, float& cap) { airportLimits(world.airports.data(), world.airports.size(), x, z, grounds, cap); }
+void airportGroundsCap(const World& world, float x, float z, float& grounds, float& cap) {
+  airportLimits(world.airports.data(), world.airports.size(), x, z, grounds, cap);
+  float ceiling = 1e9f, influence = 0.f;
+  extraRunwayLimits(world, x, z, grounds, cap, ceiling, influence);
+}
 
 // The height a road may be built up to under an approach funnel: its cap where the funnel holds the ground down in full
 // (computeTexel's own weight 0.9 and over), unlimited elsewhere - on a funnel's fringe the ground keeps most of its own
@@ -291,7 +318,11 @@ static float airportInfluenceFor(const Airport* data, size_t count, float x, flo
 }
 
 float airportFunnelCeiling(float x, float z) { return airportFunnelCeilingFor(kAirports, std::size(kAirports), x, z); }
-float airportFunnelCeiling(const World& world, float x, float z) { return airportFunnelCeilingFor(world.airports.data(), world.airports.size(), x, z); }
+float airportFunnelCeiling(const World& world, float x, float z) {
+  float ceiling = airportFunnelCeilingFor(world.airports.data(), world.airports.size(), x, z), grounds = 0.f, cap = 1e9f, influence = 0.f;
+  extraRunwayLimits(world, x, z, grounds, cap, ceiling, influence);
+  return ceiling;
+}
 float airportInfluence(float x, float z) { return airportInfluenceFor(kAirports, std::size(kAirports), x, z); }
 int solaceAirportCount() { return (int)std::size(kAirports); }
 const Airport& solaceAirport(int i) { return kAirports[std::clamp(i, 0, (int)std::size(kAirports) - 1)]; }
@@ -299,7 +330,11 @@ float solaceDistanceKm(int a, int b) {
   const Airport &A = solaceAirport(a), &B = solaceAirport(b);
   return sqrtf((A.x - B.x) * (A.x - B.x) + (A.z - B.z) * (A.z - B.z)) / 1000.f;
 }
-float airportInfluence(const World& world, float x, float z) { return airportInfluenceFor(world.airports.data(), world.airports.size(), x, z); }
+float airportInfluence(const World& world, float x, float z) {
+  float influence = airportInfluenceFor(world.airports.data(), world.airports.size(), x, z), grounds = 0.f, cap = 1e9f, ceiling = 1e9f;
+  extraRunwayLimits(world, x, z, grounds, cap, ceiling, influence);
+  return influence;
+}
 float buildableHeight(const World& world, float x, float z) {
   if (!world.earthChart || world.earthChart->cover.empty()) return 2.5f;
   const int i = std::clamp((int)((x + WORLD_HALF) / HM_TEXEL), 0, HM_N - 1), j = std::clamp((int)((z + WORLD_HALF) / HM_TEXEL), 0, HM_N - 1);
@@ -307,14 +342,14 @@ float buildableHeight(const World& world, float x, float z) {
 }
 float airportExclusion(const World& world, float x, float z) {
   if (!world.earthChart) return airportInfluence(world, x, z);
-  float grounds, cap; airportLimits(world.airports.data(), world.airports.size(), x, z, grounds, cap);
+  float grounds, cap; airportGroundsCap(world, x, z, grounds, cap);
   return grounds;
 }
 
 void World::build(const std::string& cachePath, const std::string& stamp, bool save) {
   generationCheckpoint();
   procedural = false; repeating = false; regionId = "solace"; regionRecipe.reset();   // (one place on the Earth: world.h)
-  earthChart.reset(); detailScale = 1.f; noiseCos = 1.f; noiseSin = noiseX = noiseZ = 0.f;
+  earthChart.reset(); extraRunways.clear(); detailScale = 1.f; noiseCos = 1.f; noiseSin = noiseX = noiseZ = 0.f;
   airports.assign(std::begin(kAirports), std::end(kAirports));
   towns.assign(kTowns, kTowns + kNumTowns);
   for (auto& a : airports) a.hospital = !strcmp(a.code, "CAP") || !strcmp(a.code, "NPT") || !strcmp(a.code, "PVI");
@@ -326,7 +361,7 @@ void World::buildProcedural(const procedural::Descriptor& region, const std::str
   generationCheckpoint();
   if (region.authored) { build(cachePath, stamp, save); return; }
   if (earthCharts::isEarthId(region.id)) { buildEarth(region, cachePath, stamp, save); return; }
-  earthChart.reset(); detailScale = 1.f; noiseCos = 1.f; noiseSin = noiseX = noiseZ = 0.f;
+  earthChart.reset(); extraRunways.clear(); detailScale = 1.f; noiseCos = 1.f; noiseSin = noiseX = noiseZ = 0.f;
   regionRecipe = std::make_shared<const procedural::Recipe>(region);
   procedural = true; repeating = false; regionId = region.id;
   airports = regionRecipe->airports; towns = regionRecipe->towns;
@@ -973,12 +1008,17 @@ vec3 World::normal(float x, float z) const {
   return normalize(vec3(-hx, 2 * e, -hz));
 }
 
-int World::onRunway(float x, float z, float margin) const {
+int World::onRunway(float x, float z, float margin, int* surface) const {
   for (size_t i = 0; i < airports.size(); i++) {
     const Airport& a = airports[i];
     float hd = a.heading * DEG, dx = x - a.x, dz = z - a.z;
     float u = dx * sinf(hd) - dz * cosf(hd), v = dx * cosf(hd) + dz * sinf(hd);
-    if (fabsf(u) <= a.length * 0.5f + margin && fabsf(v) <= a.width * 0.5f + margin) return (int)i;
+    if (fabsf(u) <= a.length * 0.5f + margin && fabsf(v) <= a.width * 0.5f + margin) { if (surface) *surface = a.surface; return (int)i; }
+  }
+  for (const ExtraRunway& r : extraRunways) {
+    const float hd = r.heading * DEG, dx = x - r.x, dz = z - r.z;
+    const float u = dx * sinf(hd) - dz * cosf(hd), v = dx * cosf(hd) + dz * sinf(hd);
+    if (fabsf(u) <= r.length * 0.5f + margin && fabsf(v) <= r.width * 0.5f + margin) { if (surface) *surface = r.surface; return r.airport; }
   }
   return -1;
 }

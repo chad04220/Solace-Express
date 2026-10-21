@@ -264,6 +264,24 @@ std::shared_ptr<const earthCharts::ChartAirports> earthCharts::chartAirports(con
     a.hospital = c.size >= 1;
     out->airports.push_back(a);
   }
+  // their other runways: OurAirports' with both ends known, 250 m or more and not on the water, up to five an airport,
+  // each laid on the chart by its ends (the main one over again, its ends the other way about, left out)
+  for (size_t i = 0; i < chosen.size(); i++) {
+    const auto& c = chosen[i];
+    int kept = 0;
+    for (size_t k = 1; k < c.rec.runways.size() && kept < 5; k++) {
+      const earth::Runway& r = c.rec.runways[k];
+      if (!r.endsKnown || r.length < 250.f || r.surface == 7) continue;
+      const vec3 p1 = chart.local({r.lat1, r.lon1, 0}), p2 = chart.local({r.lat2, r.lon2, 0});
+      ExtraRunway x{(int)i, 0.5f * (p1.x + p2.x), 0.5f * (p1.z + p2.z), wrapDeg360(atan2f(p2.x - p1.x, -(p2.z - p1.z)) / DEG),
+                    length(vec3(p2.x - p1.x, 0, p2.z - p1.z)), 0.f, surfaceOf(r.surface, c.size)};
+      if (x.length < 250.f || std::max(std::fabs(x.x), std::fabs(x.z)) > WORLD_HALF - 0.5f * x.length - 500.f) continue;
+      if (hypotf(x.x - c.x, x.z - c.z) < 30.f && std::fabs(std::remainder(x.heading - c.heading, 180.f)) < 3.f) continue;
+      x.width = r.width > 5.f ? std::min(r.width, 75.f) : (c.size == 2 ? 45.f : c.size == 1 ? 30.f : 20.f);
+      out->extras.push_back(x);
+      kept++;
+    }
+  }
   return out;
 
 }
@@ -306,6 +324,7 @@ void World::buildEarth(const procedural::Descriptor& chartDesc, const std::strin
     a.code = data->codes[i].c_str(); a.name = data->names[i].c_str(); a.blurb = data->blurbs[i].c_str();
     airports.push_back(a);
   }
+  extraRunways = picked->extras;
 
   // ---- the towns: GeoNames' places in the square, the most telling first - the bigger and the nearer the chart's
   // centre, where the flight starts (a place's people over 1 + (its distance / 15 km)^2: a city counts from anywhere in
@@ -583,6 +602,25 @@ void World::buildEarthTerrain() {
         const float w = 1.f - smoothstepf(0.f, 550.f, sqrtf(du * du + dv * dv));
         if (w <= 0.f) continue;
         t[0] = lerpf(t[0], a.elev, w);
+        t[1] *= 1.f - w;
+        t[2] = lerpf(t[2], std::max(t[2], 0.5f), w);
+      }
+      // (each airport's other runways the same, on its height: their approaches clear, a strip of level ground along them)
+      for (const ExtraRunway& r : extraRunways) {
+        const float elev = airports[r.airport].elev;
+        const float hd = r.heading * DEG, dx = x - r.x, dz = z - r.z;
+        const float u = fabsf(dx * sinf(hd) - dz * cosf(hd)), v = fabsf(dx * cosf(hd) + dz * sinf(hd));
+        const float d = u - r.length * 0.5f;
+        if (d > 0 && d < 7000) {
+          const float halfw = 250.f + 0.18f * d;
+          const float wc = (1.f - smoothstepf(halfw, halfw + 900.f, v)) * (1.f - smoothstepf(5000.f, 7000.f, d));
+          const float cap = elev + 10.f + 0.05f * d;
+          if (t[0] > cap) { t[0] = lerpf(t[0], cap, wc); t[1] = lerpf(t[1], std::min(t[1], 4.f), wc); }
+        }
+        const float du = std::max(0.f, u - (r.length * 0.5f + 150.f)), dv = std::max(0.f, v - (r.width * 0.5f + 90.f));
+        const float w = 1.f - smoothstepf(0.f, 400.f, sqrtf(du * du + dv * dv));
+        if (w <= 0.f) continue;
+        t[0] = lerpf(t[0], elev, w);
         t[1] *= 1.f - w;
         t[2] = lerpf(t[2], std::max(t[2], 0.5f), w);
       }

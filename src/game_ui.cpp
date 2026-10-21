@@ -3359,6 +3359,15 @@ void Game::drawGps() {
     // click an airport to pick it for the autopilot
     if (in.mPressed[0] && !pointerOverOverlay() && inside(p, 0) && fabsf(in.mx - p.x) < 16 * s && fabsf(in.my - p.y) < 16 * s && apDest != i) { apDest = i; g_audio.trigger(SFX_CLICK); }
   }
+  // the real Earth's airports' other runways, to scale beside their main ones
+  for (const ExtraRunway& r : g_world.extraRunways) {
+    const vec2 p = toS(r.x, r.z); if (!inside(p, -40 * s)) continue;
+    const float h = r.heading * DEG, hl = std::max(r.length * 0.5f * k, 4 * s);
+    const vec2 d(sinf(h), -cosf(h));
+    const vec3 c = &g_world.airports[r.airport] == &dest() ? MAG : r.airport == nearest ? C_WARN : vec3(0.9f, 0.95f, 1.f);
+    seg(vec2(p.x - d.x * hl, p.y - d.y * hl), vec2(p.x + d.x * hl, p.y + d.y * hl), 4 * s, vec3(0.05f, 0.05f, 0.07f), 0.9f);
+    seg(vec2(p.x - d.x * hl, p.y - d.y * hl), vec2(p.x + d.x * hl, p.y + d.y * hl), 2 * s, c, 1.f);
+  }
   // the real Earth: its airports beyond this chart (the next charts' own, there once flown into), dimmer, the larger
   // named, every one once the map is close in
   for (const BeyondAirport& b : beyondAirports()) {

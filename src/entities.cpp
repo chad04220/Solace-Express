@@ -414,6 +414,7 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
         if (c.x + ext < C.x0 || c.x - ext > C.x1 || c.z + ext < C.z0 || c.z - ext > C.z1) continue;
         auto put = [&](vec3 p, int col) {
           if (!C.inside(p.x, p.z)) return;
+          if (!W.extraRunways.empty() && W.onRunway(p.x, p.z) >= 0) return;   // (where another runway crosses: its lights are flush, none stands)
           float y = std::max(W.height(p.x, p.z), a.elev - 0.5f);
           C.out[EK_RWYLIGHT]->push_back({p.x, y, p.z, 0.f, 1.f, 1.f, 1.f, (float)col + 0.5f});
         };
@@ -438,6 +439,24 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
             for (int k = 1; k <= 6; k++)
               for (float v = -8.f; v <= 8.f; v += 4.f) put(c + dir * (end * (a.length * 0.5f + 60.f * k)) + rt * v, 0);
         }
+      }
+    // (the real Earth's airports' other runways: their edge lights and threshold bars, on their airport's height)
+    if (L == 1)
+      for (const ExtraRunway& r : W.extraRunways) {
+        const Airport& a = W.airports[r.airport];
+        const float h = r.heading * DEG;
+        const vec3 c(r.x, a.elev, r.z), dir(sinf(h), 0, -cosf(h)), rt(-dir.z, 0, dir.x);
+        const float ext = r.length * 0.5f + 20.f;
+        if (c.x + ext < C.x0 || c.x - ext > C.x1 || c.z + ext < C.z0 || c.z - ext > C.z1) continue;
+        auto put = [&](vec3 p, int col) {
+          if (!C.inside(p.x, p.z) || W.onRunway(p.x, p.z) >= 0) return;   // (none standing on a runway it crosses)
+          C.out[EK_RWYLIGHT]->push_back({p.x, std::max(W.height(p.x, p.z), a.elev - 0.5f), p.z, 0.f, 1.f, 1.f, 1.f, (float)col + 0.5f});
+        };
+        for (float u = -r.length * 0.5f; u <= r.length * 0.5f + 0.1f; u += 60.f)
+          for (int sd = -1; sd <= 1; sd += 2)
+            put(c + dir * u + rt * (sd * (r.width * 0.5f + 1.5f)), fabsf(u) > r.length * 0.5f - 600.f && a.size > 0 ? 1 : 0);
+        for (int end = -1; end <= 1; end += 2)
+          for (float v = -r.width * 0.5f; v <= r.width * 0.5f + 0.01f; v += 3.f) put(c + dir * (end * (r.length * 0.5f + 1.f)) + rt * v, end < 0 ? 2 : 3);
       }
     // ---------------------------------------------------------------- airport buildings, aircraft, vehicles (L1)
     if (L == 1) {
