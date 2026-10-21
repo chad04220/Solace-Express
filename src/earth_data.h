@@ -87,6 +87,13 @@ struct PlaceRecord {
   uint32_t population = 0, id = 0;   // id: GeoNames'
   int kind = 0;                      // 0 place, 1 seat of a minor division, 2 of a first-order one, 3 capital
 };
+struct LandmarkRecord {   // (landmarks.bin, Wikidata's)
+  enum Kind { LIGHTHOUSE = 1 };
+  std::string name;
+  double lat = 0, lon = 0;
+  int kind = 0;
+  float height = 0;   // m (0: unknown)
+};
 struct RoadEdge {
   uint64_t id = 0;
   int cls = 0;        // GRIP: 1 highway, 2 primary, 3 secondary, 4 tertiary, 5 local, 0 unspecified
@@ -131,6 +138,7 @@ public:
   // The tables, by box
   std::vector<AirportRecord> airports(const Box& box) const;
   std::vector<PlaceRecord> places(const Box& box) const;
+  std::vector<LandmarkRecord> landmarks(const Box& box) const;   // (none in a pack without landmarks.bin)
   std::vector<RoadEdge> roads(const Box& box, bool local) const;   // each edge once, those whose bounds reach the box
   size_t airportCount() const;
   size_t placeCount() const;

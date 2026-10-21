@@ -42,9 +42,13 @@
    "bytes": 236114,
    "sha256": "c43a6418845deac1d14ce672fc37d53a02c4857c81d1868c2813d797c5330be8"
   },
+  "landmarks.bin": {
+   "bytes": 520993,
+   "sha256": "beeb1d9155a3a391a484ef675d6a64b8c2e443bd37f3908f03e386669f8bb6c4"
+  },
   "licenses/ATTRIBUTION.txt": {
-   "bytes": 1891,
-   "sha256": "7a738a7d4c32f13bae1496d134a877e3d3664a08a45a2ef6db96b375b45595c2"
+   "bytes": 2097,
+   "sha256": "917fd44f1b8a59443e4fc5aa3d1e90f3fdb71a26e83df06d8979eda835f311d1"
   },
   "lroads/N40W080.svb": {
    "bytes": 38163,
@@ -130,6 +134,13 @@
   {
    "licence": "Copernicus DEM licence",
    "name": "Copernicus DEM GLO-90 N41W071 (cropped 41.20-41.68 N) and N41W070"
+  },
+  {
+   "bytes": 27430,
+   "file": "lh_fix.csv",
+   "licence": "CC0-1.0",
+   "name": "Wikidata lighthouses (query.wikidata.org)",
+   "sha256": "f2143467f06e2cc6df514cad2747aeb96a31dae1543a0d0003054a15ecb963f4"
   }
  ],
  "tool": 1,

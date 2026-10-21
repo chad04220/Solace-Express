@@ -47,10 +47,11 @@ def main(argv=None):
     for name in ("out", "etopo", "cover", "airports", "runways", "places", "glo90-dir"):
         ap.add_argument("--" + name, required=True)
     ap.add_argument("--grip", action="append", required=True)
+    ap.add_argument("--landmarks", help="the box's lighthouses (python3 -m tools.earth2.landmarks OUT --box 41 -72 42 -69)")
     a = ap.parse_args(argv)
     out = a.out
     args = argparse.Namespace(out=out, box=list(BOX), etopo=a.etopo, cover=a.cover, airports=a.airports,
-                              runways=a.runways, places=a.places, grip=a.grip, local_roads=True, glo90_listing=None,
+                              runways=a.runways, places=a.places, landmarks=a.landmarks, grip=a.grip, local_roads=True, glo90_listing=None,
                               glo90_dir=None, quiet=False, local_roads_box=(41.2, -70.85, 41.5, -70.45))
     builder.build(args)
     # GLO-90: two tiles, one cropped, and the bitmap listing a third that isn't there
@@ -103,6 +104,11 @@ def write_expect(root):
     lines.append("places %d" % len(recs))
     for r in recs[:40]:
         lines.append("place %s %d %.7f %.7f" % (tables.string_at(strings, r[3]).replace(" ", "_"), r[2], r[0] * 1e-7, r[1] * 1e-7))
+    if os.path.exists(os.path.join(root, "landmarks.bin")):
+        m, cells, recs, runs, strings = tables.read_table(os.path.join(root, "landmarks.bin"))
+        lines.append("landmarks %d" % len(recs))
+        for r in recs:
+            lines.append("landmark %s %.7f %.7f %d %d" % ((tables.string_at(strings, r[4]) or "-").replace(" ", "_"), r[0] * 1e-7, r[1] * 1e-7, r[2], r[3]))
     for layer, name in ((svb.LAYER_ROADS, "roads"), (svb.LAYER_LOCAL_ROADS, "lroads")):
         ids = {}
         for lat in range(BOX[0], BOX[2]):

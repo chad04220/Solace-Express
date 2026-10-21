@@ -2,7 +2,8 @@
 
   python3 -m tools.earth2 build --out PACK --box SOUTH WEST NORTH EAST \\
       --etopo ETOPO_30s(.bin with .hdr, or GeoTIFF) --cover CGLS_LC100(.tif or URL) \\
-      --airports airports.csv --runways runways.csv --places cities500.zip --grip GRIP4_RegionN_vector_shp.zip ... \\
+      --airports airports.csv --runways runways.csv --places cities500.zip [--landmarks lighthouses.csv] \\
+      --grip GRIP4_RegionN_vector_shp.zip ... \\
       [--glo90-listing listing.txt] [--glo90-dir DIR] [--local-roads] [--only rasters,tables,roads,glo90] [--part NAME]
   python3 -m tools.earth2 split-grip --out DIR GRIP4_RegionN_vector_shp.zip ...
   python3 -m tools.earth2 index PACK
@@ -30,7 +31,7 @@ import sys
 import time
 import zipfile
 
-from . import TOOL_VERSION, glo90, roads, svb, tables
+from . import TOOL_VERSION, glo90, landmarks, roads, svb, tables
 
 ATTRIBUTION = """Somnium Volandi Earth pack: sources and licences
 
@@ -50,6 +51,9 @@ Airports: OurAirports (https://ourairports.com/data/), public domain. Changes: o
 with a runway of 300 m or more; feet to metres.
 
 Places: GeoNames (https://www.geonames.org/), cities500, CC BY 4.0. Changes: populated places, binary table.
+
+Landmarks: Wikidata (https://www.wikidata.org/), CC0 1.0. Changes: the lighthouses with a coordinate, not demolished,
+their height in metres where known; those within 60 m of another merged; binary table.
 
 Roads: GRIP4 (Version 4, 2018), J. R. Meijer, M. A. J. Huijbregts, C. G. J. Schotten and A. M. Schipper, Global
 patterns of current and future road infrastructure, Environmental Research Letters 13, 064006 (2018),
@@ -163,6 +167,12 @@ def _tables(args, box, out, files, sources, log):
         files["places.bin"] = size
         sources.append(source_record("GeoNames cities500", args.places, "CC-BY-4.0"))
         log("places %d" % n)
+    if getattr(args, "landmarks", None):
+        marks = landmarks.read(args.landmarks, None if box == (-90, -180, 90, 180) else box)
+        size, n = tables.write_landmarks(os.path.join(out, "landmarks.bin"), marks)
+        files["landmarks.bin"] = size
+        sources.append(source_record("Wikidata lighthouses (query.wikidata.org)", args.landmarks, "CC0-1.0"))
+        log("landmarks %d" % n)
 
 
 BLOCK_MARGIN = 0.5   # (degrees: the lines a block's roads are noded from, past its edges)
@@ -338,7 +348,7 @@ def verify(root):
                             roads.decode_tile(raw)
                     else:
                         b.samples(lat, lon)
-            elif rel in ("airports.bin", "places.bin"):
+            elif rel in ("airports.bin", "places.bin", "landmarks.bin"):
                 tables.read_table(p)
         except ValueError as e:
             problems.append(str(e))
@@ -409,6 +419,7 @@ def main(argv=None):
     b.add_argument("--airports")
     b.add_argument("--runways")
     b.add_argument("--places")
+    b.add_argument("--landmarks", help="Wikidata's lighthouses, as tools.earth2.landmarks fetches them (CSV)")
     b.add_argument("--grip", action="append")
     b.add_argument("--grip-blocks", help="GRIP filed by block (split-grip): a part's roads from its blocks' files")
     b.add_argument("--local-roads", action="store_true")

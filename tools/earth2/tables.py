@@ -21,6 +21,13 @@ places.bin:
     (0 place, 1 seat of a second-order division or lower, 2 seat of a first-order division, 3 capital), u8 reserved,
     char country[2]
   strings as above
+
+landmarks.bin (Wikidata, src/earth_data.cpp Pack::landmarks):
+  header, 32 bytes: magic "SVL2", u32 version (1), u32 landmarks, u32 string bytes, 16 bytes reserved
+  cell index as above
+  landmarks, 16 bytes each: i32 lat, i32 lon (1e-7 degree), u8 kind (1 lighthouse), u8 reserved, u16 height (0.1 m,
+    0 unknown), u32 name
+  strings as above
 """
 import csv
 import io
@@ -34,10 +41,13 @@ AIRPORT = struct.Struct("<iihBBIIIIIIII4x")
 RUNWAY = struct.Struct("<iiiiHHBBhhH4s4sHH")
 PLACE_HEADER = struct.Struct("<4sIII16x")
 PLACE = struct.Struct("<iiIIIBx2s")
+LANDMARK_HEADER = struct.Struct("<4sIII16x")
+LANDMARK = struct.Struct("<iiBxHI")
 CELLS = 360 * 180
 CELL = struct.Struct("<II")
 UNKNOWN_E7 = 0x7FFFFFFF
 assert AIRPORT_HEADER.size == 32 and AIRPORT.size == 48 and RUNWAY.size == 40 and PLACE_HEADER.size == 32 and PLACE.size == 24
+assert LANDMARK_HEADER.size == 32 and LANDMARK.size == 16
 
 AIRPORT_TYPES = {"small_airport": 0, "medium_airport": 1, "large_airport": 2}
 MIN_RUNWAY_M = 300
@@ -233,8 +243,33 @@ def write_places(path, places):
     return os.path.getsize(path), len(recs)
 
 
+def write_landmarks(path, landmarks):
+    """landmarks: [{"id", "name", "lat", "lon", "kind", "height" (m or None)}], by cell, then by id."""
+    strings = Strings()
+    landmarks = sorted(landmarks, key=lambda m: (cell_of(m["lat"], m["lon"]), m["id"]))
+    cells = [[0, 0] for _ in range(CELLS)]
+    recs = []
+    for i, m in enumerate(landmarks):
+        c = cell_of(m["lat"], m["lon"])
+        if cells[c][1] == 0:
+            cells[c][0] = i
+        cells[c][1] += 1
+        h = m.get("height")
+        recs.append(LANDMARK.pack(e7(m["lat"]), e7(m["lon"]), m["kind"], min(int(round(h * 10)), 0xFFFF) if h and h > 0 else 0,
+                                  strings.add(m["name"])))
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path + ".tmp", "wb") as f:
+        f.write(LANDMARK_HEADER.pack(b"SVL2", 1, len(recs), len(strings.data)))
+        for first, count in cells:
+            f.write(CELL.pack(first, count))
+        f.writelines(recs)
+        f.write(bytes(strings.data))
+    os.replace(path + ".tmp", path)
+    return os.path.getsize(path), len(recs)
+
+
 def read_table(path):
-    """Either table back, checked: (magic, header fields, cells, records, runways or None, strings)."""
+    """Any of the tables back, checked: (magic, header fields, cells, records, runways or None, strings)."""
     with open(path, "rb") as f:
         data = f.read()
     magic = data[:4]
@@ -244,6 +279,9 @@ def read_table(path):
     elif magic == b"SVP2":
         _, version, na, ns = PLACE_HEADER.unpack_from(data, 0)
         nr, rec, extra = 0, PLACE, None
+    elif magic == b"SVL2":
+        _, version, na, ns = LANDMARK_HEADER.unpack_from(data, 0)
+        nr, rec, extra = 0, LANDMARK, None
     else:
         raise ValueError("%s: not a point table" % path)
     if version != 1:

@@ -458,6 +458,12 @@ void World::buildEarth(const procedural::Descriptor& chartDesc, const std::strin
   }
   data->towns.reserve(kept.size());
   for (const auto& p : kept) data->towns.push_back(p.name);
+  // ---- the real landmarks in the square (the pack's: its lighthouses), placed with the others (landmarks.cpp)
+  for (const auto& l : pack->landmarks(box)) {
+    const vec3 at = chart.local({l.lat, l.lon, 0});
+    if (std::max(std::fabs(at.x), std::fabs(at.z)) > WORLD_HALF - 500.f) continue;
+    data->landmarks.push_back({l.name, at.x, at.z, l.height, l.kind});
+  }
   towns.clear();
   for (size_t i = 0; i < kept.size(); i++) towns.push_back(Town{data->towns[i].c_str(), kept[i].x, kept[i].z, kept[i].r, kept[i].kind});
   earthChart = data;

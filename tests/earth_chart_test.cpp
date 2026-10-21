@@ -125,6 +125,43 @@ int main(int argc, char** argv) {
     check(answered == n, fmt("onRunway answers each with its airport and its own surface (%d of %d)", answered, n));
     check(clear == n, fmt("nothing of the scenery on any (%d of %d clear)", clear, n));
   }
+  if (w.earthChart) {   // the real lighthouses (ChartData::landmarks): each standing among the landmarks within 120 m of
+                        // its place (the nearest land) as tall as it is, on its ground (at sea: 2 m down at most), in the
+                        // scenery chunk it stands in, no building of a settlement's lot within its reach
+    int placed = 0, chunked = 0, roomy = 0, seen = 0;
+    Scenery scenery(0, &w);
+    for (const auto& l : w.earthChart->landmarks) {
+      const PlacedEnt* got = nullptr;
+      for (const PlacedEnt& p : landmarks(w))
+        if (p.kind == EK_LIGHTHOUSE && hypotf(p.e.x - l.x, p.e.z - l.z) < 121.f) got = &p;
+      if (!got) { printf("  no lighthouse for %s at %.0f %.0f\n", l.name.c_str(), l.x, l.z); continue; }
+      const float g = w.groundHeight(got->e.x, got->e.z, 8), top = got->e.y + kEntInfo[EK_LIGHTHOUSE].h * got->e.sy;
+      const float want = std::clamp(l.height > 0.f ? l.height : 16.f, 0.45f * 27.f, 1.6f * 27.f);
+      if (got->e.y >= -2.2f && got->e.y <= std::max(g, -2.f) + 0.1f && fabsf(top - std::max(got->e.y, 0.f) - want) < 0.5f) placed++;
+      else printf("  %s at %.1f (ground %.1f), its top %.1f, %.1f m tall\n", l.name.c_str(), got->e.y, g, top, l.height);
+      const Scenery::Chunk* ch = scenery.ensure(Scenery::chunkOf(got->e.x), Scenery::chunkOf(got->e.z), 1);
+      bool in = false, clear = true;
+      for (uint32_t q = ch ? ch->off[EK_LIGHTHOUSE] : 0; ch && q < ch->off[EK_LIGHTHOUSE + 1]; q++) in |= ch->ents[q].x == got->e.x && ch->ents[q].z == got->e.z;
+      for (int k = EK_HOUSE; ch && k <= EK_GASSTATION; k++)
+        for (uint32_t q = ch->off[k]; q < ch->off[k + 1]; q++)
+          if (k != EK_LIGHTHOUSE && hypotf(ch->ents[q].x - got->e.x, ch->ents[q].z - got->e.z) < 6.f * got->e.sx) clear = false;
+      chunked += in; roomy += clear;
+      printf("  lighthouse %-32s %4.1f m  at %7.0f %7.0f (%3.0f m from its place)  foot %5.1f\n", l.name.c_str(), l.height, got->e.x, got->e.z,
+             hypotf(got->e.x - l.x, got->e.z - l.z), got->e.y);
+      seen++;
+    }
+    const int n = (int)w.earthChart->landmarks.size();
+    if (ident == "KMVY") {
+      int named = 0;
+      for (const char* want : {"East Chop Light", "West Chop Light", "Edgartown Harbor Light", "Gay Head Light"})
+        for (const auto& l : w.earthChart->landmarks) named += l.name == want;
+      check(named == 4, fmt("the Vineyard's lights in its chart (%d of 4)", named));
+    }
+    check(seen == n, fmt("each real lighthouse placed (%d of %d)", seen, n));
+    check(placed == seen, fmt("each on its ground and as tall as it is (%d of %d)", placed, seen));
+    check(chunked == seen, fmt("each in its scenery chunk (%d of %d)", chunked, seen));
+    check(roomy == seen, fmt("no settlement's building within any's reach (%d of %d)", roomy, seen));
+  }
   for (const Town& t : w.towns) printf("  town %-28s %d r %4.0f at %7.0f %7.0f ground %.1f\n", t.name, t.kind, t.r, t.x, t.z, w.height(t.x, t.z));
   // every height finite, the sea below 0 and the land above it
   int bad = 0, seaN = 0, landN = 0;

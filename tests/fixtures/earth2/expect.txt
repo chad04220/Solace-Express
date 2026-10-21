@@ -731,6 +731,79 @@ place Valley_Falls 11547 41.9067700 -71.3906100
 place Rehoboth 11486 41.8403800 -71.2494900
 place Warren 11280 41.7303800 -71.2825500
 place North_Smithfield 11212 41.9667700 -71.5495100
+landmarks 72
+landmark Morgan_Point_Light 41.3164000 -71.9894000 1 158
+landmark Block_Island_Southeast_Light 41.1534170 -71.5521390 1 160
+landmark Beavertail_Lighthouse 41.4493000 -71.3993000 1 140
+landmark Block_Island_North_Light 41.2275000 -71.5761110 1 170
+landmark Borden_Flats_Light 41.7044410 -71.1743960 1 150
+landmark Bristol_Ferry_Light 41.6430560 -71.2602780 1 100
+landmark Buzzards_Bay_Entrance_Light 41.3969778 -71.0346861 1 0
+landmark Castle_Hill_Light 41.4619440 -71.3633330 1 100
+landmark Conanicut_Island_Light 41.5733330 -71.3725000 1 130
+landmark Conimicut_Light 41.7169440 -71.3458330 1 0
+landmark Dutch_Island_Light 41.4967420 -71.4042640 1 130
+landmark Fuller_Rock_Light 41.7941000 -71.3797000 1 0
+landmark Hog_Island_Shoal_Light 41.6323060 -71.2732220 1 180
+landmark Latimer_Reef_Light 41.3045070 -71.9333160 1 150
+landmark Montauk_Point_Light 41.0709670 -71.8570910 1 340
+landmark Musselbed_Shoals_Light 41.6363000 -71.2599000 1 60
+landmark Mystic_Seaport_Light 41.3615000 -71.9670000 1 76
+landmark Nayatt_Point_Light 41.7250000 -71.3397220 1 75
+landmark Plum_Beach_Light 41.5300000 -71.4055560 1 160
+landmark Point_Judith_Light 41.3610250 -71.4813960 1 160
+landmark Pomham_Rocks_Light 41.7775170 -71.3695540 1 120
+landmark Poplar_Point_Light 41.5708330 -71.4397220 1 0
+landmark Prudence_Island_Light 41.6058610 -71.3035280 1 85
+landmark Rose_Island_Light 41.4954670 -71.3427170 1 110
+landmark Sakonnet_Light 41.4531190 -71.2024360 1 200
+landmark Stonington_Harbor_Light 41.3286000 -71.9056000 1 110
+landmark Warwick_Light 41.6669440 -71.3786110 1 155
+landmark Wickford_Harbor_Light 41.5734000 -71.4362000 1 45
+landmark Ida_Lewis_Light 41.4777780 -71.3263890 1 0
+landmark Newport_Harbor_Light 41.4933111 -71.3270389 1 110
+landmark Sassafras_Point_Light 41.8004000 -71.3921000 1 0
+landmark Watch_Hill_Light 41.3039000 -71.8584000 1 0
+landmark Whale_Rock_Light 41.4436000 -71.4236000 1 0
+landmark Noank_Light_5 41.3163180 -71.9871960 1 0
+landmark Billingsgate_Island_Light 41.8716667 -70.0689861 1 0
+landmark Bird_Island_Light 41.6693060 -70.7173330 1 95
+landmark Bishop_and_Clerks_Light 41.5742556 -70.2500556 1 91
+landmark Brant_Point_Light 41.2899200 -70.0902850 1 79
+landmark Butler_Flats_Light 41.6037500 -70.8944440 1 0
+landmark Cape_Poge_Light 41.4194420 -70.4523190 1 110
+landmark Clarks_Point_Light 41.5931778 -70.9013500 1 0
+landmark Cleveland_East_Ledge_Light 41.6309640 -70.6941790 1 210
+landmark Cuttyhunk_Light 41.4141667 -70.9497222 1 180
+landmark Dumpling_Rocks_Light 41.5382778 -70.9214167 1 140
+landmark Duxbury_Pier_Light 41.9874250 -70.6485472 1 140
+landmark East_Chop_Light 41.4702640 -70.5674510 1 140
+landmark Edgartown_Harbor_Light 41.3908470 -70.5030220 1 135
+landmark Falmouth_Inner_Light 41.5420000 -70.6082778 1 0
+landmark Gay_Head_Light 41.3484440 -70.8349440 1 155
+landmark Great_Point_Light 41.3901670 -70.0482780 1 210
+landmark Hyannis_Rear_Range_Light 41.6362778 -70.2885000 1 0
+landmark Nantucket_Beacon 41.2733000 -70.0733000 1 0
+landmark Nantucket_Cliff_Range_Lights 41.2939000 -70.1065000 1 0
+landmark Ned_Point_Light 41.6508700 -70.7956490 1 120
+landmark Palmer_Island_Light 41.6269440 -70.9091670 1 70
+landmark Point_Gammon_Light 41.6097222 -70.2661111 1 0
+landmark Sandy_Neck_Light 41.7227778 -70.2811111 1 160
+landmark Tarpaulin_Cove_Light 41.4688170 -70.7574970 1 85
+landmark West_Chop_Light 41.4819440 -70.6038890 1 140
+landmark West_Dennis_Light 41.6517000 -70.1692000 1 0
+landmark Wing's_Neck_Light 41.6822220 -70.6602780 1 100
+landmark Mayo_Beach_Light 41.9307000 -70.0343000 1 90
+landmark Nobska_Light 41.5164000 -70.6575000 1 120
+landmark Nantucket_Range_Rear_Light 41.2893000 -70.0919000 1 140
+landmark Nantucket_Reef_Range_Front_Light 41.2898890 -70.0922200 1 91
+landmark Monomoy_Point_Light 41.5593330 -69.9937220 1 140
+landmark Chatham_Light 41.6713070 -69.9501540 1 145
+landmark Nauset_Light 41.8601390 -69.9529440 1 150
+landmark Sankaty_Head_Light 41.2843830 -69.9662360 1 210
+landmark Stage_Harbor_Light 41.6584069 -69.9844708 1 0
+landmark Three_Sisters_of_Nauset 41.8594000 -69.9569000 1 0
+landmark Stage_Harbor_Light 41.6586111 -69.9836111 1 0
 roads 3761 29639
 edge roads 3184348710594255 1 1 10 419758700 -707108200 420147300 -707263100
 edge roads 4219199998285913 3 1 7 418782600 -714152000 418869000 -714132000

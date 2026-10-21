@@ -11,7 +11,7 @@ import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
-from tools.earth2 import build, roads, svb, tables  # noqa: E402
+from tools.earth2 import build, landmarks, roads, svb, tables  # noqa: E402
 
 FIXTURE = os.path.join(ROOT, "tests", "fixtures", "earth2")
 failures = 0
@@ -109,6 +109,36 @@ def test_tables_roundtrip():
         shutil.rmtree(tmp)
     check(tables.surface_code("ASPH-G") == 1 and tables.surface_code("Turf") == 3 and tables.surface_code("GRVL") == 4 and
           tables.surface_code("WATER") == 7 and tables.surface_code("") == 0, "runway surfaces")
+
+
+def test_landmarks():
+    """Wikidata's lighthouses (tools.earth2.landmarks): an item once (its first coordinate), two within 60 m one (the one
+    with a height kept), a height out of reason dropped, a bare Q-number no name, the box kept to; and landmarks.bin
+    round-trips them."""
+    tmp = tempfile.mkdtemp()
+    try:
+        e = "http://www.wikidata.org/entity/Q"
+        rows = [("item,itemLabel,coord,height",),
+                (e + "10,East Light,Point(-70.5 41.4),14",), (e + "10,East Light,Point(-70.6 41.5),14",),
+                (e + "11,East Light rear,Point(-70.5003 41.4002),",),   # (28 m from Q10)
+                (e + "12,Q12,Point(-70.4 41.3),",), (e + "13,Tall,Point(-70.3 41.2),500",),
+                (e + "14,Far,Point(10.0 50.0),20",), (e + "15,Bad,nowhere,20",)]
+        csv_path = os.path.join(tmp, "lh.csv")
+        open(csv_path, "w").write("\n".join(r[0] for r in rows) + "\n")
+        marks = landmarks.read(csv_path, (40, -71, 42, -70))
+        by = {m["id"]: m for m in marks}
+        check(sorted(by) == [10, 12, 13], "lighthouses merged and boxed: %s" % sorted(by))
+        check(by.get(10, {}).get("lat") == 41.4 and by.get(10, {}).get("height") == 14.0, "an item's first coordinate, its height")
+        check(by.get(12, {}).get("name") == "" and by.get(13, {}).get("height") is None, "no name for a bare Q-number, no 500 m light")
+        p = os.path.join(tmp, "landmarks.bin")
+        tables.write_landmarks(p, marks)
+        magic, cells, recs, runs, strings = tables.read_table(p)
+        check(magic == b"SVL2" and len(recs) == 3, "landmarks round-trip")
+        heights = sorted(r[3] for r in recs)
+        check(heights == [0, 0, 140], "heights in tenths of a metre (0: not known): %s" % heights)
+        check(sorted(tables.string_at(strings, r[4]) for r in recs) == ["", "East Light", "Tall"], "landmark names round-trip")
+    finally:
+        shutil.rmtree(tmp)
 
 
 def test_parts_index():
@@ -267,6 +297,7 @@ if __name__ == "__main__":
     test_bundle_roundtrip()
     test_roads_roundtrip()
     test_tables_roundtrip()
+    test_landmarks()
     test_parts_index()
     test_grip_blocks()
     test_expectations()

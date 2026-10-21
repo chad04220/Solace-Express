@@ -308,7 +308,7 @@ struct Pack::Impl {
   Lru<RasterTile> rasters{192u << 20};
   Lru<std::vector<RoadEdge>> roads{256u << 20};
   Lru<Glo90Tile> glo90{160u << 20};
-  std::vector<uint8_t> airports, places, glo90Bits;
+  std::vector<uint8_t> airports, places, landmarks, glo90Bits;
   std::string glo90Cache;
   ~Impl() { for (auto& b : bundles) if (b.second && b.second->file) fclose(b.second->file); }
 
@@ -540,6 +540,7 @@ std::shared_ptr<Pack> Pack::open(const std::string& dir, std::string* error) {
   };
   if (!table("airports.bin", "SVA2", im.airports)) return fail(dir + ": airports.bin is damaged");
   if (!table("places.bin", "SVP2", im.places)) return fail(dir + ": places.bin is damaged");
+  if (!table("landmarks.bin", "SVL2", im.landmarks)) return fail(dir + ": landmarks.bin is damaged");
   if (!im.airports.empty()) {   // (the sizes the header promises, and every cell inside the table)
     const uint32_t na = u32(im.airports.data() + 8), nr = u32(im.airports.data() + 12), ns = u32(im.airports.data() + 16);
     if (im.airports.size() != 32 + 8ull * kCells + 48ull * na + 40ull * nr + ns) return fail(dir + ": airports.bin is damaged");
@@ -549,6 +550,11 @@ std::shared_ptr<Pack> Pack::open(const std::string& dir, std::string* error) {
     const uint32_t np = u32(im.places.data() + 8), ns = u32(im.places.data() + 12);
     if (im.places.size() != 32 + 8ull * kCells + 24ull * np + ns) return fail(dir + ": places.bin is damaged");
     for (int c = 0; c < kCells; c++) if (u32(im.places.data() + 32 + 8 * c) + (uint64_t)u32(im.places.data() + 36 + 8 * c) > np) return fail(dir + ": places.bin is damaged");
+  }
+  if (!im.landmarks.empty()) {
+    const uint32_t nl = u32(im.landmarks.data() + 8), ns = u32(im.landmarks.data() + 12);
+    if (im.landmarks.size() != 32 + 8ull * kCells + 16ull * nl + ns) return fail(dir + ": landmarks.bin is damaged");
+    for (int c = 0; c < kCells; c++) if (u32(im.landmarks.data() + 32 + 8 * c) + (uint64_t)u32(im.landmarks.data() + 36 + 8 * c) > nl) return fail(dir + ": landmarks.bin is damaged");
   }
   if (im.files.count("glo90.bits")) {
     if (!readFile(joinPath(dir, "glo90.bits"), im.glo90Bits) || im.glo90Bits.size() != kCells / 8) return fail(dir + ": glo90.bits is damaged");
@@ -747,6 +753,26 @@ std::vector<PlaceRecord> Pack::places(const Box& box) const {
       p.population = u32(r + 8); p.name = str(t, strAt, u32(r + 12)); p.id = u32(r + 16); p.kind = r[20];
       p.country = std::string((const char*)r + 22, strnlen((const char*)r + 22, 2));
       out.push_back(std::move(p));
+    }
+  });
+  return out;
+}
+
+std::vector<LandmarkRecord> Pack::landmarks(const Box& box) const {
+  std::vector<LandmarkRecord> out;
+  const auto& t = impl_->landmarks;
+  if (t.empty()) return out;
+  const uint32_t nl = u32(t.data() + 8);
+  const size_t recAt = 32 + 8ull * kCells, strAt = recAt + 16ull * nl;
+  forCells(box, [&](int, int, int cell) {
+    const uint32_t first = u32(&t[32 + 8 * cell]), count = u32(&t[36 + 8 * cell]);
+    for (uint32_t i = first; i < first + count; i++) {
+      const uint8_t* r = &t[recAt + 16ull * i];
+      LandmarkRecord m;
+      m.lat = i32(r) * 1e-7; m.lon = i32(r + 4) * 1e-7;
+      if (!box.contains(m.lat, m.lon)) continue;
+      m.kind = r[8]; m.height = u16(r + 10) * 0.1f; m.name = str(t, strAt, u32(r + 12));
+      out.push_back(std::move(m));
     }
   });
   return out;

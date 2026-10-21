@@ -1,6 +1,7 @@
 // The real Earth's data reader (src/earth_data.cpp) against the test fixture (tests/fixtures/earth2: real data over
 // Martha's Vineyard and Nantucket) and what the Python reference read from it (expect.txt, tools/earth2/fixture.py):
-// inflate, the bundles, the GLO-90 tiles, the sampling, the airport, place and road tables - and the reader's refusals.
+// inflate, the bundles, the GLO-90 tiles, the sampling, the airport, place, landmark and road tables - and the reader's
+// refusals.
 #include "../src/earth_data.h"
 #include <cinttypes>
 #include <filesystem>
@@ -71,7 +72,8 @@ int main(int argc, char** argv) {
   std::ifstream ex(dir + "/expect.txt");
   check(ex.good(), "expect.txt exists");
   std::string line;
-  int elev = 0, coarse = 0, cover = 0, glo = 0, airports = 0, places = 0, edges = 0;
+  int elev = 0, coarse = 0, cover = 0, glo = 0, airports = 0, places = 0, edges = 0, landmarks = 0;
+  const std::vector<earth::LandmarkRecord> lms = pack->landmarks(earth::Box{41, -72, 42, -69});
   double worst = 0;
   std::vector<earth::AirportRecord> aps = pack->airports(earth::Box{41, -72, 42, -69});
   std::unordered_map<std::string, const earth::AirportRecord*> byIdent;
@@ -126,6 +128,17 @@ int main(int argc, char** argv) {
       for (const auto& p : pls) found |= p.name == name && p.population == pop && std::abs(p.lat - lat) < 1e-6 && std::abs(p.lon - lon) < 1e-6;
       check(found, "place " + name);
       places++;
+    } else if (kind == "landmarks") {
+      size_t n; s >> n;
+      check(lms.size() == n, fmt("landmarks: %zu, the reference %zu", lms.size(), n));
+    } else if (kind == "landmark") {
+      std::string name; double lat, lon; int k, dm; s >> name >> lat >> lon >> k >> dm;
+      for (auto& ch : name) if (ch == '_') ch = ' ';
+      if (name == "-") name.clear();
+      bool found = false;
+      for (const auto& m : lms) found |= m.name == name && m.kind == k && std::abs(m.height - dm * .1f) < 1e-3f && std::abs(m.lat - lat) < 1e-6 && std::abs(m.lon - lon) < 1e-6;
+      check(found, "landmark " + name);
+      landmarks++;
     } else if (kind == "roads" || kind == "lroads") {
       size_t n, pts; s >> n >> pts;
       const int k = kind == "lroads";
@@ -146,7 +159,7 @@ int main(int argc, char** argv) {
       edges++;
     }
   }
-  check(elev > 200 && coarse > 200 && cover > 200 && glo >= 6 && airports > 3 && places > 10 && edges > 20, "expect.txt read through");
+  check(elev > 200 && coarse > 200 && cover > 200 && glo >= 6 && airports > 3 && places > 10 && edges > 20 && landmarks > 20, "expect.txt read through");
   // the sampler's sense: Martha's Vineyard airport stands at about 20 m on GLO-90, the sea off Nantucket is below 0
   check(std::abs(sampler.elevation(41.393, -70.614) - 20.f) < 12.f, fmt("KMVY's ground %.1f m", sampler.elevation(41.393, -70.614)));
   check(sampler.cover(41.2, -70.3) == earth::COVER_SEA, "open sea south of the islands");

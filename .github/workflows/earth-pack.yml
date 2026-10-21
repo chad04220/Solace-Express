@@ -87,7 +87,7 @@ jobs:
           path: sources
           key: ${{ steps.key.outputs.key }}
 
-  tables:   # the airports, the places and the GLO-90 bitmap: global, one part
+  tables:   # the airports, the places, the lighthouses and the GLO-90 bitmap: global, one part
     needs: sources
     runs-on: ubuntu-latest
     steps:
@@ -97,11 +97,15 @@ jobs:
           path: sources
           key: ${{ needs.sources.outputs.key }}
           fail-on-cache-miss: true
+      - name: Lighthouses   # (Wikidata's, fresh each run; the query service down: the pack built without them)
+        run: |
+          if python3 -m tools.earth2.landmarks lighthouses.csv; then echo "LANDMARKS=--landmarks lighthouses.csv" >> "$GITHUB_ENV"
+          else echo "::warning::Wikidata's query service did not answer: this pack has no lighthouses"; fi
       - name: Build
         run: |
           python3 -m tools.earth2 build --out part --box -90 -180 90 180 --part tables --only tables,glo90 \
             --airports sources/airports.csv --runways sources/runways.csv --places sources/cities500.zip \
-            --glo90-listing sources/glo90_listing.txt
+            --glo90-listing sources/glo90_listing.txt $LANDMARKS
       - uses: actions/upload-artifact@v4
         with:
           name: earth-part-tables
@@ -178,7 +182,7 @@ jobs:
           gh release view "$tag" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1 ||
             gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --latest=false \
               --title "The real Earth (data pack)" \
-              --notes "The real Earth's data pack. The game installs its first zip, the core (the index, the airports, the places), from its Free Flight screen and streams the land from the others as it is flown; or downloads them all, to fly with no connection. Built by the Earth pack workflow from ETOPO 2022, Copernicus GLO-90 (fetched as flown), CGLS-LC100, GRIP4, OurAirports and GeoNames; their licences are in the pack's licenses folder."
+              --notes "The real Earth's data pack. The game installs its first zip, the core (the index, the airports, the places, the lighthouses), from its Free Flight screen and streams the land from the others as it is flown; or downloads them all, to fly with no connection. Built by the Earth pack workflow from ETOPO 2022, Copernicus GLO-90 (fetched as flown), CGLS-LC100, GRIP4, OurAirports, GeoNames and Wikidata; their licences are in the pack's licenses folder."
           # (the zips are named for the pack they hold: the last pack's are kept - a streamed copy of it reads from
           # them until it is got again - and any before that removed)
           gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern SHA256SUMS --output prev.sums 2>/dev/null || : > prev.sums

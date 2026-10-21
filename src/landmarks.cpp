@@ -2,6 +2,7 @@
 // once the world is built or loaded (after its road furniture), and handed to the scenery chunks as they are generated
 // (entities.cpp). Each search is deterministic and runs on the base height map (World::sampleBase), so it is quick.
 #include "scenery.h"
+#include "earth_charts.h"
 #include "entities.h"
 #include "settlements.h"
 #include "world.h"
@@ -248,6 +249,54 @@ void lighthouseKey(const World& world, WorldSceneryState& state, std::vector<Pla
   const vec2 c = shore + dir * 19.5f;   // (its deck's landward 6 m over the shore)
   const float lift = std::max(0.f, world.groundHeight(shore.x, shore.y, 8) - 1.3f);
   out.push_back({EK_JETTY, {c.x, lift, c.y, atan2f(dir.x, dir.y), 1.f, 1.f, 1.f, 0.5f}});
+}
+
+// The real Earth's lighthouses (World::earthChart's landmarks: Wikidata's), each where it stands - or, where the ground
+// has it in the sea (a light at a breakwater's end, the shore drawn a little out), on the nearest land within 120 m;
+// with none there, out on its own rock, its foot at the sea floor (2 m down at most) - as tall as it is (16 m when not
+// known: the tower scaled from its 27 m, 0.45 to 1.6 of it, its height above the water its own), its front to the open
+// water. The settlements' lots under it are given up, and its ground cleared 25 m round
+void realLighthouses(const World& world, WorldSceneryState& state, std::vector<PlacedEnt>& out) {
+  if (!world.earthChart) return;
+  auto g = [&](vec2 p) { return world.groundHeight(p.x, p.y, 8); };
+  std::vector<int> ids;
+  for (const earthCharts::ChartLandmark& l : world.earthChart->landmarks) {
+    generationCheckpoint();
+    if (l.kind != earth::LandmarkRecord::LIGHTHOUSE) continue;
+    vec2 at(l.x, l.z);
+    if (g(at) < 0.5f) {
+      bool found = false;
+      for (float r = 10.f; r <= 120.f && !found; r += 10.f) {
+        float lowest = 1e9f;   // (on the ring: the lowest land, nearest the water)
+        for (int a = 0; a < 24; a++) {
+          const vec2 p = at + vec2(cosf(a * 0.2618f), sinf(a * 0.2618f)) * r;
+          const float h = g(p);
+          if (h >= 0.8f && h < lowest) { lowest = h; at = p; found = true; }
+        }
+      }
+      if (!found) at = vec2(l.x, l.z);
+    }
+    const float s = std::clamp((l.height > 0.f ? l.height : 16.f) / 27.f, 0.45f, 1.6f), R = 6.f * s;
+    vec2 sea(0.f, 1.f); float low = 1e9f;
+    for (int a = 0; a < 16; a++) {
+      const vec2 u(sinf(a * 0.3927f), cosf(a * 0.3927f));
+      const float h = g(at + u * 80.f);
+      if (h < low) { low = h; sea = u; }
+    }
+    float foot = g(at);
+    for (int k = 0; k < 8; k++) foot = std::min(foot, g(at + vec2(cosf(k * 0.7854f), sinf(k * 0.7854f)) * (3.4f * s)));
+    const float y = foot >= 0.f ? foot - 0.05f : std::max(foot, -2.f) - 0.05f;
+    const float sy = s + std::max(-y, 0.f) / 27.f;
+    out.push_back({EK_LIGHTHOUSE, {at.x, y, at.y, atan2f(sea.x, sea.y), s, sy, s, hash2i((int)at.x, (int)at.y)}});
+    state.clearings.push_back(vec3(at.x, at.y, 25.f));
+    lotsIn(world, at.x - 60.f, at.y - 60.f, at.x + 60.f, at.y + 60.f, ids);
+    for (int id : ids) {   // (a lot whose footprint comes within the light's reach and its keeper's house)
+      Lot& lot = state.lots[id];
+      const float c = cosf(lot.yaw), sn = sinf(lot.yaw), dx = at.x - lot.cx, dz = at.y - lot.cz;
+      const float qx = std::max(fabsf(c * dx - sn * dz) - lot.hw, 0.f), qz = std::max(fabsf(sn * dx + c * dz) - lot.hd, 0.f);
+      if (qx * qx + qz * qz < (R + 2.f) * (R + 2.f)) lot.present = false;
+    }
+  }
 }
 
 // The racetrack (its circuit, its pit lane and its road in are the network's: addRacetrack, settlements.h). Along the
@@ -582,6 +631,7 @@ void sceneryBakeLandmarks(World& world) {
   observatory(world, state, out);
   starFort(world, state, out);
   lighthouseKey(world, state, out);
+  realLighthouses(world, state, out);
   racetrack(world, state, out);
   fjordhavenDam(world, state, out);
   ferries(world, state);

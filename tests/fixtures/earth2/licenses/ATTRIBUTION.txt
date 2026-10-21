@@ -17,6 +17,9 @@ with a runway of 300 m or more; feet to metres.
 
 Places: GeoNames (https://www.geonames.org/), cities500, CC BY 4.0. Changes: populated places, binary table.
 
+Landmarks: Wikidata (https://www.wikidata.org/), CC0 1.0. Changes: the lighthouses with a coordinate, not demolished,
+their height in metres where known; those within 60 m of another merged; binary table.
+
 Roads: GRIP4 (Version 4, 2018), J. R. Meijer, M. A. J. Huijbregts, C. G. J. Schotten and A. M. Schipper, Global
 patterns of current and future road infrastructure, Environmental Research Letters 13, 064006 (2018),
 https://doi.org/10.1088/1748-9326/aabd42, dataset https://doi.org/10.5281/zenodo.6420961, used under CC BY 4.0

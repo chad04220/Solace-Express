@@ -519,6 +519,7 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
       const std::vector<Lot>& lots = settlementLots();
       for (int id : ids) {
         const Lot& lot = lots[id];
+        if (!lot.present) continue;   // (given up to a landmark: a real lighthouse, landmarks.cpp)
         const float c = cosf(lot.yaw), s = sinf(lot.yaw);
         auto at = [&](float lx, float lz, float& x, float& z) { x = lot.cx + c * lx + s * lz; z = lot.cz - s * lx + c * lz; };
         const int si = (int)floorf(lot.cx), sj = (int)floorf(lot.cz);

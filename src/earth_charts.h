@@ -43,7 +43,9 @@ std::optional<procedural::Descriptor> chartForAirport(const std::string& ident);
 std::vector<earth::AirportRecord> searchAirports(const std::string& query, size_t limit = 20);
 
 // What a real-Earth chart's World owns besides its arrays: the pack, the airports' and towns' names (the Airport and
-// Town records point into them), the real records behind its airports, and the land cover per heightfield texel
+// Town records point into them), the real records behind its airports, the land cover per heightfield texel, and the
+// real landmarks in its square (the pack's: Wikidata's lighthouses), in its x and z
+struct ChartLandmark { std::string name; float x = 0, z = 0, height = 0; int kind = 0; };   // (height 0: not known)
 struct ChartData {
   procedural::Descriptor descriptor;
   std::shared_ptr<const earth::Pack> pack;
@@ -51,6 +53,7 @@ struct ChartData {
   std::vector<earth::AirportRecord> airports;   // World::airports' records, by index
   std::vector<uint8_t> cover;                   // per HM_N^2 texel (World::buildEarth: the mask's farmland and forest)
   int fineTiles = 0;                            // GLO-90 tiles it was built with
+  std::vector<ChartLandmark> landmarks;         // (placed with the other landmarks: landmarks.cpp)
 };
 // The airports a chart has, as World::buildEarth lays them: OurAirports' in its square, each on its main runway, the
 // biggest first, none on another's grounds - or, with none there, the nearest beyond it. Without the rest of the chart:

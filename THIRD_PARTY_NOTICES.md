@@ -74,6 +74,10 @@ inputs in `manifest.json`.
 - **Places:** GeoNames, https://www.geonames.org/, `cities500`.
   - CC BY 4.0: https://creativecommons.org/licenses/by/4.0/.
   - Changes: populated places only, as a binary table.
+- **Landmarks:** Wikidata, https://www.wikidata.org/, read through its query service.
+  - CC0 1.0: https://creativecommons.org/publicdomain/zero/1.0/.
+  - Changes: the lighthouses with a coordinate and not demolished, their height where given (2-200 m), two within
+    60 m taken as one; as a binary table.
 - **Roads:** GRIP4 (Version 4, 2018). Attribution:
   - J. R. Meijer, M. A. J. Huijbregts, C. G. J. Schotten and A. M. Schipper, *Global patterns of current and future
     road infrastructure*, Environmental Research Letters 13, 064006 (2018), https://doi.org/10.1088/1748-9326/aabd42.

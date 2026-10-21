@@ -201,7 +201,7 @@ The usual `buildConfigured` pipeline, with Earth inputs:
    - bridges;
    - road furniture.
 
-   No invented landmarks.
+   No invented landmarks: only the real ones the pack has (E8, its lighthouses).
 
 The cache key is the chart id, the pack's content hash, the GLO-90 tiles used and the build stamp. Budget: a chart builds
 in under 10 s on two background threads (a generated region takes about 6 s today).
@@ -668,7 +668,32 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
     or an exit. Solace Capital as a hub: a 650 m terminal in three buildings, 11 airliners at its gates.
   - Seen at Boston (the dev pack): the long terminal along its apron, cut where its crossing runways pass.
 
-  Still open in E8: rivers (GRIP has none; a rivers dataset), and real landmarks.
+- **E8, sixth pass: real landmarks, the lighthouses first** (`landmarks.bin`, `earthCharts::ChartData::landmarks`).
+  Before, a real-Earth chart had no landmark of its own: none is invented there (above).
+  - The pack carries Wikidata's lighthouses (CC0). `tools.earth2.landmarks` asks its query service for every
+    instance of lighthouse (Q39715) or of a subclass, with a coordinate and not demolished, with its height where
+    Wikidata has one. Two items within 60 m are one (a duplicate, a range's front and rear lights). The world has
+    about 9,200; the fixture's box 72. The tables job fetches them fresh each run; if the service does not answer,
+    the pack is built without them, with a warning.
+  - `landmarks.bin` (`SVL2`, `tables.write_landmarks`) is a point table like the places: by 1-degree cell, each light
+    its place, its kind, its height in tenths of a metre (0: not known) and its name. It rides in the core zip.
+    `Pack::landmarks(box)` reads it.
+  - A chart takes the lights in its square (`World::buildEarth`), and the landmarks pass places them
+    (`realLighthouses`, `landmarks.cpp`). Each stands where it is, its front to the open water. Where the ground has it
+    in the sea (a light at a breakwater's end, the shore drawn a little out) it goes to the nearest land within
+    120 m; with none there it stands out on its own rock, its foot 2 m down at most, as Edgartown's and the caisson
+    lights do.
+  - Each is as tall as it is: the tower scaled from its 27 m, 0.45 to 1.6 of it, 16 m when not known, its height
+    above the water its own. A settlement's lots under it are given up (`Lot::present`), and the trees cleared 25 m
+    round.
+  - `earth_chart_test` checks the Vineyard's chart: East and West Chop, Edgartown Harbor and Gay Head among its 23
+    lights; each placed within 120 m of its place, on its ground and as tall as it is, in its scenery chunk, and no
+    building of a settlement within its reach. Seen there: Gay Head on its cliff top, Edgartown's out at the harbour
+    mouth.
+  - Not yet: the lights as photo-flight sites (a chart's sites are its own, and the charts overlap as they slide:
+    a light needs one id in all of them), their beams at night, and other kinds of landmark.
+
+  Still open in E8: rivers (GRIP has none; a rivers dataset), and more kinds of real landmark.
 
 Decisions taken with the defaults (the owner can change them):
 - The generated regions keep working until E6. In real-Earth play the real world replaces them; they stay available

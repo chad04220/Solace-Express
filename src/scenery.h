@@ -48,8 +48,8 @@ const std::vector<RoadFurniture>& roadFurniture(const World& world);
 std::pair<const RoadFurniture*, const RoadFurniture*> roadFurnitureIn(const World& world, int cx, int cz);
 std::pair<const RoadFurniture*, const RoadFurniture*> roadFurnitureIn(int cx, int cz);   // (the items centred in that chunk)
 // The landmarks (landmarks.cpp; Phase C), each where the world has room for it: a wind farm along a ridge, a stone
-// circle on a bare summit, a wreck on a reef, an offshore platform. Their clearings (x, z, radius) are kept clear of
-// trees, bushes and boulders
+// circle on a bare summit, a wreck on a reef, an offshore platform; on the real Earth, its lighthouses. Their clearings
+// (x, z, radius) are kept clear of trees, bushes and boulders
 void sceneryBakeLandmarks(World& world);
 const std::vector<PlacedEnt>& landmarks();
 const std::vector<PlacedEnt>& landmarks(const World& world);
@@ -99,7 +99,8 @@ void sceneryBaseMod(float x, float z, float& h, float& amp);  // flatten roads /
 
 // A building's place in a settlement: its centre, its half frontage and depth (along its own x and z: its front, +z,
 // faces the road), the ground it stands on, its kind (entities.h EK_), the settlement, the road it fronts
-// (World::roads.paths) and how far out in the settlement (settlementShare)
+// (World::roads.paths) and how far out in the settlement (settlementShare); present false once a landmark has taken
+// its place (sceneryBakeLandmarks: a real lighthouse), nothing then standing or growing on it
 struct Lot { bool present; float cx, cz, hw, hd, wallH, roofH, ground; int type; int ridgeX; float seed; float yaw; int town; int kind; int street; float share; };
 const std::vector<Lot>& settlementLots();
 const std::vector<Lot>& settlementLots(const World& world);
