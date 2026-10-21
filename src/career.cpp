@@ -616,7 +616,9 @@ void Career::finishPlan(LaunchPlan& e, const Contract& c, float minutes, float f
   float need = s.runwayNeeded(B.elev);
   float wkt = c.wx.windSpeed * MS_TO_KT, xw = 0;
   { float d = (c.wx.windFrom - B.heading) * DEG; xw = fabsf(sinf(d)) * (wkt + c.wx.gust * MS_TO_KT); }
-  if (c.longHaul()) e.challenge = fmt("Long haul: %.0f km across the ocean to %s - no field on the way, so carry the fuel", c.haulKm, B.name);
+  if (c.crossCountry()) e.challenge = fmt("Cross-country: %.0f km to %s, beyond this chart - find the field on the GPS", c.haulKm, B.name);
+  else if (c.longHaul()) e.challenge = earthCharts::isEarthId(c.toRegion) ? fmt("Long haul: %.0f km to %s - carry the fuel", c.haulKm, B.name) :
+                                       fmt("Long haul: %.0f km across the ocean to %s - no field on the way, so carry the fuel", c.haulKm, B.name);
   else if (c.timeLimitMin > 0 && e.mayBeLate(c.timeLimitMin)) e.challenge = fmt("May miss the deadline: %.0f min for %.0f +- %.0f min of flying", c.timeLimitMin, e.minutesEst, e.minutesSigma);
   else if (c.timeLimitMin > 0 && e.minutesEst > c.timeLimitMin * 0.75f) e.challenge = fmt("Tight deadline: %.0f min for about %.0f min of flying", c.timeLimitMin, e.minutesEst);
   else if (c.wx.storm) e.challenge = "Thunderstorms on the route";
@@ -880,6 +882,68 @@ void Career::refreshBoard() {
     for (auto& b : board) if ((b.to == c.to && b.type == c.type) || (c.type == CT_TOUR && b.type == CT_TOUR)) dup = true;   // (one photo flight a board)
     if (!dup) board.push_back(c);
   }
+  // cross-country work (the real Earth, docs/REAL_EARTH_PLAN.md E7): a load for a small field beyond this chart, 30 to
+  // 180 km on - a strip, or a field no airline serves, which the long hauls never take - flown there yourself as a long
+  // haul is, the charts on the way made ready as you fly. Two at most, the fields drawn afresh with each board
+  if (!job && !access.empty() && realEarth && earthCharts::isEarthId(region))
+    if (const auto pack = earthCharts::pack(); pack && procedural::find(region)) {
+      const regionTravel::Chart chart(procedural::find(region)->origin);
+      const geo::Position here = airportPlace(region, g_world.airports[location]);
+      const double reach = 180000.0, dLat = reach / 111320.0 + 0.05, dLon = dLat / std::max(0.05, std::cos(here.latitude * geo::kDegrees));
+      std::vector<std::pair<uint32_t, earth::AirportRecord>> fields;
+      for (auto& a : pack->airports({here.latitude - dLat, here.longitude - dLon, here.latitude + dLat, here.longitude + dLon})) {
+        if (a.runways.empty() || (a.type >= 1 && a.scheduled)) continue;
+        const double m = geo::surfaceDistance(here, {a.lat, a.lon, 0});
+        const vec3 at = chart.local({a.lat, a.lon, 0});
+        if (m < 30000.0 || m > reach || std::max(fabsf(at.x), fabsf(at.z)) < WORLD_HALF) continue;   // (beyond the chart)
+        uint32_t h = boardSeed * 2654435761u + 977u;
+        for (char ch : a.ident) { h ^= (uint8_t)ch; h *= 16777619u; }
+        fields.push_back({h, std::move(a)});
+      }
+      std::sort(fields.begin(), fields.end(), [](const auto& a, const auto& b) { return a.first != b.first ? a.first < b.first : a.second.ident < b.second.ident; });
+      static const char* bearings[] = {"north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"};
+      int added = 0, tried = 0;
+      for (const auto& field : fields) {
+        if (added >= 2 || tried++ >= 8) break;
+        const earth::AirportRecord& a = field.second;
+        const auto to = earthCharts::chartForAirport(a.ident);
+        if (!to) continue;
+        int index = -1;
+        for (int i = 0, n = procedural::airportCount(to->id); i < n && index < 0; i++)
+          if (const Airport* p = procedural::airportOf(to->id, i); p && a.ident == p->code) index = i;
+        const Airport* B = index >= 0 ? procedural::airportOf(to->id, index) : nullptr;
+        if (!B) continue;
+        const geo::Position there = airportPlace(to->id, *B);
+        Contract c; c.from = location; c.to = index; c.toRegion = to->id; c.haulKm = (float)(geo::surfaceDistance(here, there) / 1000.);
+        c.id = fmt("X%u_%d", boardSeed, added);
+        int si = -1;
+        for (int k = 0; k < (int)access.size() && si < 0; k++) {   // (a type that can use both fields, drawn from those you can fly)
+          const int t = access[(r.next() + k) % access.size()];
+          c.cargoKg = std::max(20, (int)(kAircraft[t].cargoKg * 0.5f) / 10 * 10);
+          if (canFly(c, t) != SRC_NONE) si = t;
+        }
+        if (si < 0) continue;
+        const AircraftSpec& s = kAircraft[si];
+        const bool pax = license >= LIC_CPL && s.pax >= 2 && (r.next() & 1);
+        if (pax) { c.type = CT_PAX; c.pax = std::max(1, (int)(s.pax * r.range(0.4f, 1.0f))); c.cargoKg = c.pax * 15; c.minLicense = LIC_CPL; }
+        else { c.type = CT_CARGO; c.cargoKg = std::max(20, (int)(s.cargoKg * r.range(0.35f, 0.95f)) / 10 * 10); c.minLicense = LIC_PPL; }
+        if (canFly(c, si) == SRC_NONE) continue;
+        c.payout = (int)((250 + c.haulKm * (30 + c.cargoKg * 0.13f + c.pax * 16)) * r.range(0.9f, 1.15f)) / 10 * 10;   // (by the km, as any job)
+        { int chapter = nextStory() ? nextStory()->chapter : 5; c.payout = (int)(c.payout * (1.f + 0.35f * chapter)) / 10 * 10; }
+        if (!atHome()) c.payout = c.payout * 115 / 100 / 10 * 10;
+        c.repBonusPct = repBonusPct();
+        c.payout = c.payout * (100 + c.repBonusPct) / 100 / 10 * 10;
+        const auto bearing = geo::initialBearing(here, there);
+        const char* way = bearing ? bearings[((int)lround(*bearing / 45.0) % 8 + 8) % 8] : "out";
+        const std::string what = pax ? fmt("%d passengers", c.pax) : fmt("%d kg of %s", c.cargoKg, cargoNames[r.next() % 10]);
+        c.title = pax ? fmt("Cross-country: %s to %s", paxNames[r.next() % 8], B->name) : fmt("Cross-country: %s to %s", cargoNames[r.next() % 10], B->name);
+        c.brief = fmt("%s for %s (%s), %.0f km %s, beyond this chart. Fly it there yourself - the land ahead is made ready as you "
+                      "fly. Land at %s to deliver it; the job is called off anywhere else, and you fly back to %s.",
+                      what.c_str(), B->name, B->code, c.haulKm, way, B->code, g_world.airports[location].code);
+        c.wx = W(r.range(0, 360), r.range(0, 12), 0, r.range(0.05f, 0.3f), r.range(0, 0.6f), r.range(2500, 7000), r.range(20, 50), 0, false, r.range(8.f, 17.f));
+        board.push_back(c); added++;
+      }
+    }
   // long hauls (C13): a load for another region's main airport, flown there across the ocean - two at most, the nearest
   // regions the licence reaches first (the islands among them when away), in a type with the range to make it (the
   // jets: the Emissary owned, the Galleon rented, so a long haul is an Airline Transport pilot's work)
@@ -916,7 +980,8 @@ void Career::refreshBoard() {
       const auto bearing = geo::initialBearing(here, there);
       const char* way = bearing ? bearings[((int)lround(*bearing / 45.0) % 8 + 8) % 8] : "out";
       const std::string where = d.home ? std::string("the Solace Islands") : realEarth ? d.name : "the " + d.name;
-      c.title = pax ? fmt("Long haul: passengers to %s", B->name) : fmt("Long haul: %s to %s", cargoNames[r.next() % 10], B->name);
+      const char* kind = c.crossCountry() ? "Cross-country" : "Long haul";   // (the real Earth's nearest: a short hop)
+      c.title = pax ? fmt("%s: passengers to %s", kind, B->name) : fmt("%s: %s to %s", kind, cargoNames[r.next() % 10], B->name);
       c.brief = fmt(realEarth ? "%s for %s, %s: %.0f km %s. Fly it there yourself - the land ahead is made ready as you fly. Land "
                                 "at %s to deliver it; the job is called off anywhere else, and you fly back to %s." :
                                 "%s for %s, in %s: %.0f km %s across the open ocean. Fly it there yourself - the islands ahead are made ready "

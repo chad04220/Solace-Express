@@ -48,6 +48,8 @@ struct Contract {
   // is called off and the career is back where it set out. Board contracts only: never saved
   std::string toRegion; float haulKm = 0;
   bool longHaul() const { return !toRegion.empty(); }
+  // a cross-country job (the real Earth): flown as a long haul is, to a small field beyond the chart, within 200 km
+  bool crossCountry() const { return longHaul() && toRegion.rfind("earth:", 0) == 0 && haulKm <= 200.f; }
 };
 // A contract's arrival: its own region's airport (a long haul's, from that region's recipe), else g_world's
 const Airport& arrivalAirport(const Contract& c);

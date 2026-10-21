@@ -521,11 +521,19 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
     less, every one is. `earth_slide_test`: from Nantucket's chart, 16 of them, Martha's Vineyard's where the Earth has
     it.
 
-  Still open in E7:
-  - **The board's local work.** The local contracts at a real airport are drawn from the airports of its chart
-    alone, up to 40 of them.
-  - **ATC across charts.** ATC sees the chart's own airports. Since the flight is never more than about 30 km from
-    its chart's centre, the field it is near is always among them.
+  - **Cross-country work beyond the chart** (`Career::refreshBoard`, `Contract::crossCountry`). On a real-Earth chart
+    the board also carries up to two loads for small fields beyond it, 30 to 180 km on: strips, and fields no airline
+    serves, which the long hauls never take.
+    - They are flown as a long haul is, the charts on the way made ready as you fly, and delivered at the field.
+    - A long haul of 200 km or less on the real Earth is titled "Cross-country" too. The board card says
+      "CROSS-COUNTRY / BEYOND THE CHART", and the plan's challenge line no longer speaks of an ocean there.
+    - `earth_career_test`: at Nantucket, after the long haul from the islands, the board holds three, two to small
+      fields beyond the chart. The nearest (Plymouth, 92 km) is flown from there into the chart about its field and
+      delivered.
+  - **ATC across charts.** Carried at the move by ident since E4's fourth part: the tower's exchange goes on with the
+    same field in the new chart.
+
+  Still open in E7: nothing beyond what E4 and E5 leave open.
 
 - **E8:** the first realism pass is in: the cities built over as the land cover has them.
   - **Districts.** The cover's built-up class is read on a 400 m grid. Each stretch of it is covered by up to 56

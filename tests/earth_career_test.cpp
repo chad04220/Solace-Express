@@ -129,6 +129,55 @@ struct GameTest {
             back.fleet.size() == 1 && back.fleet[0].region == "solace", "without the pack: loaded at home, its aircraft too");
       earthCharts::usePack(pack);
     }
+    // its board there: cross-country work (Contract::crossCountry) - small fields beyond the chart, each in its own -
+    // and the nearest flown: out of this chart, into the one about its field, delivered there
+    {
+      game.career.refreshBoard();
+      const auto mine = procedural::find(game.career.region);
+      const regionTravel::Chart here(mine ? mine->origin : geo::solaceOrigin());
+      // (a small field: one the airline's travel doesn't list)
+      const auto airline = game.career.destinations();
+      auto served = [&](const Contract& c) { for (const auto& d : airline) if (d.id == c.toRegion && d.airport == c.to) return true; return false; };
+      int cross = 0, small = 0; bool beyond = true, named = true; Contract x;
+      for (const Contract& c : game.career.board) {
+        if (!c.crossCountry()) continue;
+        cross++;
+        named &= c.title.rfind("Cross-country: ", 0) == 0;
+        const Airport* B = procedural::airportOf(c.toRegion, c.to);
+        const vec3 at = B ? here.local(airportPlace(c.toRegion, *B)) : vec3(0.f);
+        beyond &= B && std::max(fabsf(at.x), fabsf(at.z)) >= WORLD_HALF && c.haulKm >= 30.f && c.haulKm <= 200.f;
+        if (served(c)) continue;
+        small++;
+        if (x.id.empty() || c.haulKm < x.haulKm) x = c;
+      }
+      check(small > 0 && beyond && named, fmt("its board there: %d cross-country jobs, %d to small fields beyond the chart (%s, %.0f km)", cross, small, x.title.c_str(), x.haulKm));
+      int si = -1; Career::Source src = Career::SRC_NONE;
+      for (int t : kCareerAircraft) if (si < 0 && !x.id.empty() && (src = game.career.canFly(x, t)) != Career::SRC_NONE) si = t;
+      check(si >= 0, "an aircraft for it");
+      if (si >= 0) {
+        const Airport* B = procedural::airportOf(x.toRegion, x.to);
+        const std::string field = B->code;
+        game.beginCareerFlight(x, si, src);
+        check(game.screen == SCR_FLIGHT && game.haulPending() && game.realEarthPlay() && field == game.dest().code,
+              "flown from there, on the real Earth, to " + field);
+        const geo::Position there = airportPlace(x.toRegion, *B), from = regionTravel::Chart(game.flightRegion.origin).position(game.plane.pos);
+        geo::Position near = geo::destination(there, *geo::initialBearing(there, from), 12000.0); near.height = 900.;
+        const regionTravel::Chart chart(game.flightRegion.origin);
+        game.plane.pos = chart.local(near);
+        const vec3 ahead = chart.local(there) - game.plane.pos;
+        game.plane.vel = normalize(vec3(ahead.x, 0, ahead.z)) * 70.f;
+        game.plane.onGround = false; game.takeoffAnnounced = true;
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(300);
+        while (!game.haul.arrived && std::chrono::steady_clock::now() < deadline) {
+          game.updateEarthFlight(); std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+        check(game.haul.arrived && g_world.regionId == x.toRegion && !strcmp(game.dest().code, field.c_str()),
+              "moved into the chart about its field, the destination its runway " + g_world.regionId);
+        const int had = game.career.money;
+        game.endFlight(true, "");
+        check(game.career.region == x.toRegion && game.career.location == x.to && game.career.money > had, "delivered: the career there");
+      }
+    }
     // an old career (a save with no world line) keeps the generated regions until it is changed, at home
     {
       Career old; old.newGame(); old.realEarth = false;

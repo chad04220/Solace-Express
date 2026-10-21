@@ -856,7 +856,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
     } else {
       const Contract& c = *cards[i].c;
       const bool legendDone = cards[i].legend && profile.count("legend." + c.id) > 0.f;
-      std::string tag = cards[i].job ? fmt("CONTINUING JOB / LEG %d", career.job->legs + 1) : cards[i].story ? fmt("CAREER / CHAPTER %02d", c.chapter + 1) : cards[i].legend ? (legendDone ? "LEGENDARY CONTRACT / FLOWN" : "LEGENDARY CONTRACT") : c.longHaul() ? "LONG HAUL / ACROSS THE OCEAN" : "FREELANCE CONTRACT";
+      std::string tag = cards[i].job ? fmt("CONTINUING JOB / LEG %d", career.job->legs + 1) : cards[i].story ? fmt("CAREER / CHAPTER %02d", c.chapter + 1) : cards[i].legend ? (legendDone ? "LEGENDARY CONTRACT / FLOWN" : "LEGENDARY CONTRACT") : c.crossCountry() ? "CROSS-COUNTRY / BEYOND THE CHART" : c.longHaul() ? (earthCharts::isEarthId(c.toRegion) ? "LONG HAUL" : "LONG HAUL / ACROSS THE OCEAN") : "FREELANCE CONTRACT";
       float cardW = lw - 48 * s;
       g_ren.text(x + 24 * s, cy + 9 * s, 10 * s, tag, cards[i].legend ? vec3(1.f, 0.82f, 0.35f) : cards[i].story ? C_WARN : C_DIM, 1, 0, false);
       fitText(x + 24 * s, cy + 28 * s, cardW, 17 * s, 12 * s, c.title, C_TEXT);
