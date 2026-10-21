@@ -22,9 +22,13 @@ struct AptLayout {
   float tieU0 = 0, tieU1 = 0, termU = 0, termHL = 0, standU0 = 0, standU1 = 0;
 };
 
+// the side an airport's facilities are on: its own (Airport::side), else by its index (the terrain shader's aptGround
+// reads it per slot: Renderer::airportSlots)
+inline float aptSide(const Airport& a, int ai) { return a.side ? (a.side > 0 ? 1.f : -1.f) : (ai & 1) ? 1.f : -1.f; }
+
 inline AptLayout aptLayout(const Airport& a, int ai) {
   AptLayout L;
-  L.side = (ai & 1) ? 1.f : -1.f;
+  L.side = aptSide(a, ai);
   float hw = a.width * 0.5f, len = a.length;
   L.paved = a.surface == SURF_ASPHALT && a.size > 0;
   L.hold = hw + 26.f;

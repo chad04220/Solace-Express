@@ -4,6 +4,7 @@
 // lushness, coldness, farmland and forest; the real airports on their own levelled grounds; the towns from GeoNames;
 // the real roads laid on the ground. Then the rest of the World's pipeline as for any chart.
 #include "world.h"
+#include "airport_layout.h"
 #include "earth_charts.h"
 #include "region_travel.h"
 #include "scenery.h"
@@ -334,6 +335,16 @@ void World::buildEarth(const procedural::Descriptor& chartDesc, const std::strin
     airports.push_back(a);
   }
   extraRunways = picked->extras;
+  // (the side each airport's buildings and apron stand on, its own in every chart that holds it - never by its place in
+  // this chart's list, which the next orders its own way: away from its other runways, else as its ident has it)
+  for (size_t i = 0; i < airports.size(); i++) {
+    Airport& a = airports[i];
+    float across = 0.f;
+    for (const ExtraRunway& r : extraRunways) if (r.airport == (int)i) across += aptLocal(a, vec3(r.x, 0, r.z)).y;
+    uint32_t h = 2166136261u;
+    for (const char* c = a.code; *c; c++) { h ^= (uint8_t)*c; h *= 16777619u; }
+    a.side = across > 50.f ? -1 : across < -50.f ? 1 : (h >> 7) & 1 ? 1 : -1;
+  }
   {   // the way houses are built here: the country most of its airports are in (the chart's own airport with none)
     std::map<std::string, int> count;
     for (const auto& r : data->airports) count[r.country]++;

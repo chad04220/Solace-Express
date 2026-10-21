@@ -6,6 +6,7 @@
 // within 1.5 km of the aircraft is there the moment it moves, each chunk as the new chart's World makes it.
 #include "../src/game.h"
 #include "../src/earth_charts.h"
+#include "../src/airport_layout.h"
 #include "../src/entity_lod.h"
 #include <chrono>
 #include <cstring>
@@ -96,6 +97,35 @@ struct GameTest {
       const geo::Position where = before.position(game.plane.pos);
       const float y = game.plane.pos.y, ground = g_world.height(game.plane.pos.x, game.plane.pos.z);
       const double bearing = *geo::initialBearing(where, before.position(game.plane.pos + game.plane.vel * 100.f));   // (true: the charts' grids turn)
+      // what refers to an airport both charts hold (Game::carriedAirport), the nearest the aircraft: the autopilot flying
+      // to it, the GPS's pick, the tower's landing clearance, an aircraft in its circuit - each carried to it in the new
+      // chart, by its ident; an aircraft of a field the new chart hasn't, gone. And every such airport's apron on the
+      // same side of its runway in both (Airport::side)
+      const World& nextWorld = *game.earthPrefetch->world;
+      int both = -1, onlyHere = -1, sidesBoth = 0, sidesSame = 0;
+      float lift = 0.f, nearest = 1e30f;
+      for (int i = 0; i < (int)g_world.airports.size(); i++) {
+        const Airport& a = g_world.airports[i];
+        const int j = nextWorld.findAirport(a.code);
+        if (j < 0) { if (onlyHere < 0) onlyHere = i; continue; }
+        sidesBoth++; sidesSame += aptLayout(a, i).side == aptLayout(nextWorld.airports[j], j).side;
+        const float d = hypotf(a.x - game.plane.pos.x, a.z - game.plane.pos.z);
+        if (d < nearest) { nearest = d; both = i; lift = nextWorld.airports[j].elev - a.elev; }
+      }
+      check(sidesBoth > 0 && sidesSame == sidesBoth, fmt("%s: each airport both charts hold, its apron on the same side in both (%d of %d)", what.c_str(), sidesSame, sidesBoth));
+      const std::string bothCode = both >= 0 ? g_world.airports[both].code : "";
+      geo::Position circuitAt{};
+      float circuitY = 0.f;
+      if (both >= 0) {
+        game.plane.apEngage(Plane::AP_NAV, both, game.wx); game.apDest = both;
+        game.atcF = Game::AtcFlight{}; game.atcF.dep = game.atcF.arr = both; game.atcF.phase = 5; game.atcF.airborne = true;
+        const Airport& a = g_world.airports[both];
+        TrafficCraft c; c.role = TrafficCraft::AIRPORT; c.state = TrafficCraft::CIRCUIT; c.airport = both;
+        c.pos = vec3(a.x + 900.f, a.elev + 300.f, a.z); c.vel = vec3(0.f, 0.f, -40.f); c.path = {c.pos + vec3(0.f, 0.f, -1500.f)};
+        circuitAt = before.position(c.pos); circuitY = c.pos.y;
+        game.traffic.craft.clear(); game.traffic.craft.push_back(c);
+        if (onlyHere >= 0) { c.airport = onlyHere; game.traffic.craft.push_back(c); }
+      }
       const auto waited = std::chrono::steady_clock::now();
       while (g_world.regionId == from && std::chrono::steady_clock::now() - waited < std::chrono::minutes(2)) {
         game.updateEarthFlight(); std::this_thread::sleep_for(std::chrono::milliseconds(2));
@@ -126,6 +156,16 @@ struct GameTest {
       }
       const regionTravel::Chart after(game.flightRegion.origin);
       check(geo::surfaceDistance(after.position(game.plane.pos), where) < 1.0, what + ": where it was on the Earth");
+      if (both >= 0) {
+        const int ap = game.plane.apAirport;
+        check(game.plane.apOn && (game.plane.apMode == Plane::AP_NAV || game.plane.apMode == Plane::AP_APPR) && ap >= 0 &&
+              bothCode == g_world.airports[ap].code && game.apDest == ap, what + ": the autopilot flies on to " + bothCode + ", the GPS's pick");
+        check(game.atcF.phase == 5 && game.atcF.arr == ap && game.atcF.dep == ap, what + ": still cleared to land there");
+        const auto& craft = game.traffic.craft;
+        check(craft.size() == 1 && craft[0].airport == ap && geo::surfaceDistance(after.position(craft[0].pos), circuitAt) < 1.0 &&
+              std::fabs(craft[0].pos.y - (circuitY + lift)) < 0.05f && craft[0].path.size() == 1,
+              fmt("%s: its circuit's aircraft where it was, over its ground there (%zu carried, %s)", what.c_str(), craft.size(), onlyHere >= 0 ? "one gone" : "none to go"));
+      } else check(false, what + ": an airport both charts hold");
       const double now = *geo::initialBearing(after.position(game.plane.pos), after.position(game.plane.pos + game.plane.vel * 100.f));
       check(std::fabs(std::remainder(now - bearing, 360.0)) < 0.2, fmt("%s: on its heading (%.2f, %.2f)", what.c_str(), bearing, now));
       const float newGround = g_world.height(game.plane.pos.x, game.plane.pos.z);

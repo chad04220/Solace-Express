@@ -371,6 +371,23 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
     - `earth_slide_test`: within 400 m of a point in Martha's Vineyard's state forest, 92% of the old chart's trees
       and stones stand in the next chart too, of their kind, within a metre. The rest sit at the woods' edges, where
       each chart's own texels tip a threshold.
+  - **Airports the same in both charts** (`Airport::side`). Each chart lists its airports its own way, and an airport's
+    apron, terminal and hangars stood on the side of its runway its index gave it. So at the move a field could swap
+    sides. A real airport's side is now its own: away from its other runways, else as its ident has it.
+    - `aptSide` (airport_layout.h) gives it to the layout, the scenery and the traffic. The terrain shader reads it per
+      slot (`uApSides`) rather than from the slot's parity, so `Renderer::airportSlots` now takes the 16 nearest airports.
+    - The islands keep the side their index gives them, so their renders are unchanged.
+  - **What refers to an airport, carried across** (`Game::carriedAirport`). At the move the old chart's airports are
+    noted by ident and found again in the new one.
+    - The autopilot flies on to the same field, NAV or approach, its touchdown and heights moved onto the new chart's
+      ground. Before, it fell back to a hold.
+    - The GPS's pick is kept, and so is the tower's exchange (a landing clearance stands). The towers keep their voice
+      by ident.
+    - The AI traffic stays where it was on the Earth (`Traffic::carry`), each field's aircraft over its ground in the
+      new chart. Only those of a field the new chart doesn't hold go.
+    - When the new chart doesn't hold the field, all of this falls back to what it did before.
+    - `earth_slide_test` checks it at both slides: every airport both charts hold keeps its side (9 of 9, 5 of 5), and
+      the autopilot, the GPS's pick, a landing clearance and a circuit's aircraft are carried to it.
 
   Still open in E4:
   - **Towns and roads agreement.** Each chart lays out its settlements' streets and roads its own way, so the houses

@@ -10,6 +10,7 @@ uniform sampler2DArray uAlb; uniform sampler2DArray uNrm;
 uniform int uApCount; uniform vec4 uAp[16]; uniform vec4 uApDim[16];   // (the 16 airports nearest: Renderer airportSlots)
 #ifndef PART_BAKE   // (the aircraft bodies' bake never traces the airports: kept out of its text, and its cache key)
 uniform vec4 uApBox[32];   // (each slot's buildings: world bounds' low corner and first box, high corner and box count)
+uniform int uApSides;      // (bit k: slot k's apron on its runway's right, airport_layout.h aptSide)
 // the real Earth's airports' other runways, the 8 nearest (World::extraRunways): x, z, its airport's height, heading
 // (rad); length, width, surface, its airport's size
 uniform int uXrCount; uniform vec4 uXr[8]; uniform vec4 uXrDim[8];

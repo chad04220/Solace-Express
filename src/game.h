@@ -277,6 +277,12 @@ private:
   void updateEarthFlight();
   void slideEarthChart(const regionTravel::Chart& chart);   // (the real Earth: the next chart under the flight)
   void continueEarthFlight();
+  // the airports of the chart a real-Earth flight has just moved out of, by their index there (slideEarthChart): what
+  // referred to one - the autopilot, the GPS's pick, the tower, the traffic - finds it again in the new chart by its
+  // ident (carriedAirport: its index there, -1 if the new chart hasn't it; lift, how much higher its ground lies)
+  struct CarriedAirport { std::string code; float elev = 0; };
+  std::vector<CarriedAirport> earthCarried;
+  int carriedAirport(int old, float* lift = nullptr) const;
   void setEarthDestination(const procedural::Descriptor& region);
   void openEarthPicker();
   void initFreeRegions();
@@ -735,7 +741,7 @@ private:
   void loadMachineSettings();
   std::string machineWritten;
   bool deckPreset = false;   // (the Deck's settings were just chosen: said once, on the main menu)
-  int atcStation(int airport) const { return (airport * 7 + 2) % AtcVoice::kVoices; }   // each airport keeps one voice
+  int atcStation(int airport) const;   // each airport keeps one voice (the real Earth's by its ident)
   std::vector<std::pair<std::string, std::string>> stations;
   bool settingsFromPause = false;
   int settingsPage = 0;                    // 0 general, 1 controls, 2 joystick

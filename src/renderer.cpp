@@ -1,5 +1,6 @@
 // Somnium Volandi - OpenGL renderer: deferred rasterizer + sprites + post + UI
 #include "renderer.h"
+#include "airport_layout.h"
 #include "hive_ordnance_sprites.h"
 #include "shader_prune.h"
 #include "models.h"
@@ -921,25 +922,21 @@ void Renderer::renderMap(float cx, float cz, float half, int N) {
 }
 
 // The airports the ground shaders paint and trace (scene_uniforms.glsl uAp, uApDim, uApBox): the 16 nearest a point. A
-// real-Earth chart holds up to 40, and past the 16th none was painted. Each keeps a slot of its own index's parity -
-// the even airports the even slots, the odd the odd, 8 of each - since the shaders take the side its apron lies on from
-// the slot (as airport_layout.h lays it out, by the airport's index). With 16 or fewer, every airport is in its own
-// slot; past 16 there are 8 of each parity at least. Each carries its buildings' world bounds and their boxes' range
-// (traceBoxes skips an airport the ray misses)
+// real-Earth chart holds up to 40, and past the 16th none was painted. With 16 or fewer, every airport is in its own
+// slot; past 16, the 16 nearest, nearest first. Each slot's side bit (uApSides) is the side its apron lies on, as
+// airport_layout.h lays it out (aptSide: the real Earth's airport's own, the islands' by its index), and each carries
+// its buildings' world bounds and their boxes' range (traceBoxes skips an airport the ray misses)
 Renderer::AirportSlots Renderer::airportSlots(const World& world, float cx, float cz) {
   AirportSlots out;
   const int count = (int)world.airports.size();
   std::vector<int> order(std::min(count, 16), -1);
   if (count <= 16) for (int i = 0; i < count; i++) order[i] = i;
-  else {
+  else {   // (each slot says its airport's side itself, sides: any airport in any slot)
     auto far = [&](int i) { return hypotf(world.airports[i].x - cx, world.airports[i].z - cz); };
-    for (int parity = 0; parity < 2; parity++) {
-      std::vector<int> mine;
-      for (int i = parity; i < count; i += 2) mine.push_back(i);
-      const size_t keep = std::min<size_t>(8, mine.size());
-      std::partial_sort(mine.begin(), mine.begin() + keep, mine.end(), [&](int a, int b) { const float da = far(a), db = far(b); return da != db ? da < db : a < b; });
-      for (size_t k = 0; k < keep; k++) order[2 * k + parity] = mine[k];
-    }
+    std::vector<int> all(count);
+    for (int i = 0; i < count; i++) all[i] = i;
+    std::partial_sort(all.begin(), all.begin() + 16, all.end(), [&](int a, int b) { const float da = far(a), db = far(b); return da != db ? da < db : a < b; });
+    for (int k = 0; k < 16; k++) order[k] = all[k];
   }
   const int nb = std::min(128, (int)world.boxes.size());
   for (int slot = 0; slot < (int)order.size(); slot++) {
@@ -950,6 +947,7 @@ Renderer::AirportSlots Renderer::airportSlots(const World& world, float cx, floa
       continue;
     }
     const Airport& A = world.airports[ai];
+    if (aptSide(A, ai) > 0.f) out.sides |= 1 << slot;
     float* ap = out.ap + slot * 4; float* dim = out.dim + slot * 4; float* box = out.box + slot * 8;
     ap[0] = A.x; ap[1] = A.z; ap[2] = A.elev; ap[3] = A.heading * DEG;
     dim[0] = A.length; dim[1] = A.width; dim[2] = (float)A.surface; dim[3] = (float)A.size;
@@ -976,7 +974,7 @@ Renderer::AirportSlots Renderer::airportSlots(const World& world, float cx, floa
 }
 void Renderer::setAirportSlots(GLuint p, const World& world, float cx, float cz) {
   const AirportSlots S = airportSlots(world, cx, cz);
-  glUniform1i(U(p, "uApCount"), S.n);
+  glUniform1i(U(p, "uApCount"), S.n); glUniform1i(U(p, "uApSides"), S.sides);
   if (S.n > 0) {
     glUniform4fv(U(p, "uAp"), S.n, S.ap); glUniform4fv(U(p, "uApDim"), S.n, S.dim);
     glUniform4fv(U(p, "uApBox"), 2 * S.n, S.box);

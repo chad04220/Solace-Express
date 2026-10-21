@@ -1,9 +1,10 @@
 // The airports the ground shaders paint and trace (Renderer::airportSlots): with 16 or fewer, every one in its own
-// slot, as before; with more - a real-Earth chart holds up to 40 - the 8 nearest the camera of the even airports in the
-// even slots and of the odd in the odd (the shaders take the apron's side from the slot's parity, as airport_layout.h
-// lays it out by the airport's), nearest first, the rest changing in as it moves. Each slot carries its airport's
-// runway and size, and its buildings' world bounds and box range, as traceBoxes reads them.
+// slot, as before; with more - a real-Earth chart holds up to 40 - the 16 nearest the camera, nearest first, the rest
+// changing in as it moves. Each slot carries its airport's runway and size, the side its apron lies on (aptSide: by
+// its index, or its own, as the real Earth's are), and its buildings' world bounds and box range, as traceBoxes reads
+// them.
 #include "../src/renderer.h"
+#include "../src/airport_layout.h"
 #include <cstdio>
 #include <set>
 
@@ -30,34 +31,38 @@ int main() {
       Box b; b.c = vec3(40.f * k, 6.f, 120.f); b.h = vec3(10.f, 6.f, 8.f); b.airport = ai; b.kind = k % 3;
       w.boxes.push_back(b);
     }
-  {   // forty, the camera at the 20th: the 8 nearest it of each parity, each in a slot of its own parity, nearest first
+  {   // forty, the camera at the 20th: the 16 nearest it, nearest first; the sides by index, then the airports' own
     const float cx = w.airports[20].x, cz = w.airports[20].z;
     const auto S = Renderer::airportSlots(w, cx, cz);
-    bool nearest = S.n == 16, ordered = true, packed = true, parity = true;
-    for (int p = 0; p < 2; p++) {
-      std::vector<std::pair<float, int>> mine;
-      for (int i = p; i < 40; i += 2) mine.push_back({hypotf(w.airports[i].x - cx, w.airports[i].z - cz), i});
-      std::sort(mine.begin(), mine.end());
-      std::set<int> want, got;
-      for (int k = 0; k < 8; k++) { want.insert(mine[k].second); got.insert(S.index[2 * k + p]); }
-      nearest &= want == got;
-      float last = -1.f;
-      for (int k = 0; k < 8; k++) {
-        const Airport& a = w.airports[S.index[2 * k + p]];
-        const float d = hypotf(a.x - cx, a.z - cz);
-        ordered &= d >= last; last = d;
-      }
-    }
+    std::vector<std::pair<float, int>> all;
+    for (int i = 0; i < 40; i++) all.push_back({hypotf(w.airports[i].x - cx, w.airports[i].z - cz), i});
+    std::sort(all.begin(), all.end());
+    std::set<int> want, got;
+    for (int k = 0; k < 16; k++) { want.insert(all[k].second); got.insert(S.index[k]); }
+    bool nearest = S.n == 16 && want == got, ordered = true, packed = true, sides = true;
+    float last = -1.f;
     for (int k = 0; k < S.n; k++) {
       const Airport& a = w.airports[S.index[k]];
-      parity &= (S.index[k] & 1) == (k & 1);
+      const float d = hypotf(a.x - cx, a.z - cz);
+      ordered &= d >= last; last = d;
+      sides &= ((S.sides >> k) & 1) == (S.index[k] & 1);
       packed &= S.ap[k * 4] == a.x && S.ap[k * 4 + 1] == a.z && S.ap[k * 4 + 2] == a.elev && std::fabs(S.ap[k * 4 + 3] - a.heading * DEG) < 1e-5f;
       packed &= S.dim[k * 4] == a.length && S.dim[k * 4 + 1] == a.width && S.dim[k * 4 + 2] == (float)a.surface;
       packed &= (int)S.dim[k * 4 + 3] == a.size;
     }
-    check(nearest && S.index[0] == 20, "forty airports: the 8 nearest the camera of each parity, its own first");
-    check(parity, "each in a slot of its own index's parity (its apron's side)");
-    check(ordered, "nearest first, each parity");
+    check(nearest && S.index[0] == 20, "forty airports: the 16 nearest the camera, its own first");
+    check(ordered, "nearest first");
+    check(sides, "each slot's side its airport's, by its index");
+    {   // (the real Earth's: each its own side, wherever it is in the list)
+      World& e = w;
+      for (int i = 0; i < 40; i++) e.airports[i].side = (i * 7 % 5) < 2 ? 1 : -1;
+      const auto E = Renderer::airportSlots(e, cx, cz);
+      bool own = true;
+      for (int k = 0; k < E.n; k++) own &= ((E.sides >> k) & 1) == (e.airports[E.index[k]].side > 0 ? 1 : 0) &&
+                                           aptLayout(e.airports[E.index[k]], E.index[k]).side == (float)e.airports[E.index[k]].side;
+      check(own && E.sides != S.sides, "an airport's own side, in its slot and its layout");
+      for (auto& a : e.airports) a.side = 0;
+    }
     check(packed, "each slot its airport's runway and size");
     // its buildings: the slot of the 20th holds their bounds and box range; the far one's isn't among the slots
     const float* box = S.box;   // (slot 0: the 20th)
@@ -76,7 +81,7 @@ int main() {
   }
   {   // the camera flown to the far end: the 39th and its buildings come in
     const auto S = Renderer::airportSlots(w, w.airports[39].x, w.airports[39].z);
-    check(S.n == 16 && S.index[1] == 39 && S.box[8 + 3] == 3.f && S.box[8 + 7] == 3.f, "flown to the far end: its airport first of the odd, its buildings (3 to 6)");
+    check(S.n == 16 && S.index[0] == 39 && S.box[3] == 3.f && S.box[7] == 3.f, "flown to the far end: its airport first, its buildings (3 to 6)");
   }
   printf("airport_slots_test: %s\n", failed ? "FAILED" : "passed");
   return failed ? 1 : 0;

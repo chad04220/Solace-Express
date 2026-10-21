@@ -93,7 +93,11 @@ float rwyDigits(vec2 q, int num){
 // Returns true when it painted the point. No local arrays (see seg7).
 float lineM(float d, float hw){ return step(abs(d), hw); }
 bool aptGround(int ai, vec2 uv, vec3 pw, int surf, int size, float len, float wid, vec2 footprint, inout Mat m){
+#ifndef PART_BAKE
+  float side = ((uApSides >> ai) & 1) != 0 ? 1.0 : -1.0;   // (the slot's airport's own side: Renderer::airportSlots)
+#else
   float side = (ai - (ai/2)*2) == 1 ? 1.0 : -1.0;
+#endif
   float u = uv.x, vv = uv.y*side, hw = wid*0.5;
   vec3 nTS;
   vec3 yel = vec3(0.62, 0.47, 0.05), wht = vec3(0.8);

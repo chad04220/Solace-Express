@@ -1348,6 +1348,8 @@ void Game::slideEarthChart(const regionTravel::Chart& chart) {
   g_roadTraffic = RoadTraffic{}; g_groundPits.clear();
   loadingRegion = earthPrefetch->region; regionResumePaused = paused;
   regionPoseChange = regionTravel::Change(chart, regionTravel::Chart(earthPrefetch->region.origin), plane.pos);
+  earthCarried.clear();
+  for (const Airport& a : g_world.airports) earthCarried.push_back({a.code ? a.code : "", a.elev});
   auto retired = std::make_unique<World>(std::move(g_world));
   g_world = std::move(*earthPrefetch->world);
   g_scenery.adopt(*earthPrefetch->scenery);   // (its chunks, made from the world now g_world)
@@ -1355,12 +1357,14 @@ void Game::slideEarthChart(const regionTravel::Chart& chart) {
   if (g_ren.ok) g_ren.commitWorldUpload(&retiredGpu);
   earthPrefetch.reset(); earthPrefetchId.clear(); earthPrefetchFailedId.clear();
   earthRetireJob = std::async(std::launch::async, [old = std::move(retired), gpu = std::move(retiredGpu)]() mutable { old.reset(); gpu = Renderer::WorldUploadData{}; });
-  atc.cancel(); commsPending.clear(); traffic.reset(); hiveCombat.reset(1, combatWrap());
+  atc.cancel(); commsPending.clear(); hiveCombat.reset(1, combatWrap());
+  traffic.carry(*regionPoseChange, [&](int old, float* lift) { return carriedAirport(old, lift); });   // (where they were)
   gpsMapValid = loadMap = false;
   wreck.clear(); debris.clear(); pops.clear(); particles.clear(); pits.clear();
   bursts.clear(); trail.clear(); cloudWake.clear(); tipTrail[0].clear(); tipTrail[1].clear();
   for (auto& smoke : pieceTrail) smoke.clear();
   continueEarthFlight();
+  earthCarried.clear();
   if (above < 30.f) {   // (low: its height over this chart's ground what it was over the last's)
     const float lift = g_world.height(plane.pos.x, plane.pos.z) + above - plane.pos.y;
     plane.pos.y += lift; plane.wxAir.y += lift; camPos.y += lift; dbgCamPos.y += lift; dbgCamLook.y += lift;
@@ -1385,12 +1389,27 @@ void Game::continueEarthFlight() {
   plane.apStuntHdg = change.heading(plane.apStuntHdg); plane.apStuntRight0 = change.vector(plane.apStuntRight0);
   plane.apLd = change.vector(plane.apLd); plane.apTd = change.point(plane.apTd); plane.apHoldC = change.point(plane.apHoldC);
   plane.seamShift = vec3();
-  if (plane.apOn && (plane.apMode == Plane::AP_NAV || plane.apMode == Plane::AP_APPR)) {
+  // (an approach to a field the new chart holds too - the next real-Earth chart's, found by its ident - flown on, its
+  // touchdown and its heights on that chart's ground; any other holds)
+  float apLift = 0.f;
+  const int apTo = plane.apOn && (plane.apMode == Plane::AP_NAV || plane.apMode == Plane::AP_APPR) ? carriedAirport(plane.apAirport, &apLift) : -1;
+  if (apTo >= 0) { plane.apTd.y += apLift; plane.apHoldAlt += apLift; plane.apIntAlt += apLift; }
+  else if (plane.apOn && (plane.apMode == Plane::AP_NAV || plane.apMode == Plane::AP_APPR)) {
     plane.apMode = Plane::AP_HOLD; plane.apHeading = plane.heading(); plane.apAlt = plane.pos.y;
     plane.apStatus = "HOLD / NEW REGION";
   }
-  plane.apAirport = plane.apHoldFor = plane.apStuntWasAirport = -1;
-  if (plane.apStuntWasMode == Plane::AP_NAV || plane.apStuntWasMode == Plane::AP_APPR) plane.apStuntWasMode = Plane::AP_HOLD;
+  plane.apAirport = apTo; plane.apHoldFor = carriedAirport(plane.apHoldFor); plane.apStuntWasAirport = carriedAirport(plane.apStuntWasAirport);
+  if ((plane.apStuntWasMode == Plane::AP_NAV || plane.apStuntWasMode == Plane::AP_APPR) && plane.apStuntWasAirport < 0) plane.apStuntWasMode = Plane::AP_HOLD;
+  // (the tower's exchange carried on with the same field, when the new chart holds it - and, on a long haul, it is the
+  // one the flight is to land at)
+  const AtcFlight tower = atcF;
+  auto carryTower = [&](int arrival) {
+    const int arr = carriedAirport(tower.arr), dep = carriedAirport(tower.dep);
+    if (arr < 0 || (arrival >= 0 && arr != arrival)) return;
+    atcF = tower; atcF.arr = arr; atcF.dep = dep >= 0 ? dep : arr; atcF.lastApt = carriedAirport(tower.lastApt);
+    atcF.holdPos = change.point(tower.holdPos);
+    if (dep < 0 && atcF.phase < 3) atcF.phase = 3;
+  };
   camPos = change.point(camPos); camQ = change.attitude(camQ); camVel = change.vector(camVel);
   dbgCamPos = change.point(dbgCamPos); dbgCamLook = change.point(dbgCamLook);
   // Chase/cockpit yaw is body-relative; only the orbit camera stores world yaw.
@@ -1413,8 +1432,9 @@ void Game::continueEarthFlight() {
     haul.arrived = at >= 0;
     contract.from = near; contract.to = haul.arrived ? at : near;
     chartHaul();
-    attemptFrom = near; wpIndex = 0; apDest = -1; tdRunway = -2;
+    attemptFrom = near; wpIndex = 0; apDest = carriedAirport(apDest); tdRunway = -2;
     atcF = AtcFlight{}; atcF.dep = near; atcF.arr = contract.to; atcF.phase = plane.onGround ? 0 : 3;
+    carryTower(contract.to);
     somnus = SomnusState{}; ufo = Ufo{}; ufo.next = 180.f;
     tipOn = false; trailT = 0; wakeGap = true; wakeOdo = 0;
     craterR = craterD = 0; boomT = -1;
@@ -1428,8 +1448,9 @@ void Game::continueEarthFlight() {
   freeAirport = std::max(0, g_world.nearestAirport(plane.pos.x, plane.pos.z));
   contract.from = contract.to = freeAirport; contract.wps.clear();
   contract.title = "Free Flight / " + flightRegion.name;
-  launchPlan.startAirport = attemptFrom = freeAirport; wpIndex = 0; apDest = -1; tdRunway = -2;
+  launchPlan.startAirport = attemptFrom = freeAirport; wpIndex = 0; apDest = carriedAirport(apDest); tdRunway = -2;
   atcF = AtcFlight{}; atcF.dep = atcF.arr = freeAirport; atcF.phase = plane.onGround ? 0 : 3;
+  carryTower(-1);
   somnus = SomnusState{}; ufo = Ufo{}; ufo.next = 180.f;
   tipOn = false; trailT = 0; wakeGap = true; wakeOdo = 0;
   craterR = craterD = 0; boomT = -1;
@@ -1437,6 +1458,23 @@ void Game::continueEarthFlight() {
   freeFlight = isolatedFlight = true; paused = regionResumePaused; screen = SCR_FLIGHT;
   earthFacilitiesPending = earthPromotionDeferred = false; updateEarthSurfaceContext();
   toast("Entering " + flightRegion.name + ".", vec3(.6f, 1.f, .8f));
+}
+
+int Game::carriedAirport(int old, float* lift) const {
+  if (lift) *lift = 0.f;
+  if (old < 0 || old >= (int)earthCarried.size() || earthCarried[old].code.empty()) return -1;
+  const int i = g_world.findAirport(earthCarried[old].code.c_str());
+  if (i >= 0 && lift) *lift = g_world.airports[i].elev - earthCarried[old].elev;
+  return i;
+}
+
+int Game::atcStation(int airport) const {
+  if (g_world.earthChart && airport >= 0 && airport < (int)g_world.airports.size() && g_world.airports[airport].code) {
+    uint32_t h = 2166136261u;   // (the real Earth's: by its ident, the same voice in every chart that holds it)
+    for (const char* c = g_world.airports[airport].code; *c; c++) { h ^= (uint8_t)*c; h *= 16777619u; }
+    return (int)(h % AtcVoice::kVoices);
+  }
+  return (airport * 7 + 2) % AtcVoice::kVoices;
 }
 
 // Main-menu Free Flight never quotes, accepts, saves or settles a career job. A fresh
@@ -6420,7 +6458,7 @@ void Game::debugScene(const std::string& name) {
     float secs = 60; int view = 0; sscanf(name.c_str() + 3, "%f_%d", &secs, &view);
     set.traffic = getenv("NOTRF") == nullptr;
     int ai = g_world.findAirport("CAP"); const Airport& a = g_world.airports[ai];
-    float h = a.heading * DEG, sn = sinf(h), cs = cosf(h), side = (ai & 1) ? 1.f : -1.f;
+    float h = a.heading * DEG, sn = sinf(h), cs = cosf(h), side = aptSide(a, ai);
     auto W = [&](float u, float v) { return vec3(a.x + u * sn + v * cs, 0, a.z - u * cs + v * sn); };
     vec3 pp = W(a.length * 0.47f, side * (a.width * 0.5f + 130.f)); pp.y = g_world.height(pp.x, pp.z) + 1.5f;
     plane.reset(&kAircraft[1], pp, a.heading, kAircraft[1].maxFuel, 100, false, 0);

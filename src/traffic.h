@@ -2,7 +2,9 @@
 // traffic, XR-30 research formations ripping past, and an aerobatic display team.
 #pragma once
 #include "common.h"
+#include "region_travel.h"
 #include "wheel_motion.h"
+#include <functional>
 #include <vector>
 #include <string>
 
@@ -49,6 +51,10 @@ public:
   // player: position, velocity, on ground; returns true if the player collided with traffic (mid-air)
   bool update(float dt, vec3 playerPos, vec3 playerVel, bool playerOnGround, float playerSpan);
   void followSeam(vec3 d);   // the player came back in over the map's seam: the craft flying with it come too (the fields' own stay)
+  // the flight moved into the next real-Earth chart (Game::slideEarthChart): every craft where it was on the Earth, in
+  // the new chart's frame, a field's with that field - airport(its index in the old chart, &lift) its index in the new
+  // one, and how much higher its ground lies there; -1 when the new chart hasn't it, and the craft goes
+  void carry(const regionTravel::Change& change, const std::function<int(int, float*)>& airport);
   int fillVisuals(vec3 camPos, TrafficVisual* out, int maxN, int* order) const;   // nearest first
   int count(int role) const;
   // O+P entertainment: a pair of XR-30 Nocturnes flies a display around the player until dismissed or the player lands

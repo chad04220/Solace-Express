@@ -708,6 +708,23 @@ void Traffic::followSeam(vec3 d) {
   for (auto& b : booms) b.first += d;
 }
 
+void Traffic::carry(const regionTravel::Change& change, const std::function<int(int, float*)>& airport) {
+  const float turn = (float)change.headingDelta() * DEG;
+  for (auto& c : craft) {
+    if (!c.alive) continue;
+    float lift = 0.f;
+    if (c.airport >= 0 && (c.airport = airport(c.airport, &lift)) < 0) { c.alive = false; continue; }
+    c.pos = change.point(c.pos) + vec3(0, lift, 0); c.vel = change.vector(c.vel); c.q = change.attitude(c.q);
+    c.hdg += turn; c.escUp = change.vector(c.escUp);
+    for (auto& p : c.path) p = change.point(p) + vec3(0, lift, 0);
+  }
+  craft.erase(std::remove_if(craft.begin(), craft.end(), [](const TrafficCraft& c) { return !c.alive; }), craft.end());
+  relinkLeaders();
+  for (auto& p : puffs) { p.p = change.point(p.p); p.v = change.vector(p.v); }
+  booms.clear();
+  escF = change.vector(escF);
+}
+
 bool Traffic::update(float dt, vec3 player, vec3 playerVel, bool playerOnGround, float playerSpan) {
   puffs.clear(); booms.clear(); flybys.clear(); radio.clear();
   if (!enabled) {   // traffic off in the settings: only a summoned display pair flies
