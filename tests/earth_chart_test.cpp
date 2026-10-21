@@ -151,7 +151,7 @@ int main(int argc, char** argv) {
       seen++;
     }
     const int n = (int)w.earthChart->landmarks.size();
-    if (ident == "KMVY") {
+    if (ident == "KMVY" && (dir.find("fixtures/earth2") != std::string::npos || n > 0)) {   // (a pack built before them: none)
       int named = 0;
       for (const char* want : {"East Chop Light", "West Chop Light", "Edgartown Harbor Light", "Gay Head Light"})
         for (const auto& l : w.earthChart->landmarks) named += l.name == want;
@@ -187,7 +187,7 @@ int main(int argc, char** argv) {
     check(low == 0, fmt("the ground never under a lake's level where it lies (%zu texels under)", low));
     size_t big = 0; for (const auto& l : levels) big += l.second >= 200;
     printf("lakes: %zu levels, %zu of them over 30 ha; %zu texels coded, %zu under water\n", levels.size(), big, coded, wet);
-    if (ident == "KBOS") check(big >= 5, "Boston's chart has its reservoirs and ponds");
+    if (ident == "KBOS" && w.earthChart->fineTiles > 0) check(big >= 5, "Boston's chart has its reservoirs and ponds");   // (GLO-90's: ETOPO has none)
     if (ident == "KMVY" && dir.find("fixtures/earth2") != std::string::npos) check(big >= 3, "the upper Cape's ponds (Mashpee-Wakeby, Johns, Ashumet)");
   }
   if (dir == "tests/fixtures/earth2" || dir.find("fixtures/earth2") != std::string::npos) {

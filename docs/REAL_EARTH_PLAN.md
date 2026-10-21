@@ -489,10 +489,18 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
     - The zips are kept as the run's artifacts and attached to a release only when one is named.
     - A three-block part of New England (40-50° N, 80-50° W) builds here in about 3 minutes (44 s of rasters,
       2.5 minutes of roads) at a peak of 2.2 GB. It writes 42 MB, 30 MB of it the New England block's local roads.
+  - **The first global run** (run 39539712480, 21 October): 111 jobs, every one green, in 77 minutes - the sources
+    29 minutes (from nothing in the cache), the 108 parts 16 at a time (2 to 4 minutes each over the oceans), the
+    pack's index, verification and zips 9 minutes.
+    - The pack: 1,763 files, 1.55 GB. Its core zip is 13.3 MB (the index, the manifest, the airports, the places,
+      the GLO-90 bitmap, `stream.idx`); the rest, 1,759 bundles, is one zip of 1.54 GB. It is attached to the
+      release `earth` (`earth-pack-f0ed8d779cb6-01-of-02.zip`, `-02-of-02.zip`, `SHA256SUMS`).
+    - Streamed from that release, as the game reads it: the Vineyard's chart (KMVY) builds after fetching 500 kB in
+      27 pieces, Boston's after 440 kB more. Boston builds in 47 s on 4 cores, its tiles fetched or not - as long as
+      from the New England dev pack on the same machine, so the build, not the stream, is its cost (E2's open item).
+    - It was built before the lighthouses (E8); the next run adds them.
 
   Still open in E5:
-  - **A first global run** and its size, then the `earth` release it fills (the owner's call: its Actions time and
-    the publishing).
   - **The far terrain and GLO-90: left as it is.** A far patch's finest vertices are 870 m apart, near ETOPO's own
     30″, so GLO-90 would add little but aliasing.
 
