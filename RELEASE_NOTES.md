@@ -1,7 +1,7 @@
 ## What's new in v3.52.0
 
 ### The real Earth
-- **Fly anywhere on the real planet.** In Free Flight, press **Get the real Earth**. The game downloads 13 MB: the index, the world's open airports with a runway of 300 m or more, its towns and its lighthouses. The land itself (terrain, coasts, land cover, roads) streams in as you fly, a few hundred kB for each area, and is kept for next time, up to 2 GB. With no connection, the places you've flown before still load.
+- **Fly anywhere on the real planet.** In Free Flight, press **Get the real Earth**. The game downloads 14 MB: the index, the world's open airports with a runway of 300 m or more, its towns and its lighthouses. The land itself (terrain, coasts, land cover, roads) streams in as you fly, a few hundred kB for each area, and is kept for next time, up to 2 GB. With no connection, the places you've flown before still load.
 - **Want it all on disk?** On the real-Earth screen, **Keep all of it offline** downloads the whole pack (1.5 GB). A download that breaks off carries on from where it stopped when you try again.
 - **Pick any airport.** Press **Real Earth** and type an airport code (KBOS, EGLL), its name or its town. The flight starts on its main runway, on the real heading, with its other runways painted and levelled around it.
 - **Keep flying.** The real Earth has no edge. The area ahead is prepared as you fly and you move into it without a loading screen: the same trees in the same places, each airport's buildings on the same side, the autopilot, the GPS pick, the tower and the traffic carried across. Beyond what's built in detail, the terrain goes on to the horizon, lit at night by its towns.
