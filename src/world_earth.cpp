@@ -337,14 +337,35 @@ void World::buildEarth(const procedural::Descriptor& chartDesc, const std::strin
   }
   extraRunways = picked->extras;
   // (the side each airport's buildings and apron stand on, its own in every chart that holds it - never by its place in
-  // this chart's list, which the next orders its own way: away from its other runways, else as its ident has it)
+  // this chart's list, which the next orders its own way: the side its other runways cross the less - their length
+  // over its apron and its building line - else as its ident has it)
   for (size_t i = 0; i < airports.size(); i++) {
     Airport& a = airports[i];
-    float across = 0.f;
-    for (const ExtraRunway& r : extraRunways) if (r.airport == (int)i) across += aptLocal(a, vec3(r.x, 0, r.z)).y;
+    a.hub = a.size == 2 && a.length >= 2800.f;   // (its long terminal: aptLayout)
+    a.side = 1;
+    const AptLayout L = aptLayout(a, (int)i);
+    const float u0 = L.apU0 - 60.f, u1 = L.apU1 + 60.f, v0 = a.width * 0.5f + 10.f, v1 = (L.paved ? L.lotV1 : L.bldV + 40.f) + 20.f;
+    float crossed[2] = {0.f, 0.f};   // (on the right, on the left)
+    for (const ExtraRunway& r : extraRunways) {
+      if (r.airport != (int)i) continue;
+      const vec3 d(sinf(r.heading * DEG) * r.length * 0.5f, 0, -cosf(r.heading * DEG) * r.length * 0.5f);
+      const vec2 p = aptLocal(a, vec3(r.x, 0, r.z) - d), q = aptLocal(a, vec3(r.x, 0, r.z) + d);
+      for (int s = 0; s < 2; s++) {   // (the segment's length within the side's rectangle: clipped, Liang-Barsky)
+        const float sv = s ? -1.f : 1.f, du = q.x - p.x, dv = (q.y - p.y) * sv;
+        float t0 = 0.f, t1 = 1.f;
+        auto clip = [&](float num, float den) {
+          if (fabsf(den) < 1e-6f) return num >= 0.f;
+          const float t = num / den;
+          if (den > 0.f) t1 = std::min(t1, t); else t0 = std::max(t0, t);
+          return t0 <= t1;
+        };
+        if (clip(u1 - p.x, du) && clip(p.x - u0, -du) && clip(v1 - p.y * sv, dv) && clip(p.y * sv - v0, -dv))
+          crossed[s] += (t1 - t0) * hypotf(du, dv);
+      }
+    }
     uint32_t h = 2166136261u;
     for (const char* c = a.code; *c; c++) { h ^= (uint8_t)*c; h *= 16777619u; }
-    a.side = across > 50.f ? -1 : across < -50.f ? 1 : (h >> 7) & 1 ? 1 : -1;
+    a.side = crossed[0] + 50.f < crossed[1] ? 1 : crossed[1] + 50.f < crossed[0] ? -1 : (h >> 7) & 1 ? 1 : -1;
   }
   {   // the way houses are built here: the country most of its airports are in (the chart's own airport with none)
     std::map<std::string, int> count;

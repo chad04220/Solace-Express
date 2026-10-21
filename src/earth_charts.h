@@ -8,7 +8,7 @@
 
 namespace earthCharts {
 constexpr int kLattice = 32;                  // a chart's origin snaps to 1/32 of a degree each way
-constexpr uint32_t kGeneratorVersion = 5;     // the real Earth's charts' content (their cache, never an id): 2, the built-up districts; 3, the airports' other runways; 4, the woods' noise in the shared frame; 5, the airports' own sides
+constexpr uint32_t kGeneratorVersion = 6;     // the real Earth's charts' content (their cache, never an id): 2, the built-up districts; 3, the airports' other runways; 4, the woods' noise in the shared frame; 5, the airports' own sides; 6, the hubs' long terminals
 constexpr const char* kIdPrefix = "earth:";
 
 // The Earth pack the game reads: EARTH_PACK when set, else "earth" beside the game's working folder (opened when

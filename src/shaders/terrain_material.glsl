@@ -95,8 +95,10 @@ float lineM(float d, float hw){ return step(abs(d), hw); }
 bool aptGround(int ai, vec2 uv, vec3 pw, int surf, int size, float len, float wid, vec2 footprint, inout Mat m){
 #ifndef PART_BAKE
   float side = ((uApSides >> ai) & 1) != 0 ? 1.0 : -1.0;   // (the slot's airport's own side: Renderer::airportSlots)
+  bool hub = ((uApHubs >> ai) & 1) != 0;
 #else
   float side = (ai - (ai/2)*2) == 1 ? 1.0 : -1.0;
+  bool hub = false;
 #endif
   float u = uv.x, vv = uv.y*side, hw = wid*0.5;
   vec3 nTS;
@@ -111,6 +113,7 @@ bool aptGround(int ai, vec2 uv, vec3 pw, int surf, int size, float len, float wi
     float termU = apU0 + ap*(big ? 0.51 : 0.47), termHL = min(ap*(big ? 0.17 : 0.1), big ? 130.0 : 45.0);
     float tieU0 = big ? apU0 + ap*0.2 : apU0 + 12.0, tieU1 = apU0 + ap*(big ? 0.31 : 0.32);
     float standU0 = apU0 + ap*(big ? 0.72 : 0.6), standU1 = apU1 - (big ? 25.0 : 20.0);
+    if (big && hub) { tieU0 = apU0 + ap*0.12; tieU1 = apU0 + ap*0.18; termU = apU0 + ap*0.5; termHL = min(ap*0.27, 400.0); standU0 = termU + termHL + 20.0; }
     int padLayer = big ? M_CONCRETE : M_ASPHALT;
     // nearest exit (signed offset of u from its centreline)
     float e0 = -(len*0.5 - 25.0), e1 = big ? -len*0.22 : -len*0.12, e2 = big ? len*0.05 : len*0.22, e3 = big ? len*0.27 : 1e9, e4 = len*0.5 - 25.0;

@@ -1,5 +1,6 @@
 // Airport ground plans and furniture: nothing stands on a runway, taxiway or exit (or the runway's graded strip),
-// buildings and parked aircraft don't overlap each other, the AI stands are clear, and every airport got furnished.
+// buildings and parked aircraft don't overlap each other, the AI stands are clear, and every airport got furnished -
+// and again with each international field laid out as a hub (its long terminal of several buildings).
 #include "../src/airport_layout.h"
 #include "../src/entities.h"
 #include "test_world.h"
@@ -33,7 +34,7 @@ static bool vehicle(int k) { return k == EK_CAR || k == EK_TRUCK; }
 int main() {
   buildTestWorld();
   int fails = 0, total = 0;
-  for (int ai = 0; ai < (int)g_world.airports.size(); ai++) {
+  auto checkAirport = [&](int ai) {
     const Airport& a = g_world.airports[ai];
     AptLayout L = aptLayout(a, ai);
     std::vector<AptItem> items; airportItems(ai, items);
@@ -60,10 +61,28 @@ int main() {
       for (auto& p : solid) if (overlap(o, p, 0.5f)) { printf("  !! %s: %s at (%.0f, %.0f) overlaps another item\n", a.code, kEntInfo[it.kind].name, o.u, o.v); bad++; break; }
       solid.push_back(o);
     }
-    printf("%s %-26s %4d items%s\n", a.code, a.name, n, bad ? "  <-- problems" : "");
+    printf("%s %-26s %4d items%s%s\n", a.code, a.name, n, a.hub ? " (as a hub)" : "", bad ? "  <-- problems" : "");
     if (n < (L.paved ? 60 : 8)) { printf("  !! %s: only %d items\n", a.code, n); bad++; }
     fails += bad; total += n;
+  };
+  for (int ai = 0; ai < (int)g_world.airports.size(); ai++) checkAirport(ai);
+  // the international fields laid out as hubs (Airport::hub, the real Earth's large airports): the long terminal's
+  // buildings, its gates and the stands past it clear of each other and of the runway, the taxiway and the exits
+  int hubs = 0;
+  for (int ai = 0; ai < (int)g_world.airports.size(); ai++) {
+    Airport& a = g_world.airports[ai];
+    if (a.size != 2) continue;
+    a.hub = true;
+    std::vector<AptItem> items; airportItems(ai, items);
+    int terminals = 0, airliners = 0;
+    for (const auto& it : items) { terminals += it.kind == EK_TERMINAL; airliners += it.kind == EK_AIRLINER; }
+    const AptLayout L = aptLayout(a, ai);
+    printf("  hub %s: terminal %.0f m long in %d buildings, %d airliners, stands from %.0f m\n", a.code, 2 * L.termHL, terminals, airliners, L.standU0);
+    if (terminals < 2 || L.termHL <= 130.f || L.standU0 < L.termU + L.termHL) { printf("  !! %s: not laid out as a hub\n", a.code); fails++; }
+    checkAirport(ai);
+    a.hub = false; hubs++;
   }
+  if (hubs == 0) { printf("  !! no international field to lay out as a hub\n"); fails++; }
   printf("airport_layout_test: %d items, %s (%d problems)\n", total, fails ? "FAIL" : "ok", fails);
   return fails ? 1 : 0;
 }

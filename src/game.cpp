@@ -5911,6 +5911,17 @@ void Game::render() {
 }
 
 // ------------------------------------------------------------------ development scenes for the render harness
+// An airport's detail views (apv_ scenes, REGION_APV): 0 over the apron, 1 at the terminal's front, 2 along the stands,
+// 3 from past the runway's end
+static void airportView(int ai, int view, vec3& cam, vec3& look) {
+  const Airport& a = g_world.airports[ai];
+  AptLayout L = aptLayout(a, ai);
+  float mid = 0.5f * (L.apU0 + L.apU1);
+  if (view == 0) { cam = aptWorld(a, L.apU0 - 120.f, L.side * (L.twV - 60.f), 0); cam.y = a.elev + 70.f; look = aptWorld(a, mid, L.side * L.bldV, a.elev + 5.f); }
+  else if (view == 1) { cam = aptWorld(a, L.termU - 140.f, L.side * (L.apV0 + 10.f), 0); cam.y = a.elev + 4.f; look = aptWorld(a, L.termU + 40.f, L.side * L.bldV, a.elev + 6.f); }
+  else if (view == 2) { cam = aptWorld(a, L.standU0 - 60.f, L.side * (L.twV - 30.f), 0); cam.y = a.elev + 25.f; look = aptWorld(a, L.standU1, L.side * L.bldV, a.elev + 4.f); }
+  else { cam = aptWorld(a, -a.length * 0.5f - 300.f, -L.side * 60.f, 0); cam.y = a.elev + 160.f; look = aptWorld(a, 0, L.side * L.apV0, a.elev); }
+}
 static std::string s_wxScene;   // a debug scene's weather: "<scene>@<WX>" (as the WX variable), for the render server's shots
 void Game::debugScene(const std::string& name) {
   if (name.find('@') != std::string::npos) { s_wxScene = name.substr(name.find('@') + 1); debugScene(name.substr(0, name.find('@'))); s_wxScene.clear(); return; }
@@ -5945,6 +5956,10 @@ void Game::debugScene(const std::string& name) {
     if (const char* view = getenv("REGION_VIEW")) {
       vec3 p, l;
       if (sscanf(view, "%f,%f,%f,%f,%f,%f", &p.x, &p.y, &p.z, &l.x, &l.y, &l.z) == 6) { dbgCam = true; dbgFollow = false; dbgCamPos = p; dbgCamLook = l; }
+    }
+    // REGION_APV=<view>: an airport detail view of REGION_AIRPORT's field (airportView)
+    if (const char* apv = getenv("REGION_APV"); apv && getenv("REGION_AIRPORT")) {
+      airportView(freeAirport, atoi(apv), dbgCamPos, dbgCamLook); dbgCam = true; dbgFollow = false;
     }
     // REGION_GPS=<range m>: the GPS open over the region (its airports and landmarks)
     if (const char* gps = getenv("REGION_GPS")) { showMap = true; uiAnim[0x6e61u] = 1.f; gpsRangeTarget = gpsRange = std::max(2000.f, (float)atof(gps)); }
@@ -6642,15 +6657,8 @@ void Game::debugScene(const std::string& name) {
     c.wx = Weather(); c.wx.timeOfDay = tod; c.wx.cloudCover = 0.25f; c.wx.visibility = 60000; c.wx.windSpeed = 6; c.wx.windFrom = 200;
     realTime = 20; startFlight(c, 0, Career::SRC_OWNED);
     for (int i = 0; i < 10; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
-    const Airport& a = g_world.airports[ai];
-    AptLayout L = aptLayout(a, ai);
-    float mid = 0.5f * (L.apU0 + L.apU1);
-    vec3 cam, look;
-    if (view == 0) { cam = aptWorld(a, L.apU0 - 120.f, L.side * (L.twV - 60.f), 0); cam.y = a.elev + 70.f; look = aptWorld(a, mid, L.side * L.bldV, a.elev + 5.f); }
-    else if (view == 1) { cam = aptWorld(a, L.termU - 140.f, L.side * (L.apV0 + 10.f), 0); cam.y = a.elev + 4.f; look = aptWorld(a, L.termU + 40.f, L.side * L.bldV, a.elev + 6.f); }
-    else if (view == 2) { cam = aptWorld(a, L.standU0 - 60.f, L.side * (L.twV - 30.f), 0); cam.y = a.elev + 25.f; look = aptWorld(a, L.standU1, L.side * L.bldV, a.elev + 4.f); }
-    else { cam = aptWorld(a, -a.length * 0.5f - 300.f, -L.side * 60.f, 0); cam.y = a.elev + 160.f; look = aptWorld(a, 0, L.side * L.apV0, a.elev); }
-    dbgCam = true; dbgFollow = false; dbgCamPos = cam; dbgCamLook = look;
+    airportView(ai, view, dbgCamPos, dbgCamLook);
+    dbgCam = true; dbgFollow = false;
     toasts.clear(); hint.clear(); uiHidden = true; return;
   }
   if (name.compare(0, 9, "loadshot_") == 0) {

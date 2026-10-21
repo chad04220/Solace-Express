@@ -653,7 +653,22 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
   - `REGION_STYLE=<n>` builds a region scene's houses another way, for review. Oak Bluffs from 260 m in four styles
     shows the roofs change from grey shingle to terracotta to red and black to tin.
 
-  Still open in E8: airport layouts by size, rivers (GRIP has none; a rivers dataset), and real landmarks.
+- **E8, fifth pass: the hubs** (`Airport::hub`). A real large airport on a runway of 2.8 km or more is laid out as a
+  hub. Before, an international field had one terminal of at most 260 m whatever its size; Boston and JFK had the
+  same as a regional capital.
+  - A hub's apron, its middle, holds a long terminal: up to 800 m, its own building every 260 m or so, a gate with an
+    airliner and a jet bridge every 54 m. The cargo sheds and a few tie-downs come before it, the AI stands after.
+  - `aptLayout` lays it out and the terrain shader mirrors it (its gates' markings, the stands', the floodlight
+    pools), told per slot (`uApHubs`).
+  - The side an airport's facilities stand on is now the side its other runways cross the less: their length over
+    its apron and building line. Before it was from where their centres lay. A building taken away for another
+    runway takes away what stood at its gates too, so no airliner parks at nothing.
+  - The islands have no hubs; their layouts are as they were. `airport_layout_test` lays out each of their
+    international fields as a hub as well, and checks again that nothing overlaps or stands on a runway, a taxiway
+    or an exit. Solace Capital as a hub: a 650 m terminal in three buildings, 11 airliners at its gates.
+  - Seen at Boston (the dev pack): the long terminal along its apron, cut where its crossing runways pass.
+
+  Still open in E8: rivers (GRIP has none; a rivers dataset), and real landmarks.
 
 Decisions taken with the defaults (the owner can change them):
 - The generated regions keep working until E6. In real-Earth play the real world replaces them; they stay available

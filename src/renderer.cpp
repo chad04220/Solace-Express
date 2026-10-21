@@ -948,6 +948,7 @@ Renderer::AirportSlots Renderer::airportSlots(const World& world, float cx, floa
     }
     const Airport& A = world.airports[ai];
     if (aptSide(A, ai) > 0.f) out.sides |= 1 << slot;
+    if (A.hub && A.size == 2) out.hubs |= 1 << slot;
     float* ap = out.ap + slot * 4; float* dim = out.dim + slot * 4; float* box = out.box + slot * 8;
     ap[0] = A.x; ap[1] = A.z; ap[2] = A.elev; ap[3] = A.heading * DEG;
     dim[0] = A.length; dim[1] = A.width; dim[2] = (float)A.surface; dim[3] = (float)A.size;
@@ -974,7 +975,7 @@ Renderer::AirportSlots Renderer::airportSlots(const World& world, float cx, floa
 }
 void Renderer::setAirportSlots(GLuint p, const World& world, float cx, float cz) {
   const AirportSlots S = airportSlots(world, cx, cz);
-  glUniform1i(U(p, "uApCount"), S.n); glUniform1i(U(p, "uApSides"), S.sides);
+  glUniform1i(U(p, "uApCount"), S.n); glUniform1i(U(p, "uApSides"), S.sides); glUniform1i(U(p, "uApHubs"), S.hubs);
   if (S.n > 0) {
     glUniform4fv(U(p, "uAp"), S.n, S.ap); glUniform4fv(U(p, "uApDim"), S.n, S.dim);
     glUniform4fv(U(p, "uApBox"), 2 * S.n, S.box);

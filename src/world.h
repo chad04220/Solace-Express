@@ -50,6 +50,9 @@ struct Airport {
   // real Earth's, the same in every chart that holds it (World::buildEarth); 0 by its index, as the islands' have it
   // (aptSide, airport_layout.h)
   int side = 0;
+  // a hub: the real Earth's large airports on a runway of 2.8 km or more (World::buildEarth) - a long terminal, its own
+  // building every 260 m or so, between the cargo sheds and the AI stands (aptLayout)
+  bool hub = false;
   // fuel costs more the further the bowser had to come: hubs x1, regional fields x1.15, strips x1.4, snow and gravel x1.8
   float fuelPriceMult() const { float m = size >= 2 ? 1.f : size == 1 ? 1.15f : 1.4f; return (surface == SURF_SNOW || surface == SURF_GRAVEL) ? std::max(m, 1.8f) : m; }
   // derived

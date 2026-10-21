@@ -117,8 +117,12 @@ void paved(Placer& P, const Airport& a, const AptLayout& L) {
   bool big = a.size == 2;
   float hl = a.length * 0.5f, hw = a.width * 0.5f;
   float tU0 = L.termU - L.termHL, tU1 = L.termU + L.termHL;
-  // ---- terminal, and the gates in front of it
-  P.facing(EK_TERMINAL, L.termU, L.bldV, L.termHL / 60.f, big ? 1.f : 0.62f, big ? 1.f : 0.7f);
+  // ---- terminal, and the gates in front of it (a hub's long one: a building every 260 m or so, side by side, 6 m apart)
+  const int units = big && a.hub ? std::max(1, (int)ceilf(L.termHL / 130.f)) : 1;
+  for (int k = 0; k < units; k++) {
+    const float uh = L.termHL / units, gap = units > 1 ? 3.f : 0.f;
+    P.facing(EK_TERMINAL, tU0 + uh * (2 * k + 1), L.bldV, (uh - gap) / 60.f, big ? 1.f : 0.62f, big ? 1.f : 0.7f);
+  }
   if (big) {
     int n = std::max(2, (int)(L.termHL * 2.f / 54.f));
     float span = n * 54.f;
@@ -314,9 +318,11 @@ void airportItems(int ai, std::vector<AptItem>& out) {
   if (L.paved) paved(P, a, L); else strip(P, a, L);
   P.rs = 0xA17F93C5u ^ (uint32_t)(ai * 747796405u);
   groundLife(P, a, L);
-  // (the real Earth: nothing of the layout on its other runways, nor within 20 m of one - it was laid out by the main)
+  // (the real Earth: nothing of the layout on its other runways, nor within 20 m of one - it was laid out by the main -
+  // and nothing at the gates of a terminal or a cargo shed so taken away: its airliners, bridges and trucks would
+  // stand at nothing)
   const auto& extras = sceneryWorld().extraRunways;
-  out.erase(std::remove_if(out.begin(), out.end(), [&](const AptItem& it) {
+  auto onExtra = [&](const AptItem& it) {
     const float reach = hypotf(kEntInfo[it.kind].hx * it.e.sx, kEntInfo[it.kind].hz * it.e.sz) + 20.f;
     for (const ExtraRunway& r : extras) {
       if (r.airport != ai) continue;
@@ -325,5 +331,20 @@ void airportItems(int ai, std::vector<AptItem>& out) {
       if (u < r.length * 0.5f + reach && v < r.width * 0.5f + reach) return true;
     }
     return false;
-  }), out.end());
+  };
+  std::vector<std::pair<float, float>> gone;   // (the runway-local stretches of the buildings taken away)
+  for (const AptItem& it : out)
+    if ((it.kind == EK_TERMINAL || it.kind == EK_WAREHOUSE) && onExtra(it)) {
+      const float u = aptLocal(a, vec3(it.e.x, 0, it.e.z)).x, h = kEntInfo[it.kind].hx * it.e.sx;
+      gone.push_back({u - h - 4.f, u + h + 4.f});
+    }
+  auto atGoneGate = [&](const AptItem& it) {
+    if (gone.empty() || (it.kind != EK_AIRLINER && it.kind != EK_JETBRIDGE && it.kind != EK_TRUCK)) return false;
+    const vec2 l = aptLocal(a, vec3(it.e.x, 0, it.e.z));
+    const float v = l.y * L.side;
+    if (v < L.apV0 || v > L.bldV + 2.f) return false;   // (on the apron, in front of the building line)
+    for (const auto& g : gone) if (l.x > g.first && l.x < g.second) return true;
+    return false;
+  };
+  out.erase(std::remove_if(out.begin(), out.end(), [&](const AptItem& it) { return onExtra(it) || atGoneGate(it); }), out.end());
 }

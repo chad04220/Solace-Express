@@ -51,6 +51,11 @@ inline AptLayout aptLayout(const Airport& a, int ai) {
       L.tieU0 = L.apU0 + ap * 0.20f; L.tieU1 = L.apU0 + ap * 0.31f;
       L.termU = L.apU0 + ap * 0.51f; L.termHL = std::min(ap * 0.17f, 130.f);
       L.standU0 = L.apU0 + ap * 0.72f; L.standU1 = L.apU1 - 25.f;
+      if (a.hub) {   // (a hub: the cargo, a few tie-downs, the long terminal at the apron's middle, the stands past it)
+        L.tieU0 = L.apU0 + ap * 0.12f; L.tieU1 = L.apU0 + ap * 0.18f;
+        L.termU = L.apU0 + ap * 0.5f; L.termHL = std::min(ap * 0.27f, 400.f);
+        L.standU0 = L.termU + L.termHL + 20.f;
+      }
     } else {
       L.nExit = 4;
       float e[4] = {-(len * 0.5f - 25.f), -len * 0.12f, len * 0.22f, len * 0.5f - 25.f};
