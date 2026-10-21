@@ -246,6 +246,10 @@ public:
   bool init(int w, int h, const std::function<void(float, const std::string&)>& progress = {});                       // everything else (runs compilePrograms itself if not done yet)
   // CPU map preparation is safe on the region loader after world generation; GPU publication stays on the GL thread.
   struct V4 { float x, y, z, w; };
+  // The airports the ground shaders paint and trace: the 16 nearest (cx, cz), their uniforms packed (renderer.cpp)
+  struct AirportSlots { int n = 0; int index[16] = {}; float ap[64] = {}, dim[64] = {}, box[128] = {}; };
+  static AirportSlots airportSlots(const World& world, float cx, float cz);
+  static void setAirportSlots(GLuint p, const World& world, float cx, float cz);   // (their uniforms, on program p)
   using FarTerrainVertex = horizon::Vertex;
   struct WorldUploadData {
     std::vector<V4> data;

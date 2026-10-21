@@ -875,6 +875,7 @@ void Renderer::renderDisplays(const FrameParams& fp, bool panel, int half) {
 }
 
 // Renders the GPS aerial image: half x half metres around (cx, cz), north (-z) at the top, into texMap
+
 void Renderer::renderMap(float cx, float cz, float half, int N) {
   if (!progMap) return;
   if (!texMap || mapN != N) {
@@ -906,17 +907,8 @@ void Renderer::renderMap(float cx, float cz, float half, int N) {
   glActiveTexture(GL_TEXTURE0 + 6); glBindTexture(GL_TEXTURE_2D, texHMax); glUniform1i(U(p, "uHMax"), 6);
   glActiveTexture(GL_TEXTURE0 + 13); glBindTexture(GL_TEXTURE_2D, texCloudCov); glUniform1i(U(p, "uCloudCov"), 13);
   glActiveTexture(GL_TEXTURE0 + 14); glBindTexture(GL_TEXTURE_3D, texNoise3); glUniform1i(U(p, "uNoise3"), 14);
-  {
-    int n = std::min(16, (int)g_world.airports.size());
-    float ap[64], dim[64];
-    for (int i = 0; i < n; i++) {
-      const Airport& a = g_world.airports[i];
-      ap[i * 4] = a.x; ap[i * 4 + 1] = a.z; ap[i * 4 + 2] = a.elev; ap[i * 4 + 3] = a.heading * DEG;
-      dim[i * 4] = a.length; dim[i * 4 + 1] = a.width; dim[i * 4 + 2] = (float)a.surface; dim[i * 4 + 3] = (float)a.size;
-    }
-    glUniform1i(U(p, "uApCount"), n); glUniform4fv(U(p, "uAp"), n, ap); glUniform4fv(U(p, "uApDim"), n, dim);
-    glUniform1i(U(p, "uBoxCount"), std::min(128, (int)g_world.boxes.size()));
-  }
+  setAirportSlots(p, g_world, cx, cz);   // (the 16 nearest the map's centre)
+  glUniform1i(U(p, "uBoxCount"), std::min(128, (int)g_world.boxes.size()));
   glUniform1i(U(p, "uCraterN"), 0); glUniform1f(U(p, "uMaxH"), maxH); glUniform1i(U(p, "uQuality"), 2);
   glUniform1f(U(p, "uTime"), 0.f); glUniform1f(U(p, "uWet"), 0.f); glUniform1f(U(p, "uSnow"), 0.f);
   glUniform4f(U(p, "uMapView"), cx, cz, half, 2.f * half / N);
@@ -926,6 +918,68 @@ void Renderer::renderMap(float cx, float cz, float half, int N) {
   glBindTexture(GL_TEXTURE_2D, texMap); glGenerateMipmap(GL_TEXTURE_2D);
   glActiveTexture(GL_TEXTURE0);
   glBindFramebuffer(GL_FRAMEBUFFER, 0); glViewport(0, 0, W, H);
+}
+
+// The airports the ground shaders paint and trace (scene_uniforms.glsl uAp, uApDim, uApBox): the 16 nearest a point. A
+// real-Earth chart holds up to 40, and past the 16th none was painted. Each keeps a slot of its own index's parity -
+// the even airports the even slots, the odd the odd, 8 of each - since the shaders take the side its apron lies on from
+// the slot (as airport_layout.h lays it out, by the airport's index). With 16 or fewer, every airport is in its own
+// slot; past 16 there are 8 of each parity at least. Each carries its buildings' world bounds and their boxes' range
+// (traceBoxes skips an airport the ray misses)
+Renderer::AirportSlots Renderer::airportSlots(const World& world, float cx, float cz) {
+  AirportSlots out;
+  const int count = (int)world.airports.size();
+  std::vector<int> order(std::min(count, 16), -1);
+  if (count <= 16) for (int i = 0; i < count; i++) order[i] = i;
+  else {
+    auto far = [&](int i) { return hypotf(world.airports[i].x - cx, world.airports[i].z - cz); };
+    for (int parity = 0; parity < 2; parity++) {
+      std::vector<int> mine;
+      for (int i = parity; i < count; i += 2) mine.push_back(i);
+      const size_t keep = std::min<size_t>(8, mine.size());
+      std::partial_sort(mine.begin(), mine.begin() + keep, mine.end(), [&](int a, int b) { const float da = far(a), db = far(b); return da != db ? da < db : a < b; });
+      for (size_t k = 0; k < keep; k++) order[2 * k + parity] = mine[k];
+    }
+  }
+  const int nb = std::min(128, (int)world.boxes.size());
+  for (int slot = 0; slot < (int)order.size(); slot++) {
+    const int ai = order[slot];
+    out.index[slot] = ai;
+    if (ai < 0) {   // (never, as above: were one empty, a runway of no length far off, that nothing matches)
+      out.ap[slot * 4] = 1e9f; out.ap[slot * 4 + 1] = 1e9f;
+      continue;
+    }
+    const Airport& A = world.airports[ai];
+    float* ap = out.ap + slot * 4; float* dim = out.dim + slot * 4; float* box = out.box + slot * 8;
+    ap[0] = A.x; ap[1] = A.z; ap[2] = A.elev; ap[3] = A.heading * DEG;
+    dim[0] = A.length; dim[1] = A.width; dim[2] = (float)A.surface; dim[3] = (float)A.size;
+    const float s = sinf(A.heading * DEG), c = cosf(A.heading * DEG);
+    vec3 lo(1e9f, 1e9f, 1e9f), hi(-1e9f, -1e9f, -1e9f); int first = -1, count = 0;
+    for (int i = 0; i < nb; i++) {
+      const Box& b = world.boxes[i];
+      if (b.airport != ai) continue;
+      if (first < 0) first = i;
+      count = i - first + 1;
+      const float r = length(vec3(b.h.x * 2.f, 0, b.h.z * 2.f)) + 2.f;   // generous: towers/radomes, rotation
+      for (int k = 0; k < 4; k++) {
+        const float lx = b.c.x + ((k & 1) ? r : -r), lz = b.c.z + ((k & 2) ? r : -r);
+        // inverse of the shader's airport frame: local (x, z) -> world
+        const float wx = A.x + lx * c + lz * s, wz = A.z + lx * s - lz * c;
+        lo.x = std::min(lo.x, wx); hi.x = std::max(hi.x, wx); lo.z = std::min(lo.z, wz); hi.z = std::max(hi.z, wz);
+      }
+      lo.y = std::min(lo.y, A.elev + b.c.y - b.h.y * 1.3f - 2.f); hi.y = std::max(hi.y, A.elev + b.c.y + b.h.y * 1.3f + 2.f);
+    }
+    if (first >= 0) { box[0] = lo.x; box[1] = lo.y; box[2] = lo.z; box[3] = (float)first; box[4] = hi.x; box[5] = hi.y; box[6] = hi.z; box[7] = (float)count; }
+  }
+  out.n = (int)order.size();
+  return out;
+}
+void Renderer::setAirportSlots(GLuint p, const World& world, float cx, float cz) {
+  const AirportSlots S = airportSlots(world, cx, cz);
+  glUniform1i(U(p, "uApCount"), S.n);
+  if (S.n == 0) return;
+  glUniform4fv(U(p, "uAp"), S.n, S.ap); glUniform4fv(U(p, "uApDim"), S.n, S.dim);
+  glUniform4fv(U(p, "uApBox"), 2 * S.n, S.box);
 }
 
 // Pack the shader world table without depending on the active world or a GL context.
@@ -938,29 +992,9 @@ std::vector<Renderer::V4> Renderer::prepareWorldData(const World& world) {
     d[192 + i] = {b.h.x, b.h.y, b.h.z, (float)b.kind};
   }
   // (slots 320..383 held the settlements' street grids until their streets became the network's roads, v3.47: unused)
-  // [384,400) / [400,416): world bounds of each airport's buildings + their box range (lets the shader skip airports)
+  // ([384, 416) held each airport's buildings' bounds until the shaders took the nearest 16 airports as uniforms:
+  // airportSlots, above)
   d.resize(416, V4{0, 0, 0, 0});
-  int nb = std::min(128, (int)world.boxes.size());
-  for (int ap = 0; ap < 16 && ap < (int)world.airports.size(); ap++) {
-    const Airport& A = world.airports[ap];
-    float s = sinf(A.heading * DEG), c = cosf(A.heading * DEG);
-    vec3 lo(1e9f, 1e9f, 1e9f), hi(-1e9f, -1e9f, -1e9f); int first = -1, count = 0;
-    for (int i = 0; i < nb; i++) {
-      const Box& b = world.boxes[i];
-      if (b.airport != ap) continue;
-      if (first < 0) first = i;
-      count = i - first + 1;
-      float r = length(vec3(b.h.x * 2.f, 0, b.h.z * 2.f)) + 2.f;   // generous: towers/radomes, rotation
-      for (int k = 0; k < 4; k++) {
-        float lx = b.c.x + ((k & 1) ? r : -r), lz = b.c.z + ((k & 2) ? r : -r);
-        // inverse of the shader's airport frame: local (x, z) -> world
-        float wx = A.x + lx * c + lz * s, wz = A.z + lx * s - lz * c;
-        lo.x = std::min(lo.x, wx); hi.x = std::max(hi.x, wx); lo.z = std::min(lo.z, wz); hi.z = std::max(hi.z, wz);
-      }
-      lo.y = std::min(lo.y, A.elev + b.c.y - b.h.y * 1.3f - 2.f); hi.y = std::max(hi.y, A.elev + b.c.y + b.h.y * 1.3f + 2.f);
-    }
-    if (first >= 0) { d[384 + ap] = {lo.x, lo.y, lo.z, (float)first}; d[400 + ap] = {hi.x, hi.y, hi.z, (float)count}; }
-  }
   // rows 1.. : the road network's entries, then its segments from the row texel 3 names (roads.glsl roadEntry)
   const int W = ROAD_DATA_W;
   d.resize(W, V4{0, 0, 0, 0});
@@ -1766,15 +1800,7 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
   }
   // airports + buildings
   {
-    int n = std::min(16, (int)g_world.airports.size());
-    float ap[64], dim[64];
-    for (int i = 0; i < n; i++) {
-      const Airport& a = g_world.airports[i];
-      ap[i * 4] = a.x; ap[i * 4 + 1] = a.z; ap[i * 4 + 2] = a.elev; ap[i * 4 + 3] = a.heading * DEG;
-      dim[i * 4] = a.length; dim[i * 4 + 1] = a.width; dim[i * 4 + 2] = (float)a.surface; dim[i * 4 + 3] = (float)a.size;
-    }
-    glUniform1i(U(p, "uApCount"), n);
-    glUniform4fv(U(p, "uAp"), n, ap); glUniform4fv(U(p, "uApDim"), n, dim);
+    setAirportSlots(p, g_world, fp.camPos.x, fp.camPos.z);   // (the 16 nearest the camera)
     glUniform1i(U(p, "uBoxCount"), std::min(128, (int)g_world.boxes.size()));
     glActiveTexture(GL_TEXTURE0 + 5); glBindTexture(GL_TEXTURE_2D, texData); glUniform1i(U(p, "uData"), 5);
   }

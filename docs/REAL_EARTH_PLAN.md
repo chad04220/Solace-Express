@@ -519,6 +519,21 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
     22:30, Martha's Vineyard's and the Cape's towns show as faint warm clusters 60 to 100 km off.
   - `REGION_TOD=<hours>` sets the time of day of a region scene, for review shots.
 
+- **A fix: every airport of a chart painted.** A real-Earth chart holds up to 40 airports, but the ground shaders took
+  the first 16 (`uAp`, `uApDim`). The smaller fields past them had their flattened grounds, ATC and the GPS, and no
+  runway drawn. `Renderer::airportSlots` now gives them the airports nearest the camera, or the map's centre for the
+  GPS image, re-chosen each frame.
+  - It takes the 8 nearest even-indexed airports into the even slots and the 8 nearest odd ones into the odd. The
+    shaders take the side an apron lies on from the slot's parity, as `airport_layout.h` lays it out by the airport's.
+    The runway shader's pinned functions (`runway_preservation_test`) stay as they were.
+  - Each slot carries its buildings' world bounds and box range as uniforms (`uApBox`), in place of the world table's
+    rows 384 to 415, which were by airport index. The uniform is kept out of the aircraft bodies' bake, so its cache
+    key doesn't move.
+  - With 16 or fewer airports, every one keeps its own slot. The islands' renders are pixel-identical before and
+    after, airport and GPS map.
+  - `airport_slots_test`: forty airports. The 8 nearest of each parity are chosen, nearest first, each with its
+    runway, size and buildings, and the far end's come in as the camera goes there.
+
   Still open in E8: secondary runways, airport layouts by size, rivers (GRIP has none; a rivers dataset), regional
   building styles, and real landmarks.
 

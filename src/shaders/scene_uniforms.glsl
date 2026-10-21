@@ -7,7 +7,10 @@ uniform int uDbg;
 uniform float uPlaneTSh;   // terrain's sun shadow at the player's aircraft (computed once per frame on the CPU)   // profiling: each set bit switches one feature off (see Renderer::dbgOff)
 uniform sampler2DArray uAlb; uniform sampler2DArray uNrm;
 // airports
-uniform int uApCount; uniform vec4 uAp[16]; uniform vec4 uApDim[16];
+uniform int uApCount; uniform vec4 uAp[16]; uniform vec4 uApDim[16];   // (the 16 airports nearest: Renderer airportSlots)
+#ifndef PART_BAKE   // (the aircraft bodies' bake never traces the airports: kept out of its text, and its cache key)
+uniform vec4 uApBox[32];   // (each slot's buildings: world bounds' low corner and first box, high corner and box count)
+#endif
 uniform int uBoxCount;
 uniform sampler2D uData;  // static scene data: [0,64) roads, [64,192) box centres, [192,320) box sizes, [320,344) town xz bounds, [352,376) town y range
 vec4 dataAt(int i){ return texelFetch(uData, ivec2(i, 0), 0); }

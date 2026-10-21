@@ -73,14 +73,17 @@ vec2 traceBoxes(vec3 ro, vec3 rd, float tmax, out vec3 nOut, out float kind, out
   // buildings are stored per airport: skip every airport whose world bounds the ray misses (most of them)
   for (int ap = 0; ap < 16; ap++) {
     if (ap >= uApCount) break;
-    vec4 A0 = dataAt(384 + ap), A1 = dataAt(400 + ap);   // xyz bounds, w = first box / box count
+#ifndef PART_BAKE
+    vec4 A0 = uApBox[2*ap], A1 = uApBox[2*ap + 1];   // xyz bounds, w = first box / box count
+#else
+    vec4 A0 = vec4(0.0), A1 = vec4(0.0);   // (the bake has no airports: scene_uniforms.glsl)
+#endif
     vec3 nap; vec2 ab = iBox(ro, rd, A0.xyz, A1.xyz, nap);
     if (ab.x > ab.y || ab.y < 0.0 || ab.x > best || A1.w < 0.5) continue;
     int i0 = int(A0.w + 0.5), i1 = i0 + int(A1.w + 0.5);
   for (int i = i0; i < i1; i++){
     vec4 BC = dataAt(64 + i), BH = dataAt(192 + i);
-    int ai = int(BC.w);
-    vec4 a = uAp[ai];
+    vec4 a = uAp[ap];   // (the box's airport: the slot's, whose boxes these are)
     float s = sin(a.w), c = cos(a.w);
     vec3 o = ro - vec3(a.x, a.z, a.y);
     vec3 lo = vec3(o.x*c + o.z*s, o.y, o.x*s - o.z*c) - BC.xyz;

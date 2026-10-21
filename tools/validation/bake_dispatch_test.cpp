@@ -159,6 +159,7 @@ static GLuint linkOnce(const std::string&, const std::string& fs, std::string& e
 // shared uniforms, and the per-aircraft builders - the mock aircraft has none of its own, so the shared pair is used)
 void Renderer::bindEnvironmentMaterials(GLuint, int, int) {}
 void Renderer::setWreckBoxes(GLuint, const WreckVisual&) {}
+void Renderer::setAirportSlots(GLuint, const World&, float, float) {}
 int Renderer::afModelOf(const float*, int) { return -1; }
 bool Renderer::afBakePrograms(int, int, GLuint*) { return false; }
 bool Renderer::sharedBakePrograms(GLuint out[2]) { if (!progHullBake) return false; out[0] = progHullBake; out[1] = progHullBakeNormal; return true; }
