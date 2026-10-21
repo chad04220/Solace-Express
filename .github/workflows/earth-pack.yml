@@ -92,7 +92,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/cache/restore@v4
+      - id: restore   # (a download of the sources that stalls is tried once more: the cache's own timeout gives up on it)
+        uses: actions/cache/restore@v4
+        continue-on-error: true
+        with:
+          path: sources
+          key: ${{ needs.sources.outputs.key }}
+          fail-on-cache-miss: true
+      - if: steps.restore.outcome == 'failure'
+        uses: actions/cache/restore@v4
         with:
           path: sources
           key: ${{ needs.sources.outputs.key }}
@@ -130,7 +138,15 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install numpy
-      - uses: actions/cache/restore@v4
+      - id: restore   # (as the tables job's: a stalled download tried once more)
+        uses: actions/cache/restore@v4
+        continue-on-error: true
+        with:
+          path: sources
+          key: ${{ needs.sources.outputs.key }}
+          fail-on-cache-miss: true
+      - if: steps.restore.outcome == 'failure'
+        uses: actions/cache/restore@v4
         with:
           path: sources
           key: ${{ needs.sources.outputs.key }}
