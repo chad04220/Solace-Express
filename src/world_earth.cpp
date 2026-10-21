@@ -310,6 +310,15 @@ void World::buildEarth(const procedural::Descriptor& chartDesc, const std::strin
     anchored(vec3(0, 0, 0), ox, oz); anchored(vec3(2000, 0, 0), ex, ez); anchored(vec3(0, 0, 2000), sx, sz);
     const double turn = 0.5 * (std::atan2(ez - oz, ex - ox) + std::atan2(sz - oz, sx - ox) - 0.5 * geo::kPi);
     noiseCos = (float)std::cos(turn); noiseSin = (float)std::sin(turn); noiseX = (float)ox; noiseZ = (float)oz;
+    // (and the same frame exactly, on a grid the natural scenery reads: World::anchorPoint)
+    const int G = kAnchorN;
+    anchorGrid.assign((size_t)(G + 1) * (G + 1) * 2, 0.0);
+    for (int j = 0; j <= G; j++)
+      for (int i = 0; i <= G; i++) {
+        double ax, az;
+        anchored(vec3(-WORLD_HALF + 2.f * WORLD_HALF * i / G, 0, -WORLD_HALF + 2.f * WORLD_HALF * j / G), ax, az);
+        anchorGrid[((size_t)j * (G + 1) + i) * 2] = ax; anchorGrid[((size_t)j * (G + 1) + i) * 2 + 1] = az;
+      }
   }
   const earth::Box box = chartBox(chart, WORLD_HALF);
   earth::Sampler sampler(pack, box, true);

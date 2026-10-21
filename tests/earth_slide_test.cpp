@@ -62,6 +62,36 @@ struct GameTest {
         check(game.earthPrefetch && game.earthPrefetch->scenery && g_world.regionId == from,
               fmt("%s: its scenery staged ahead (%zu chunks)", what.c_str(), game.earthPrefetch && game.earthPrefetch->scenery ? game.earthPrefetch->scenery->generated() : 0));
       }
+      {   // the same trees, bushes and boulders in both charts where they overlap on land (Martha's Vineyard's state forest,
+          // in both, away from the towns, whose streets each chart lays out its own way): laid in the frame neighbouring
+          // charts share, each of this chart's within 400 m stands in the next one too, of its kind, within a metre
+        const geo::Position town{41.385, -70.565, 0};
+        const World& next = *game.earthPrefetch->world;
+        const regionTravel::Chart nextChart(game.earthPrefetch->region.origin);
+        Scenery here(0, &g_world), there(0, &next);
+        const vec3 p = before.local(town);
+        int seen = 0, matched = 0;
+        for (int cz = Scenery::chunkOf(p.z - 400.f); cz <= Scenery::chunkOf(p.z + 400.f); cz++)
+          for (int cx = Scenery::chunkOf(p.x - 400.f); cx <= Scenery::chunkOf(p.x + 400.f); cx++) {
+            const Scenery::Chunk* c = here.ensure(cx, cz, 2);
+            for (int k = 0; c && k <= EK_SLAB; k++)
+              for (uint32_t q = c->off[k]; q < c->off[k + 1]; q++) {
+                const Ent& e = c->ents[q];
+                if (hypotf(e.x - p.x, e.z - p.z) > 400.f) continue;
+                seen++;
+                const vec3 o = nextChart.local(before.position(vec3(e.x, 0, e.z)));
+                bool found = false;
+                for (int dz = Scenery::chunkOf(o.z - 2.f); dz <= Scenery::chunkOf(o.z + 2.f) && !found; dz++)
+                  for (int dx = Scenery::chunkOf(o.x - 2.f); dx <= Scenery::chunkOf(o.x + 2.f) && !found; dx++) {
+                    const Scenery::Chunk* d = there.ensure(dx, dz, 2);
+                    for (uint32_t r = d ? d->off[k] : 0; d && r < d->off[k + 1] && !found; r++) found = hypotf(d->ents[r].x - o.x, d->ents[r].z - o.z) < 1.f;
+                  }
+                matched += found;
+              }
+          }
+        const float share = seen ? float(matched) / float(seen) : 0.f;
+        if (from == A->id) check(seen > 100 && share > 0.9f, fmt("%s: the same trees and stones in both charts (%d of %d, %.0f%%)", what.c_str(), matched, seen, 100.f * share));
+      }
       place(moveX);
       const geo::Position where = before.position(game.plane.pos);
       const float y = game.plane.pos.y, ground = g_world.height(game.plane.pos.x, game.plane.pos.z);

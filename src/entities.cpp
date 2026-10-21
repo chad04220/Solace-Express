@@ -403,6 +403,36 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
   for (int k = 0; k < EK_COUNT; k++) C.out[k] = &lists[k];
   C.x0 = chunkX0(cx); C.z0 = chunkX0(cz); C.x1 = C.x0 + CH; C.z1 = C.z0 + CH;
   const int from = ch.level + 1;
+  // (the natural scenery's cells - the stacks', rocks', trees', bushes', boulders': on the real Earth laid in the frame
+  // neighbouring charts share, World::anchorPoint, so the next chart grows the same tree in the same place - each cell's
+  // the chunk's that holds its point, found by the frame's affine fit over the chunk (exact to millimetres over 256 m);
+  // elsewhere the chart's own cells, as ever. at: a cell's point in this chart)
+  double fit[6] = {0, 0, 1, 0, 0, 1};   // (anchor = a0 + M (local - chunk corner): a0x, a0z, then M's inverse by rows)
+  if (W.anchored()) {
+    const vec2 a00 = W.anchorPoint(C.x0, C.z0), a10 = W.anchorPoint(C.x1, C.z0), a01 = W.anchorPoint(C.x0, C.z1);
+    const double m00 = (double(a10.x) - a00.x) / CH, m10 = (double(a10.y) - a00.y) / CH, m01 = (double(a01.x) - a00.x) / CH, m11 = (double(a01.y) - a00.y) / CH;
+    const double det = m00 * m11 - m01 * m10;
+    fit[0] = a00.x; fit[1] = a00.y; fit[2] = m11 / det; fit[3] = -m01 / det; fit[4] = -m10 / det; fit[5] = m00 / det;
+  }
+  auto eachCell = [&](float cell, const auto& visit) {
+    if (!W.anchored()) {
+      for (int j = (int)floorf(C.z0 / cell); j <= (int)floorf((C.z1 - 1e-3f) / cell); j++)
+        for (int i = (int)floorf(C.x0 / cell); i <= (int)floorf((C.x1 - 1e-3f) / cell); i++) visit(i, j);
+      return;
+    }
+    float ax0 = 1e30f, az0 = 1e30f, ax1 = -1e30f, az1 = -1e30f;
+    for (int k = 0; k < 4; k++) {
+      const vec2 a = W.anchorPoint((k & 1) ? C.x1 : C.x0, (k & 2) ? C.z1 : C.z0);
+      ax0 = std::min(ax0, a.x); az0 = std::min(az0, a.y); ax1 = std::max(ax1, a.x); az1 = std::max(az1, a.y);
+    }
+    for (int j = (int)floorf(az0 / cell) - 1; j <= (int)floorf(az1 / cell) + 1; j++)
+      for (int i = (int)floorf(ax0 / cell) - 1; i <= (int)floorf(ax1 / cell) + 1; i++) visit(i, j);
+  };
+  auto at = [&](float u, float v) {
+    if (!W.anchored()) return vec2(u, v);
+    const double du = double(u) - fit[0], dv = double(v) - fit[1];
+    return vec2((float)(C.x0 + fit[2] * du + fit[3] * dv), (float)(C.z0 + fit[4] * du + fit[5] * dv));
+  };
 
   for (int L = from; L <= level; L++) {
     // ---------------------------------------------------------------- airport lighting fixtures (L1): runway edge
@@ -565,58 +595,58 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
       { float lx, lz, ly; if (lighthouseSite(lx, lz, ly) && C.inside(lx, lz)) putBuilding(C, EK_LIGHTHOUSE, lx, lz, ly, 3.4f, 3.4f, 0, 0.5f); }
       // ---------------------------------------------------------------- sea stacks (70 m cells): off the cliffed shores
       // alone, close in (seaStackShore) - an open bay or a beach has none
-      for (int sj = (int)floorf(C.z0 / STACK_CELL); sj <= (int)floorf((C.z1 - 1e-3f) / STACK_CELL); sj++)
-        for (int si = (int)floorf(C.x0 / STACK_CELL); si <= (int)floorf((C.x1 - 1e-3f) / STACK_CELL); si++) {
-          float x = (si + 0.5f + (h2(si + 17, sj) - 0.5f) * 0.4f) * STACK_CELL, z = (sj + 0.5f + (h2(si, sj + 23) - 0.5f) * 0.4f) * STACK_CELL;
-          if (!C.inside(x, z)) continue;
+      eachCell(STACK_CELL, [&](int si, int sj) {
+          const vec2 q = at((si + 0.5f + (h2(si + 17, sj) - 0.5f) * 0.4f) * STACK_CELL, (sj + 0.5f + (h2(si, sj + 23) - 0.5f) * 0.4f) * STACK_CELL);
+          const float x = q.x, z = q.y;
+          if (!C.inside(x, z)) return;
           float g = ground(x, z);
-          if (g > 0.3f) continue;
+          if (g > 0.3f) return;
           float m[4]; W.sampleMask(x, z, m);
-          if (m[3] < 0.5f) continue;
+          if (m[3] < 0.5f) return;
           float depthOk = smoothstepf(-16.f, -4.f, g) * smoothstepf(-0.5f, -2.5f, g);
-          if (h2(si * 7 + 3, sj * 11 - 5) > 0.18f * depthOk) continue;
-          if (!seaStackShore(x, z)) continue;
+          if (h2(si * 7 + 3, sj * 11 - 5) > 0.18f * depthOk) return;
+          if (!seaStackShore(x, z)) return;
           float r = 7.f + 8.f * h2(si, sj + 31), H = 14.f + 30.f * h2(si + 5, sj + 9);
           put(C, EK_SEASTACK, x, g - 1.5f, z, h2(si - 3, sj + 3) * 6.28f, r / 10.f, (H - g + 1.5f) / 30.f, r / 10.f * (0.8f + 0.3f * h2(si, sj)), h2(si * 3, sj));
-        }
+        });
       // ---------------------------------------------------------------- outcrops (64 m) and spires (160 m)
       const float OC = 64.f;
-      for (int oj = (int)floorf(C.z0 / OC); oj <= (int)floorf((C.z1 - 1e-3f) / OC); oj++)
-        for (int oi = (int)floorf(C.x0 / OC); oi <= (int)floorf((C.x1 - 1e-3f) / OC); oi++) {
+      eachCell(OC, [&](int oi, int oj) {
           float hp = h2(oi * 5 + 9, oj * 7 - 1);
-          if (hp > 0.4f) continue;
-          float x = (oi + 0.5f + (h2(oi + 3, oj - 8) - 0.5f) * 0.7f) * OC, z = (oj + 0.5f + (h2(oi - 6, oj + 2) - 0.5f) * 0.7f) * OC;
-          if (!C.inside(x, z) || W.underLake(x, z)) continue;
+          if (hp > 0.4f) return;
+          const vec2 q = at((oi + 0.5f + (h2(oi + 3, oj - 8) - 0.5f) * 0.7f) * OC, (oj + 0.5f + (h2(oi - 6, oj + 2) - 0.5f) * 0.7f) * OC);
+          const float x = q.x, z = q.y;
+          if (!C.inside(x, z) || W.underLake(x, z)) return;
           float b[4]; W.sampleBase(x, z, b);
-          if (b[1] < 0.01f) continue;
+          if (b[1] < 0.01f) return;
           float g = ground(x, z);
-          if (g < 6.f) continue;
+          if (g < 6.f) return;
           float slope = (fabsf(ground(x + 10, z) - ground(x - 10, z)) + fabsf(ground(x, z + 10) - ground(x, z - 10))) / 20.f;
           float m[4]; W.sampleMask(x, z, m);
           float p = smoothstepf(70.f, 220.f, b[1]) * 0.22f + smoothstepf(1000.f, 1500.f, g) * 0.12f + smoothstepf(0.35f, 0.8f, slope) * 0.2f;
           p *= smoothstepf(12.f, 24.f, m[0] * ROAD_RANGE) * (1.f - smoothstepf(0.02f, 0.1f, m[1])) * (1.f - 0.8f * m[3]);
-          if (hp > p) continue;
+          if (hp > p) return;
           float sc = 0.55f + 0.9f * h2(oi * 3, oj * 3 + 1);
           float yaw = h2(oi + 1, oj + 1) * 6.28f;
           put(C, EK_OUTCROP, x, footprintGround(x, z, yaw, 6.f * sc, 5.f * sc) - 1.2f * sc, z, yaw, sc, sc * (0.7f + 0.6f * h2(oi, oj + 9)), sc, h2(oi * 9, oj));
-        }
+        });
       const float SPC = 160.f;
-      for (int pj = (int)floorf(C.z0 / SPC); pj <= (int)floorf((C.z1 - 1e-3f) / SPC); pj++)
-        for (int pi = (int)floorf(C.x0 / SPC); pi <= (int)floorf((C.x1 - 1e-3f) / SPC); pi++) {
+      eachCell(SPC, [&](int pi, int pj) {
           float hp = h2(pi * 3 - 11, pj * 13 + 4);
-          if (hp > 0.3f) continue;
-          float x = (pi + 0.5f + (h2(pi + 9, pj) - 0.5f) * 0.7f) * SPC, z = (pj + 0.5f + (h2(pi, pj + 9) - 0.5f) * 0.7f) * SPC;
-          if (!C.inside(x, z) || W.underLake(x, z)) continue;
+          if (hp > 0.3f) return;
+          const vec2 q = at((pi + 0.5f + (h2(pi + 9, pj) - 0.5f) * 0.7f) * SPC, (pj + 0.5f + (h2(pi, pj + 9) - 0.5f) * 0.7f) * SPC);
+          const float x = q.x, z = q.y;
+          if (!C.inside(x, z) || W.underLake(x, z)) return;
           float b[4]; W.sampleBase(x, z, b);
           float g = ground(x, z);
           float p = 0.3f * smoothstepf(110.f, 260.f, b[1]) * smoothstepf(0.45f, 0.75f, b[2]) * smoothstepf(40.f, 80.f, g) * smoothstepf(950.f, 700.f, g);
           float m[4]; W.sampleMask(x, z, m);
           p *= (1.f - smoothstepf(0.02f, 0.1f, m[1])) * smoothstepf(15.f, 30.f, m[0] * ROAD_RANGE);
-          if (hp > p) continue;
+          if (hp > p) return;
           float sc = 0.55f + 0.75f * h2(pi * 7, pj * 7);
           float yaw = h2(pi - 2, pj + 2) * 6.28f;
           put(C, EK_SPIRE, x, footprintGround(x, z, yaw, 3.f * sc, 3.f * sc) - 1.f, z, yaw, sc, sc * (0.8f + 0.5f * h2(pi, pj - 4)), sc, h2(pi * 5, pj));
-        }
+        });
     } else {
       // (each farm's compound - its yard and the buildings round it - and each landmark's clearing are kept clear of
       // trees, bushes and boulders)
@@ -628,16 +658,16 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
       auto inFarmstead = [&](float x, float z) { for (const vec3& f : clearings) if ((x - f.x) * (x - f.x) + (z - f.y) * (z - f.y) < f.z * f.z) return true; return false; };
       // ---------------------------------------------------------------- forests and lone trees (6 m cells)
       const float TC = 6.f;
-      for (int tj = (int)floorf(C.z0 / TC); tj <= (int)floorf((C.z1 - 1e-3f) / TC); tj++)
-        for (int ti = (int)floorf(C.x0 / TC); ti <= (int)floorf((C.x1 - 1e-3f) / TC); ti++) {
+      eachCell(TC, [&](int ti, int tj) {
           float hp = h2(ti * 3 + 11, tj * 5 - 7);
-          if (hp > 0.62f) continue;   // the most a cell can be planted
-          float x = (ti + 0.5f + (h2(ti + 101, tj - 31) - 0.5f) * 0.7f) * TC, z = (tj + 0.5f + (h2(ti - 57, tj + 77) - 0.5f) * 0.7f) * TC;
-          if (!C.inside(x, z) || inFarmstead(x, z) || W.underLake(x, z)) continue;
+          if (hp > 0.62f) return;   // the most a cell can be planted
+          const vec2 q = at((ti + 0.5f + (h2(ti + 101, tj - 31) - 0.5f) * 0.7f) * TC, (tj + 0.5f + (h2(ti - 57, tj + 77) - 0.5f) * 0.7f) * TC);
+          const float x = q.x, z = q.y;
+          if (!C.inside(x, z) || inFarmstead(x, z) || W.underLake(x, z)) return;
           float b[4]; W.sampleBase(x, z, b);
-          if (b[1] < 2.5f) continue;   // airport grounds and flattened land
+          if (b[1] < 2.5f) return;   // airport grounds and flattened land
           float g = ground(x, z);
-          if (g < 4.f) continue;
+          if (g < 4.f) return;
           float lush = b[2], cold = b[3], amp = b[1];
           float m[4]; W.sampleMask(x, z, m);
           float roadD = m[0] * ROAD_RANGE, town = m[1], farm = m[3];
@@ -653,26 +683,26 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
             fd += (fdField - fd) * smoothstepf(0.12f, 0.4f, farm);
           }
           fd *= smoothstepf(4.f, 9.f, g) * smoothstepf(2.5f, 8.f, amp) * smoothstepf(9.f, 18.f, roadD) * (1.f - smoothstepf(0.03f, 0.2f, town));
-          if (hp > fd * 0.56f) continue;
+          if (hp > fd * 0.56f) return;
           float sp = h2(ti * 13 + 1, tj * 7 + 3), sp2 = h2(ti * 5 - 9, tj * 11 + 2), hv = h2(ti - 3, tj + 19);
           int k = treeSpecies(g, lush, cold, sp, sp2);
           // forest-interior trees grow taller, lone trees spread wider
           float sc = (0.72f + 0.5f * hv) * (k == EK_PALM ? 1.f : lerpf(0.9f, 1.08f, fd));
           float sy = sc * (0.88f + 0.24f * h2(ti + 7, tj - 7));
           put(C, k, x, g - 0.15f, z, h2(ti * 7, tj * 3) * 6.2832f, sc, sy, sc * (0.9f + 0.2f * h2(ti, tj + 5)), h2(ti * 17 + 3, tj * 19 + 5));
-        }
+        });
       // ---------------------------------------------------------------- bushes (8 m cells)
       const float BC = 8.f;
-      for (int bj = (int)floorf(C.z0 / BC); bj <= (int)floorf((C.z1 - 1e-3f) / BC); bj++)
-        for (int bi = (int)floorf(C.x0 / BC); bi <= (int)floorf((C.x1 - 1e-3f) / BC); bi++) {
+      eachCell(BC, [&](int bi, int bj) {
           float hp = h2(bi * 9 - 4, bj * 7 + 13);
-          if (hp > 0.9f) continue;   // (the most a cell can be planted: a hedgerow's; elsewhere at most 0.3, as before)
-          float x = (bi + 0.5f + (h2(bi + 41, bj - 3) - 0.5f) * 0.8f) * BC, z = (bj + 0.5f + (h2(bi - 8, bj + 33) - 0.5f) * 0.8f) * BC;
-          if (!C.inside(x, z) || inFarmstead(x, z) || W.underLake(x, z)) continue;
+          if (hp > 0.9f) return;   // (the most a cell can be planted: a hedgerow's; elsewhere at most 0.3, as before)
+          const vec2 q = at((bi + 0.5f + (h2(bi + 41, bj - 3) - 0.5f) * 0.8f) * BC, (bj + 0.5f + (h2(bi - 8, bj + 33) - 0.5f) * 0.8f) * BC);
+          const float x = q.x, z = q.y;
+          if (!C.inside(x, z) || inFarmstead(x, z) || W.underLake(x, z)) return;
           float b[4]; W.sampleBase(x, z, b);
-          if (b[1] < 2.5f) continue;
+          if (b[1] < 2.5f) return;
           float g = ground(x, z);
-          if (g < 3.f) continue;
+          if (g < 3.f) return;
           float m[4]; W.sampleMask(x, z, m);
           float treeline = smoothstepf(1700.f - b[3] * 900.f, 1200.f - b[3] * 700.f, g);
           float fn = W.forestAt(x, z);
@@ -683,32 +713,32 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
             p += ((border < 0.035f ? 0.8f : crop >= 0.76f ? 0.01f : 0.f) - p) * smoothstepf(0.12f, 0.4f, m[3]);
           }
           p *= treeline * smoothstepf(2.5f, 8.f, b[1]) * smoothstepf(8.f, 14.f, m[0] * ROAD_RANGE) * (1.f - smoothstepf(0.03f, 0.2f, m[1]));
-          if (hp > p) continue;
+          if (hp > p) return;
           float sc = 0.6f + 0.8f * h2(bi * 3, bj * 5);
           put(C, EK_BUSH, x, g - 0.1f, z, h2(bi, bj * 3) * 6.28f, sc, sc * (0.8f + 0.4f * h2(bi + 1, bj)), sc, h2(bi * 7, bj * 13));
-        }
+        });
       // ---------------------------------------------------------------- boulders (16 m cells)
-      for (int rj = (int)floorf(C.z0 / ROCK_CELL); rj <= (int)floorf((C.z1 - 1e-3f) / ROCK_CELL); rj++)
-        for (int ri = (int)floorf(C.x0 / ROCK_CELL); ri <= (int)floorf((C.x1 - 1e-3f) / ROCK_CELL); ri++) {
+      eachCell(ROCK_CELL, [&](int ri, int rj) {
           float hp = h2(ri * 5 - 13, rj * 3 + 29);
-          if (hp > 0.3f) continue;
-          float x = (ri + 0.5f + (h2(ri + 41, rj - 9) - 0.5f) * 0.6f) * ROCK_CELL, z = (rj + 0.5f + (h2(ri - 21, rj + 63) - 0.5f) * 0.6f) * ROCK_CELL;
-          if (!C.inside(x, z) || inFarmstead(x, z) || W.underLake(x, z)) continue;
+          if (hp > 0.3f) return;
+          const vec2 q = at((ri + 0.5f + (h2(ri + 41, rj - 9) - 0.5f) * 0.6f) * ROCK_CELL, (rj + 0.5f + (h2(ri - 21, rj + 63) - 0.5f) * 0.6f) * ROCK_CELL);
+          const float x = q.x, z = q.y;
+          if (!C.inside(x, z) || inFarmstead(x, z) || W.underLake(x, z)) return;
           float b[4]; W.sampleBase(x, z, b);
-          if (b[1] < 0.01f) continue;
+          if (b[1] < 0.01f) return;
           float g = ground(x, z);
-          if (g < 0.4f) continue;
+          if (g < 0.4f) return;
           float m[4]; W.sampleMask(x, z, m);
           float farm = m[3];
           float rdn = smoothstepf(60.f, 200.f, b[1]) * 0.25f + smoothstepf(900.f, 1400.f, g) * 0.12f + smoothstepf(3.f, 0.6f, g) * 0.06f * (1.f - farm);
           rdn *= smoothstepf(10.f, 20.f, m[0] * ROAD_RANGE) * (1.f - smoothstepf(0.03f, 0.2f, m[1]));
-          if (hp > rdn * 0.6f) continue;
+          if (hp > rdn * 0.6f) return;
           float hr = h2(ri + 7, rj - 77), kind = h2(ri * 3, rj * 7);
           int k = kind < 0.5f ? EK_BOULDER : kind < 0.8f ? EK_BLOCK : EK_SLAB;
           float r = 0.8f + 3.6f * hr * hr;
           float sc = r / kEntInfo[k].hx, sy = sc * (0.75f + 0.4f * h2(ri, rj + 3));
           put(C, k, x, g - 0.22f * kEntInfo[k].h * sy, z, h2(ri - 5, rj) * 6.28f, sc, sy, sc * (0.8f + 0.4f * h2(ri + 2, rj)), h2(ri * 11, rj * 13));
-        }
+        });
       // ---------------------------------------------------------------- landmarks' stones (landmarks.cpp: the rocks
       // kinds a chunk drops when it is trimmed back, so with its other level-2 scenery)
       for (auto r = landmarksIn(cx, cz); r.first != r.second; ++r.first) if (r.first->kind <= EK_SLAB) C.out[r.first->kind]->push_back(r.first->e);

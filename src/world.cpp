@@ -349,7 +349,7 @@ float airportExclusion(const World& world, float x, float z) {
 void World::build(const std::string& cachePath, const std::string& stamp, bool save) {
   generationCheckpoint();
   procedural = false; repeating = false; regionId = "solace"; regionRecipe.reset();   // (one place on the Earth: world.h)
-  earthChart.reset(); extraRunways.clear(); buildingStyle = 0; detailScale = 1.f; noiseCos = 1.f; noiseSin = noiseX = noiseZ = 0.f;
+  earthChart.reset(); extraRunways.clear(); anchorGrid.clear(); buildingStyle = 0; detailScale = 1.f; noiseCos = 1.f; noiseSin = noiseX = noiseZ = 0.f;
   airports.assign(std::begin(kAirports), std::end(kAirports));
   towns.assign(kTowns, kTowns + kNumTowns);
   for (auto& a : airports) a.hospital = !strcmp(a.code, "CAP") || !strcmp(a.code, "NPT") || !strcmp(a.code, "PVI");
@@ -361,7 +361,7 @@ void World::buildProcedural(const procedural::Descriptor& region, const std::str
   generationCheckpoint();
   if (region.authored) { build(cachePath, stamp, save); return; }
   if (earthCharts::isEarthId(region.id)) { buildEarth(region, cachePath, stamp, save); return; }
-  earthChart.reset(); extraRunways.clear(); buildingStyle = 0; detailScale = 1.f; noiseCos = 1.f; noiseSin = noiseX = noiseZ = 0.f;
+  earthChart.reset(); extraRunways.clear(); anchorGrid.clear(); buildingStyle = 0; detailScale = 1.f; noiseCos = 1.f; noiseSin = noiseX = noiseZ = 0.f;
   regionRecipe = std::make_shared<const procedural::Recipe>(region);
   procedural = true; repeating = false; regionId = region.id;
   airports = regionRecipe->airports; towns = regionRecipe->towns;
@@ -1006,6 +1006,17 @@ vec3 World::normal(float x, float z) const {
   const float e = 2.0f;
   float hx = height(x + e, z) - height(x - e, z), hz = height(x, z + e) - height(x, z - e);
   return normalize(vec3(-hx, 2 * e, -hz));
+}
+
+vec2 World::anchorPoint(float x, float z) const {
+  if (anchorGrid.empty()) return vec2(x, z);
+  const double cell = 2.0 * WORLD_HALF / kAnchorN;
+  const double u = std::clamp((x + WORLD_HALF) / cell, 0.0, (double)kAnchorN - 1e-9), v = std::clamp((z + WORLD_HALF) / cell, 0.0, (double)kAnchorN - 1e-9);
+  const int i = (int)u, j = (int)v;
+  const double fu = u - i, fv = v - j;
+  auto at = [&](int ii, int jj, int c) { return anchorGrid[((size_t)jj * (kAnchorN + 1) + ii) * 2 + c]; };
+  auto lerp2 = [&](int c) { return (at(i, j, c) * (1 - fu) + at(i + 1, j, c) * fu) * (1 - fv) + (at(i, j + 1, c) * (1 - fu) + at(i + 1, j + 1, c) * fu) * fv; };
+  return vec2((float)lerp2(0), (float)lerp2(1));
 }
 
 int World::onRunway(float x, float z, float margin, int* surface) const {

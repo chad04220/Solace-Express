@@ -359,10 +359,22 @@ Each stage builds and passes the full `ctest` and the MinGW build, adds its own 
     - `earth_slide_test`: about 1,500 chunks staged and taken over at each slide, none missing within 1.5 km. Each one
       compared is the same, entity for entity, as a chunk made afterwards from g_world. Staged from the old chart's
       World instead, none match.
+  - **The same trees in the same places** (`World::anchorPoint`). The natural scenery is laid in the frame
+    neighbouring charts share: the trees, bushes, boulders, outcrops, spires and sea stacks.
+    - The frame is the anchor's azimuthal x and z, exactly, not the noise frame's turn and shift (which is metres out
+      tens of km from the centre). `World::buildEarth` holds it on a 65×65 grid; it is read bilinear, in double.
+    - Each chunk visits the frame's cells over its own bounds, and maps each cell's point back through an affine fit
+      over the chunk (exact to millimetres over 256 m). A point belongs to the chunk that holds it in this chart, so
+      nothing is made twice. Off the real Earth the cells are the chart's own, as before.
+    - The woods' noise in the forest bake is read in the same frame, so their edges agree too
+      (`kGeneratorVersion` 4).
+    - `earth_slide_test`: within 400 m of a point in Martha's Vineyard's state forest, 92% of the old chart's trees
+      and stones stand in the next chart too, of their kind, within a metre. The rest sit at the woods' edges, where
+      each chart's own texels tip a threshold.
 
   Still open in E4:
-  - **Scenery agreement.** The two charts' scenery isn't placed by geographic position, so the trees and houses
-    near the aircraft change at the move: the same land, laid out afresh.
+  - **Towns and roads agreement.** Each chart lays out its settlements' streets and roads its own way, so the houses
+    and gardens near the aircraft change at the move.
   - **Base agreement.** The bases still differ by up to a metre or so where the ground is rough: bilinear texels on
     two grids.
 

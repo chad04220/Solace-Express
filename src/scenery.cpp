@@ -197,9 +197,12 @@ void World::bakeMask() {
       // forest-patch noise baked once instead of evaluating 3 octaves of value noise at every ray-march step: the road
       // grid's second channel
       float forestNoise = clampf(coverFbm(x / 1400.f + 3.1f, z / 1400.f, 3) / 0.875f, 0, 1);
-      if (earth) {   // (the cover's woods, their edges ragged by the noise: in a closed forest well over the trees' threshold)
+      if (earth) {   // (the cover's woods, their edges ragged by the noise: in a closed forest well over the trees' threshold.
+                     // The noise read where neighbouring charts read it, World::anchorPoint: their woods' edges agree)
         const float f = earthForest[(size_t)j * MASK_N + i];
-        forestNoise = clampf(0.08f + 0.55f * f + 0.32f * (coverFbm(x / 260.f + 3.1f, z / 260.f, 3) / 0.875f - 0.5f) + 0.12f * f * forestNoise, 0, 1);
+        const vec2 a = anchorPoint(x, z);
+        const float wide = clampf(coverFbm(a.x / 1400.f + 3.1f, a.y / 1400.f, 3) / 0.875f, 0, 1);
+        forestNoise = clampf(0.08f + 0.55f * f + 0.32f * (coverFbm(a.x / 260.f + 3.1f, a.y / 260.f, 3) / 0.875f - 0.5f) + 0.12f * f * wide, 0, 1);
       }
       roadGrid.forest[(size_t)j * MASK_N + i] = raceGround ? 0 : (uint8_t)lroundf(forestNoise * 127.f);
       // the settlements (settlements.h, their lots): their ground as far as their buildings and gardens - the woods

@@ -122,6 +122,15 @@ public:
     if (detailScale >= 1.f) return vec2(x / DETAIL_SCALE, z / DETAIL_SCALE);
     return vec2((noiseCos * x - noiseSin * z + noiseX) / DETAIL_SCALE, (noiseSin * x + noiseCos * z + noiseZ) / DETAIL_SCALE);
   }
+  // Where a point lies on the Earth in the frame neighbouring real-Earth charts share, in metres: its azimuthal x and z
+  // from the anchor (the noise frame's, above), exactly - not the noise frame's turn and shift, which is metres out tens
+  // of km from the chart's centre. The natural scenery's cells and the woods' noise are laid in it there, so the next
+  // chart grows the same trees in the same places (entities.cpp, World::bakeMask). Read off a grid of the exact values
+  // (anchorGrid, kAnchorN cells a side over the square: World::buildEarth), bilinear; elsewhere the chart's own x and z
+  static constexpr int kAnchorN = 64;
+  std::vector<double> anchorGrid;   // ((kAnchorN + 1)^2 points, x then z; empty off the real Earth)
+  bool anchored() const { return !anchorGrid.empty(); }
+  vec2 anchorPoint(float x, float z) const;
   float wrap(float v) const { return repeating ? wrapCoord(v) : v; }
   float nearPoint(float v, float ref) const { return repeating ? nearCopy(v, ref) : v; }
   std::string regionId = "solace";
