@@ -1,5 +1,20 @@
 ## What's new in v3.52.0
 
+### The real Earth
+- **Fly anywhere on the real planet.** In Free Flight, press **Get the real Earth**. The game downloads 13 MB: the index, the world's open airports with a runway of 300 m or more, its towns and its lighthouses. The land itself (terrain, coasts, land cover, roads) streams in as you fly, a few hundred kB for each area, and is kept for next time, up to 2 GB. With no connection, the places you've flown before still load.
+- **Want it all on disk?** On the real-Earth screen, **Keep all of it offline** downloads the whole pack (1.5 GB). A download that breaks off carries on from where it stopped when you try again.
+- **Pick any airport.** Press **Real Earth** and type an airport code (KBOS, EGLL), its name or its town. The flight starts on its main runway, on the real heading, with its other runways painted and levelled around it.
+- **Keep flying.** The real Earth has no edge. The area ahead is prepared as you fly and you move into it without a loading screen: the same trees in the same places, each airport's buildings on the same side, the autopilot, the GPS pick, the tower and the traffic carried across. Beyond what's built in detail, the terrain goes on to the horizon, lit at night by its towns.
+- **Solace is in the real Atlantic.** With the real Earth installed, the islands sit 640 km east of Bermuda. Fly west and Bermuda, then the American coast, come up over the horizon. **Beyond: real Earth / generated** switches between this and the generated regions.
+- **The real world, as it is built.**
+  - **Cities** are built over where the land cover says they are, suburbs and all.
+  - **Houses** are built the way their country builds them: New England's boards under grey shingles, the Mediterranean's white and ochre under terracotta, Nordic red and yellow boarding, and more.
+  - **Big airports** like Boston and JFK have long terminals with an airliner at every gate.
+  - **About 9,200 real lighthouses** stand where they are and as tall as they are, on their headlands, cliff tops and harbour mouths. Gay Head stands on its cliffs, Edgartown's out in its harbour mouth.
+- **A career on the real Earth.** A new career's travel and long hauls go to real airports: Bermuda first, then the American coast. On a real-Earth field, the board also offers cross-country loads to small fields up to 180 km beyond, flown without a loading screen. A real-Earth career saves in a new format (version 8). Older careers keep the generated regions; the hub's travel screen switches them.
+- **Fly to a real airport.** In flight, the pause menu's route goes to any real airport, with the distance to each. The autopilot holds the course: Solace to Bermuda is 640 km.
+- **Sources:** ETOPO 2022 and Copernicus GLO-90 (terrain), CGLS-LC100 (land cover), GRIP4 (roads), OurAirports, GeoNames and Wikidata, under their licences (THIRD_PARTY_NOTICES.md). Not for navigation.
+
 ### Photo mode
 - **Press F2 in flight, or choose Photo mode in the pause menu.** The flight freezes where it is, and a free camera takes over. Fly it with W A S D, Q and E (Shift goes faster, Ctrl slower) or the left stick and the triggers. Drag the mouse or use the right stick to turn it, [ ] or the bumpers to tilt it, and the wheel to zoom. It can go up to 600 m from the aircraft, and never into the ground.
 - **A panel at the right sets up the shot:**
