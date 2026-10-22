@@ -5,8 +5,9 @@
 // the scenery's chunks where they are thickest; the quote's background flight and the hub's estimate; a career's save
 // and load; the audio mix; and the memory each leaves behind. Not the GPU's: that is the rendered diagnostics on real
 // hardware (diagnostics.bat). EARTH_LIVE=<folder>: the release's pack installed there streamed, as the game installs it,
-// and charts built with their land and their GLO-90 terrain fetched live. Built on request (make perf_check), not run by
-// ctest: it times, it doesn't judge.
+// and charts built with their land and their GLO-90 terrain fetched live. PERF_ONLY=<words> runs only the parts named,
+// PERF_WORLD=<file> keeps the islands in a cache between runs. Built on request (make perf_check), not run by ctest: it
+// times, it doesn't judge.
 #include "../src/game.h"
 #include "../src/earth_charts.h"
 #include "../src/earth_install.h"
@@ -17,6 +18,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <functional>
 #include <memory>
@@ -72,7 +74,7 @@ struct GameTest {
     const Stats u = stats(r.update), m = stats(r.mix);
     printf("  %-34s update %7.0f µs median %7.0f p99 %8.0f max   mix %5.0f µs median   (%zu frames, warp %.0fx, traffic %zu; %d over 8 ms, %d as a tower call began)\n",
            what, u.med, u.p99, u.max, m.med, r.update.size(), g.timeAccel, g.traffic.craft.size(), r.slow, r.slowWithCall);
-    if (r.update.empty()) printf("    (no frames: screen %d, crashed %d)\n", (int)g.screen, (int)g.crashed);
+    if (r.update.empty()) printf("    (no frames: screen %d, crashed %d, %s)\n", (int)g.screen, (int)g.crashed, g.debriefTitle.c_str());
     fflush(stdout);
   }
   // a ferry from one field to the next, begun 9 km out at 900 m on the autopilot (as the soak flies it)
@@ -92,9 +94,13 @@ struct GameTest {
     setvbuf(stdout, nullptr, _IOLBF, 0);
     printf("Performance check: %u hardware threads\n", std::thread::hardware_concurrency());
     const std::string tmp = getenv("PERF_TMP") ? getenv("PERF_TMP") : "/tmp";
+    // PERF_ONLY=<words>: only the parts named (world perf model flight tower scenery hub save regions earth live)
+    const char* only = getenv("PERF_ONLY");
+    auto want = [&](const char* key) { return !only || strstr(only, key) != nullptr; };
 
     section("the islands");
-    {
+    if (const char* keep = getenv("PERF_WORLD")) { g_world.build(keep, "perf-check", true); printf("  %s (%s)\n", keep, g_world.fromCache ? "read from it" : "generated into it"); }
+    else {
       const std::string cache = tmp + "/perf_world.bin";
       remove(cache.c_str());
       auto t0 = Clock::now(); g_world.build(cache, "perf-check", true);
@@ -108,8 +114,8 @@ struct GameTest {
     buildStory();
     g_audio.init(48000);
 
-    section("each type's learned performance (Plane::perf, once a build; cached after)");
-    {
+    if (want("perf")) {
+      section("each type's learned performance (Plane::perf, once a build; cached after)");
       double total = 0, worst = 0; const char* worstName = "";
       for (int i = 0; i < kAircraftCount; i++) {
         const auto t0 = Clock::now(); Plane::perf(&kAircraft[i]); const double ms = msSince(t0);
@@ -118,18 +124,21 @@ struct GameTest {
       printf("  all %d types %8.0f ms, the slowest %s %.0f ms\n", kAircraftCount, total, worstName, worst);
     }
 
-    section("the flight model: one 60th of a second of each type in cruise on the autopilot");
-    {
+    if (want("model")) {
+      section("the flight model: one 60th of a second of each type in cruise on the autopilot");
       Weather calm; calm.windSpeed = 0; calm.gust = 0; calm.turbulence = 0;
+      vec3 sea(0.f, 0.f, 36000.f);   // (open water, out in the border's sea: nothing to fly into for half an hour)
+      for (int k = 0; k < 400 && g_world.height(sea.x, sea.z) > -20.f; k++) sea = vec3(-36000.f + (k % 20) * 3600.f, 0.f, 36000.f - (k / 20) * 3600.f);
       for (int i = 0; i < kAircraftCount; i++) {
         const AircraftSpec& s = kAircraft[i];
-        Plane p; p.reset(&s, vec3(30000.f, 1500.f, -30000.f), 90.f, s.maxFuel * .5f, 100, true, s.cruise);
+        Plane::perf(&s);   // (learned first: not in its first step's time)
+        Plane p; p.reset(&s, sea + vec3(0.f, 1500.f, 0.f), 90.f, s.maxFuel * .5f, 100, true, s.cruise);
         p.engineRunning = true; p.engineSpool = .75f; p.ctl.gearDown = !s.retract; p.gear = p.ctl.gearDown ? 1.f : 0.f;
         p.apEngage(Plane::AP_HOLD, -1, calm); p.apAlt = p.pos.y; p.apHeading = p.heading();
         std::vector<double> us;
         for (int k = 0; k < 1800; k++) { p.ctl.throttle = .75f; const auto t0 = Clock::now(); p.step(kDt, calm, k * kDt); us.push_back(msSince(t0) * 1000.0); }
         const Stats st = stats(us);
-        printf("  %-22s %6.1f µs median %6.0f max   (%s at %.0f m, %.0f m/s)\n", s.name, st.med, st.max, p.ev.crashed ? "CRASHED" : "flying", p.pos.y, length(p.vel));
+        printf("  %-22s %6.1f µs median %6.0f max   (%s at %.0f m, %.0f m/s)\n", s.name, st.med, st.max, p.ev.crashed ? ("CRASHED: " + p.ev.crashReason).c_str() : "flying", p.pos.y, length(p.vel));
       }
     }
 
@@ -138,50 +147,57 @@ struct GameTest {
 #ifdef SOMNIUM_ASSETS
     g.atc.load(std::string(SOMNIUM_ASSETS) + "/voice");
 #endif
+    if (getenv("PERF_WARM_VOICES")) {   // (every clip decoded beforehand: what's left of a call's start is its own)
+      g.atc.cacheLimit = size_t(2) << 30;
+      for (const auto& id : g.atc.indexed()) g.atc.decodes(id);
+      printf("  every voice clip decoded beforehand: %.0f MB\n", g.atc.cachedBytes() / 1048576.0);
+    }
     const int cap = std::max(0, g_world.findAirport("CAP")), mdb = std::max(0, g_world.findAirport("MDB")), pvi = std::max(0, g_world.findAirport("PVI"));
-    for (float warp : {1.f, 4.f, 16.f}) {
-      ferry(g, 1, mdb, cap);
-      fly(g, 120);   // (settled: the traffic spawned, the first calls made)
-      g.timeAccel = warp;
-      const Run r = fly(g, 1800);
-      char what[64]; snprintf(what, sizeof what, "cruise to CAP, %.0fx", warp);
-      row(what, r, g);
-      g.timeAccel = 1.f;
-      if (g.screen == SCR_FLIGHT) g.endFlight(false, "perf", OUT_ABANDONED);
-      g.screen = SCR_HUB;
-    }
-    {
-      ferry(g, 6, pvi, cap);   // (an airliner)
-      fly(g, 120);
-      row("airliner cruise to CAP, 1x", fly(g, 1800), g);
-      if (g.screen == SCR_FLIGHT) g.endFlight(false, "perf", OUT_ABANDONED);
-      g.screen = SCR_HUB;
-    }
-    {   // on the ground at the capital, engine running, brakes on: the field's traffic and the tower about it
-      Contract c = g_story[0]; c.forceAircraft = -1; c.type = CT_FERRY; c.from = cap; c.to = mdb; c.wps.clear(); c.hints.clear();
-      g.startFlight(c, 1, Career::SRC_RENT);
-      g.engineAutoStarted = true; g.plane.engineRunning = true; g.plane.ctl.brake = 1.f; g.takeoffAnnounced = true;
-      fly(g, 120);
-      row("on the ground at CAP", fly(g, 1800), g);
-      if (g.screen == SCR_FLIGHT) g.endFlight(false, "perf", OUT_ABANDONED);
-      g.screen = SCR_HUB;
-    }
-    {   // the XR-40, its lasers in bursts and a bomb every two seconds
-      g.resCraft = kSomnus; g.resAirborne = true; g.resAirport = mdb; g.launchResearch();
-      g.somnus.armed = true;
-      const Run r = fly(g, 1800, [&](int i) {
+    if (want("flight")) {
+      for (float warp : {1.f, 4.f, 16.f}) {
+        ferry(g, 1, mdb, cap);
+        fly(g, 120);   // (settled: the traffic spawned, the first calls made)
+        g.timeAccel = warp;
+        const Run r = fly(g, 1800);
+        char what[64]; snprintf(what, sizeof what, "cruise to CAP, %.0fx", warp);
+        row(what, r, g);
+        g.timeAccel = 1.f;
+        if (g.screen == SCR_FLIGHT) g.endFlight(false, "perf", OUT_ABANDONED);
+        g.screen = SCR_HUB;
+      }
+      {
+        ferry(g, 6, pvi, cap);   // (an airliner)
+        fly(g, 120);
+        row("airliner cruise to CAP, 1x", fly(g, 1800), g);
+        if (g.screen == SCR_FLIGHT) g.endFlight(false, "perf", OUT_ABANDONED);
+        g.screen = SCR_HUB;
+      }
+      {   // on the ground at the capital, engine running, brakes on: the field's traffic and the tower about it
+        Contract c = g_story[0]; c.forceAircraft = -1; c.type = CT_FERRY; c.from = cap; c.to = mdb; c.wps.clear(); c.hints.clear();
+        g.startFlight(c, 1, Career::SRC_RENT);
+        g.engineAutoStarted = true; g.plane.engineRunning = true; g.plane.ctl.brake = 1.f;
+        fly(g, 120);
+        row("on the ground at CAP", fly(g, 1800), g);
+        if (g.screen == SCR_FLIGHT) g.endFlight(false, "perf", OUT_ABANDONED);
+        g.screen = SCR_HUB;
+      }
+      {   // the XR-40, its lasers in bursts and a bomb every two seconds
+        g.resCraft = kSomnus; g.resAirborne = true; g.resAirport = mdb; g.launchResearch();
+        g.somnus.armed = true;
+        const Run r = fly(g, 1800, [&](int i) {
+          g.in = Input();
+          if (i % 120 == 0) g.somnus.bombQueue = std::min(3, g.somnus.bombQueue + 1);
+          g.in.mDown[0] = (i % 60) < 30;
+        });
+        row("XR-40 sortie, firing", r, g);
         g.in = Input();
-        if (i % 120 == 0) g.somnus.bombQueue = std::min(3, g.somnus.bombQueue + 1);
-        g.in.mDown[0] = (i % 60) < 30;
-      });
-      row("XR-40 sortie, firing", r, g);
-      g.in = Input();
-      if (g.screen == SCR_FLIGHT) g.endFlight(false, "perf", OUT_ABANDONED);
-      g.screen = SCR_HUB;
+        if (g.screen == SCR_FLIGHT) g.endFlight(false, "perf", OUT_ABANDONED);
+        g.screen = SCR_HUB;
+      }
     }
 
-    section("the tower's voice clips: each decoded and resampled the first time it is said");
-    {
+    if (want("tower")) {
+      section("the tower's voice clips: each decoded and resampled the first time it is said");
       AtcVoice v; std::vector<double> ms; double secs = 0;
 #ifdef SOMNIUM_ASSETS
       v.load(std::string(SOMNIUM_ASSETS) + "/voice");
@@ -196,8 +212,8 @@ struct GameTest {
              st.med, st.mean, st.max, secs, secs > 0 ? st.mean * ms.size() / secs : 0.0);
     }
 
-    section("the scenery: chunks of 256 m made at their full detail (on the workers; within 700 m, the game's thread)");
-    {
+    if (want("scenery")) {
+      section("the scenery: chunks of 256 m made at their full detail (on the workers; within 700 m, the game's thread)");
       struct Place { const char* name; float x, z; };
       const Airport& A = g_world.airports[cap];
       const Place places[] = {{"Solace Capital", A.x + 1500.f, A.z + 1500.f}, {"the capital's centre", -3200.f, -1200.f},
@@ -216,8 +232,8 @@ struct GameTest {
       }
     }
 
-    section("the hub: the board's estimates (the game's thread) and their flown quotes (a worker's)");
-    {
+    if (want("hub")) {
+      section("the hub: the board's estimates (the game's thread) and their flown quotes (a worker's)");
       g.career = Career{}; g.career.newGame(); g.career.location = cap; g.career.license = LIC_ATP; g.career.money = 1000000;
       g.career.storyIndex = (int)g_story.size(); g.career.refreshBoard();
       printf("  the board at CAP: %zu jobs\n", g.career.board.size());
@@ -226,6 +242,8 @@ struct GameTest {
       for (const Contract& c : g.career.board) {
         if (c.longHaul() || n >= 8) continue;
         const int spec = c.forceAircraft >= 0 ? c.forceAircraft : 1;
+        const int loops = getenv("PERF_PLAN_LOOP") ? atoi(getenv("PERF_PLAN_LOOP")) : 0;   // (a profiler's samples)
+        for (int k = 0; k < loops; k++) g.career.plan(c, spec, Career::SRC_RENT);
         auto t0 = Clock::now(); g.career.plan(c, spec, Career::SRC_RENT); plan.push_back(msSince(t0));
         t0 = Clock::now(); float fuel = -1; simulateFlightMinutes(c, spec, &fuel); quote.push_back(msSince(t0));
         n++;
@@ -234,8 +252,8 @@ struct GameTest {
       printf("  %d jobs: estimate %.2f ms median, %.2f max   flown quote %.0f ms median, %.0f max\n", n, p.med, p.max, q.med, q.max);
     }
 
-    section("a career's save and load");
-    {
+    if (want("save")) {
+      section("a career's save and load");
       const std::string path = tmp + "/perf_career.sav";
       std::vector<double> sv, ld;
       for (int i = 0; i < 20; i++) {
@@ -246,8 +264,8 @@ struct GameTest {
       remove(path.c_str());
     }
 
-    section("generated regions: built and prepared for the renderer (a region's loading, or a flight's next region)");
-    {
+    if (want("regions")) {
+      section("generated regions: built and prepared for the renderer (a region's loading, or a flight's next region)");
       const auto regions = procedural::nearby(procedural::solaceDescriptor().origin, 12);
       bool done[3] = {};
       for (const auto& d : regions) {
@@ -262,7 +280,7 @@ struct GameTest {
       }
     }
 
-    if (const char* dir = getenv("EARTH_PACK")) {
+    if (const char* dir = getenv("EARTH_PACK"); dir && want("earth")) {
       section("the real Earth's charts (EARTH_PACK)");
       std::string why;
       auto pack = earth::Pack::open(dir, &why);
@@ -285,7 +303,7 @@ struct GameTest {
         } else printf("  no KMVY chart in the pack\n");
       }
     }
-    if (const char* live = getenv("EARTH_LIVE")) {
+    if (const char* live = getenv("EARTH_LIVE"); live && want("live")) {
       section("the real Earth, live: the release's pack streamed (EARTH_LIVE)");
       namespace fs = std::filesystem;
       auto bytesIn = [](const std::string& dir) {

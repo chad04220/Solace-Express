@@ -314,6 +314,8 @@ struct GameTest {
           g.update(dt); audio(dt);
           if (incursion && g.atcF.goAround) break;
         }
+        // (the call starts a moment after it is made: AtcVoice::kDecodeLead)
+        for (float w = 0; w < 1.f && g.atcF.goAround && !towerSaid("Go around") && g.screen == SCR_FLIGHT; w += dt) { g.update(dt); audio(dt); }
         const bool late = clearedFirst && incursion && towerSaid("Go around") && g.atcF.goAround;
         // the departure: lined up, an aircraft stuck on the runway for good - held past 90 s, the tower clears it off
         g.startFlight(g_story[0], 0, Career::SRC_LESSON);

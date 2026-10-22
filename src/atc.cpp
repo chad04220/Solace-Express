@@ -5,14 +5,33 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <deque>
 #include <fstream>
 #include <iterator>
 #include <regex>
 #include <sstream>
+#include <thread>
 
 static const char* kVoiceName[AtcVoice::kVoices] = {"tower_north", "tower_coast", "tower_valley"};
 
+// the clips of transmissions waiting their turn, decoded on a thread of its own, one at a time, nearest first
+struct AtcVoice::Decoder {
+  std::mutex m; std::condition_variable cv;
+  std::deque<std::string> todo;
+  bool stop = false;
+  std::thread worker;
+  ~Decoder() {
+    { std::lock_guard<std::mutex> lk(m); stop = true; }
+    cv.notify_all();
+    if (worker.joinable()) worker.join();
+  }
+};
+AtcVoice::AtcVoice() = default;
+AtcVoice::~AtcVoice() { decoder.reset(); }
+
 bool AtcVoice::load(const std::string& d) {
+  decoder.reset();   // (stopped before the clips it reads are replaced)
+  std::lock_guard<std::mutex> lock(clipLock);
   dir = d; clips.clear(); lookup.clear(); exact.clear(); cues.clear(); cacheBytes = 0;   // (a reload with removed ids leaves no stale references)
   std::ifstream f(dir + "/voice_index.txt");
   if (!f) return false;
@@ -293,33 +312,88 @@ static bool readWav(const std::string& path, std::vector<float>& out, int outRat
   return true;
 }
 
-bool AtcVoice::decodes(const std::string& id) { const std::vector<float>* p = pcm(id); return p && !p->empty(); }
+bool AtcVoice::decodes(const std::string& id) {
+  std::unique_lock<std::mutex> lk(clipLock);
+  const std::vector<float>* p = pcm(id, lk); return p && !p->empty();
+}
 std::vector<std::string> AtcVoice::indexed() const { std::vector<std::string> v; v.reserve(clips.size()); for (auto& c : clips) v.push_back(c.first); return v; }
 
-const std::vector<float>* AtcVoice::pcm(const std::string& id) {
+void AtcVoice::install(Clip& c, std::vector<float>&& samples) {
+  c.loaded = true;   // (a file that doesn't decode stays loaded, empty: it isn't read again)
+  c.pcm = std::move(samples); c.used = ++useTick;
+  cacheBytes += c.pcm.capacity() * sizeof(float);
+  // over the budget: the least recently used clips go, never this one (the callers copy a clip out before asking
+  // for the next, so a clip let go mid-transmission has already been used)
+  while (cacheBytes > cacheLimit) {
+    Clip* old = nullptr;
+    for (auto& e : clips) if (&e.second != &c && !e.second.pcm.empty() && (!old || e.second.used < old->used)) old = &e.second;
+    if (!old) break;
+    cacheBytes -= old->pcm.capacity() * sizeof(float);
+    std::vector<float>().swap(old->pcm); old->loaded = false;
+  }
+}
+
+const std::vector<float>* AtcVoice::pcm(const std::string& id, std::unique_lock<std::mutex>& held) {
   auto it = clips.find(id);
   if (it == clips.end()) return nullptr;
   Clip& c = it->second;
   c.used = ++useTick;
-  if (!c.loaded) {
-    c.loaded = true;   // (a file that doesn't decode stays loaded, empty: it isn't read again)
-    if (!readWav(dir + "/" + c.file, c.pcm, g_audio.sampleRate)) std::vector<float>().swap(c.pcm);
-    cacheBytes += c.pcm.capacity() * sizeof(float);
-    // over the budget: the least recently used clips go, never this one (the callers copy a clip out before asking
-    // for the next, so a clip let go mid-transmission has already been used)
-    while (cacheBytes > cacheLimit) {
-      Clip* old = nullptr;
-      for (auto& e : clips) if (&e.second != &c && !e.second.pcm.empty() && (!old || e.second.used < old->used)) old = &e.second;
-      if (!old) break;
-      cacheBytes -= old->pcm.capacity() * sizeof(float);
-      std::vector<float>().swap(old->pcm); old->loaded = false;
-    }
+  if (!c.loaded && c.decoding) decoded.wait(held, [&] { return !c.decoding; });   // (the decoder has it in hand: its result)
+  if (!c.loaded) {   // (not asked for ahead, or let go since: decoded here)
+    std::vector<float> samples;
+    if (!readWav(dir + "/" + c.file, samples, g_audio.sampleRate)) samples.clear();
+    install(c, std::move(samples));
   }
   return c.pcm.empty() ? nullptr : &c.pcm;
 }
 
+void AtcVoice::prefetch(const Tx& tx) {
+  std::vector<std::string> want;
+  {
+    std::lock_guard<std::mutex> lk(clipLock);
+    for (const std::string& id : tx.ids) {
+      auto it = clips.find(id);
+      if (it != clips.end() && !it->second.loaded && !it->second.decoding) want.push_back(id);
+    }
+  }
+  if (want.empty()) return;
+  if (!decoder) { decoder = std::make_unique<Decoder>(); decoder->worker = std::thread([this, d = decoder.get()] { decodeLoop(*d); }); }
+  {
+    std::lock_guard<std::mutex> lk(decoder->m);
+    for (auto& id : want) if (std::find(decoder->todo.begin(), decoder->todo.end(), id) == decoder->todo.end()) decoder->todo.push_back(std::move(id));
+  }
+  decoder->cv.notify_one();
+}
+
+void AtcVoice::decodeLoop(Decoder& d) {
+  for (;;) {
+    std::string id;
+    {
+      std::unique_lock<std::mutex> lk(d.m);
+      d.cv.wait(lk, [&] { return d.stop || !d.todo.empty(); });
+      if (d.stop) return;
+      id = std::move(d.todo.front()); d.todo.pop_front();
+    }
+    Clip* c = nullptr; std::string path;
+    {
+      std::lock_guard<std::mutex> lk(clipLock);
+      auto it = clips.find(id);
+      if (it == clips.end() || it->second.loaded || it->second.decoding) continue;
+      c = &it->second; c->decoding = true; path = dir + "/" + c->file;
+    }
+    std::vector<float> samples;   // (read and resampled outside the lock: the game's thread goes on meanwhile)
+    if (!readWav(path, samples, g_audio.sampleRate)) samples.clear();
+    {
+      std::lock_guard<std::mutex> lk(clipLock);
+      c->decoding = false;
+      if (!c->loaded) install(*c, std::move(samples));
+    }
+    decoded.notify_all();
+  }
+}
+
 // squelch click, the clips with 35 ms between fragments (a longer pause between sentences), and a squelch tail
-std::shared_ptr<std::vector<float>> AtcVoice::assemble(const Tx& tx) {
+std::shared_ptr<std::vector<float>> AtcVoice::assemble(const Tx& tx, std::unique_lock<std::mutex>& held) {
   auto out = std::make_shared<std::vector<float>>();
   const float sr = (float)g_audio.sampleRate;
   uint32_t seed = 0x9e3779b9u;
@@ -341,7 +415,7 @@ std::shared_ptr<std::vector<float>> AtcVoice::assemble(const Tx& tx) {
   bool any = false;
   for (const std::string& id : tx.ids) {
     if (id == kPause) { out->insert(out->end(), (size_t)(0.22f * sr), 0.f); continue; }
-    const std::vector<float>* p = pcm(id);
+    const std::vector<float>* p = pcm(id, held);
     if (!p || p->empty()) { ++missingAudio; out->clear(); return out; } // never speak a partial clearance with a missing digit/word
     if (any) out->insert(out->end(), (size_t)(0.035f * sr), 0.f);
     size_t first=0,last=p->size();
@@ -364,7 +438,8 @@ std::shared_ptr<std::vector<float>> AtcVoice::assemble(const Tx& tx) {
 }
 
 void AtcVoice::start(const Tx& tx) {
-  auto buf = assemble(tx);
+  std::shared_ptr<std::vector<float>> buf;
+  { std::unique_lock<std::mutex> lk(clipLock); buf = assemble(tx, lk); }   // (the decoder installs nothing while its clips are copied)
   if (buf->empty()) return;
   std::string speaker;
   for(const auto& id:tx.ids) {auto c=clips.find(id);if(c!=clips.end()) {speaker=c->second.speaker;break;}}
@@ -403,6 +478,7 @@ void AtcVoice::say(const Tx& tx) {
     for (size_t i = 1; i < queue.size(); i++) if (queue[i].prio < queue[worst].prio) worst = i;
     queue.erase(queue.begin() + worst);
   }
+  prefetch(tx);   // (its clips decoded while it waits: the channel's 0.6 s gap at the least)
 }
 
 // Returns each started transmission exactly once: one started here, or one that cut in from say() since the last call
@@ -415,6 +491,9 @@ AtcVoice::Tx AtcVoice::update(float dt) {
     if (started.ids.empty() && !queue.empty() && idleT > 0.6f) {   // the most important waiting call, oldest first
       size_t best = 0;
       for (size_t i = 1; i < queue.size(); i++) if (queue[i].prio > queue[best].prio) best = i;
+      // (a tenth of a second queued at the least, every time: its clips decoded meanwhile, on the decoder - a call on
+      // a quiet channel would otherwise start the frame it was made, decoding them on the game's thread)
+      if (queue[best].age < kDecodeLead) return Tx();
       Tx tx = queue[best];
       queue.erase(queue.begin() + best);
       if (valid && !valid(tx)) { dropped++; return update(0.f); }   // overtaken by events (a go-around, a runway change, a phase gone by): never said
@@ -426,4 +505,7 @@ AtcVoice::Tx AtcVoice::update(float dt) {
   return out;
 }
 
-void AtcVoice::cancel() { queue.clear(); started = Tx(); if (busy()) g_audio.voiceStop(); playingPrio = -1; playingText.clear(); }
+void AtcVoice::cancel() {
+  queue.clear(); started = Tx(); if (busy()) g_audio.voiceStop(); playingPrio = -1; playingText.clear();
+  if (decoder) { std::lock_guard<std::mutex> lk(decoder->m); decoder->todo.clear(); }   // (nothing waits to be said)
+}

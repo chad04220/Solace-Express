@@ -1,9 +1,11 @@
 // Somnium Volandi - tower controller voices
 #pragma once
 #include "common.h"
+#include <condition_variable>
 #include <functional>
 #include <regex>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -35,7 +37,14 @@ public:
   static const int kVoices = 3;
   static const int kHazard = 95;   // priority from which a transmission interrupts any routine one
   static constexpr const char* kPause = "@pause";
-  bool load(const std::string& dir);   // voice_index.txt; the clips are decoded on first use
+  static constexpr float kDecodeLead = 0.1f;   // (s) a queued transmission waits this long before it starts: its clips' decode
+  AtcVoice();
+  ~AtcVoice();   // (the decoder stopped)
+  AtcVoice(const AtcVoice&) = delete;
+  AtcVoice& operator=(const AtcVoice&) = delete;
+  // voice_index.txt; the clips are decoded on first use - those of a queued transmission ahead of it, on a thread of
+  // their own (a call's few clips, decoded and resampled the frame it started, took 10-30 ms of the game's thread)
+  bool load(const std::string& dir);
   bool ok() const { return !clips.empty(); }
   // a transmission; kPause in ids: a pause between sentences. Empty/missing IDs refuse the entire call.
   // radio: squelch around it; subtitle: show its text (the
@@ -72,12 +81,12 @@ public:
   // the decoded clips kept, at most this many bytes (the least recently used go first, and decode again when next
   // wanted): the whole cast decodes to over 400 MB at the engine's rate, a session's working set to a few tens
   size_t cacheLimit = size_t(64) << 20;
-  size_t cachedBytes() const { return cacheBytes; }
+  size_t cachedBytes() const { std::lock_guard<std::mutex> lk(clipLock); return cacheBytes; }
 private:
   bool resolveRecorded(const std::string&, const std::string&, bool, Tx&) const;
   std::vector<std::pair<std::regex,std::string>> cues;
   std::string playingText;
-  struct Clip { std::string file, words, speaker, kind, mission; int prio = 40; std::vector<float> pcm; bool loaded = false; uint64_t used = 0; };
+  struct Clip { std::string file, words, speaker, kind, mission; int prio = 40; std::vector<float> pcm; bool loaded = false, decoding = false; uint64_t used = 0; };
   std::unordered_map<std::string, Clip> clips;
   size_t cacheBytes = 0; uint64_t useTick = 0;
   std::unordered_map<std::string, std::vector<std::string>> exact;   // shown text -> lines
@@ -88,8 +97,17 @@ private:
   std::vector<Tx> queue;
   int playingPrio = -1;
   float idleT = 10.f;
-  const std::vector<float>* pcm(const std::string& id);
-  std::shared_ptr<std::vector<float>> assemble(const Tx& tx);
+  // the clips' samples, loaded and decoding flags, last uses and the cache's bytes: the decoder writes them too. The
+  // map itself changes only in load(), with the decoder stopped
+  mutable std::mutex clipLock;
+  std::condition_variable decoded;   // (a clip the decoder had in hand is in)
+  struct Decoder;
+  std::unique_ptr<Decoder> decoder;
+  void prefetch(const Tx& tx);   // a queued transmission's clips handed to the decoder
+  void decodeLoop(Decoder& d);
+  void install(Clip& c, std::vector<float>&& samples);   // (clipLock held) its samples in, the least recently used out past the budget
+  const std::vector<float>* pcm(const std::string& id, std::unique_lock<std::mutex>& held);   // (clipLock held)
+  std::shared_ptr<std::vector<float>> assemble(const Tx& tx, std::unique_lock<std::mutex>& held);
   void start(const Tx& tx);
   Tx started;
 };
