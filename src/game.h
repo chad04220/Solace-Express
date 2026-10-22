@@ -205,8 +205,9 @@ private:
   int earthPick = 0;
   procedural::Descriptor loadingRegion;
   GameScreen regionAfterLoad = SCR_FREE_FLIGHT;
-  std::future<std::vector<uint8_t>> regionJob;
-  std::atomic<int> regionLoadStage{0}; // 0 draining readers, 1 building, 2 preparing navigation, 3 publishing
+  std::future<Renderer::WorldUploadData> regionJob;   // (the world built into g_world, its GPU upload prepared beside it)
+  bool regionUploading = false;   // (that upload staged, a slice each loading frame, then published: updateRegionLoading)
+  std::atomic<int> regionLoadStage{0}; // 0 draining readers, 1 building, 2 preparing the map and the upload, 3 uploading
   std::string regionError;
   float regionLoadTime = 0;
   bool regionCancel = false, regionResumePaused = false;
@@ -266,6 +267,7 @@ private:
   // The real Earth's pack fetched and installed from the Free Flight screen when it isn't there (earth_install.h): into
   // the user's folder's earth, where the game looks for it, and opened from there when whole
   std::unique_ptr<earthInstall::Installer> earthInstaller;
+  std::future<void> earthReopenJob;   // (the installed pack opened off the game's thread: updateEarthInstall)
   bool startEarthInstall(bool whole = false);   // (streamed unless whole) false: no folder of the user's to put it in (a diskless run)
   void updateEarthInstall();
   bool earthSceneryDraining = false, earthFacilitiesPending = false, earthPromotionDeferred = false;
@@ -295,6 +297,7 @@ private:
   void loadCareerWorld(const std::string& id, GameScreen after);
   std::string careerPlaceName() const;   // where the career is: its airport when its world is loaded, else its region
   void updateRegionLoading(float dt);
+  void finishRegionLoad();   // (the region published: its airport chosen, on to where it was loaded for)
   void drawRegionLoading();
   void drawRegionPicker();
   void drawEarthAirportPicker();
@@ -813,6 +816,8 @@ private:
   void menuBackgroundCamera(FrameParams& fp);
   void hangarPreviewCamera(FrameParams& fp);
   void menuTour(FrameParams& fp);   // main menu: a tour of the islands
+  int hubField() const;   // the hub's airport when its world is loaded, else -1
+  vec3 hubOrbitAt(vec3 centre) const;   // where the hub's camera circles round centre now (on the ground plane)
   int computePhase() const;
   std::string landingCoaching() const;
   const Airport& dest() const { return haulPending() ? haul.target : g_world.airports[contract.to]; }

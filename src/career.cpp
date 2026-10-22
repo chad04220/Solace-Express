@@ -1,5 +1,6 @@
 // Somnium Volandi - career progression and hand-designed story campaign
 #include "career.h"
+#include "entities.h"
 #include "profile.h"
 #include "military_missions.h"
 #include "procedural_regions.h"
@@ -523,7 +524,7 @@ Career::LaunchPlan Career::plan(const Contract& c, int si, Source src) const {
   st.y = std::max(g_world.height(st.x, st.z), A.elev) + 150.f;
   vec3 dir = B.pos() - st; dir.y = 0;
   pl.reset(&s, st, atan2f(dir.x, -dir.z) / DEG, s.maxFuel * 0.7f, 100, true, s.cruise * 0.8f);
-  pl.apComfort = c.gentle();
+  pl.apComfort = c.gentle(); pl.apTrees = false;   // (an estimate, never flown: the flown quote replaces it)
   pl.apEngage(Plane::AP_NAV, c.to, c.wx);
   const PerfModel& P = Plane::perf(&s);
   vec3 C = pl.apHoldC; C.y = 0;
@@ -653,7 +654,10 @@ float simulateFlightMinutes(const Contract& c, int si, float* fuelKgOut, bool cl
   const float payload = (float)c.cargoKg + c.pax * 85.f + 85.f;
   const float initialFuel = s.engineType == ENG_JET ? s.maxFuelForPayload(payload) : s.maxFuel;
   Plane p; p.reset(&s, start, reverse ? h0 + 180.f : h0, initialFuel, payload, c.startAirborne, s.cruise);
-  p.apComfort = c.gentle(); p.sceneryHits = false;
+  // (the trees on the finals from scenery of its own: the quote is flown on a worker thread, and the game's scenery
+  // is the game thread's)
+  Scenery obstacles(0);
+  p.apComfort = c.gentle(); p.sceneryHits = false; p.obstacles = &obstacles;
   if (!c.startAirborne) { p.engineRunning = true; p.engineSpool = 0.f; }
   const float dt = 1 / 30.f;
   float t = c.startAirborne ? 0.f : 4.f;   // (the engine start and the brake release before the roll)

@@ -763,7 +763,7 @@ void Game::chooseFreeRegion(const procedural::Descriptor& region) {
 
 void Game::loadFreeRegion(int index, GameScreen after) {
   initFreeRegions();
-  if (regionJob.valid() || index < 0 || index >= (int)freeRegions.size()) return;
+  if (regionJob.valid() || regionUploading || index < 0 || index >= (int)freeRegions.size()) return;
   const procedural::Descriptor target = freeRegions[index];
   if (regionError.empty() && !quoteJob.valid() && g_world.regionId == target.id) {
     freeRegion = index; screen = after; return;
@@ -808,7 +808,9 @@ void Game::loadFreeRegion(int index, GameScreen after) {
       else g_world.buildProcedural(target, path, stamp, save);
       if (g_world.airports.empty()) throw std::runtime_error("This region has no usable airports.");
       regionLoadStage = 2;
-      return makeMap ? Renderer::prepareWorldMinimap() : std::vector<uint8_t>{};
+      // (its textures' and buffers' contents, the map and its levels, made here: the loading screen then only uploads
+      // them, a slice a frame, as a flight's next region is published)
+      return makeMap ? Renderer::prepareWorldUpload(g_world) : Renderer::WorldUploadData{};
     });
 }
 
@@ -834,7 +836,7 @@ std::string Game::careerPlaceName() const {
 }
 
 void Game::loadCareerWorld(const std::string& id, GameScreen after) {
-  if (regionJob.valid() || g_world.regionId == id) return;
+  if (regionJob.valid() || regionUploading || g_world.regionId == id) return;
   const auto region = procedural::find(id);
   if (!region) return;
   chooseFreeRegion(*region);
@@ -845,36 +847,54 @@ void Game::updateRegionLoading(float dt) {
   regionLoadTime += dt;
   // Cancellation is deferred until the builder joins. No reader may resume in a partial World.
   if (in.pressed[K_ESC] || (in.buttonsPressed & PAD_B)) regionCancel = true;
-  if (!regionJob.valid() || regionJob.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
   try {
-    const auto map = regionJob.get();
+    if (regionUploading) {   // the world's textures and buffers, up to 24 MB of them a frame, then published at once
+      if (!g_ren.worldUploadReady() && !g_ren.pumpWorldUpload(24u << 20, 8.0)) {
+        if (g_ren.worldUploadError().empty()) return;
+        Renderer::WorldUploadData back;   // (a staging that failed: the world loaded as before, all of it now)
+        g_ren.cancelWorldUpload(&back);
+        g_ren.reloadWorld(back.minimapLevels.empty() ? std::vector<uint8_t>{} : back.minimapLevels[0]);
+      } else g_ren.commitWorldUpload(nullptr, false);
+      regionUploading = false;
+      finishRegionLoad();
+      return;
+    }
+    if (!regionJob.valid() || regionJob.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+    auto upload = regionJob.get();
     regionLoadStage = 3;
-    if (g_ren.ok) g_ren.reloadWorld(map);
-    freeAirport = freeLaunchPending ? std::clamp(freeAirport, 0, (int)g_world.airports.size() - 1) : 0;
-    if (!freeEarthIdent.empty()) {   // (the real Earth: the airport chosen, its chart now loaded)
-      if (g_world.earthChart) freeAirport = std::max(0, g_world.findAirport(freeEarthIdent.c_str()));
-      freeEarthIdent.clear();
+    if (g_ren.ok) {
+      if (g_ren.beginWorldUpload(g_world, std::move(upload))) { regionUploading = true; return; }
+      g_ren.reloadWorld(upload.minimapLevels.empty() ? std::vector<uint8_t>{} : upload.minimapLevels[0]);
     }
-    crashed = completed = landed = false;
-    dbgCam = dbgFollow = false;
-    wreck.clear(); debris.clear(); pops.clear(); particles.clear(); pits.clear();
-    bursts.clear(); trail.clear(); cloudWake.clear(); tipTrail[0].clear(); tipTrail[1].clear();
-    for (auto& smoke : pieceTrail) smoke.clear();
-    g_ren.entBudgetMs = 2.5f;
-    const bool launchAfterPreparation = freeLaunchPending && !regionCancel;
-    freeLaunchPending = false;
-    if (regionCancel && !loadingRegion.authored) {   // (a generated region given up: back to the islands)
-      loadFreeRegion(0, SCR_MENU); return;
-    }
-    screen = regionCancel ? SCR_MENU : regionAfterLoad;
-    if (screen == SCR_HUB && g_world.regionId == career.region) { career.refreshBoard(); selContract = 0; selAircraft = -1; }   // (the career's region: its board)
-    if (launchAfterPreparation && screen == SCR_FREE_FLIGHT) { launchFreeFlight(); return; }
-    if (screen == SCR_FREE_FLIGHT) toast(loadingRegion.name + " ready. Choose an airport and take flight.", vec3(.6f, 1.f, .8f), false);
+    finishRegionLoad();
   } catch (const std::exception& e) {
-    regionError = e.what();
+    regionUploading = false; regionError = e.what();
   } catch (...) {
-    regionError = "The region could not be prepared.";
+    regionUploading = false; regionError = "The region could not be prepared.";
   }
+}
+
+void Game::finishRegionLoad() {
+  freeAirport = freeLaunchPending ? std::clamp(freeAirport, 0, (int)g_world.airports.size() - 1) : 0;
+  if (!freeEarthIdent.empty()) {   // (the real Earth: the airport chosen, its chart now loaded)
+    if (g_world.earthChart) freeAirport = std::max(0, g_world.findAirport(freeEarthIdent.c_str()));
+    freeEarthIdent.clear();
+  }
+  crashed = completed = landed = false;
+  dbgCam = dbgFollow = false;
+  wreck.clear(); debris.clear(); pops.clear(); particles.clear(); pits.clear();
+  bursts.clear(); trail.clear(); cloudWake.clear(); tipTrail[0].clear(); tipTrail[1].clear();
+  for (auto& smoke : pieceTrail) smoke.clear();
+  g_ren.entBudgetMs = 2.5f;
+  const bool launchAfterPreparation = freeLaunchPending && !regionCancel;
+  freeLaunchPending = false;
+  if (regionCancel && !loadingRegion.authored) {   // (a generated region given up: back to the islands)
+    loadFreeRegion(0, SCR_MENU); return;
+  }
+  screen = regionCancel ? SCR_MENU : regionAfterLoad;
+  if (screen == SCR_HUB && g_world.regionId == career.region) { career.refreshBoard(); selContract = 0; selAircraft = -1; }   // (the career's region: its board)
+  if (launchAfterPreparation && screen == SCR_FREE_FLIGHT) { launchFreeFlight(); return; }
+  if (screen == SCR_FREE_FLIGHT) toast(loadingRegion.name + " ready. Choose an airport and take flight.", vec3(.6f, 1.f, .8f), false);
 }
 
 void Game::openEarthPicker() {
@@ -1203,7 +1223,7 @@ const std::vector<Game::BeyondAirport>& Game::beyondAirports() {
 // release of the game's own otherwise), downloaded and unpacked in the user's folder, there beside where they go -
 // the core alone, the land streamed as it is flown, unless whole (every zip: to fly with no connection)
 bool Game::startEarthInstall(bool whole) {
-  if (diskless || saveDir.empty() || (earthInstaller && earthInstaller->state() == earthInstall::Installer::RUNNING)) return false;
+  if (diskless || saveDir.empty() || (earthInstaller && earthInstaller->state() == earthInstall::Installer::RUNNING) || earthReopenJob.valid()) return false;
 #ifdef _WIN32
   const std::string sep = "\\";
 #else
@@ -1215,8 +1235,12 @@ bool Game::startEarthInstall(bool whole) {
 }
 void Game::updateEarthInstall() {
   if (!earthInstaller || earthInstaller->state() != earthInstall::Installer::DONE) return;
+  // the new pack opened on a worker (its index, its tables and its cache folder read there), the installer's line still
+  // up meanwhile; the user's earth folder is among those the game looks in
+  if (!earthReopenJob.valid()) { earthReopenJob = std::async(std::launch::async, [] { earthCharts::reopen(); }); return; }
+  if (earthReopenJob.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+  try { earthReopenJob.get(); } catch (...) {}
   earthInstaller.reset();
-  earthCharts::reopen();   // (the user's earth folder is among those the game looks in)
   if (auto pack = earthCharts::pack())
     toast(pack->streamed() ? "The real Earth is ready: its land comes as you fly. Fly it from Free Flight, or out beyond the islands" :
                              "The real Earth is installed: fly it from Free Flight, or out beyond the islands", vec3(.6f, 1.f, .8f), false);
@@ -4444,6 +4468,10 @@ static const MenuShot kMenuShots[] = {
 static const float kMenuShotLen = 16.f;
 static const MenuShot& menuShot(float t) { int n = (int)floorf(t / kMenuShotLen); return kMenuShots[((n % 8) + 8) % 8]; }
 
+static const float kHubOrbitR = 2200.f, kHubOrbitRate = 0.035f;   // (the hub's camera: radius, radians a second)
+int Game::hubField() const { return g_world.regionId == career.region && career.location < (int)g_world.airports.size() ? career.location : -1; }
+vec3 Game::hubOrbitAt(vec3 centre) const { const float t = realTime * kHubOrbitRate; return centre + vec3(cosf(t) * kHubOrbitR, 0, sinf(t) * kHubOrbitR); }
+
 void Game::menuTour(FrameParams& fp) {
   static Plane demo;
   static int lastCraft = -1;
@@ -4457,6 +4485,9 @@ void Game::menuTour(FrameParams& fp) {
     const MenuShot& N = menuShot(realTime + kMenuShotLen);
     fp.prefetchOn = true; fp.prefetchPos = g_world.airports[std::max(0, g_world.findAirport(N.ap))].pos();
   }
+  // and round the hub's camera (menuBackgroundCamera's orbit of its field), which the menu cuts to: what stands within
+  // 700 m of a camera is built on the game's thread when missing, some three dozen chunks in the cut's first frame
+  if (const int ap = hubField(); ap >= 0) { fp.prefetchNearR = 1500.f; fp.prefetchNearPos = hubOrbitAt(g_world.airports[ap].pos()); }
   // the aircraft passes over the airfield at mid-shot, on a heading turned from the runway's
   float hd = a.heading + S.turn;
   vec3 dir(sinf(hd * DEG), 0, -cosf(hd * DEG)), right = normalize(cross(dir, vec3(0, 1, 0)));
@@ -4583,11 +4614,11 @@ void Game::menuBackgroundCamera(FrameParams& fp) {
   static Plane demo;
   static bool initd = false;
   if (!initd) { demo.reset(&kAircraft[screen == SCR_MENU ? 1 : 0], vec3(0, 600, 0), 0, 50, 100, true, 60); initd = true; }
-  const int ap = g_world.regionId == career.region && career.location < (int)g_world.airports.size() ? career.location : -1;   // (the hub's field, when its world is loaded)
+  const int ap = hubField();
   vec3 centre = screen == SCR_MENU || ap < 0 ? vec3(-6000, 0, 11000) : g_world.airports[ap].pos();
-  float R = 2200.f, t = realTime * 0.035f;
+  const float t = realTime * kHubOrbitRate;
   float alt = (screen == SCR_MENU ? 380.f : 320.f) + std::max(centre.y, 0.f);
-  vec3 p = centre + vec3(cosf(t) * R, 0, sinf(t) * R); p.y = std::max(alt, g_world.height(p.x, p.z) + 250.f);
+  vec3 p = hubOrbitAt(centre); p.y = std::max(alt, g_world.height(p.x, p.z) + 250.f);
   vec3 vdir = normalize(vec3(-sinf(t), 0, cosf(t)));
   float hdg = atan2f(vdir.x, -vdir.z) / DEG;
   demo.pos = p;
@@ -5932,7 +5963,7 @@ void Game::debugScene(const std::string& name) {
     auto descriptor = procedural::find(regionId);
     if (!descriptor) throw std::invalid_argument("Unknown region scene: " + name);
     beginFreeFlightSetup(); chooseFreeRegion(*descriptor); loadFreeRegion(freeRegion);
-    while (screen == SCR_REGION_LOADING && regionJob.valid()) {
+    while (screen == SCR_REGION_LOADING && (regionJob.valid() || regionUploading)) {
       std::this_thread::sleep_for(std::chrono::milliseconds(10)); updateRegionLoading(.01f);
     }
     if (!regionError.empty()) throw std::runtime_error(regionError);

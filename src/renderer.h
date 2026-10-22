@@ -120,6 +120,7 @@ struct FrameParams {
   vec3 sunDir, sunCol; float night = 0;
   float planeTerrSh = 1.f;   // terrain's sun shadow at the player's aircraft (one value for the whole airframe, from the CPU)
   bool prefetchOn = false; vec3 prefetchPos;   // scenery to have the worker threads build ahead (the menu tour's next place)
+  float prefetchNearR = 0.f; vec3 prefetchNearPos;   // > 0: and what stands within this of a second place, once the first is built (the hub's view, which the menu cuts to)
   float cloudCover = 0.3f, cloudBase = 1500, fogB = 0.0001f, wet = 0, snow = 0, lightning = 0, storm = 0;
   float sunDim = 1.f;   // the weather's share of the sunlight (Game::computeSun): the lighting pass's sunLightAt times it
   // the sky's bodies (sky.h): the game's frame into the equator's (the stars), towards the moon, the share of it lit
@@ -302,7 +303,9 @@ public:
   // Accepted, resident GPU representation, independent of this frame's camera/FOV culling.
   regionalSurface::Handle drawableRegionSurface(const std::string& regionId) const;
   const std::string& worldUploadError() const { return worldStageError; }
-  bool commitWorldUpload(WorldUploadData* retired = nullptr);
+  // adjacent: the region left is the one beside it (a flight's next chart), its distant silhouette kept in view; else (a
+  // region loaded somewhere else) nothing of it is kept
+  bool commitWorldUpload(WorldUploadData* retired = nullptr, bool adjacent = true);
   void cancelWorldUpload(WorldUploadData* retired = nullptr); // call while the GL context is alive, including shutdown
   size_t worldUploadBytesThisFrame = 0, worldUploadBytesTotal = 0;
   double worldUploadMsThisFrame = 0, worldUploadMaxMs = 0;

@@ -131,7 +131,8 @@ struct GameTest {
   // Each frame's update (a 60th of a second of game time, as at 60 fps) and render (the GPU finished) on the wall clock;
   // a segment's median and worst, and every frame well over its segment's median named by what it did on the game's
   // thread: programs compiled, bodies baked, scenery made there. The software renderer's frame is slow throughout:
-  // what matters is the frame that stands out of its neighbours. SEAMLESS_SLIDE=0 leaves the slide out
+  // what matters is the frame that stands out of its neighbours. SEAMLESS_MENUS=0 leaves the menus out, SEAMLESS_FLIGHT=0
+  // the flight, SEAMLESS_SLIDE=0 the slide
   static int seamless(Game& game) {
     using clk = std::chrono::steady_clock;
     setvbuf(stdout, nullptr, _IOLBF, 0);   // (each line as it comes: a run cut short keeps what it found)
@@ -142,10 +143,19 @@ struct GameTest {
     };
     for (int i : kCareerAircraft) Plane::perf(&kAircraft[i]);
     game.headless = false; g_ren.entSync = false; game.profile.welcomed = true;
-    {
+    {   // the launch's prewarm (Game::prewarm) of what the session shows: the menu's scenery and terrain lighting, then the
+        // bodies and cockpits of the menu's aircraft and the one flown. The launch warms every craft, but on the software
+        // renderer each one's compiled programs stay in memory, some 14 GB for them all: the AI traffic, which would draw
+        // the rest, is left off (a frame that compiles or bakes another type here the launch would have spared)
       const auto t0 = clk::now();
       game.debugScene("menu");
-      game.prewarm([](float, const std::string&) {}, true);   // (as the launch does: every craft)
+      game.set.traffic = false;
+      auto offscreen = [&] { g_ren.setOffscreen(true); game.update(1.f / 60.f); game.render(); glFinish(); g_ren.setOffscreen(false); };
+      g_ren.entSync = true;
+      for (int i = 0; i < 400; i++) { game.realTime = 3.f; offscreen(); if (i >= 2 && g_ren.entPending == 0 && !game.loadingShadowPending()) break; }
+      g_ren.entSync = false;
+      for (int craft : {0, 1}) for (bool inside : {false, true}) { game.prewarmCraft = craft; game.prewarmInside = inside; game.realTime = 3.f; offscreen(); }
+      game.prewarmCraft = -1; game.prewarmInside = false; game.realTime = 0.f;
       printf("prewarm %.1f s, %.0f MB resident\n", std::chrono::duration<double>(clk::now() - t0).count(), residentMB());
     }
     struct Seg { std::string name; std::vector<double> u, r; int flagged = 0; };
@@ -167,7 +177,7 @@ struct GameTest {
       const double mu = median(s.u), mr = median(s.r);
       const bool slow = s.u.size() >= 3 && (u > std::max(8.0, 3.0 * mu) || r > 1.6 * mr + 40.0);
       s.u.push_back(u); s.r.push_back(r);
-      if (slow || (s.u.size() == 1 && (u > 8.0 || r > 400.0))) {
+      if (slow || (s.u.size() <= 3 && (u > 8.0 || (s.u.size() == 1 && r > 400.0)))) {
         s.flagged += slow;
         printf("  frame %5d %-22s update %7.1f ms (median %5.1f)  render %7.1f ms (median %6.1f)  compiled %d (%.0f ms)  baked %d  scenery made here %d (%.0f ms)  screen %d\n",
                frameNo, what, u, mu, r, mr, (int)g_shaderCacheMisses - miss0, (g_shaderCompileUs - us0) / 1000.0, g_ren.bakeCount - bake0,
@@ -178,15 +188,24 @@ struct GameTest {
       frameNo++;
     };
     auto frames = [&](int n, const char* what = "") { for (int i = 0; i < n; i++) frame(what); };
-    // ---- the menus
+    auto summary = [&] {
+      printf("\n%-34s %6s %10s %10s %10s %10s %8s\n", "segment", "frames", "update med", "update max", "render med", "render max", "flagged");
+      for (const Seg& s : segs) {
+        if (s.u.empty()) continue;
+        printf("%-34s %6zu %10.1f %10.1f %10.1f %10.1f %8d\n", s.name.c_str(), s.u.size(), median(s.u), *std::max_element(s.u.begin(), s.u.end()),
+               median(s.r), *std::max_element(s.r.begin(), s.r.end()), s.flagged);
+      }
+    };
+    // ---- the menus (SEAMLESS_MENUS=0: straight to the flight)
+    const bool menus = !(getenv("SEAMLESS_MENUS") && !atoi(getenv("SEAMLESS_MENUS")));
+    if (menus) {
     begin("main menu"); game.screen = SCR_MENU; frames(60);
     const char* tabs[] = {"hub: contracts", "hub: hangar", "hub: airline", "hub: logbook", "hub: settings"};
     for (int t = TAB_CONTRACTS; t <= TAB_SETTINGS; t++) { begin(tabs[t]); game.screen = SCR_HUB; game.hubTab = t; frames(20); }
     for (int p = 1; p <= 2; p++) { begin(p == 1 ? "hub: settings, controls" : "hub: settings, joystick"); game.settingsPage = p; frames(12); }
     game.settingsPage = 0;
     begin("free flight: setup"); game.beginFreeFlightSetup(); frames(30);
-    const auto pack = earthCharts::pack();
-    if (pack) {
+    if (earthCharts::pack()) {
       begin("free flight: real Earth picker"); game.freeEarthPicker = true; frames(10, "opened");
       for (const char* q : {"BOSTON", "KMVY"}) {
         game.earthQuery.clear();
@@ -195,6 +214,9 @@ struct GameTest {
       game.freeEarthPicker = false;
     }
     begin("free flight: region map"); game.freeRegionMap = true; frames(30); game.freeRegionMap = false;
+    } else { game.beginFreeFlightSetup(); }
+    if (getenv("SEAMLESS_FLIGHT") && !atoi(getenv("SEAMLESS_FLIGHT"))) { summary(); return 0; }   // (the menus alone)
+    const auto pack = earthCharts::pack();
     // ---- into the flight: the real Earth's KMVY with a pack, else the islands' Solace Capital
     begin("flight: region loading");
     if (pack) {
@@ -245,12 +267,7 @@ struct GameTest {
     }
     begin("debrief"); game.endFlight(false, "Seamlessness check", OUT_ABANDONED); frames(30);
     begin("main menu again"); game.screen = SCR_MENU; frames(30);
-    printf("\n%-34s %6s %10s %10s %10s %10s %8s\n", "segment", "frames", "update med", "update max", "render med", "render max", "flagged");
-    for (const Seg& s : segs) {
-      if (s.u.empty()) continue;
-      printf("%-34s %6zu %10.1f %10.1f %10.1f %10.1f %8d\n", s.name.c_str(), s.u.size(), median(s.u), *std::max_element(s.u.begin(), s.u.end()),
-             median(s.r), *std::max_element(s.r.begin(), s.r.end()), s.flagged);
-    }
+    summary();
     return 0;
   }
   // HORIZON=<seconds>: the generated regions round the flight built and uploaded before the shot (Renderer::

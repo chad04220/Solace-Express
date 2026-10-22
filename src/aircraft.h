@@ -11,6 +11,8 @@ enum EngineType { ENG_PISTON = 0, ENG_TURBOPROP, ENG_JET };
 enum License { LIC_STUDENT = 0, LIC_PPL, LIC_CPL, LIC_ATP };
 inline const char* licenseName(int l) { static const char* n[] = {"Student Permit", "Private Pilot (PPL)", "Commercial Pilot (CPL)", "Airline Transport (ATP)"}; return n[l]; }
 
+class Scenery;
+
 struct AircraftSpec {
   const char* id; const char* name; const char* role;
   int engineType, engines, cylinders, blades;
@@ -204,6 +206,12 @@ public:
   WheelMotion wheelMotion[3]; // main left, main right, nose/tail; cosmetic simulation state
   bool onGround = false, wasOnGround = false;
   bool sceneryHits = true;   // collide with trees and buildings (off for the quote's background flight: the scenery isn't thread-safe)
+  // the trees and buildings its autopilot plans the final over (apPlan): nullptr the game's (g_scenery); a background
+  // flight's own, made on its thread (the game's is the game thread's alone: its chunks are replaced and trimmed there).
+  // apTrees false: the ground alone (a plan never flown - the menu's quick estimate - that would otherwise build the
+  // scenery round a far field's final on the game thread, some 30 ms of a frame)
+  Scenery* obstacles = nullptr;
+  bool apTrees = true;
   bool apComfort = false;   // the autopilot flies for passengers (career flights): gentle bank, g, roll and climb; the stick is never limited
   bool apUpset = false;     // slow or steep enough that recovering comes before comfort (apControl)
   bool apPro = false;       // the pilot rework's first stage (docs/PILOT.md), off until it passes the checkride: a professional's envelope (30 deg of bank and 1.3 g in a civil type, up to 60 deg and 2.5 g in a research jet, smooth), the energy law, the ground ahead along its turn, a stabilised final (the gate at 230-460 m, configured and slowed by height, the path loop damped to the airframe's lag); false: the autopilot as it was (pilot_exam: PILOT=new)

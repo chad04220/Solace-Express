@@ -44,22 +44,36 @@ std::string nameFor(double lat, double lon) {
 }
 } // namespace
 
-std::shared_ptr<const earth::Pack> pack() {
-  std::lock_guard<std::mutex> g(g_lock);
-  if (!g_opened) {
-    g_opened = true;
-    if (!earth::hasRangeFetch()) earth::setRangeFetch(earthFetch::fetchRange);   // (a streamed pack's pieces, fetched as wanted)
-    const char* env = getenv("EARTH_PACK");
-    std::vector<std::string> dirs;
-    if (env && *env) dirs.push_back(env);
-    else { dirs = g_search; dirs.push_back("earth"); }
-    for (const auto& dir : dirs) {
-      std::string why;
-      auto p = earth::Pack::open(dir, &why);
-      if (p) { if (!g_glo90Cache.empty()) p->setGlo90Cache(g_glo90Cache); g_pack = std::move(p); g_error.clear(); break; }
-      g_error += (g_error.empty() ? "" : "; ") + why;
-    }
+namespace {
+std::mutex g_openLock;   // (one open at a time; g_lock is never held through one, so pack() never waits on a reopen)
+// The search's first pack that opens - EARTH_PACK when set, else the folders setSearch named and "earth" - and, with
+// none, why each didn't. Its index, its tables and its cache folder are read here, on the caller's thread
+std::shared_ptr<earth::Pack> openSearch(std::string& error) {
+  std::vector<std::string> dirs; std::string cache;
+  { std::lock_guard<std::mutex> g(g_lock); dirs = g_search; cache = g_glo90Cache; }
+  if (!earth::hasRangeFetch()) earth::setRangeFetch(earthFetch::fetchRange);   // (a streamed pack's pieces, fetched as wanted)
+  const char* env = getenv("EARTH_PACK");
+  if (env && *env) dirs = {env};
+  else dirs.push_back("earth");
+  error.clear();
+  for (const auto& dir : dirs) {
+    std::string why;
+    auto p = earth::Pack::open(dir, &why);
+    if (p) { if (!cache.empty()) p->setGlo90Cache(cache); error.clear(); return p; }
+    error += (error.empty() ? "" : "; ") + why;
   }
+  return nullptr;
+}
+} // namespace
+
+std::shared_ptr<const earth::Pack> pack() {
+  { std::lock_guard<std::mutex> g(g_lock); if (g_opened) return g_pack; }
+  std::lock_guard<std::mutex> once(g_openLock);   // (the first asks it opened; any other asking meanwhile waits for it)
+  { std::lock_guard<std::mutex> g(g_lock); if (g_opened) return g_pack; }
+  std::string error;
+  auto p = openSearch(error);
+  std::lock_guard<std::mutex> g(g_lock);
+  g_pack = std::move(p); g_error = error; g_opened = true;
   return g_pack;
 }
 void setSearch(std::vector<std::string> dirs, std::string glo90Cache) {
@@ -69,8 +83,11 @@ void setSearch(std::vector<std::string> dirs, std::string glo90Cache) {
 std::string glo90Cache() { std::lock_guard<std::mutex> g(g_lock); return g_glo90Cache; }
 std::string packError() { pack(); std::lock_guard<std::mutex> g(g_lock); return g_error; }
 void reopen() {
+  std::lock_guard<std::mutex> once(g_openLock);
+  std::string error;
+  auto p = openSearch(error);
   std::lock_guard<std::mutex> g(g_lock);
-  g_pack.reset(); g_opened = false; g_error.clear();
+  g_pack = std::move(p); g_error = error; g_opened = true;
 }
 void usePack(std::shared_ptr<const earth::Pack> p) {
   if (!earth::hasRangeFetch()) earth::setRangeFetch(earthFetch::fetchRange);

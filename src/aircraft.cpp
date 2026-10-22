@@ -235,7 +235,7 @@ void Plane::reset(const AircraftSpec* s, vec3 position, float headingDeg, float 
   spec = s; pos = position; fuel = s->engineType == ENG_JET ? clampf(fuelKg, 0.f, s->maxFuel) : fuelKg; payload = payloadKg; fuelBurnRemainder = 0;
   for (auto& wheel : wheelMotion) wheel.reset();
   q = quat::axisAngle(vec3(0, 1, 0), -headingDeg * DEG);
-  w = vec3(); ctl = Controls(); ev = FlightEvents(); apComfort = false; sceneryHits = true; brakeHold = 0;
+  w = vec3(); ctl = Controls(); ev = FlightEvents(); apComfort = false; sceneryHits = true; obstacles = nullptr; apTrees = true; brakeHold = 0;
   flaps = 0; gear = 1; rpm = 0; n1 = 0; engineSpool = 0; maxG = minG = 1; flightTime = 0;
   fail = Failures(); iceFeed = 0; overG = 0; stallWarn = 0; assistHeld = false;   // (no warning carried over from the last flight)
   apDisengage(); apDone = false; apOverrun = false; apPitchI = 0; gust = vec3(); rng = Rng(77);
@@ -1120,7 +1120,11 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   // 25 m above the terrain the glidepath was planned over, and the Wavecrest flew into them a kilometre short - by half the
   // ground's margin: an obstacle clearance surface, not a second terrain margin on top of the treetops, which closed
   // Far Isle to the Emissary)
-  auto clear = [&](vec3 q, float d) { return std::max(H(q) + margin(d), g_scenery.obstacleTop(q.x, q.z, 40.f) + clampf(d * 0.01f, 5.f, 20.f)); };
+  Scenery& trees = obstacles ? *obstacles : g_scenery;
+  auto clear = [&](vec3 q, float d) {
+    const float ground = H(q) + margin(d);
+    return apTrees ? std::max(ground, trees.obstacleTop(q.x, q.z, 40.f) + clampf(d * 0.01f, 5.f, 20.f)) : ground;
+  };
   for (float d = 300.f; d <= 3500.f; d += 50.f) { vec3 q = td - ld * d; need = std::max(need, (clear(q, d) - a.elev) / d); }
   float gs = std::min(need, tanf(maxAng * DEG));
   // the gate - the final approach fix - where the glidepath is 230 m up for a light aircraft, 330-460 m (1,500 ft) for an

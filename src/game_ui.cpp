@@ -1503,7 +1503,7 @@ void Game::drawRegionLoading() {
   const int stage = regionLoadStage.load();
   std::string detail = stage == 0 ? "Finishing background work from the previous region" :
     stage == 1 ? (g_worldStage.load() == 1 ? "Checking the region cache" : "Generating terrain, airports, roads and settlements") :
-    stage == 2 ? "Preparing the region navigation map" : "Uploading terrain and refreshing the renderer";
+    stage == 2 ? "Preparing the region's map and its terrain for the renderer" : "Uploading terrain and refreshing the renderer";
   if (!regionError.empty()) detail = "Region preparation failed: " + regionError;
   fitText(x, y + 92 * s, w, 16 * s, 11 * s, detail, regionError.empty() ? C_DIM : C_WARN);
   g_ren.rect(x, y + 131 * s, w, 4 * s, C_ACCENT, .12f, 2 * s);

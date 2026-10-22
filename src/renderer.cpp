@@ -1333,7 +1333,7 @@ bool Renderer::pumpWorldUpload(size_t byteBudget, double timeBudgetMs) {
   return finish();
 }
 
-bool Renderer::commitWorldUpload(WorldUploadData* retired) {
+bool Renderer::commitWorldUpload(WorldUploadData* retired, bool adjacent) {
   WorldStageTimer timer{worldUploadCommitMs};
   if (!worldUploadReady()) return false;
   // Candidate CPU data has already been moved into g_world by the caller. The staged source pointers are not
@@ -1355,6 +1355,7 @@ bool Renderer::commitWorldUpload(WorldUploadData* retired) {
   resetTemporal(true); depthValid = false;
   for (bool& valid : feedValid) valid = false;
   terrInst.clear(); terrInstCoarse.clear(); envInst.clear();
+  if (!adjacent) destroyFarRegion(previousFarRegion);
   cancelWorldUpload(retired); // deletes the previous region's GPU objects; never more than active + one staged set
   return true;
 }
