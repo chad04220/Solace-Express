@@ -134,18 +134,24 @@ struct GameTest {
   // what matters is the frame that stands out of its neighbours. SEAMLESS_SLIDE=0 leaves the slide out
   static int seamless(Game& game) {
     using clk = std::chrono::steady_clock;
+    setvbuf(stdout, nullptr, _IOLBF, 0);   // (each line as it comes: a run cut short keeps what it found)
+    auto residentMB = [] {
+      long pages = 0, resident = 0;
+      if (FILE* f = fopen("/proc/self/statm", "r")) { if (fscanf(f, "%ld %ld", &pages, &resident) != 2) resident = 0; fclose(f); }
+      return resident * (double)sysconf(_SC_PAGESIZE) / 1048576.0;
+    };
     for (int i : kCareerAircraft) Plane::perf(&kAircraft[i]);
     game.headless = false; g_ren.entSync = false; game.profile.welcomed = true;
     {
       const auto t0 = clk::now();
       game.debugScene("menu");
       game.prewarm([](float, const std::string&) {}, true);   // (as the launch does: every craft)
-      printf("prewarm %.1f s\n", std::chrono::duration<double>(clk::now() - t0).count());
+      printf("prewarm %.1f s, %.0f MB resident\n", std::chrono::duration<double>(clk::now() - t0).count(), residentMB());
     }
     struct Seg { std::string name; std::vector<double> u, r; int flagged = 0; };
     std::vector<Seg> segs;
     int frameNo = 0;
-    auto begin = [&](const std::string& name) { segs.push_back(Seg{name, {}, {}, 0}); printf("-- %s\n", name.c_str()); fflush(stdout); };
+    auto begin = [&](const std::string& name) { segs.push_back(Seg{name, {}, {}, 0}); printf("-- %s (%.0f MB resident)\n", name.c_str(), residentMB()); };
     auto median = [](std::vector<double> v) { if (v.empty()) return 0.0; std::sort(v.begin(), v.end()); return v[v.size() / 2]; };
     auto frame = [&](const char* what = "") {
       Seg& s = segs.back();
@@ -168,6 +174,7 @@ struct GameTest {
                g_scenery.syncBuilt - gen0, g_scenery.syncBuildMs - genMs0, (int)game.screen);
         fflush(stdout);
       }
+      if (frameNo % 100 == 0) printf("  frame %5d: %.0f MB resident\n", frameNo, residentMB());
       frameNo++;
     };
     auto frames = [&](int n, const char* what = "") { for (int i = 0; i < n; i++) frame(what); };
