@@ -14,6 +14,7 @@
 #include "../src/world.h"
 #include "../src/aircraft.h"
 #include "../src/game.h"
+#include "../src/earth_charts.h"
 
 typedef struct __GLXFBConfigRec* GLXFBConfig;
 typedef struct __GLXcontextRec* GLXContext;
@@ -121,6 +122,128 @@ struct GameTest {
     int frames = 0, pend0 = -1; const int b0 = g_ren.bakeBuilt;
     while (game.screen == SCR_LOADING && game.loadReadyT < 0 && frames < 2000) { game.update(1.f / 30.f); game.render(); if (pend0 < 0) pend0 = g_ren.entPending; frames++; }
     printf("loading from %s: first frame pending %d, ready after %d frames (%.1f s of game time), meshes built %d\n", g_world.airports[c.from].code, pend0, frames, game.loadT, g_ren.bakeBuilt - b0);
+    return 0;
+  }
+  // A session through the menus and into flight, every frame timed (the seamlessness check): the launch's prewarm, then
+  // the main menu, each of the hub's tabs and settings pages, Free Flight's setup, the real Earth's picker typed into
+  // (with EARTH_PACK), the region map; the flight's loading, then the flight - outside, the cockpit, the GPS, the pause
+  // menu, photo mode, time warp - and on the real Earth a slide into the next chart; the debrief and back to the menu.
+  // Each frame's update (a 60th of a second of game time, as at 60 fps) and render (the GPU finished) on the wall clock;
+  // a segment's median and worst, and every frame well over its segment's median named by what it did on the game's
+  // thread: programs compiled, bodies baked, scenery made there. The software renderer's frame is slow throughout:
+  // what matters is the frame that stands out of its neighbours. SEAMLESS_SLIDE=0 leaves the slide out
+  static int seamless(Game& game) {
+    using clk = std::chrono::steady_clock;
+    for (int i : kCareerAircraft) Plane::perf(&kAircraft[i]);
+    game.headless = false; g_ren.entSync = false; game.profile.welcomed = true;
+    {
+      const auto t0 = clk::now();
+      game.debugScene("menu");
+      game.prewarm([](float, const std::string&) {}, true);   // (as the launch does: every craft)
+      printf("prewarm %.1f s\n", std::chrono::duration<double>(clk::now() - t0).count());
+    }
+    struct Seg { std::string name; std::vector<double> u, r; int flagged = 0; };
+    std::vector<Seg> segs;
+    int frameNo = 0;
+    auto begin = [&](const std::string& name) { segs.push_back(Seg{name, {}, {}, 0}); printf("-- %s\n", name.c_str()); fflush(stdout); };
+    auto median = [](std::vector<double> v) { if (v.empty()) return 0.0; std::sort(v.begin(), v.end()); return v[v.size() / 2]; };
+    auto frame = [&](const char* what = "") {
+      Seg& s = segs.back();
+      const int miss0 = g_shaderCacheMisses, bake0 = g_ren.bakeCount, gen0 = g_scenery.syncBuilt;
+      const long long us0 = g_shaderCompileUs; const double genMs0 = g_scenery.syncBuildMs;
+      const auto t0 = clk::now();
+      game.update(1.f / 60.f);
+      const auto t1 = clk::now();
+      game.render(); glFinish();
+      const auto t2 = clk::now();
+      game.framePresented(); game.in.endFrame();
+      const double u = std::chrono::duration<double, std::milli>(t1 - t0).count(), r = std::chrono::duration<double, std::milli>(t2 - t1).count();
+      const double mu = median(s.u), mr = median(s.r);
+      const bool slow = s.u.size() >= 3 && (u > std::max(8.0, 3.0 * mu) || r > 1.6 * mr + 40.0);
+      s.u.push_back(u); s.r.push_back(r);
+      if (slow || (s.u.size() == 1 && (u > 8.0 || r > 400.0))) {
+        s.flagged += slow;
+        printf("  frame %5d %-22s update %7.1f ms (median %5.1f)  render %7.1f ms (median %6.1f)  compiled %d (%.0f ms)  baked %d  scenery made here %d (%.0f ms)  screen %d\n",
+               frameNo, what, u, mu, r, mr, (int)g_shaderCacheMisses - miss0, (g_shaderCompileUs - us0) / 1000.0, g_ren.bakeCount - bake0,
+               g_scenery.syncBuilt - gen0, g_scenery.syncBuildMs - genMs0, (int)game.screen);
+        fflush(stdout);
+      }
+      frameNo++;
+    };
+    auto frames = [&](int n, const char* what = "") { for (int i = 0; i < n; i++) frame(what); };
+    // ---- the menus
+    begin("main menu"); game.screen = SCR_MENU; frames(60);
+    const char* tabs[] = {"hub: contracts", "hub: hangar", "hub: airline", "hub: logbook", "hub: settings"};
+    for (int t = TAB_CONTRACTS; t <= TAB_SETTINGS; t++) { begin(tabs[t]); game.screen = SCR_HUB; game.hubTab = t; frames(20); }
+    for (int p = 1; p <= 2; p++) { begin(p == 1 ? "hub: settings, controls" : "hub: settings, joystick"); game.settingsPage = p; frames(12); }
+    game.settingsPage = 0;
+    begin("free flight: setup"); game.beginFreeFlightSetup(); frames(30);
+    const auto pack = earthCharts::pack();
+    if (pack) {
+      begin("free flight: real Earth picker"); game.freeEarthPicker = true; frames(10, "opened");
+      for (const char* q : {"BOSTON", "KMVY"}) {
+        game.earthQuery.clear();
+        for (const char* c = q; *c; c++) { game.in.text = std::string(1, *c); frame("a letter typed"); frames(3); }
+      }
+      game.freeEarthPicker = false;
+    }
+    begin("free flight: region map"); game.freeRegionMap = true; frames(30); game.freeRegionMap = false;
+    // ---- into the flight: the real Earth's KMVY with a pack, else the islands' Solace Capital
+    begin("flight: region loading");
+    if (pack) {
+      const auto found = earthCharts::searchAirports("KMVY", 1);
+      if (found.empty()) { printf("no KMVY in the pack\n"); return 1; }
+      game.chooseEarthAirport(found[0]);
+    }
+    for (int i = 0; i < 6000 && game.screen == SCR_REGION_LOADING; i++) frame("region loading");
+    if (!game.regionError.empty()) { printf("region failed: %s\n", game.regionError.c_str()); return 1; }
+    begin("flight: loading screen");
+    game.freeCraft = 0; game.freeAirborne = true;
+    game.freeAirport = std::max(0, g_world.findAirport(pack ? "KMVY" : "CAP"));
+    game.launchFreeFlight();
+    for (int i = 0; i < 6000 && game.screen == SCR_LOADING && game.loadReadyT < 0; i++) frame("loading");
+    frames(30, "establishing shot");
+    game.in.pressed[K_ENTER] = true; frame("into the flight");
+    if (game.screen != SCR_FLIGHT) { printf("not in flight (screen %d)\n", (int)game.screen); return 1; }
+    game.botControl = true;
+    game.plane.apEngage(Plane::AP_HOLD, -1, game.wx);   // (level, on its heading)
+    begin("flight: outside"); game.camMode = 0; frames(120);
+    begin("flight: cockpit"); game.camMode = 1; frame("-> cockpit"); frames(60);
+    begin("flight: outside again"); game.camMode = 0; frame("-> outside"); frames(30);
+    begin("flight: GPS"); game.showMap = true; frame("GPS opened"); frames(40); game.showMap = false; frame("GPS closed");
+    begin("flight: pause menu"); game.paused = true; frame("paused"); frames(30); game.paused = false; frame("resumed");
+    begin("flight: photo mode"); game.enterPhoto(); frame("photo mode"); frames(30); game.exitPhoto(); frame("photo mode left");
+    begin("flight: time warp x4"); game.timeAccel = 4.f; frames(60); game.timeAccel = 1.f;
+    if (pack && !(getenv("SEAMLESS_SLIDE") && !atoi(getenv("SEAMLESS_SLIDE")))) {
+      begin("flight: the next chart prepared");
+      auto place = [&](float x) {
+        const float h = std::max(g_world.height(x, 0.f), 0.f) + 600.f;
+        game.plane.pos = vec3(x, h, 0.f); game.plane.vel = vec3(70.f, 0.f, 0.f); game.plane.onGround = false;
+        game.plane.q = quat::axisAngle(vec3(0, 1, 0), -0.5f * PI);
+        game.plane.apEngage(Plane::AP_HOLD, -1, game.wx);
+      };
+      const std::string from = g_world.regionId;
+      place(12000.f);
+      const auto deadline = clk::now() + std::chrono::minutes(4);
+      while ((!game.earthPrefetch || !game.earthPrefetch->scenery || game.earthPrefetch->scenery->generated() < 1500) && clk::now() < deadline) {
+        frame("preparing ahead");
+        if (game.plane.pos.x > 16000.f) place(12000.f);   // (kept short of the move while the next chart prepares)
+      }
+      printf("  the next chart %s after %d frames\n", game.earthPrefetch ? game.earthPrefetch->region.id.c_str() : "(none)", (int)segs.back().u.size());
+      begin("flight: the move into it");
+      place(18000.f);
+      for (int i = 0; i < 3000 && g_world.regionId == from; i++) frame("waiting for the move");
+      frame(g_world.regionId != from ? "moved" : "(not moved)");
+      begin("flight: after the move"); frames(90);
+    }
+    begin("debrief"); game.endFlight(false, "Seamlessness check", OUT_ABANDONED); frames(30);
+    begin("main menu again"); game.screen = SCR_MENU; frames(30);
+    printf("\n%-34s %6s %10s %10s %10s %10s %8s\n", "segment", "frames", "update med", "update max", "render med", "render max", "flagged");
+    for (const Seg& s : segs) {
+      if (s.u.empty()) continue;
+      printf("%-34s %6zu %10.1f %10.1f %10.1f %10.1f %8d\n", s.name.c_str(), s.u.size(), median(s.u), *std::max_element(s.u.begin(), s.u.end()),
+             median(s.r), *std::max_element(s.r.begin(), s.r.end()), s.flagged);
+    }
     return 0;
   }
   // HORIZON=<seconds>: the generated regions round the flight built and uploaded before the shot (Renderer::
@@ -488,6 +611,7 @@ void main(){
   game.initHeadless();
   if (scene == "hubfly") return GameTest::hubFly(game);
   if (scene == "somnushitch") return GameTest::somnusHitch(game);
+  if (scene == "seamless") return GameTest::seamless(game);
   if (scene == "prewarm") {   // the launch prewarm, then the menu's first frames as a player would see them open
     game.debugScene("menu");
     auto t0 = std::chrono::steady_clock::now();

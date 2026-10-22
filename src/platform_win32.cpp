@@ -68,6 +68,9 @@ static PFNXINPUTGETSTATE s_xinput = nullptr;
 struct XVibration { WORD left, right; };
 typedef DWORD(WINAPI* PFNXINPUTSETSTATE)(DWORD, XVibration*);
 static PFNXINPUTSETSTATE s_xinputSet = nullptr;
+// with no pad there, its slot asked again a second on, or at once when a device comes or goes: XInput's answer for an
+// empty slot can take a millisecond and more, every frame (pollPad)
+static ULONGLONG s_padRetryAt = 0;
 // the game's rumble (Game::rumbleLo / rumbleHi, 0..1) to the pad's motors: sent when it changes, off when the window
 // loses the focus or the game ends
 static void sendRumble(float lo, float hi) {
@@ -114,7 +117,7 @@ static LRESULT CALLBACK wndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
   switch (msg) {
     case WM_CLOSE: if (g_game) g_game->quit = true; return 0;
     case WM_DISPLAYCHANGE: case WM_EXITSIZEMOVE: setupPacing(h); break;   // refresh rate / monitor may have changed
-    case WM_DEVICECHANGE: joyDevicesChanged(); break;   // (a joystick, throttle or pedals plugged in or out)
+    case WM_DEVICECHANGE: joyDevicesChanged(); s_padRetryAt = 0; break;   // (a joystick, throttle, pedals or pad plugged in or out)
     case WM_SIZE: if (g_ren.ok) g_ren.resize(LOWORD(lp), HIWORD(lp)); return 0;
     case WM_GETMINMAXINFO: {   // (a window no smaller than 800 x 600 inside: the menus and settings are laid out for it - the review of v3.44.0, UI-4)
       RECT r = {0, 0, 800, 600}; AdjustWindowRect(&r, (DWORD)GetWindowLongPtr(h, GWL_STYLE), FALSE);
@@ -340,10 +343,11 @@ const char* audioBackendName() { return s_wasapi ? "WASAPI (shared, 10 ms)" : "w
 // ------------------------------------------------------------------ gamepad
 static void pollPad(Input& in) {
   if (!s_xinput) return;
+  if (!in.pad && GetTickCount64() < s_padRetryAt) return;
   XState st = {};
   if (s_xinput(0, &st) != 0) {   // disconnected: nothing it was holding stays held
     if (in.pad) { in.buttons = 0; in.lx = in.ly = in.rx = in.ry = in.lt = in.rt = 0; }
-    in.pad = false; return;
+    in.pad = false; s_padRetryAt = GetTickCount64() + 1000; return;
   }
   in.pad = true;
   auto ax = [](SHORT v) { return clampf(v / 32767.f, -1, 1); };
