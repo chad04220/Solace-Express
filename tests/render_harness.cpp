@@ -680,6 +680,7 @@ void main(){
   if (scene == "researchwarm") return GameTest::researchWarm(game);
   if (getenv("PREWARM")) game.prewarm([](float, const std::string& what) { if (getenv("PREWARMLOG")) printf("prewarm: %s\n", what.c_str()); });   // (every aircraft's body built first, as the game's launch does: the traffic drawn from meshes; PREWARMLOG: what each step says)
   if (getenv("NOTRAFFIC")) game.set.traffic = false;   // (A/B timings of the player's aircraft alone)
+  if (getenv("PERFWARM")) for (int i : kCareerAircraft) Plane::perf(&kAircraft[i]);   // (every career type's performance learned first, as the game's launch does)
   game.debugScene(scene);
   if (getenv("PREPASSAUTO")) {   // ground depth first, measured as in play (PREPASSAUTO=<frames to the first trial>)
     g_ren.prepassAutoOn = true; g_ren.prepareTerrainDepth(); g_ren.prepassAuto.countdown = std::max(1, atoi(getenv("PREPASSAUTO")));
@@ -693,7 +694,12 @@ void main(){
   if (getenv("HORIZON")) { GameTest::waitHorizon(game, (float)atof(getenv("HORIZON"))); for (int i = 0; i < 3; i++) game.render(); }
   if (getenv("TAAF")) for (int i = 0, n = atoi(getenv("TAAF")); i < n; i++) game.render();   // extra static frames: let TAA converge
   if (getenv("SIMFRAMES")) {   // the scene flown on first, simulated but not drawn (a timing scene should hold still)
-    for (int i = 0, n = atoi(getenv("SIMFRAMES")); i < n; i++) game.update(1.f / 60.f);
+    for (int i = 0, n = atoi(getenv("SIMFRAMES")); i < n; i++) {   // (each update over 5 ms named: a hitch in the scene's own work)
+      const auto t0 = std::chrono::steady_clock::now();
+      game.update(1.f / 60.f);
+      const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+      if (ms > 5.0) printf("  update %d: %.1f ms\n", i, ms);
+    }
     for (int i = 0; i < 3; i++) game.render();
   }
   if (getenv("GROUNDCOUNT")) {   // the main view's ground over one frame, as the analysis counts it (renderer.h groundStats)
