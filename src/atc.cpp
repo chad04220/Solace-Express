@@ -340,6 +340,7 @@ const std::vector<float>* AtcVoice::pcm(const std::string& id, std::unique_lock<
   c.used = ++useTick;
   if (!c.loaded && c.decoding) decoded.wait(held, [&] { return !c.decoding; });   // (the decoder has it in hand: its result)
   if (!c.loaded) {   // (not asked for ahead, or let go since: decoded here)
+    decodedInPlace++;
     std::vector<float> samples;
     if (!readWav(dir + "/" + c.file, samples, g_audio.sampleRate)) samples.clear();
     install(c, std::move(samples));
@@ -467,7 +468,9 @@ void AtcVoice::say(const Tx& tx) {
   if (busy() && (tx.prio >= playingPrio + 30 || (tx.prio >= kHazard && playingPrio < kHazard))) {
     g_audio.voiceStop();
     queue.clear();
-    start(tx);
+    // next, without the gap between calls: update() starts it as it would any other, its clips decoded meanwhile
+    queue.push_back(tx); idleT = 10.f;
+    prefetch(tx);
     return;
   }
   if (!tx.group.empty())   // a newer lever setting replaces the one still waiting to be said
@@ -491,7 +494,7 @@ AtcVoice::Tx AtcVoice::update(float dt) {
     if (started.ids.empty() && !queue.empty() && idleT > 0.6f) {   // the most important waiting call, oldest first
       size_t best = 0;
       for (size_t i = 1; i < queue.size(); i++) if (queue[i].prio > queue[best].prio) best = i;
-      // (a tenth of a second queued at the least, every time: its clips decoded meanwhile, on the decoder - a call on
+      // (a quarter of a second queued at the least, every time: its clips decoded meanwhile, on the decoder - a call on
       // a quiet channel would otherwise start the frame it was made, decoding them on the game's thread)
       if (queue[best].age < kDecodeLead) return Tx();
       Tx tx = queue[best];

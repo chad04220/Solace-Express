@@ -54,9 +54,10 @@ static void section(const char* name) { printf("\n== %s (%.0f MB resident)\n", n
 struct GameTest {
   static constexpr float kDt = 1.f / 60.f;
   // a flight's frames on the game's thread: each update timed (µs), the audio thread's mix of the same 60th timed beside it
-  struct Run { std::vector<double> update, mix; int slow = 0, slowWithCall = 0; };
+  struct Run { std::vector<double> update, mix; int slow = 0, slowWithCall = 0, calls = 0, inPlace = 0; };
   static Run fly(Game& g, int frames, const std::function<void(int)>& each = nullptr) {
     Run r; static float abuf[2 * 800];
+    const size_t calls0 = g.atc.history.size(); const int inPlace0 = g.atc.decodedInPlace;
     for (int i = 0; i < frames && g.screen == SCR_FLIGHT; i++) {
       if (each) each(i);
       const size_t calls = g.atc.history.size();
@@ -68,12 +69,14 @@ struct GameTest {
       g_audio.render(abuf, 800);
       r.mix.push_back(msSince(t1) * 1000.0);
     }
+    r.calls = (int)(g.atc.history.size() - std::min(calls0, g.atc.history.size())); r.inPlace = g.atc.decodedInPlace - inPlace0;
     return r;
   }
   static void row(const char* what, const Run& r, const Game& g) {
     const Stats u = stats(r.update), m = stats(r.mix);
-    printf("  %-34s update %7.0f µs median %7.0f p99 %8.0f max   mix %5.0f µs median   (%zu frames, warp %.0fx, traffic %zu; %d over 8 ms, %d as a tower call began)\n",
-           what, u.med, u.p99, u.max, m.med, r.update.size(), g.timeAccel, g.traffic.craft.size(), r.slow, r.slowWithCall);
+    printf("  %-34s update %7.0f µs median %7.0f p99 %8.0f max   mix %5.0f µs median   (%zu frames, warp %.0fx, traffic %zu; %d over 8 ms, %d as a tower call began;\n"
+           "  %-34s %d calls, %d clips decoded on the game's thread)\n",
+           what, u.med, u.p99, u.max, m.med, r.update.size(), g.timeAccel, g.traffic.craft.size(), r.slow, r.slowWithCall, "", r.calls, r.inPlace);
     if (r.update.empty()) printf("    (no frames: screen %d, crashed %d, %s)\n", (int)g.screen, (int)g.crashed, g.debriefTitle.c_str());
     fflush(stdout);
   }
@@ -113,6 +116,7 @@ struct GameTest {
     }
     buildStory();
     g_audio.init(48000);
+    for (int i : kCareerAircraft) Plane::perf(&kAircraft[i]);   // (as the game's start learns them, or reads them from its cache)
 
     if (want("perf")) {
       section("each type's learned performance (Plane::perf, once a build; cached after)");

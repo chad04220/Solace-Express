@@ -68,7 +68,7 @@ int main(int argc,char** argv){
  AtcVoice::Tx routine,hazard;
  check(voice.resolve("Full tanks. Release the parking brake when ready.","",false,routine) && voice.resolve("INCOMING FIRE - BREAK AWAY","",false,hazard),"queue fixtures resolve");
  voice.say(routine);voice.update(1);render(.05f);size_t n=voice.history.size();
- voice.say(routine);voice.say(routine);voice.say(hazard);auto started=voice.update(.01f);
+ voice.say(routine);voice.say(routine);voice.say(hazard);auto started=voice.update(AtcVoice::kDecodeLead);   // (the decode's lead, then it starts)
  check(started.text==hazard.text && voice.history.size()==n+1,"urgent threat interrupts routine speech and duplicates are suppressed");
  render(8);voice.update(1);check(voice.history.size()==n+1,"duplicate routine does not replay later");
  voice.cancel();voice.say(routine);voice.update(20);

@@ -37,7 +37,7 @@ public:
   static const int kVoices = 3;
   static const int kHazard = 95;   // priority from which a transmission interrupts any routine one
   static constexpr const char* kPause = "@pause";
-  static constexpr float kDecodeLead = 0.1f;   // (s) a queued transmission waits this long before it starts: its clips' decode
+  static constexpr float kDecodeLead = 0.25f;   // (s) a queued transmission waits this long before it starts: its clips' decode (a flight's first calls, some 16 clips, take about 0.1 s)
   AtcVoice();
   ~AtcVoice();   // (the decoder stopped)
   AtcVoice(const AtcVoice&) = delete;
@@ -76,6 +76,7 @@ public:
   bool pending() const { return busy() || !queue.empty() || !started.ids.empty(); }
   std::vector<std::string> history;   // every transmission started, in order; the towers' prefixed "TWR " (tests)
   int missingAudio = 0;
+  int decodedInPlace = 0;             // clips decoded where they were wanted, not ahead on the decoder (perf_check)
   int dropped = 0;                    // stale transmissions never started
   size_t historyLimit = 64;           // the newest this many are kept (0: all, for tests)
   // the decoded clips kept, at most this many bytes (the least recently used go first, and decode again when next
