@@ -197,6 +197,7 @@ static void computeTexel(float x, float z, float out[4]) {
   }
   sceneryBaseMod(x, z, h, amp);
   for (const Airport& a : kAirports) {
+    if (beyondRunway(x - a.x, z - a.z, a.length)) continue;
     float hd = a.heading * DEG, dx = x - a.x, dz = z - a.z;
     float u = fabsf(dx * sinf(hd) - dz * cosf(hd)), v = fabsf(dx * cosf(hd) + dz * sinf(hd));
     // Approach funnel: keep terrain below a glide corridor off both runway ends
@@ -236,6 +237,7 @@ static void airportLimits(const Airport* data, size_t count, float x, float z, f
   grounds = 0.f; cap = 1e9f;
   for (size_t i = 0; i < count; ++i) {
     const Airport& a = data[i];
+    if (beyondRunway(x - a.x, z - a.z, a.length)) continue;
     float hd = a.heading * DEG, dx = x - a.x, dz = z - a.z;
     float u = fabsf(dx * sinf(hd) - dz * cosf(hd)), v = fabsf(dx * cosf(hd) + dz * sinf(hd));
     float d = u - a.length * 0.5f;
@@ -255,6 +257,7 @@ static void airportLimits(const Airport* data, size_t count, float x, float z, f
 // funnelCeiling as airportFunnelCeilingFor's; influence the stronger of the two, as airportInfluenceFor's
 static void extraRunwayLimits(const World& world, float x, float z, float& grounds, float& cap, float& funnelCeiling, float& influence) {
   for (const ExtraRunway& r : world.extraRunways) {
+    if (beyondRunway(x - r.x, z - r.z, r.length, std::max(2410.f, r.width * 0.5f + 490.f))) continue;
     const float elev = world.airports[r.airport].elev;
     const float hd = r.heading * DEG, dx = x - r.x, dz = z - r.z;
     const float u = fabsf(dx * sinf(hd) - dz * cosf(hd)), v = fabsf(dx * cosf(hd) + dz * sinf(hd));
@@ -287,6 +290,7 @@ static float airportFunnelCeilingFor(const Airport* data, size_t count, float x,
   float ceiling = 1e9f;
   for (size_t i = 0; i < count; ++i) {
     const Airport& a = data[i];
+    if (beyondRunway(x - a.x, z - a.z, a.length)) continue;
     float hd = a.heading * DEG, dx = x - a.x, dz = z - a.z;
     float u = fabsf(dx * sinf(hd) - dz * cosf(hd)), v = fabsf(dx * cosf(hd) + dz * sinf(hd));
     float d = u - a.length * 0.5f;
@@ -303,6 +307,7 @@ static float airportInfluenceFor(const Airport* data, size_t count, float x, flo
   float best = 0;
   for (size_t i = 0; i < count; ++i) {
     const Airport& a = data[i];
+    if (beyondRunway(x - a.x, z - a.z, a.length)) continue;
     float hd = a.heading * DEG, dx = x - a.x, dz = z - a.z;
     float u = fabsf(dx * sinf(hd) - dz * cosf(hd)), v = fabsf(dx * cosf(hd) + dz * sinf(hd));
     float d = u - a.length * 0.5f;

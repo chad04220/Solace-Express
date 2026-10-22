@@ -10,12 +10,12 @@ void require(bool yes, const char* why) { if (!yes) throw std::invalid_argument(
 double chartHeading(geo::Double3 v) { return std::atan2(v.x, -v.z) / geo::kDegrees; }
 double wrapped(double degrees) { const double v = degrees - 360. * std::floor(degrees / 360.); return v >= 360. ? 0. : v; }
 }
-Chart::Chart(geo::Position origin) : origin_(geo::fromDirection(geo::direction(origin), 0)) {}
+Chart::Chart(geo::Position origin) : origin_(geo::fromDirection(geo::direction(origin), 0)), from_(origin_) {}
 geo::Position Chart::position(vec3 p) const {
   require(finite(p.x) && finite(p.y) && finite(p.z), "non-finite regional position");
   const double distance = std::hypot(double(p.x), double(p.z));
   require(distance < geo::radius() * (geo::kPi - 1e-12), "regional chart reaches its antipode");
-  geo::Position result = distance > 0 ? geo::destination(origin_, std::atan2(double(p.x), -double(p.z)) / geo::kDegrees, distance) : origin_;
+  geo::Position result = distance > 0 ? from_(std::atan2(double(p.x), -double(p.z)) / geo::kDegrees, distance) : origin_;
   result.height = p.y;
   (void)geo::direction(result); // validates altitude too
   return result;

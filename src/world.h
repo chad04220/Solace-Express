@@ -66,6 +66,15 @@ struct Airport {
 // centre, heading (degrees true of its first end toward its second), length and width (m), surface (SURF_), and the
 // airport it belongs to (World::airports: onRunway answers with that one, whose height its ground is levelled to)
 struct ExtraRunway { int airport; float x, z, heading, length, width; int surface; };
+// Nothing of a runway reaches the ground beyond a rectangle round it: its approach funnel, 7 km past either end and at
+// most 2.41 km either side of the line (halfw + 900 at the funnel's far end), its grounds well inside that (side: wider
+// for a runway wider than 3.8 km). A point further from its middle (dx, dz) than that rectangle's corner 50 m out each
+// way lies over 49 m past one of its sides: the runway's readings of the ground there (computeTexel's, airportLimits'
+// and the rest, World::buildEarthTerrain's) pass it by before any of their trigonometry, its every weight exactly 0
+inline bool beyondRunway(float dx, float dz, float length, float side = 2410.f) {
+  const float a = length * 0.5f + 7000.f + 50.f, b = side + 50.f;
+  return dx * dx + dz * dz > a * a + b * b;
+}
 
 struct Town { const char* name; float x, z, r; int kind; };  // kind 0 village, 1 town, 2 city
 

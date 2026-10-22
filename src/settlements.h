@@ -53,6 +53,18 @@ std::vector<SettlementField> buildSettlementFields(const World& world);
 // How far out in its settlement a place lies - the effort there over its settlement's budget: 0 at the centre, 1 at
 // the edge - for the settlement it lies furthest within (a large value: none); which one in *town
 float settlementShare(const std::vector<SettlementField>& fields, float x, float z, int* town = nullptr);
+// settlementShare for the many places of a pass over fields that stay as they are: the fields' extents on a grid, each
+// cell listing those reaching it in their order - so the same answer, its ties as theirs, from a few fields not all
+struct SettlementLookup {
+  explicit SettlementLookup(const std::vector<SettlementField>& fields);
+  float share(float x, float z, int* town = nullptr) const;
+private:
+  static constexpr float C = 500.f;
+  const std::vector<SettlementField>& fields;
+  float x0 = 0.f, z0 = 0.f, x1 = -1.f, z1 = -1.f;   // (the extents' bounds: none beyond them)
+  int nx = 0, nz = 0;
+  std::vector<int> first, ids;                      // (cell k's fields: ids[first[k]] .. ids[first[k + 1]])
+};
 // The settlements' streets, laid out and added to the network
 void addSettlementStreets(const World& world, const std::vector<SettlementField>& fields, RoadNetwork& net);
 // The farmsteads out in the farmland, clear of the settlements and the airfields: each a level yard (a short path of

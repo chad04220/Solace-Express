@@ -588,12 +588,20 @@ void harbourBoats(const World& world, std::vector<PlacedEnt>& out) {
   }
   for (int t = 0; t < (int)world.towns.size(); t++) {
     const vec2 c(world.towns[t].x, world.towns[t].z);
-    std::vector<std::pair<float, vec2>> spots;
-    for (float z = c.y - 2500.f; z <= c.y + 2500.f; z += 20.f)
-      for (float x = c.x - 2500.f; x <= c.x + 2500.f; x += 20.f) {
+    // (the 20 m grid round it, its rows side by side - the points as the one pass stepped them, each row's spots in its
+    // order, the rows in theirs - the ground looked at only within its 2.5 km)
+    std::vector<float> xs, zs;
+    for (float z = c.y - 2500.f; z <= c.y + 2500.f; z += 20.f) zs.push_back(z);
+    for (float x = c.x - 2500.f; x <= c.x + 2500.f; x += 20.f) xs.push_back(x);
+    std::vector<std::vector<std::pair<float, vec2>>> rows(zs.size());
+    parallelFor((int)zs.size(), [&](int j) {
+      const float z = zs[j];
+      for (const float x : xs) {
         generationCheckpoint();
-        const vec2 p(x, z); const float d = length(p - c), g = world.naturalHeight(x, z);
-        if (d > 2500.f || g > -1.2f || g < -7.f || length(p - quay) < 450.f) continue;
+        const vec2 p(x, z); const float d = length(p - c);
+        if (d > 2500.f || length(p - quay) < 450.f) continue;
+        const float g = world.naturalHeight(x, z);
+        if (g > -1.2f || g < -7.f) continue;
         bool shore = false, near = false;
         for (int k = 0; k < 8 && !shore; k++) shore = world.naturalHeight(x + 70.f * cosf(k * 0.785f), z + 70.f * sinf(k * 0.785f)) > 0.5f;
         for (const vec2& h : harbours) near = near || length(p - h) < 250.f;
@@ -601,8 +609,11 @@ void harbourBoats(const World& world, std::vector<PlacedEnt>& out) {
           const vec2 ab = pierB[k] - pierA[k]; const float u = std::clamp(((p.x - pierA[k].x) * ab.x + (p.y - pierA[k].y) * ab.y) / std::max(ab.x * ab.x + ab.y * ab.y, 1.f), 0.f, 1.f);
           near = length(pierA[k] + ab * u - p) < 80.f;
         }
-        if (shore && !near && clearOfRunways(world, x, z, 1500.f)) spots.push_back({d, p});
+        if (shore && !near && clearOfRunways(world, x, z, 1500.f)) rows[j].push_back({d, p});
       }
+    });
+    std::vector<std::pair<float, vec2>> spots;
+    for (const auto& r : rows) spots.insert(spots.end(), r.begin(), r.end());
     std::sort(spots.begin(), spots.end(), [](const auto& a, const auto& b) { return a.first != b.first ? a.first < b.first : a.second.x < b.second.x; });
     const int most = world.towns[t].kind == 2 ? 24 : world.towns[t].kind == 1 ? 14 : 8;
     std::vector<vec2> moored;

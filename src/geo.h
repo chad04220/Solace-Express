@@ -68,6 +68,18 @@ private:
   Double3 ecef_, east_, up_, south_;
 };
 
+// destination() from one start again and again (a chart's every point from its origin): the start's frame and
+// direction made once, each destination the same arithmetic as destination()'s, so exactly its result
+class DestinationFrom {
+public:
+  explicit DestinationFrom(Position start);
+  Position operator()(double bearingDegrees, double distanceMetres) const;
+private:
+  Position start_;
+  LocalFrame frame_;
+  Double3 up_;
+};
+
 // Generalises a seam translation to a rigid frame change. Transform every local
 // POINT (including camera/history/effects/route targets), rotate every world-frame
 // VECTOR, and left-multiply every local attitude. Body-space values do not change.

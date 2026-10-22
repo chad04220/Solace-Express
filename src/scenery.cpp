@@ -188,6 +188,7 @@ void World::bakeMask() {
   std::vector<float> earthForest, earthFarm;
   if (earthChart) earthCharts::maskFields(*earthChart, earthForest, earthFarm);
   const bool earth = !earthForest.empty();
+  const SettlementLookup settle(settlements);
   parallelFor(MASK_N, [&](int j) {
     for (int i = 0; i < MASK_N; i++) {
       float x = -WORLD_HALF + (i + 0.5f) * MASK_TEXEL, z = -WORLD_HALF + (j + 0.5f) * MASK_TEXEL;
@@ -208,7 +209,7 @@ void World::bakeMask() {
       // the settlements (settlements.h, their lots): their ground as far as their buildings and gardens - the woods
       // and the fields come up to the last houses, and fill the gaps between the streets - its core urban
       float dens = 0, urban = 0;
-      int town = -1; const float share = settlementShare(settlements, x, z, &town);
+      int town = -1; const float share = settle.share(x, z, &town);
       if (town >= 0 && share < 1.15f) {
         std::vector<int> near; lotsIn(*this, x - 70.f, z - 70.f, x + 70.f, z + 70.f, near);
         float d = 1e9f;
@@ -377,6 +378,7 @@ void sceneryBakeCommunityLots(World& world) {
   WorldSceneryState& state = sceneryStateForBuild(world);
   state.lots.clear(); state.trees.clear(); state.lotCells.clear(); state.treeCells.clear(); state.civic.clear();
   if (world.settlements.empty()) return;
+  const SettlementLookup settle(world.settlements);
   RoadIndex roads;
   for (size_t pi = 0; pi < world.roads.paths.size(); pi++) roads.addPath(world.roads.paths[pi], (int)pi);
   // what the lots are laid into: the footprints claimed so far (with their margins, in 64 m cells), and the lots made
@@ -385,25 +387,31 @@ void sceneryBakeCommunityLots(World& world) {
   auto ground = [&](float x, float z) { return world.groundHeight(x, z, 7); };
   // a footprint, if it can stand there: on dry, buildable ground, clear of the roads and of the buildings so far
   auto fits = [&](Claims& C, const Footprint& f, float margin, float fall, int town, float maxShare, float& base) {
+    // (all of these together, so in any order: the cheap first - the buildings so far, the roads, the settlement - and
+    // the ground's last, most places failing before it)
+    Footprint m = f; m.hw += margin; m.hd += margin;
+    // (the cells its own square reaches: any footprint overlapping it was claimed in one of them, claim() filing each in
+    // every cell its circle reaches)
+    const float r = hypotf(m.hw, m.hd);
+    cellsIn(C.placed, m.c.x - r, m.c.y - r, m.c.x + r, m.c.y + r, C.near);
+    for (int id : C.near) if (overlaps(m, C.prints[id])) return false;
     const vec2 v(-f.u.y, f.u.x);
-    float lo = 1e9f, hi = -1e9f;
+    vec2 at[9];
     for (int k = 0; k < 9; k++) {
       const float a = (k % 3 - 1) * f.hw, b = (k / 3 - 1) * f.hd;
       const vec2 p = f.c + f.u * a + v * b;
+      at[k] = p;
+      if (roads.nearest(p, 3.f, -1, nullptr, nullptr, true) < 1.f) return false;   // (a platform within a metre)
+      int t = -1; const float share = settle.share(p.x, p.y, &t);
+      if (t != town || share > maxShare || airportExclusion(world, p.x, p.y) > 0.02f) return false;
+    }
+    float lo = 1e9f, hi = -1e9f;
+    for (const vec2& p : at) {
       const float g = ground(p.x, p.y);
       lo = std::min(lo, g); hi = std::max(hi, g);
-      if (g < buildableHeight(world, p.x, p.y) || airportExclusion(world, p.x, p.y) > 0.02f) return false;
-      if (roads.nearest(p, 3.f, -1, nullptr, nullptr, true) < 1.f) return false;   // (a platform within a metre)
-      int t = -1; const float share = settlementShare(world.settlements, p.x, p.y, &t);
-      if (t != town || share > maxShare) return false;
+      if (g < buildableHeight(world, p.x, p.y)) return false;
     }
     if (hi - lo > fall) return false;
-    Footprint g = f; g.hw += margin; g.hd += margin;
-    // (the cells its own square reaches: any footprint overlapping it was claimed in one of them, claim() filing each in
-    // every cell its circle reaches)
-    const float r = hypotf(g.hw, g.hd);
-    cellsIn(C.placed, g.c.x - r, g.c.y - r, g.c.x + r, g.c.y + r, C.near);
-    for (int id : C.near) if (overlaps(g, C.prints[id])) return false;
     base = lo - 0.05f;
     return true;
   };
@@ -491,7 +499,7 @@ void sceneryBakeCommunityLots(World& world) {
         for (float dx = -2600.f; dx <= 2600.f; dx += 50.f) {
           generationCheckpoint();
           const vec2 c(F.cx + dx, F.cz + dz);
-          int t = -1; const float share = settlementShare(world.settlements, c.x, c.y, &t);
+          int t = -1; const float share = settle.share(c.x, c.y, &t);
           if (t != F.town || share < 0.3f || share > 1.15f || share >= bestShare) continue;
           const Footprint f{c, u, 96.f, 80.f};
           float lo, hi;
@@ -512,7 +520,7 @@ void sceneryBakeCommunityLots(World& world) {
           if (dist >= bestScore) continue;
           const float g = ground(P.x, P.y);
           if (g < -7.f || g > 3.f) continue;
-          int t = -1; const float share = settlementShare(world.settlements, P.x, P.y, &t);
+          int t = -1; const float share = settle.share(P.x, P.y, &t);
           if (t >= 0 && t != F.town && share < 1.2f) continue;
           for (int k = 0; k < 16; k++) {
             const vec2 d(cosf(k * 0.3927f), sinf(k * 0.3927f)), a(-d.y, d.x);
@@ -572,7 +580,7 @@ void sceneryBakeCommunityLots(World& world) {
             const float t = std::clamp((s - along[k]) / std::max(along[k + 1] - along[k], 1e-3f), 0.f, 1.f);
             const vec2 at(A.x + (B.x - A.x) * t, A.z + (B.z - A.z) * t), d = vec2(B.x - A.x, B.z - A.z) * (1.f / std::max(along[k + 1] - along[k], 1e-3f));
             const vec2 out = vec2(-d.y, d.x) * side;
-            int town = -1; const float share = settlementShare(world.settlements, at.x, at.y, &town);
+            int town = -1; const float share = settle.share(at.x, at.y, &town);
             const float reach = P.cls == RC_STREET ? 1.f : 1.1f;   // (houses strung out a little way along the roads out)
             if (town < 0 || share >= reach || (only >= 0 && town != only)) { s += 12.f; continue; }
             const int ix = (int)floorf(at.x / 3.f) * 7 + sideI, iz = (int)floorf(at.y / 3.f);
@@ -607,14 +615,20 @@ void sceneryBakeCommunityLots(World& world) {
     // wholly in its own town, so the towns' walks hardly meet - each from the claims so far, along the paths reaching
     // its field; their lots then in the towns' order)
     std::vector<Claims> jobs(world.settlements.size());
+    struct Bounds { float lx, lz, hx, hz; };
+    std::vector<Bounds> bounds(every.size(), Bounds{1e9f, 1e9f, -1e9f, -1e9f});   // (each path's, once)
+    for (int pi : every)
+      for (const RoadPoint& q : world.roads.paths[pi].pts) {
+        Bounds& b = bounds[pi];
+        b.lx = std::min(b.lx, q.x); b.hx = std::max(b.hx, q.x); b.lz = std::min(b.lz, q.z); b.hz = std::max(b.hz, q.z);
+      }
     parallelFor((int)jobs.size(), [&](int k) {
       const SettlementField& F = world.settlements[k];
       const float x1 = F.x0 + F.n * SETTLE_CELL, z1 = F.z0 + F.n * SETTLE_CELL;
       std::vector<int> paths;
       for (int pi : every) {
-        float lx = 1e9f, lz = 1e9f, hx = -1e9f, hz = -1e9f;
-        for (const RoadPoint& q : world.roads.paths[pi].pts) { lx = std::min(lx, q.x); hx = std::max(hx, q.x); lz = std::min(lz, q.z); hz = std::max(hz, q.z); }
-        if (hx >= F.x0 && lx <= x1 && hz >= F.z0 && lz <= z1) paths.push_back(pi);
+        const Bounds& b = bounds[pi];
+        if (b.hx >= F.x0 && b.lx <= x1 && b.hz >= F.z0 && b.lz <= z1) paths.push_back(pi);
       }
       jobs[k].placed = main.placed; jobs[k].prints = main.prints;
       walk(jobs[k], F.town, paths);
@@ -635,7 +649,7 @@ void sceneryBakeCommunityLots(World& world) {
       const vec2 d = (b - a) * (1.f / l), n(-d.y, d.x);
       for (float s = 14.f - acc; s < l; s += 14.f) {
         const vec2 at = a + d * s;
-        int town = -1; const float share = settlementShare(world.settlements, at.x, at.y, &town);
+        int town = -1; const float share = settle.share(at.x, at.y, &town);
         if (town < 0 || world.towns[town].kind == 0 || share > 0.6f) continue;
         for (float side : {-1.f, 1.f}) {
           // (not on a street lamp: road_furniture.cpp stands them on the right, as it runs, 15 m on and every 30 m, on

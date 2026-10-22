@@ -643,6 +643,7 @@ void World::buildEarthTerrain() {
       float* t = &hm[((size_t)j * N + i) * 4];
       const float x = -WORLD_HALF + (i + 0.5f) * HM_TEXEL, z = -WORLD_HALF + (j + 0.5f) * HM_TEXEL;
       for (const Airport& a : airports) {
+        if (beyondRunway(x - a.x, z - a.z, a.length)) continue;
         const float hd = a.heading * DEG, dx = x - a.x, dz = z - a.z;
         const float u = fabsf(dx * sinf(hd) - dz * cosf(hd)), v = fabsf(dx * cosf(hd) + dz * sinf(hd));
         const float d = u - a.length * 0.5f;
@@ -662,6 +663,7 @@ void World::buildEarthTerrain() {
       }
       // (each airport's other runways the same, on its height: their approaches clear, a strip of level ground along them)
       for (const ExtraRunway& r : extraRunways) {
+        if (beyondRunway(x - r.x, z - r.z, r.length, std::max(2410.f, r.width * 0.5f + 490.f))) continue;
         const float elev = airports[r.airport].elev;
         const float hd = r.heading * DEG, dx = x - r.x, dz = z - r.z;
         const float u = fabsf(dx * sinf(hd) - dz * cosf(hd)), v = fabsf(dx * cosf(hd) + dz * sinf(hd));

@@ -16,6 +16,7 @@ public:
   std::optional<double> bearing(vec3 focus, geo::Position target) const;
 private:
   geo::Position origin_;
+  geo::DestinationFrom from_;   // (position()'s every point from the origin: its frame made once)
 };
 
 class Change {

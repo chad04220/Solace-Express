@@ -96,6 +96,15 @@ Position destination(Position start, double bearing, double metres) {
   return fromDirection(direction(start)*std::cos(theta) + tangent*std::sin(theta), start.height);
 }
 
+DestinationFrom::DestinationFrom(Position start) : start_(start), frame_((check(start), start)), up_(direction(start)) {}
+Position DestinationFrom::operator()(double bearing, double metres) const {
+  require(finite(bearing) && finite(metres) && metres >= 0, "invalid destination course/distance");
+  const double heading = std::fmod(bearing,360.0)*kDegrees;
+  const double theta = std::fmod(metres/radius(),2*kPi);
+  const Double3 tangent = frame_.vectorToEcef({std::sin(heading),0,-std::cos(heading)});
+  return fromDirection(up_*std::cos(theta) + tangent*std::sin(theta), start_.height);
+}
+
 LocalFrame::LocalFrame(Position origin) : origin_(origin) {
   check(origin); origin_.longitude = canonicalLongitude(origin.longitude);
   const double lon = origin_.longitude*kDegrees;
