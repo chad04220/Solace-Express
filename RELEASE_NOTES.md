@@ -1,3 +1,28 @@
+## What's new in v3.52.1
+
+A release about smoothness: fewer stutters in flight and in the menus, and the world prepared faster. Nothing new to learn.
+
+### Smoother in flight
+- **No more stutter when the tower speaks.** When a tower call began, the game prepared its voice clips in the middle of a frame: a hitch of up to about 30 ms, the worst in a normal flight. The clips are now prepared on a thread of their own just before the call, so each call starts a quarter of a second after it's made. A call that cuts in (a takeoff clearance over the airport information, say) stops the one it interrupts and follows straight on.
+- **Engaging the autoland to a far airfield no longer hitches.** Planning the approach meant working out the trees and buildings under the final, up to 60 ms in one frame. That's now done in the background for the fields you're likely to land at: the GPS pick, the field the autopilot is flying to and the job's destination.
+- **Saving the career no longer pauses the game.** A save also rebuilt the job board, about 12 ms. It now takes under a millisecond.
+
+### Smoother menus and loading
+- **The hub's trip estimates are worked out about 17 times faster**, under a millisecond each instead of 13 ms, with the same planned route.
+- **The cut from the main menu to the hub is smooth.** Its first frame used to build the scenery around the hub's camera; that's now prepared while the menu is showing.
+- **Loading a region no longer ends with a 600 ms freeze.** Its terrain goes to the graphics card a little each frame while the loading screen keeps moving.
+- **With no gamepad connected,** the game no longer asks Windows for one every frame, which could cost a millisecond or more each time. It asks once a second, or at once when a device is plugged in.
+- **Installing the real-Earth pack** no longer pauses the game when the pack is opened.
+- **Fixed** a rare clash between the hub's background flight quote and the scenery on screen.
+
+### The world, prepared faster
+- **Real-Earth areas are prepared about a third faster:** about 7 seconds each instead of 10.5 on the test machine, whether you start a flight there or fly into the next area.
+- **The islands are generated again after this update** (as after every update) in about 20 seconds instead of 32. **Generated regions** are 18 to 35% quicker.
+- What's built is exactly the same as before: the terrain, roads, towns, buildings, trees, farms and bridges were checked byte for byte.
+
+### Good to know
+- These timings come from a 4-core test machine without a graphics card, so they measure the game's own work, not the drawing. Your PC's numbers will differ. Worth trying: a takeoff and a go-around with the tower talking, the hub's job list, the autoland on a long flight, saving, and flying from one real-Earth area into the next.
+
 ## What's new in v3.52.0
 
 ### The real Earth
