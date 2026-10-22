@@ -2136,6 +2136,7 @@ Game::~Game() {
   if (regionJob.valid()) { try { regionJob.get(); } catch (...) {} }
   if (earthPrefetchJob.valid()) { try { earthPrefetchJob.get(); } catch (...) {} }
   if (earthRetireJob.valid()) { try { earthRetireJob.get(); } catch (...) {} }
+  g_sceneryProfiles.reset();   // (the finals profiled for this game's flights: their worker reads the world)
 }
 
 void Game::shutdown() {
@@ -2143,6 +2144,7 @@ void Game::shutdown() {
   retireEarthPrefetch();
   if (earthRetireJob.valid()) { try { earthRetireJob.get(); } catch (...) {} }
   if (regionJob.valid()) { try { regionJob.get(); } catch (...) {} }
+  g_sceneryProfiles.reset();
   saveSettings(); radio.shutdown(); g_music.own(false); g_music.stop(); g_ren.releaseLoadingPreview();
 }
 
@@ -5738,6 +5740,12 @@ void Game::update(float dt) {
       }
       if (saved) in = frameIn;
       if (screen == SCR_FLIGHT) updateCamera(dt);
+      if (screen == SCR_FLIGHT && !crashed) {   // the finals the autopilot may plan next, profiled ahead (Plane::wantFinals): the GPS pick, the field it flies to, the job's
+        if (apDest >= 0) Plane::wantFinals(apDest);
+        if (plane.apAirport >= 0) Plane::wantFinals(plane.apAirport);
+        if (plane.apHoldFor >= 0) Plane::wantFinals(plane.apHoldFor);
+        if (!haulPending() && contract.to >= 0 && contract.to < (int)g_world.airports.size()) Plane::wantFinals(contract.to);
+      }
       if (plane.spec && wreck.empty()) {
         float rps = plane.spec->engineType == ENG_TURBOPROP ? plane.rpm / 60.f : plane.rpm / 60.f;
         propAngle = fmodf(propAngle + rps * 2 * PI * dt * (plane.rpm < 400 ? 1.f : 0.0f) + (plane.rpm >= 400 ? dt * 3.f : 0.f), 2 * PI * 100);

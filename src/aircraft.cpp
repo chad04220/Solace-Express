@@ -1103,6 +1103,42 @@ float Plane::apStopNeed(const Airport& a, bool rev, const Weather& wx, float* tw
   const float vtd = E.vApp / sqrtf(sigma) + t;
   return E.hover ? 0.f : len2(td - a.threshold(rev)) + (spec->taildragger ? 0.27f : 0.2f) * vtd * vtd * (surfaceRough(a.surface) ? 1.1f : 1.f);   // (what holds itself up on its thrust comes down vertically)
 }
+// an orbit's cost (apPlan): how high it holds above the gate's height, and how far out of the way it is from where the
+// aircraft is now (every km flown is fuel). Out of line: the bound the search prunes by and the cost it compares are
+// the same arithmetic, the cost never under the bound for any height above it
+[[gnu::noinline]] static float apOrbitCost(float hAlt, float iafAlt, vec3 c, vec3 qi, vec3 P, float near) {
+  return (hAlt - iafAlt) * 3.f + std::max(0.f, hAlt - iafAlt - 150.f) * 10.f + len2(c - qi) * 0.15f + near
+         + std::max(0.f, len2(c - P) + len2(c - qi) - len2(qi - P)) * 0.12f;
+}
+
+// a final, as apPlan flies it: from the aim point (its touchdown) back along the runway's line, d out. Its obstacles
+// are sampled every 50 m from 300 m out to 9.5 km (the steepest glidepath's to 3.5 km, then the final's length, every
+// 100 m) - the profile wantFinals makes ahead, end by end
+static constexpr float kFinalFrom = 300.f, kFinalStep = 50.f;
+static constexpr int kFinalSamples = 185;   // (to 9,500 m)
+static void apFinalFrame(const Airport& a, bool rev, vec3& td, vec3& ld) {
+  ld = rev ? a.dir() * -1.f : a.dir();
+  td = a.threshold(rev) + ld * clampf(a.length * 0.12f, 80.f, 300.f); td.y = a.elev;
+}
+
+void Plane::wantFinals(int airport) {
+  if (airport < 0 || airport >= (int)g_world.airports.size()) return;
+  g_sceneryProfiles.want(airport, [airport](Scenery& own, const std::atomic<bool>& cancel) {
+    std::vector<float> tops; tops.reserve(2 * kFinalSamples);
+    const Airport& a = g_world.airports[airport];
+    for (bool rev : {false, true}) {
+      vec3 td, ld; apFinalFrame(a, rev, td, ld);
+      float d = kFinalFrom;
+      for (int i = 0; i < kFinalSamples; i++, d += kFinalStep) {
+        if (cancel.load(std::memory_order_relaxed)) return std::vector<float>();
+        const vec3 q = td - ld * d;
+        tops.push_back(own.obstacleTop(q.x, q.z, 40.f));
+      }
+    }
+    return tops;
+  });
+}
+
 float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   const AircraftSpec& s = *spec;
   apSense();
@@ -1110,8 +1146,8 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   const Airport& a = g_world.airports[airport];
   auto H = [](vec3 q) { return g_world.height(q.x, q.z); };
   const vec3 P(g_world.nearPoint(pos.x, a.x), pos.y, g_world.nearPoint(pos.z, a.z));   // (where the aircraft is, the short way round the map from the field)
-  vec3 ld = rev ? a.dir() * -1.f : a.dir(), rr(-ld.z, 0, ld.x);
-  vec3 td = a.threshold(rev) + ld * clampf(a.length * 0.12f, 80.f, 300.f); td.y = a.elev;
+  vec3 td, ld; apFinalFrame(a, rev, td, ld);
+  const vec3 rr(-ld.z, 0, ld.x);
   // glidepath: 3 degrees, steepened (up to what the type can fly) to clear the ground and trees under the final
   const float maxAng = E.glideMax;
   auto margin = [](float d) { return clampf(d * 0.02f, 8.f, 60.f); };
@@ -1120,10 +1156,16 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   // 25 m above the terrain the glidepath was planned over, and the Wavecrest flew into them a kilometre short - by half the
   // ground's margin: an obstacle clearance surface, not a second terrain margin on top of the treetops, which closed
   // Far Isle to the Emissary)
+  // (from the field's profile when it is in - the same tops, but for what has been destroyed since - else sampled here)
   Scenery& trees = obstacles ? *obstacles : g_scenery;
+  const std::vector<float>* finals = apTrees && !obstacles ? g_sceneryProfiles.get(airport) : nullptr;
   auto clear = [&](vec3 q, float d) {
     const float ground = H(q) + margin(d);
-    return apTrees ? std::max(ground, trees.obstacleTop(q.x, q.z, 40.f) + clampf(d * 0.01f, 5.f, 20.f)) : ground;
+    if (!apTrees) return ground;
+    const int i = (int)((d - kFinalFrom) / kFinalStep + 0.5f);
+    const bool profiled = finals && finals->size() == 2u * kFinalSamples && i >= 0 && i < kFinalSamples && d == kFinalFrom + i * kFinalStep;
+    const float top = profiled ? (*finals)[(rev ? kFinalSamples : 0) + i] : trees.obstacleTop(q.x, q.z, 40.f);
+    return std::max(ground, top + clampf(d * 0.01f, 5.f, 20.f));
   };
   for (float d = 300.f; d <= 3500.f; d += 50.f) { vec3 q = td - ld * d; need = std::max(need, (clear(q, d) - a.elev) / d); }
   float gs = std::min(need, tanf(maxAng * DEG));
@@ -1151,24 +1193,36 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   for (float d = F; d <= F + kIntRegion; d += 250.f) for (int k = -2; k <= 2; k++) intMsa = std::max(intMsa, H(td - ld * d + rr * (k * 500.f)));
   float intAlt = std::max(iafAlt, intMsa + 250.f);
   vec3 bestC = td - ld * (F + R + 2000.f); float bestCost = 1e9f, bestAlt = intAlt;
-  for (float al = -3000.f; al <= F + R + vh * 15.f + 9000.f; al += 750.f)
-    for (float cr = -7000.f; cr <= 7000.f; cr += 750.f) {
-      if (fabsf(cr) < R * 0.5f && al < F + R + 1000.f) continue;   // keep the orbit off the final approach itself
-      float near = al - R < F + 500.f + vh * 15.f ? 800.f : 0.f;     // too close in: an outbound leg first
-      vec3 c = td - ld * al + rr * cr;
-      if (fabsf(c.x) > WORLD_HALF - R - 1500.f || fabsf(c.z) > WORLD_HALF - R - 1500.f) continue;   // stay on the chart
+  {
+    // the orbit: the cheapest of the places round the final, its height clear of the ground under it and on the way in.
+    // The ground only ever raises a place's cost, so each is costed first as if the ground were low, the cheapest of
+    // those looked at first, and one costing more even so isn't sampled at all: the same place chosen as when every
+    // one was (ties to the first in the search's order), from a few hundred of the 19,000 samples of the ground
+    const vec3 qi = td - ld * (F + 1500.f);
+    struct Place { vec3 c; float near, lowest; int order; };
+    std::vector<Place> places; places.reserve(640);
+    for (float al = -3000.f; al <= F + R + vh * 15.f + 9000.f; al += 750.f)
+      for (float cr = -7000.f; cr <= 7000.f; cr += 750.f) {
+        if (fabsf(cr) < R * 0.5f && al < F + R + 1000.f) continue;   // keep the orbit off the final approach itself
+        float near = al - R < F + 500.f + vh * 15.f ? 800.f : 0.f;     // too close in: an outbound leg first
+        vec3 c = td - ld * al + rr * cr;
+        if (fabsf(c.x) > WORLD_HALF - R - 1500.f || fabsf(c.z) > WORLD_HALF - R - 1500.f) continue;   // stay on the chart
+        if (len2(c - qi) < R + 1200.f) continue;   // leave the orbit with room to line up
+        places.push_back({c, near, apOrbitCost(intAlt, iafAlt, c, qi, P, near), (int)places.size()});
+      }
+    std::sort(places.begin(), places.end(), [](const Place& x, const Place& y) { return x.lowest != y.lowest ? x.lowest < y.lowest : x.order < y.order; });
+    int bestOrder = -1;
+    for (const Place& pl : places) {
+      if (pl.lowest > bestCost || (pl.lowest == bestCost && pl.order > bestOrder)) break;   // (the rest cost as much at the least)
+      const vec3 c = pl.c;
       float m = H(c);
       for (int k = 0; k < 16; k++) { float an = k * PI / 8; vec3 q = c + vec3(cosf(an), 0, sinf(an)) * (R + 600.f); m = std::max(m, H(q)); }
       for (int k = 0; k < 8; k++) { float an = k * PI / 4; vec3 q = c + vec3(cosf(an), 0, sinf(an)) * (R * 0.6f); m = std::max(m, H(q)); }
-      vec3 qi = td - ld * (F + 1500.f);
-      if (len2(c - qi) < R + 1200.f) continue;   // leave the orbit with room to line up
       for (int i = 1; i < 8; i++) { vec3 q = c + (qi - c) * (i / 8.f); m = std::max(m, H(q)); }
-      float hAlt = std::max(intAlt, m + 280.f);
-      // ...and how far out of the way it is from where the aircraft is now (every km flown is fuel)
-      float cost = (hAlt - iafAlt) * 3.f + std::max(0.f, hAlt - iafAlt - 150.f) * 10.f + len2(c - qi) * 0.15f + near
-                 + std::max(0.f, len2(c - P) + len2(c - qi) - len2(qi - P)) * 0.12f;
-      if (cost < bestCost) { bestCost = cost; bestC = c; bestAlt = hAlt; }
+      const float hAlt = std::max(intAlt, m + 280.f), cost = apOrbitCost(hAlt, iafAlt, c, qi, P, pl.near);
+      if (cost < bestCost || (cost == bestCost && pl.order < bestOrder)) { bestCost = cost; bestC = c; bestAlt = hAlt; bestOrder = pl.order; }
     }
+  }
   vec3 from(sinf(wx.windFrom * DEG), 0, -cosf(wx.windFrom * DEG));
   // (the wind weighs 40 per m/s of headwind, the distance to the entry 0.02 per metre: a 10 kt wind is worth about
   //  10 km of flying round to the other end, a light one isn't)

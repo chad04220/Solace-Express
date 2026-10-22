@@ -12,6 +12,7 @@
 #include "../src/earth_charts.h"
 #include "../src/earth_install.h"
 #include "../src/renderer.h"
+#include "../src/scenery.h"
 #include "test_world.h"
 #include <algorithm>
 #include <chrono>
@@ -50,6 +51,43 @@ static Stats stats(std::vector<double> v) {
   return s;
 }
 static void section(const char* name) { printf("\n== %s (%.0f MB resident)\n", name, residentMB()); fflush(stdout); }
+
+// PERF_HASH: a built world's outputs, each part hashed (FNV-1a over its values), to show a change to the build leaves
+// them as they were
+struct Fnv {
+  uint64_t h = 1469598103934665603ull;
+  void bytes(const void* p, size_t n) { const uint8_t* b = (const uint8_t*)p; for (size_t i = 0; i < n; i++) { h ^= b[i]; h *= 1099511628211ull; } }
+  template <class T> void add(const T& v) { bytes(&v, sizeof v); }
+  template <class T> void all(const std::vector<T>& v) { add(v.size()); if (!v.empty()) bytes(v.data(), v.size() * sizeof(T)); }
+};
+static void worldHash(const char* what, const World& w) {
+  if (!getenv("PERF_HASH")) return;
+  Fnv hm, mask, hmax, lakes, roads, bridges, settle, farms, lots, trees, boxes;
+  hm.all(w.hm); mask.all(w.mask); lakes.all(w.lakes);
+  for (const auto& l : w.hmax) hmax.all(l);
+  for (const RoadNode& n : w.roads.nodes) { roads.add(n.x); roads.add(n.z); roads.add(n.kind); roads.add(n.island); }
+  for (const RoadPath& p : w.roads.paths) {
+    roads.add((int)p.cls); roads.add(p.from); roads.add(p.to); roads.all(p.bridge);
+    for (const RoadPoint& q : p.pts) { roads.add(q.x); roads.add(q.z); roads.add(q.h); }
+  }
+  for (const Bridge& b : w.bridges) {
+    bridges.add(b.path); bridges.add(b.first); bridges.add(b.last); bridges.add(b.length); bridges.add(b.depth); bridges.all(b.along);
+    for (const RoadPoint& q : b.deck) { bridges.add(q.x); bridges.add(q.z); bridges.add(q.h); }
+  }
+  for (const SettlementField& s : w.settlements) { settle.add(s.town); settle.add(s.cx); settle.add(s.cz); settle.add(s.n); settle.all(s.effort); }
+  for (const Farmstead& f : w.farms) { farms.add(f.x); farms.add(f.z); farms.add(f.dx); farms.add(f.dz); farms.add(f.seed); }
+  for (const Lot& l : settlementLots(w)) {
+    lots.add(l.present); lots.add(l.cx); lots.add(l.cz); lots.add(l.hw); lots.add(l.hd); lots.add(l.wallH); lots.add(l.roofH); lots.add(l.ground);
+    lots.add(l.type); lots.add(l.ridgeX); lots.add(l.seed); lots.add(l.yaw); lots.add(l.town); lots.add(l.kind); lots.add(l.street); lots.add(l.share);
+  }
+  for (const TreeSpot& t : settlementTrees(w)) { trees.add(t.x); trees.add(t.z); trees.add(t.scale); trees.add(t.kind); trees.add(t.seed); }
+  for (const Box& b : w.boxes) { boxes.add(b.c); boxes.add(b.h); boxes.add(b.airport); boxes.add(b.kind); }
+  printf("  hash %-22s hm %016llx mask %016llx hmax %016llx lakes %016llx roads %016llx bridges %016llx settlements %016llx farms %016llx"
+         " lots %016llx trees %016llx boxes %016llx (%zu paths, %zu lots)\n", what,
+         (unsigned long long)hm.h, (unsigned long long)mask.h, (unsigned long long)hmax.h, (unsigned long long)lakes.h, (unsigned long long)roads.h,
+         (unsigned long long)bridges.h, (unsigned long long)settle.h, (unsigned long long)farms.h, (unsigned long long)lots.h,
+         (unsigned long long)trees.h, (unsigned long long)boxes.h, w.roads.paths.size(), settlementLots(w).size());
+}
 
 struct GameTest {
   static constexpr float kDt = 1.f / 60.f;
@@ -97,7 +135,7 @@ struct GameTest {
     setvbuf(stdout, nullptr, _IOLBF, 0);
     printf("Performance check: %u hardware threads\n", std::thread::hardware_concurrency());
     const std::string tmp = getenv("PERF_TMP") ? getenv("PERF_TMP") : "/tmp";
-    // PERF_ONLY=<words>: only the parts named (world perf model flight tower scenery hub save regions earth live)
+    // PERF_ONLY=<words>: only the parts named (world perf model flight autoland tower scenery hub save regions earth live)
     const char* only = getenv("PERF_ONLY");
     auto want = [&](const char* key) { return !only || strstr(only, key) != nullptr; };
 
@@ -113,10 +151,12 @@ struct GameTest {
       printf("  generated and saved %8.0f ms   read from its cache %6.0f ms (%s)   %zu airports\n", cold, warm,
              g_world.fromCache ? "from the cache" : "NOT from the cache", g_world.airports.size());
       remove(cache.c_str());
+      worldHash("islands", g_world);
     }
     buildStory();
     g_audio.init(48000);
-    for (int i : kCareerAircraft) Plane::perf(&kAircraft[i]);   // (as the game's start learns them, or reads them from its cache)
+    if (want("perf") || want("model") || want("flight") || want("autoland") || want("hub"))
+      for (int i : kCareerAircraft) Plane::perf(&kAircraft[i]);   // (as the game's start learns them, or reads them from its cache)
 
     if (want("perf")) {
       section("each type's learned performance (Plane::perf, once a build; cached after)");
@@ -195,6 +235,27 @@ struct GameTest {
         });
         row("XR-40 sortie, firing", r, g);
         g.in = Input();
+        if (g.screen == SCR_FLIGHT) g.endFlight(false, "perf", OUT_ABANDONED);
+        g.screen = SCR_HUB;
+      }
+    }
+
+    if (want("autoland")) {
+      section("the autoland engaged in flight, 30 km out: its final's trees built here, or profiled ahead (Plane::wantFinals)");
+      for (bool ahead : {false, true}) {
+        ferry(g, 1, mdb, cap);
+        sceneryResetWorldCaches();   // (none of the field's scenery made yet: a far field's)
+        if (ahead) {
+          Plane::wantFinals(cap);
+          const auto t0 = Clock::now();
+          while (!g_sceneryProfiles.get(cap) && msSince(t0) < 30000.0) std::this_thread::sleep_for(std::chrono::milliseconds(5));
+          printf("  the profile made on a worker in %.0f ms\n", msSince(t0));
+        }
+        const int built0 = g_scenery.syncBuilt;
+        g.apDest = cap;
+        const auto t0 = Clock::now(); g.engageAutopilot(); const double ms = msSince(t0);
+        printf("  %-34s %6.1f ms on the game's thread, %d scenery chunks built there   (%s)\n", ahead ? "with the profile in" : "without one", ms,
+               g_scenery.syncBuilt - built0, g.plane.apOn ? "engaged" : "not engaged");
         if (g.screen == SCR_FLIGHT) g.endFlight(false, "perf", OUT_ABANDONED);
         g.screen = SCR_HUB;
       }
@@ -281,6 +342,7 @@ struct GameTest {
         t0 = Clock::now(); auto up = Renderer::prepareWorldUpload(*w); const double prep = msSince(t0);
         printf("  %-7s %-22s built %7.0f ms, prepared %6.0f ms   %zu airports   %.0f MB resident\n", procedural::scaleName(d.scale), d.name.c_str(),
                build, prep, w->airports.size(), residentMB());
+        worldHash(d.name.c_str(), *w);
       }
     }
 
@@ -293,17 +355,21 @@ struct GameTest {
         earthCharts::usePack(pack);
         const auto A = earthCharts::chartForAirport("KMVY");
         if (A) {
-          for (int rep = 0; rep < 4; rep++) {   // (the same chart again and again: what a slide leaves behind shows as growth)
+          const int reps = getenv("PERF_EARTH_REPS") ? atoi(getenv("PERF_EARTH_REPS")) : 4;   // (1: a profiler's run)
+          for (int rep = 0; rep < reps; rep++) {   // (the same chart again and again: what a slide leaves behind shows as growth)
             auto w = std::make_unique<World>();
             auto t0 = Clock::now(); w->buildProcedural(*A, std::string(), std::string(), false); const double build = msSince(t0);
             t0 = Clock::now(); auto up = Renderer::prepareWorldUpload(*w); const double prep = msSince(t0);
             printf("  %s (%s) built %6.0f ms, prepared %5.0f ms   %zu airports   %.0f MB resident\n", A->id.c_str(), A->name.c_str(), build, prep,
                    w->airports.size(), residentMB());
+            if (rep == 0) worldHash(A->id.c_str(), *w);
           }
-          g.debugScene("region-" + A->id);
-          g.botControl = true; g.plane.apEngage(Plane::AP_HOLD, -1, g.wx);
-          fly(g, 120);
-          row("cruise over KMVY's chart, 1x", fly(g, 1800), g);
+          if (reps > 1) {
+            g.debugScene("region-" + A->id);
+            g.botControl = true; g.plane.apEngage(Plane::AP_HOLD, -1, g.wx);
+            fly(g, 120);
+            row("cruise over KMVY's chart, 1x", fly(g, 1800), g);
+          }
         } else printf("  no KMVY chart in the pack\n");
       }
     }

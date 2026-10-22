@@ -3,7 +3,12 @@
 // from the world masks, streamed in 256 m chunks around the camera and drawn as instanced meshes.
 #pragma once
 #include "world.h"
+#include <atomic>
+#include <functional>
+#include <future>
+#include <map>
 #include <memory>
+#include <mutex>
 #include <unordered_map>
 
 enum EntKind {
@@ -164,3 +169,26 @@ private:
 };
 
 extern Scenery g_scenery;
+
+// What stands over a place, profiled ahead on a worker from scenery of its own, for a plan made later on the game's
+// thread that would otherwise build that scenery there: the autopilot's finals (Plane::wantFinals). One profile at a
+// time, each kept until the world changes - sceneryResetWorldCaches drops them all, the one under way stopped and
+// joined first, as it reads g_world and the region's cache
+class SceneryProfiles {
+public:
+  // make: the profile, from the scenery handed it (stopping early, its result unused, once cancel is set)
+  using Make = std::function<std::vector<float>(Scenery&, const std::atomic<bool>& cancel)>;
+  void want(int key, Make make);              // made unless it is, or is under way or waiting
+  const std::vector<float>* get(int key);     // made (taking in one just finished); nullptr until then
+  void reset();                               // all dropped, the one under way stopped and joined
+  ~SceneryProfiles() { reset(); }
+private:
+  std::mutex m;
+  std::map<int, std::vector<float>> made;
+  std::vector<std::pair<int, Make>> waiting;
+  std::future<std::vector<float>> job;
+  int running = -1;
+  std::shared_ptr<std::atomic<bool>> cancel;
+  void next();   // (m held) the finished one taken in, the next one begun
+};
+extern SceneryProfiles g_sceneryProfiles;

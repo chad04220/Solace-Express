@@ -11,6 +11,41 @@ namespace { std::atomic<uint64_t> entityChunkRevision{1}; }
 void Scenery::Chunk::markChanged() { revision=entityChunkRevision.fetch_add(1,std::memory_order_relaxed); }
 
 Scenery g_scenery;
+SceneryProfiles g_sceneryProfiles;
+
+void SceneryProfiles::next() {
+  if (job.valid()) {
+    if (job.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
+    std::vector<float> profile;
+    try { profile = job.get(); } catch (...) {}
+    if (!cancel->load() && !profile.empty()) made[running] = std::move(profile);
+    running = -1;
+  }
+  if (waiting.empty()) return;
+  auto [key, make] = std::move(waiting.front());
+  waiting.erase(waiting.begin());
+  running = key; cancel = std::make_shared<std::atomic<bool>>(false);
+  job = std::async(std::launch::async, [make = std::move(make), stop = cancel] { Scenery own(0); return make(own, *stop); });
+}
+void SceneryProfiles::want(int key, Make make) {
+  std::lock_guard<std::mutex> lk(m);
+  next();
+  if (made.count(key) || running == key) return;
+  for (const auto& w : waiting) if (w.first == key) return;
+  waiting.push_back({key, std::move(make)});
+  next();
+}
+const std::vector<float>* SceneryProfiles::get(int key) {
+  std::lock_guard<std::mutex> lk(m);
+  next();
+  auto it = made.find(key);
+  return it == made.end() ? nullptr : &it->second;   // (kept until reset: a map's entries stay where they are)
+}
+void SceneryProfiles::reset() {
+  std::lock_guard<std::mutex> lk(m);
+  if (job.valid()) { cancel->store(true); try { job.get(); } catch (...) {} }
+  made.clear(); waiting.clear(); running = -1;
+}
 
 // A region's immutable, lazily populated geometry. Reset only after all scenery workers have finished, before
 // replacing the world they refer to (a staged chart's travels with its chunks: Scenery::adopt)
@@ -368,6 +403,7 @@ int treeSpecies(float g, float lush, float cold, float sp, float sp2) {
 }  // namespace
 
 void sceneryResetWorldCaches() {
+  g_sceneryProfiles.reset();   // (first: a profile under way reads the region's cache, reset below)
   g_scenery.clear();
   regionCache().reset(new EntityRegionCache());
   g_scenery.craters.clear();

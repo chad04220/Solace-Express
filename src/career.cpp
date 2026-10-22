@@ -1610,7 +1610,7 @@ bool Career::save(const std::string& path) const {
   // the current save becomes the backup only if it is itself a good save: a damaged one (the game may have just
   // recovered from the backup) must never replace the good backup. If the final replacement then fails, the
   // backup still holds the last good career.
-  { Career probe; if (probe.load(path)) replaceFile(path, path + ".bak"); }
+  { Career probe; if (probe.load(path, false)) replaceFile(path, path + ".bak"); }
   if (!replaceFile(tmp, path)) { remove(tmp.c_str()); return false; }
   return true;
 }
@@ -1618,7 +1618,7 @@ bool Career::save(const std::string& path) const {
 // Parses into a temporary career and only commits it when the file is complete and every value is in range:
 // a damaged save is rejected (the caller then falls back to the backup) instead of crashing later or silently
 // resetting progress.
-bool Career::load(const std::string& path) {
+bool Career::load(const std::string& path, bool board) {
   FILE* f = fopen(path.c_str(), "r");
   if (!f) return false;
   Career c; char key[64]; int ver = 0;
@@ -1831,6 +1831,6 @@ bool Career::load(const std::string& path) {
     c.job->plan.net = c.job->c.payout - c.job->plan.fees() - c.job->plan.fuelCostEst;
   }
   *this = c;
-  refreshBoard();
+  if (board) refreshBoard();
   return true;
 }
