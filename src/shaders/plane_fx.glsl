@@ -12,6 +12,9 @@ uniform vec4 uExhaustExit[4];  // body exit xyz, local horizontal radius
 uniform vec4 uExhaustAxis[4];  // body direction xyz, local vertical radius
 uniform vec4 uExhaustPower[4]; // spool, reheat, per-engine intensity, Mach
 uniform int uExhaustEngine[4]; // physical engine index of each compacted live slot
+#ifndef PART_BAKE   // (not in the aircraft bodies' bake, which never draws an exhaust: its programs, and their cache, stay as they were)
+uniform float uExhaustStyle;   // 1: the XR-40's plasma thrusters (exhaust.h ExhaustVisual::style), 0 a jet's
+#endif
 vec4 exhaustEnginePower(int engine){
   if (!gOwn) return vec4(gFlame.xy, 1.0, gFlame.w); // AI reads its own packed traffic state
   for (int i = 0; i < 4; ++i) {
@@ -27,7 +30,14 @@ vec3 plumeOne(vec3 lo, vec3 ld, float tmax, vec3 o, vec3 ax, vec2 radius, vec4 p
   radius = clamp(radius, vec2(0.05), vec2(2.0));
   ax = normalize(ax);
   float scale = clamp(sqrt(radius.x*radius.y)/sqrt(0.36*0.23), 0.5, 1.65);
-  float L = (mix(1.6, 4.5, sp) + 8.0*ab)*scale;
+  // the XR-40's thrusters: a plasma jet twice as long at a given power, violet-white, its shock cells showing well
+  // short of full power (the traffic's jets are jets)
+#ifndef PART_BAKE
+  float plasma = gOwn ? clamp(uExhaustStyle, 0.0, 1.0) : 0.0;
+#else
+  float plasma = 0.0;
+#endif
+  float L = (mix(1.6, 4.5, sp)*(1.0 + 1.1*plasma) + 8.0*ab)*scale;
   // A finite cylinder bounds all nonzero samples. Axial and radial rejection happen before the 28-step loop,
   // including tilted/side-on jets, rays parallel to the jet, and rays already clipped by the opaque scene depth.
   float boundR = 2.0*max(max(radius.x, radius.y), 0.55*scale*(1.0 + 0.5*ab));
@@ -71,6 +81,8 @@ vec3 plumeOne(vec3 lo, vec3 ld, float tmax, vec3 o, vec3 ax, vec2 radius, vec4 p
     if (e2 > 4.0) continue;
     float r = sqrt(e2);
     float turb = vnoise(vec2(x*2.2 - uTime*55.0, nx*4.0 + ny*6.0))*0.65 + vnoise(vec2(x*5.5 - uTime*95.0, ny*9.0 - nx*7.0))*0.35;
+    // (and a fine third octave twisting with the flow: the jet's shear layer, rolling up as it goes)
+    turb = turb*0.8 + 0.2*vnoise(vec2(x*9.0 - uTime*150.0, atan(ny, nx)*2.0 + x*1.5));
     float lip = smoothstep(0.0, 0.08*scale, x);
     // shock diamonds: Mach disk mid-cell plus the converging / diverging cone edges, fading cell by cell
     float dc = abs(cell - 0.5)*2.0;
@@ -84,13 +96,19 @@ vec3 plumeOne(vec3 lo, vec3 ld, float tmax, vec3 o, vec3 ax, vec2 radius, vec4 p
     vec3 fCol = mix(vec3(1.0, 0.5, 0.14), vec3(0.85, 0.16, 0.04), smoothstep(0.4, 1.0, u));
     // (the reheat flame as bright as sunlit concrete and saturated enough for the tone curve to leave it orange: at a
     // third of that, in the dry flame's paler colour, the XR-10's full reheat was a beige smear on a daylit runway)
-    vec3 rCol = mix(vec3(1.0, 0.45, 0.11), vec3(1.0, 0.18, 0.03), smoothstep(0.3, 0.95, u));
+    vec3 rCol = mix(mix(vec3(1.0, 0.45, 0.11), vec3(1.0, 0.18, 0.03), smoothstep(0.3, 0.95, u)),
+                    mix(vec3(0.72, 0.45, 1.0), vec3(0.45, 0.15, 0.9), smoothstep(0.3, 0.95, u)), plasma);
     vec3 e = ab*4.0*(vec3(0.75, 0.38, 0.95)*shell*0.9 + vec3(1.0, 0.85, 0.6)*diam*9.0 + rCol*flame*(4.0 - 2.4*u)
                      + vec3(1.0, 0.72, 0.42)*exp(-e2*5.0)*(1.0 - smoothstep(0.0, 0.5, u))*1.2);
     // dry: a blue core that grows with the throttle, an orange-tipped flame from mid power, pale shock cells near full
-    e += (1.0 - ab)*(vec3(0.3, 0.5, 1.0)*exp(-e2*2.5)*(1.0 - u)*3.2*sp
-                     + mix(vec3(1.0, 0.55, 0.25), fCol, u)*flame*(1.8 - 0.8*u)*smoothstep(0.3, 0.85, sp)
-                     + vec3(0.65, 0.78, 1.0)*diam*3.5*smoothstep(0.5, 0.95, sp));
+    vec3 coreCol = mix(vec3(0.3, 0.5, 1.0), vec3(0.62, 0.45, 1.0), plasma);
+    vec3 dryFlame = mix(mix(vec3(1.0, 0.55, 0.25), fCol, u), mix(vec3(0.78, 0.58, 1.0), vec3(0.42, 0.2, 0.95), u), plasma);
+    e += (1.0 - ab)*(coreCol*exp(-e2*2.5)*(1.0 - u)*3.2*sp*(1.0 + 0.8*plasma)
+                     + dryFlame*flame*(1.8 - 0.8*u)*smoothstep(0.3, 0.85, sp)
+                     + mix(vec3(0.65, 0.78, 1.0), vec3(0.88, 0.82, 1.0), plasma)*diam*3.5
+                       *mix(smoothstep(0.5, 0.95, sp), 1.6*smoothstep(0.35, 0.8, sp), plasma));
+    // (the plasma thrusters' white-hot lip at the exit)
+    e += plasma*(1.0 - ab)*vec3(0.88, 0.82, 1.0)*exp(-pow((r - 0.85)/0.12, 2.0))*(1.0 - smoothstep(0.0, 0.15*scale, x))*4.0*sp;
     float tcam = t0 + (float(i) + jit)*dt;
     acc += e*lip*pow(1.0 - u, 0.8)*mix(1.0, smoothstep(3.0*scale, 14.0*scale, tcam), camIn)*dt;
     // (the hot flame by the nozzle hides a little of what is behind it; the cooling tail, which hardly glows, doesn't -

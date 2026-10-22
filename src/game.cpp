@@ -2303,14 +2303,15 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
   parkingBrake = !c.startAirborne;   // a start on the ground is parked: the brake is released to roll
   if (!plane.onGround) settleAirborneStart();
   particles.clear(); bursts.clear(); pops.clear(); boomT = -1; for (auto& tt : pieceTrail) tt.clear(); trail.clear(); tipTrail[0].clear(); tipTrail[1].clear(); tipOn = false; trailT = 0; wreck.clear(); debris.clear(); craterR = 0; pits.clear();
-  lightning = 0; nextLightning = 6;
+  lightning = 0; nextLightning = 6; strikes.clear(); lightningGlow = 0.f;
   landingLight = true;
   approachMinAgl = 1e9f; thrPrevAlong = -1e9f; appLow = false; appHigh = false; coaching.clear();
   apWasOn = false; apDest = -1; somnus = SomnusState(); g_scenery.resetDamage();
   licenseBefore = career.license;
   // the player sees a loading screen while the scenery around the start is generated (tests fly straight away)
   screen = headless ? SCR_FLIGHT : SCR_LOADING;
-  loadT = 0; loadReadyT = -1; loadShown = 0; loadPend0 = 0; loadFrames = 0; loadViewsDrawn = false; loadStableFrames = 0; loadBakeSeen = g_ren.bakeCount; loadObservedFrame = -1; loadMap = false; dbgCam = dbgFollow = false; benchPin = false;
+  if (!loadLogging) loadLogBegin();
+  loadT = 0; loadReadyT = -1; loadShown = 0; loadPend0 = 0; loadFrames = 0; loadViewsDrawn = false; loadViewsStep = 0; loadWarmStep = 0; loadWarmAt = -1; loadStableFrames = 0; loadBakeSeen = g_ren.bakeCount; loadObservedFrame = -1; loadMap = false; dbgCam = dbgFollow = false; benchPin = false;
   atc.cancel(); atcF = AtcFlight(); hintsVoiced.clear(); commsPending.clear(); lessonVoiceWarned = false;   // (the last flight's calls go before this one's announcements)
   // (a hazard call is said only while the hazard holds: a "PULL UP" queued behind the tower played at 1,958 m, climbing -
   // the review of v3.44.0, AUD-3)
@@ -2873,17 +2874,40 @@ void Game::updateFlight(float dt) {
   if (prevGear > 0.99f && plane.gear < 0.99f) g_audio.triggerLocal(SFX_GEAR_CLUNK, vec3(0,-plane.gearHeight(),0), .6f);
   if (prevGear < 0.99f && plane.gear >= 0.99f) g_audio.triggerLocal(SFX_GEAR_CLUNK, vec3(0,-plane.gearHeight(),0), 1.f);
   prevGear = plane.gear; prevFlaps = plane.flaps;
-  // weather effects
+  // weather effects: in a storm a stroke every 6 to 21 s, 600 m to 4 km off - down to the ground from the cloud's base
+  // (two in five), crawling along under the base (one in five), or hidden in the cloud, lighting it from inside
   if (wx.storm) {
     nextLightning -= dt;
     if (nextLightning <= 0) {
-      lightning = 1.f; nextLightning = 6.f + (rand() % 1000) * .015f;
-      float angle = (rand()%6283)*.001f, range = 350.f + (rand()%1700);
-      vec3 strike = camPos + vec3(cosf(angle)*range, 250.f+(rand()%600), sinf(angle)*range);
-      g_audio.triggerAt(SFX_THUNDER, strike, .85f); // the mixer delays the sound by the actual distance / speed of sound
+      nextLightning = 6.f + (rand() % 1000) * .015f;
+      const float angle = (rand() % 6283) * .001f, range = 600.f + (rand() % 3400), kind = (rand() % 1000) * .001f;
+      const float base = std::max(wx.cloudBase, 300.f);
+      const vec3 foot = camPos + vec3(cosf(angle) * range, 0.f, sinf(angle) * range);
+      const float drift = (rand() % 1000) * 0.6f, da = (rand() % 6283) * .001f;
+      vec3 top = foot + vec3(cosf(da) * drift, 0.f, sinf(da) * drift); top.y = base;
+      const uint32_t seed = (uint32_t)rand() * 2654435761u + 1u;
+      if (kind < 0.4f) makeStrike(top, vec3(foot.x, std::max(g_world.height(foot.x, foot.z), 0.f), foot.z), true, seed);
+      else if (kind < 0.6f) {   // (a crawler: a few hundred metres to a couple of km along under the base)
+        const float L = 500.f + (rand() % 1500), a2 = (rand() % 6283) * .001f;
+        makeStrike(top - vec3(0, 20.f, 0), top + vec3(cosf(a2) * L, -40.f - (rand() % 80), sinf(a2) * L), false, seed);
+      } else makeStrike(top + vec3(0, 300.f, 0), top + vec3(0, 300.f, 0), false, seed);   // (in the cloud: no channel seen)
+      const Strike& S = strikes.back();
+      g_audio.triggerAt(SFX_THUNDER, (S.top + S.foot) * 0.5f, .85f);   // the mixer delays the sound by the actual distance / speed of sound
     }
   }
-  lightning = std::max(0.f, lightning - dt * 4.f) * (lightning > 0.5f ? 1.f : (rand() % 3 ? 1.f : 0.3f));
+  // the strokes' light: the flash over everything, as bright as the nearest stroke is close; the newest one's in its cloud
+  {
+    float flash = 0.f;
+    for (Strike& S : strikes) {
+      S.t += dt;
+      const float d = length((S.top + S.foot) * 0.5f - camPos), f = S.flash(S.t);
+      flash = std::max(flash, f * clampf(2400.f / std::max(d, 1.f), 0.3f, 1.2f) * (S.a.empty() ? 0.6f : 1.f));
+    }
+    while (!strikes.empty() && strikes.front().t > 1.4f) strikes.erase(strikes.begin());
+    lightning = flash;
+    lightningGlow = strikes.empty() ? 0.f : strikes.back().flash(strikes.back().t);
+    if (!strikes.empty()) lightningTop = strikes.back().top;
+  }
   updateCloudWake(simDt);
 
   updateUfo(simDt);
@@ -3041,6 +3065,18 @@ void Game::updateFlight(float dt) {
       spawn(wp, plane.vel * 0.15f + vec3(0, 0.8f, 0), 2.5f, 0.8f, 2.2f, col, surf == SURF_GRASS ? 0.15f : 0.35f, SPR_SMOKE, 1.5f, 0.1f);
     }
   }
+  // a wet runway in the rain: spray thrown up behind the main wheels at speed, a mist trailing off them
+  if (plane.onGround && wx.precip == 1 && rainNow > 0.1f && plane.groundRough <= 0.3f && gs > 12.f) {
+    sprayAccum += dt * gs * 0.45f * std::min(rainNow * 1.5f, 1.f);
+    const GearStations gst = gearStations(*plane.spec);
+    while (sprayAccum > 1) {
+      sprayAccum -= 1;
+      const int side = rand() & 1 ? 1 : -1;
+      const vec3 wp = plane.pos + plane.q.rotate(vec3(side * gst.track, -plane.gearHeight(), gst.mainZ + 0.6f));
+      spawn(wp, plane.vel * 0.55f + plane.right() * (side * (1.f + (rand() % 100) * 0.03f)) + vec3(0, 1.f + (rand() % 100) * 0.02f, 0),
+            0.9f + (rand() % 100) * 0.008f, 0.4f, 2.6f, vec3(0.86f, 0.88f, 0.92f), 0.32f, SPR_SMOKE, 2.6f, -0.4f);
+    }
+  } else sprayAccum = 0.f;
   // prop wash dust on rough ground
   if (plane.onGround && plane.groundRough > 0.3f && plane.engineSpool > 0.5f && gs < 15.f && (rand() % 3 == 0)) {
     vec3 bp = plane.pos + plane.q.rotate(vec3((rand() % 100 - 50) * 0.04f, -plane.gearHeight(), 3.f));
@@ -3237,6 +3273,10 @@ void Game::updateLoading(float dt) {
     // leaves the player there with its message; one that does sets up the flight and its loading screen again
     screen = L.from; paused = L.paused;
     launchRunning = true; L.begin(); launchRunning = false;
+    // (the flight set up: its loading screen as it now stands goes up on its own before the first frame of its scene,
+    // which can take a while - the driver finishing the flight's programs on their first draw - so it never stands
+    // still on the card of a flight not yet begun)
+    launchSetUpShown = screen == SCR_LOADING;
     if (L.kind == LAUNCH_CAREER && screen == SCR_DEBRIEF) { screen = SCR_HUB; hubTab = TAB_CONTRACTS; }   // (the debrief's retry didn't take: its message is on the hub)
     return;
   }
@@ -3248,6 +3288,7 @@ void Game::updateLoading(float dt) {
     pendingMilitaryLaunch.reset();
     militaryLaunchFrameDrawn = militaryLaunchFramePresented = false;
     if (!beginMilitaryLaunch(c)) returnToMilitary();
+    else launchSetUpShown = screen == SCR_LOADING;   // (its loading screen alone first, as a queued launch's: above)
     return;   // the first real scene and collision warmup still use the normal readiness path
   }
   if (militaryFlight || isMilitaryContract(contract.type)) {
@@ -3275,13 +3316,14 @@ void Game::updateLoading(float dt) {
     loadBakeSeen = g_ren.bakeCount;
     // Observe completed scene frames; elapsed time alone is not evidence that any work finished.
     if (loadFrames != loadObservedFrame) {
-      if (loadFrames >= 2 && pend == 0 && !shadowPending && !baked) ++loadStableFrames;
+      const bool viewsIn = headless || loadViewsDrawn || crashed || !plane.spec;   // (the flight's views each drawn once: render)
+      if (loadFrames >= 2 && pend == 0 && !shadowPending && !baked && viewsIn) ++loadStableFrames;
       else loadStableFrames = 0;
       loadObservedFrame = loadFrames;
     }
     const float scenery = loadPend0 > 0 ? 1.f - float(pend) / loadPend0 : (loadFrames >= 2 ? 1.f : 0.f);
     const float verified = std::min(loadStableFrames / 2.f, 1.f);
-    const float completed = 0.10f * clampf(loadFrames/2.f,0.f,1.f) + 0.65f * scenery + 0.15f * (loadFrames >= 2 && !shadowPending ? 1.f : 0.f) + 0.10f * verified;
+    const float completed = 0.20f * loadSetupDone() + 0.55f * scenery + 0.15f * (loadFrames >= 2 && !shadowPending ? 1.f : 0.f) + 0.10f * verified;
     loadShown = std::max(loadShown, std::min(completed, 0.99f));
     if (loadStableFrames >= 2) { loadReadyT = loadT; loadShown = 1.f; g_ren.entBudgetMs = 2.5f; }
     // a research sortie: the preview has already streamed its airport, so the flight opens at once (no establishing shot)
@@ -3619,6 +3661,21 @@ void Game::jetEffects(float dt) {
       spawn(vec3(plane.pos.x, gy + 0.5f, plane.pos.z) + d * 3.f, d * (12.f + (rand() % 100) * 0.1f) + vec3(0, 1.5f, 0), 1.6f, 1.2f, 3.f,
             water ? vec3(0.9f, 0.95f, 1.f) : vec3(0.5f, 0.46f, 0.38f), water ? 0.5f : 0.35f, SPR_SMOKE, 1.2f, 0.3f);
     }
+    if (wr && !water)   // the XR-40's plasma where each pod's jet strikes the ground: a violet glow, and sparks off it
+      for (int s = 0; s < nEx; s++) {
+        const vec3 ex = plane.pos + plane.q.rotate(exP[s]), d = plane.q.rotate(exD[s]);
+        if (d.y > -0.5f) continue;
+        const float t = (ex.y - gy) / -d.y;
+        if (t > 30.f) continue;
+        const float k = (1.f - t / 30.f) * smoothstepf(0.25f, 0.8f, thr);
+        const vec3 hit = vec3(ex.x + d.x * t, gy + 0.25f, ex.z + d.z * t);
+        spawn(hit, vec3(0.f), 0.05f, 1.6f + 2.4f * k, 0.f, vec3(0.6f, 0.42f, 1.f) * (1.5f * k), 1.f, SPR_GLOW, 0.f, 0.f);
+        for (int i = 0; i < (int)(40.f * k * dt + frand()); i++) {
+          const float a = frand() * 6.2832f;
+          spawn(hit, vec3(cosf(a), 0.f, sinf(a)) * (8.f + 14.f * frand()) + vec3(0.f, 2.f + 4.f * frand(), 0.f), 0.25f + 0.3f * frand(), 0.03f, -0.02f,
+                vec3(0.75f, 0.6f, 1.f) * 3.f, 1.f, SPR_SPARK, 1.5f, -6.f);
+        }
+      }
   }
   // The pilot feels transonic buffeting; an external observer hears a boom only when the Mach cone arrives.
   float M = plane.mach;
@@ -3628,7 +3685,21 @@ void Game::jetEffects(float dt) {
     g_audio.triggerLocal(SFX_TRANSONIC, kModels[plane.spec-kAircraft].eye+vec3(0,0,-1), .45f);
     toast("MACH 1 - SUPERSONIC", vec3(0.4f, 0.9f, 1));
     vec3 f = normalize(plane.vel), r = normalize(cross(f, vec3(0, 1, 0)) + vec3(1e-4f, 0, 0)), u = cross(r, f);
-    bursts.push_back({plane.pos, r * 25.f, u * 25.f, vec3(0.7f, 0.85f, 1.f), 0.f});
+    // the boom: two shock rings racing out, and a collar of condensation flashing round the airframe at the shock -
+    // denser in damp air - for a fraction of a second, thinning as it falls back (a thin ring: thicker or longer-lived,
+    // it swallowed the chase camera, the whole view white)
+    bursts.push_back({plane.pos, r * 25.f, u * 25.f, vec3(0.7f, 0.85f, 1.f), 0.f, false});
+    bursts.push_back({plane.pos - f * 6.f, r * 45.f, u * 45.f, vec3(0.55f, 0.7f, 1.f), 0.f, false});
+    const float humid = clampf(0.35f + 0.45f * wx.cloudCover + (wx.precip ? 0.3f : 0.f), 0.f, 1.f) * smoothstepf(13000.f, 1500.f, plane.pos.y);
+    const float span = plane.spec->span, len = plane.spec->fusLen, R0 = 0.3f * span + 1.2f;
+    const int n = (int)(36.f + 54.f * humid);
+    for (int i = 0; i < n; i++) {
+      const float a = (i + frand()) * 6.2832f / n, along = (frand() - 0.35f) * len * 0.3f;
+      const vec3 radial = r * cosf(a) + u * sinf(a);
+      const float rr = R0 * (0.7f + 0.4f * frand());
+      spawn(plane.pos + radial * rr - f * along, plane.vel + radial * (3.f + 4.f * frand()),
+            0.3f + 0.3f * frand(), 0.5f + 0.5f * frand(), 1.5f + 1.5f * frand(), vec3(0.96f, 0.97f, 1.f), 0.22f + 0.2f * humid, SPR_SMOKE, 0.6f, 0.f);
+    }
   }
   prevMach = M;
 }
@@ -3763,6 +3834,64 @@ void Game::updateUfo(float dt) {
   if (t > 26.5f) { ufo.on = false; ufo.next = 480.f + (rand() % 1000) * 0.42f; }   // next one in 8-15 minutes
 }
 
+// ------------------------------------------------------------------ lightning
+// A stroke's channel: the line from the cloud to the ground broken again and again - each piece's middle pushed aside
+// up to a fifth of its length, square to it - so it zigzags at every scale as a real one does; branches forking off its
+// upper two thirds, down and out, some forking once more, none reaching the ground. Its light: the stepped leader
+// feeling its way down for 45 ms (faint, only as far as it has come), then the return stroke, all of it blinding at
+// once, then a restroke or three down the main channel 50 to 120 ms apart
+float Game::Strike::flash(float at) const {
+  float f = 0.f;
+  for (int i = 0; i < strokes; i++) { const float d = at - restrike[i]; if (d >= 0.f) f = std::max(f, (i ? 0.8f : 1.f) * expf(-d * 22.f)); }
+  return f;
+}
+void Game::makeStrike(vec3 top, vec3 foot, bool ground, uint32_t seed) {
+  Rng r(seed);
+  Strike S; S.top = top; S.foot = foot; S.ground = ground;
+  const float H = std::max(length(top - foot), 1.f);
+  // a channel from a to b, broken `levels` times; each segment with its glow's half width and brightness
+  auto channel = [&](vec3 a, vec3 b, int levels, float w, float k, float rough) {
+    std::vector<vec3> P{a, b};
+    for (int l = 0; l < levels; l++) {
+      std::vector<vec3> Q; Q.reserve(P.size() * 2);
+      for (size_t i = 0; i + 1 < P.size(); i++) {
+        const vec3 d = P[i + 1] - P[i]; const float L = length(d);
+        vec3 n = cross(d, vec3(r.range(-1, 1), r.range(-1, 1), r.range(-1, 1)));
+        n = length(n) > 1e-4f ? normalize(n) : vec3(1, 0, 0);
+        Q.push_back(P[i]); Q.push_back((P[i] + P[i + 1]) * 0.5f + n * (L * rough * r.range(-1.f, 1.f)));
+      }
+      Q.push_back(P.back()); P.swap(Q);
+    }
+    for (size_t i = 0; i + 1 < P.size(); i++) {
+      S.a.push_back(P[i]); S.b.push_back(P[i + 1]); S.w.push_back(w); S.k.push_back(k);
+      S.along.push_back(clampf(length((P[i] + P[i + 1]) * 0.5f - top) / H, 0.f, 1.f));
+    }
+    return P;
+  };
+  if (H > 2.f) {   // (a flash hidden in the cloud has no channel)
+    const std::vector<vec3> M = channel(top, foot, 7, ground ? 6.f : 4.f, ground ? 1.f : 0.6f, 0.2f);
+    S.main = (int)S.a.size();
+    const vec3 down = normalize(foot - top);
+    const int nb = 4 + (int)r.range(0.f, 6.f);
+    for (int i = 0; i < nb; i++) {
+      const int at = (int)r.range(4.f, (float)M.size() * 0.66f);
+      const vec3 side = normalize(cross(down, normalize(vec3(r.range(-1, 1), r.range(-0.3f, 0.3f), r.range(-1, 1)) + vec3(1e-3f, 0, 0))));
+      const float L = H * r.range(0.12f, 0.35f) * (1.f - (float)at / M.size());
+      const vec3 to = M[at] + normalize(down * r.range(0.5f, 1.f) + side * r.range(0.4f, 1.1f)) * L;
+      const std::vector<vec3> B = channel(M[at], to, 5, 3.f, 0.6f, 0.24f);
+      if (r.uni() < 0.6f) {   // (and a twig off it)
+        const int j = (int)r.range(1.f, B.size() * 0.6f);
+        channel(B[j], B[j] + normalize(down + side * r.range(-1.2f, 1.2f)) * (L * r.range(0.25f, 0.5f)), 4, 1.8f, 0.4f, 0.26f);
+      }
+    }
+  }
+  S.strokes = 2 + (int)r.range(0.f, 2.99f);   // (2 to 4)
+  float t0 = 0.045f;
+  for (int i = 0; i < S.strokes; i++) { S.restrike[i] = t0; t0 += r.range(0.05f, 0.12f); }
+  if (strikes.size() >= 3) strikes.erase(strikes.begin());
+  strikes.push_back(std::move(S));
+}
+
 // ------------------------------------------------------------------ crash wreckage
 // the ground under the wreckage: the pits dug this flight in it (g_groundPits)
 float Game::wreckGround(float x, float z) const { return pitGround(x, z, g_world.height(x, z, 6)); }
@@ -3835,7 +3964,7 @@ void Game::fireball(vec3 c, vec3 baseV, float R, bool air, bool water) {
 // a fireball, if it was burning - all of it sized by the blow. A crater's size goes as the cube root of the energy that
 // dug it (an engine coming down at 90 m/s: a 5 m pit; a propeller at 40: a scrape); the earth flies out faster and
 // further, and the dust rises higher, from a harder blow
-void Game::partImpact(vec3 p, vec3 v, float E, float fire, bool water) {
+float Game::partImpact(vec3 p, vec3 v, float E, float fire, bool water) {
   Rng r((uint32_t)(p.x * 31.f + p.z * 17.f + realTime * 977.f));
   const float s = cbrtf(std::max(E, 1.f)), R = clampf(0.055f * s, 0.4f, 18.f);
   auto sph = [&]() { vec3 d(r.range(-1, 1), r.range(-1, 1), r.range(-1, 1)); float l = length(d); return l > 1e-3f ? d / l : vec3(0, 1, 0); };
@@ -3851,15 +3980,16 @@ void Game::partImpact(vec3 p, vec3 v, float E, float fire, bool water) {
       spawn(p + vec3(0, 0.3f, 0), d * (r.range(0.8f, 1.6f) * (3.f + 4.f * sqrtf(R))), r.range(1.6f, 3.f), clampf(R * r.range(0.25f, 0.45f), 0.4f, 6.f), R * 0.4f, vec3(0.92f, 0.95f, 1.f), 0.8f, SPR_SMOKE, 1.f, -7.f);
     }
     bursts.push_back({p + vec3(0, 0.2f, 0), vec3(R * 3.f, 0, 0), vec3(0, 0, R * 3.f), vec3(0.8f, 0.9f, 1.f), 0.f});
-    return;
+    return 0.f;
   }
   // the pit (a scrape below 0.6 m is earth thrown up, no more), the smallest given up for a bigger one past the limit
+  float dug = 0.f;
   if (R >= 0.6f) {
     if ((int)pits.size() >= kMaxPits) {
       auto least = std::min_element(pits.begin(), pits.end(), [](const Pit& a, const Pit& b) { return a.R < b.R; });
       if (least->R < R) pits.erase(least);
     }
-    if ((int)pits.size() < kMaxPits) pits.push_back({p.x, p.z, R, R * r.range(0.26f, 0.34f)});
+    if ((int)pits.size() < kMaxPits) { dug = R * r.range(0.26f, 0.34f); pits.push_back({p.x, p.z, R, dug}); refreshGroundPits(); }   // (the ground the pieces meet has it at once)
   }
   // earth thrown out of it: clods arcing out and falling back, downrange more than up
   const int nc = (int)clampf(8.f + R * 16.f, 8.f, 160.f);
@@ -3891,6 +4021,7 @@ void Game::partImpact(vec3 p, vec3 v, float E, float fire, bool water) {
       spawn(p + vec3(0, 0.2f, 0), hd * r.range(3.f, 12.f) + sph() * r.range(4.f, 6.f + 6.f * sqrtf(R)) + vec3(0, r.range(1.f, 6.f), 0), r.range(0.3f, 0.9f), r.range(0.04f, 0.09f), -0.02f,
             vec3(1.f, 0.7f, 0.3f) * r.range(2.f, 4.f), 1.f, SPR_SPARK, 0.6f, -9.f);
   }
+  return dug;
 }
 
 void Game::breakUp(vec3 impactVel, bool water, bool air) {
@@ -4087,20 +4218,33 @@ void Game::updateWreck(float dt) {
       float g = wreckGround(cw.x, cw.z);
       if (g - cw.y > pen) { pen = g - cw.y; hitArm = cw - w.c; }
     }
-    if (pen > 0 && !w.landed) {
+    if (pen > 0 && !w.landed && (airBreak || crashTimer > 0.3f)) {
       // first contact: the blow is the piece's own - its mass, and its speed into the ground with a little of its skid
-      // (an impact's own pieces, thrown from the fireball, only from their second bounce on)
+      // (an impact's own pieces, thrown from the fireball, once they come down again). Where it digs a pit - under it -
+      // or comes down in the crash's own crater, it drives itself into the ground there, a share of its own thickness
+      // and of the pit's depth, and the earth takes its way: it stays where it struck, half buried
       w.landed = true;
       const float vn = std::max(-w.v.y, 0.f), E = 0.5f * w.body.mass * (vn * vn + 0.25f * std::max(dot(w.v, w.v) - vn * vn, 0.f));
-      const vec3 at = w.c + hitArm;
-      if (E > 1500.f && (airBreak || crashTimer > 0.3f)) partImpact(vec3(at.x, wreckGround(at.x, at.z), at.z), w.v, E, w.fire, false);
+      float dug = 0.f;
+      if (E > 1500.f) dug = partImpact(vec3(w.c.x, wreckGround(w.c.x, w.c.z), w.c.z), w.v, E, w.fire, false);
+      else if (craterR > 0.f && hypotf(w.c.x - craterX, w.c.z - craterZ) < craterR) dug = craterD;
+      if (dug > 0.f) {
+        const vec3 ext = hi - lo;
+        w.bury = std::min(0.45f * std::min(ext.x, std::min(ext.y, ext.z)), 0.6f * dug);
+        w.v.x *= 0.3f; w.v.z *= 0.3f;
+      }
     }
+    if (w.landed) w.groundT += dt;
+    pen -= w.bury;   // (its crater's floor that far over its lowest point: it sinks in until it gets there)
     if (pen > 0) {
+      // down on the ground: no rebound - the earth takes the blow - and it slides, rolls and turns to a stop, a piece
+      // dug in far sooner; at rest once still and its pit is under it (dug the frame it struck, drawn the next)
       w.c.y += pen;
-      if (w.v.y < 0) w.v.y = -w.v.y * 0.22f;
-      w.v.x *= 0.72f; w.v.z *= 0.72f;
-      w.w = w.w * 0.75f + cross(hitArm, vec3(w.v.x, 0, w.v.z)) * 0.02f;
-      if (length(w.v) < 0.8f && length(w.w) < 0.35f) w.rest = true;
+      if (w.v.y < 0) w.v.y = 0.f;
+      const float grip = expf(-(w.bury > 0.f ? 14.f : 7.f) * dt);
+      w.v.x *= grip; w.v.z *= grip;
+      w.w = w.bury > 0.f ? w.w * expf(-12.f * dt) : w.w * expf(-4.f * dt) + cross(hitArm, vec3(w.v.x, 0, w.v.z)) * (1.2f * dt);
+      if (w.groundT > 0.25f && length(w.v) < 0.8f && length(w.w) < 0.35f) w.rest = true;
     }
   }
   // in-flight break-up: the camera rides with the centre section; results come up a while after the last piece is down
@@ -4133,9 +4277,13 @@ void Game::updateWreck(float dt) {
       d.p.y = g + d.size * 0.15f;
       if (-d.v.y > 8.f) {   // a chunk coming down hard throws up a puff of earth (and, hard enough, digs a little pit)
         const float E = 0.5f * d.body.mass * d.v.y * d.v.y;
-        if (E > 4000.f) partImpact(d.p, d.v, E, 0.f, false);
+        const float dug = E > 4000.f ? partImpact(d.p, d.v, E, 0.f, false) : 0.f;
+        if (dug > 0.f) {   // (one that dug its pit stays stuck in it, edge first, at the angle it struck, half buried)
+          d.p.y = g - dug; d.v = vec3(); d.w = vec3(); d.rest = true;
+          continue;
+        }
       }
-      d.v.y = fabsf(d.v.y) * 0.25f; d.v.x *= 0.6f; d.v.z *= 0.6f; d.w = d.w * 0.6f;
+      d.v.y = 0.f; d.v.x *= 0.45f; d.v.z *= 0.45f; d.w = d.w * 0.5f;   // (no rebound: it skids and tumbles to a stop)
       if (length(d.v) < 0.7f) {  // settle flat on the ground
         d.rest = true;
         float yaw = atan2f(d.q.rotate(vec3(1, 0, 0)).z, d.q.rotate(vec3(1, 0, 0)).x);
@@ -4219,6 +4367,7 @@ static void fillPlaneVisual(PlaneVisual& pv, const Plane& p, float propAngle, bo
   pv.hudV[0] = vb.x; pv.hudV[1] = vb.y; pv.hudV[2] = vb.z;
   pv.hud3[0] = p.engineSpool; pv.hud3[1] = p.alpha / DEG; pv.hud3[2] = p.vel.y; pv.hud3[3] = p.agl();
   pv.exhaust = buildExhaustVisual(p, md);
+  pv.exhaust.style = s.special == 2 ? 1.f : 0.f;
   pv.flame[0] = pv.flame[1] = 0.f;
   for (int i = 0; i < pv.exhaust.count; ++i) {
     pv.flame[0] = std::max(pv.flame[0], pv.exhaust.power[i][0]);
@@ -4256,7 +4405,7 @@ FrameParams Game::buildFrame() {
   const bool flying = screen == SCR_FLIGHT && plane.spec;
   fp.fogB = 1.5f / std::max(wx.visibility * (flying && wx.precip ? 1.25f - 0.5f * rainNow : 1.f), 500.f);
   fp.wet = wx.precip == 1 ? 1.f : 0.f; fp.snow = wx.precip == 2 ? 0.8f : 0.f;
-  fp.storm = wx.storm ? 1.f : 0.f; fp.lightning = lightning;
+  fp.storm = wx.storm ? 1.f : 0.f; fp.lightning = lightning; fp.lightningTop = lightningTop; fp.lightningGlow = lightningGlow;
   fp.windOff = cloudOff; fp.cloudDet = cloudDet; fp.cloudBoil = cloudBoil;
   fp.wind = vec3(-sinf(wx.windFrom * DEG), 0, cosf(wx.windFrom * DEG)) * wx.windSpeed;
   fp.windSock = fp.wind;
@@ -4866,15 +5015,16 @@ void sortAlphaQuads(std::vector<SpriteVert>& v, vec3 cam) {
 void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, std::vector<SpriteVert>& add) {
   vec3 cr = fp.camRight;
   // billboards are turned to face whichever camera draws them (the main view or a cockpit camera) in the vertex shader
-  auto bill = [&](std::vector<SpriteVert>& v, vec3 p, float s, vec3 col, float a, int kind, float soft) {
-    SpriteVert q[4] = {{p.x, p.y, p.z, 0, 0, col.x, col.y, col.z, a, (float)kind, soft, s}, {p.x, p.y, p.z, 1, 0, col.x, col.y, col.z, a, (float)kind, soft, s},
-                       {p.x, p.y, p.z, 1, 1, col.x, col.y, col.z, a, (float)kind, soft, s}, {p.x, p.y, p.z, 0, 1, col.x, col.y, col.z, a, (float)kind, soft, s}};
+  // (kind: the sprite's kind, and in its fraction - under 0.4 - a value of its own: a puff's pattern, a splash's age)
+  auto bill = [&](std::vector<SpriteVert>& v, vec3 p, float s, vec3 col, float a, float kind, float soft) {
+    SpriteVert q[4] = {{p.x, p.y, p.z, 0, 0, col.x, col.y, col.z, a, kind, soft, s}, {p.x, p.y, p.z, 1, 0, col.x, col.y, col.z, a, kind, soft, s},
+                       {p.x, p.y, p.z, 1, 1, col.x, col.y, col.z, a, kind, soft, s}, {p.x, p.y, p.z, 0, 1, col.x, col.y, col.z, a, kind, soft, s}};
     v.push_back(q[0]); v.push_back(q[1]); v.push_back(q[2]); v.push_back(q[0]); v.push_back(q[2]); v.push_back(q[3]);
   };
-  auto quadAx = [&](std::vector<SpriteVert>& v, vec3 p, vec3 ax, vec3 ay, vec3 col, float a, int kind, float soft) {
+  auto quadAx = [&](std::vector<SpriteVert>& v, vec3 p, vec3 ax, vec3 ay, vec3 col, float a, float kind, float soft) {
     vec3 c0 = p - ax - ay, c1 = p + ax - ay, c2 = p + ax + ay, c3 = p - ax + ay;
-    SpriteVert q[4] = {{c0.x, c0.y, c0.z, 0, 0, col.x, col.y, col.z, a, (float)kind, soft}, {c1.x, c1.y, c1.z, 1, 0, col.x, col.y, col.z, a, (float)kind, soft},
-                       {c2.x, c2.y, c2.z, 1, 1, col.x, col.y, col.z, a, (float)kind, soft}, {c3.x, c3.y, c3.z, 0, 1, col.x, col.y, col.z, a, (float)kind, soft}};
+    SpriteVert q[4] = {{c0.x, c0.y, c0.z, 0, 0, col.x, col.y, col.z, a, kind, soft}, {c1.x, c1.y, c1.z, 1, 0, col.x, col.y, col.z, a, kind, soft},
+                       {c2.x, c2.y, c2.z, 1, 1, col.x, col.y, col.z, a, kind, soft}, {c3.x, c3.y, c3.z, 0, 1, col.x, col.y, col.z, a, kind, soft}};
     v.push_back(q[0]); v.push_back(q[1]); v.push_back(q[2]); v.push_back(q[0]); v.push_back(q[2]); v.push_back(q[3]);
   };
   float night = fp.night;
@@ -5090,7 +5240,7 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
       if (!markers) break;
       float k = b.t / 0.9f, s = 1.f + 2.2f * (1.f - (1.f - k) * (1.f - k));
       quadAx(add, b.c, b.ax * s, b.ay * s, b.col * 3.f, (1.f - k) * (1.f - k), SPR_SHOCK, 5.f);
-      if (k < 0.35f) bill(add, b.c, 90.f * (0.5f + k * 3.f), b.col * 2.f * (1.f - k / 0.35f), 1.f, SPR_GLOW, 5.f);
+      if (k < 0.35f && b.flash) bill(add, b.c, 90.f * (0.5f + k * 3.f), b.col * 2.f * (1.f - k / 0.35f), 1.f, SPR_GLOW, 5.f);
     }
   }
   // trail ribbons: camera-facing strips through trail points, soft across their width (wingtip vapour; the smoke
@@ -5136,6 +5286,24 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
       quadAx(add, w.c - ax * (L * 0.35f), ax * (L * 0.35f + Wd * 2.f), ay * Wd * 2.2f, vec3(1.f, 0.4f, 0.1f) * 0.8f, heat * 0.6f, SPR_SPARK, 1.f);
     }
   }
+  // lightning: each channel segment a ribbon turned to the camera (its glow at least a few pixels wide however far off),
+  // the stepped leader faint and only as far down as it has come, then the strokes; a flash on the ground it struck
+  for (const Strike& S : strikes) {
+    const float lead = S.restrike[0], t = S.t;
+    const float first = t >= lead ? expf(-(t - lead) * 22.f) : 0.f, after = t >= lead ? 0.1f * expf(-(t - lead) * 5.f) : 0.f, all = S.flash(t);
+    for (size_t i = 0; i < S.a.size(); i++) {
+      float I;
+      if (t < lead) { if (S.along[i] > t / lead) continue; I = 0.12f * S.k[i]; }
+      else I = S.k[i] * (((int)i < S.main ? all : first) + after);
+      if (I < 0.01f) continue;
+      const vec3 m = (S.a[i] + S.b[i]) * 0.5f, d = (S.b[i] - S.a[i]) * 0.5f, vd = normalize(m - fp.camPos);
+      vec3 side = cross(d, vd); const float sl = length(side); if (sl < 1e-4f) continue;
+      const float w = std::max(S.w[i], length(m - fp.camPos) * 0.0022f);
+      const float dl = length(d);
+      quadAx(add, m, d * ((dl + w * 0.35f) / std::max(dl, 1e-3f)), side * (w / sl), vec3(0.85f, 0.88f, 1.f) * 7.f, I, SPR_BOLT, 6.f);
+    }
+    if (S.ground && t >= lead) bill(add, S.foot + vec3(0, 6.f, 0), 70.f, vec3(0.8f, 0.85f, 1.f) * 3.f, all, SPR_GLOW, 8.f);
+  }
   // particles
   vec3 camVel = screen == SCR_FLIGHT && plane.spec ? plane.vel : vec3();
   std::vector<std::pair<float, const Particle*>> order;
@@ -5144,6 +5312,8 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
   for (auto& o : order) {
     const Particle& p = *o.second;
     if (p.gate && photo.on && !photo.markers) continue;   // (photo mode: the gates' sparks go with the gates)
+    // (its own billows: a seed from what it was born with, the same every frame of its life)
+    const float seed = 0.4f * (0.5f + 0.5f * sinf(p.maxLife * 7919.f + p.grow * 104.7f + p.col.x * 31.f)) * 0.999f;
     float fade = clampf(p.life / p.maxLife, 0, 1);
     float a = p.alpha * (p.kind == SPR_FIRE || p.instant ? fade : fade * smoothstepf(0.f, 0.15f, 1.f - fade + 0.15f));
     if (p.kind == SPR_SPARK) {   // hot embers: streaks along their motion relative to the camera (1/60 s shutter)
@@ -5158,14 +5328,14 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
       vec3 hot = p.col * 3.f, red = vec3(1.f, 0.28f, 0.06f) * 1.3f, soot = vec3(0.05f, 0.045f, 0.04f);
       vec3 col = t < 0.4f ? lerp(hot, red, t / 0.4f) : lerp(red, soot, std::min(1.f, (t - 0.4f) / 0.4f));
       float al = p.alpha * smoothstepf(0.f, 0.06f, 1.f - fade + 0.02f) * (t < 0.8f ? 1.f : 1.f - (t - 0.8f) / 0.2f);
-      bill(alpha, p.p, std::max(p.size, 0.05f), col, al, p.kind, 1.f);
+      bill(alpha, p.p, std::max(p.size, 0.05f), col, al, p.kind + seed, 1.f);
     }
     else if (p.kind == SPR_FIRE) {   // flame cools from its spawn colour toward a deep red as it ages
       float cool = 1.f - fade;
       vec3 col = lerp(p.col, vec3(0.9f, 0.18f, 0.04f) * (p.col.x + p.col.y + p.col.z) * 0.4f, cool * cool);
-      bill(add, p.p, std::max(p.size, 0.05f), col, a, p.kind, 1.f);
+      bill(add, p.p, std::max(p.size, 0.05f), col, a, p.kind + seed, 1.f);
     }
-    else bill(alpha, p.p, p.size, p.col, a, p.kind, 1.f);
+    else bill(alpha, p.p, p.size, p.col, a, p.kind + (p.kind == SPR_SMOKE ? seed : 0.f), 1.f);
   }
   // precipitation around the camera: as many drops as it is raining hard here (weather.cpp rainAt: heavier under
   // the denser cells, none above the tops), each streaked along its motion past the camera (its fall, the wind and
@@ -5207,6 +5377,46 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
         quadAx(alpha, wpos, side, dir * len, col, (0.25f + 0.2f * precipK) * smoothstepf(3.f, 9.f, dc), SPR_RAIN, 0.5f);
       } else {
         bill(alpha, wpos, 0.07f + 0.05f * big, col, 0.9f, SPR_SNOW, 0.5f);
+      }
+    }
+    if (rain) {
+      vec3 col = vec3(0.75f, 0.78f, 0.85f);
+      if (lightning > 0.05f) col = vec3(1.f) + vec3(0.8f, 0.85f, 1.f) * (lightning * 0.6f);
+      // the rain further off (30 to 110 m): coarser, fainter streaks - a third of the near ones' number, each standing
+      // for many drops - so that heavy rain has depth rather than ending a few metres from the eye
+      const int NF = N / 3;
+      for (int i = 0; i < NF; i++) {
+        const vec3& d = rainDrops[i];
+        const float big = (float)((i * 2246822519u) >> 24) / 255.f;
+        const vec3 rel = vec3(0, -(7.5f + 2.5f * big), 0) + wv - camV;
+        vec3 p = d * 3.7f + rel * fmodf(realTime * 0.4f + (i % 41) * 0.11f, 1.0f) * 1.2f;
+        auto wrap = [](float v, float h) { return v - floorf((v + h) / (2 * h)) * 2 * h; };
+        vec3 wpos(wrap(p.x, 110.f), wrap(p.y, 45.f), wrap(p.z, 110.f));
+        const float dc = length(vec3(wpos.x, 0.f, wpos.z));
+        if (dc < 30.f || dc > 110.f) continue;
+        wpos = wpos + fp.camPos;
+        const vec3 dir = normalize(rel), side = normalize(cross(dir, wpos - fp.camPos)) * (0.04f + 0.03f * big);
+        quadAx(alpha, wpos, side, dir * (2.5f + 2.f * big), col, (0.05f + 0.06f * precipK) * smoothstepf(110.f, 70.f, dc), SPR_RAIN, 2.f);
+      }
+      // splashes where it lands round the camera while it is low: a ring spreading on the ground or the water and, on the
+      // ground, a crown of droplets thrown up - each spot's own tenth of a second, then on to another spot
+      const float camGround = std::max(g_world.height(fp.camPos.x, fp.camPos.z), 0.f), camAgl = fp.camPos.y - camGround;
+      if (camAgl < 60.f) {
+        const int NS = (int)(260.f * precipK * (1.f - camAgl / 60.f));
+        for (int i = 0; i < NS; i++) {
+          const float cyc = realTime * 9.f + (float)((i * 2654435761u) >> 8) / 16777216.f;
+          const float ph = cyc - floorf(cyc);
+          Rng rr((uint32_t)i * 73856093u ^ (uint32_t)(int)floorf(cyc) * 19349663u ^ 0x9e3779b9u);
+          vec3 at = fp.camPos + vec3(rr.range(-1.f, 1.f), 0.f, rr.range(-1.f, 1.f)) * (3.f + 22.f * rr.uni());
+          const float g = g_world.height(at.x, at.z);
+          const bool water = g < 0.3f;
+          at.y = water ? 0.03f : g + 0.04f;
+          const float dc = length(at - fp.camPos);
+          if (dc < 1.5f) continue;
+          const float sz = 0.06f + 0.22f * ph + 0.05f * rr.uni();
+          quadAx(alpha, at, vec3(sz, 0, 0), vec3(0, 0, sz), col, (water ? 0.55f : 0.4f) * smoothstepf(28.f, 12.f, dc), SPR_SPLASH + ph * 0.399f, 0.05f);
+          if (!water && ph < 0.55f && dc < 12.f) bill(alpha, at + vec3(0, 0.06f, 0), 0.09f, col, 0.35f * smoothstepf(12.f, 5.f, dc), 14.f + ph * 0.399f, 0.05f);   // (the crowns only close by: further off a few pixels' chevron)
+        }
       }
     }
   }
@@ -5539,6 +5749,7 @@ void Game::feedAudio() {
     audioBoomCooldown=std::max(0.f,audioBoomCooldown-lastDt);
     if(ap.scene && !paused && !ap.interior && camMode==3 && audioPlayerCone>-1e8f && audioPlayerCone<0 && cone>=0 && audioBoomCooldown<=0) {
       g_audio.triggerAt(SFX_BOOM,plane.pos,.85f);audioBoomCooldown=6.f;
+      shake(0.45f);   // (the shock front's double jolt reaching the flyby camera)
     }
     audioPlayerCone=cone;
   }
@@ -5620,6 +5831,7 @@ void Game::feedAudio() {
 
 // ------------------------------------------------------------------ main update / render
 void Game::update(float dt) {
+  if (loadLogging) loadLogTick();
   g_ren.beginRegionUploadFrame(); // one shared detail + horizon GPU budget per displayed frame
   if (screen != SCR_FLIGHT) { rumbleLo = rumbleHi = 0.f; shakeTrauma = shakeBuffet = 0.f; }   // (the motors and the shake are the flight's)
   if (screen != SCR_REGION_LOADING) { const std::string want = screenWorld(); if (!want.empty()) loadCareerWorld(want, screen); }
@@ -5797,6 +6009,7 @@ void Game::render() {
     return;
   }
   if (screen == SCR_LOADING && launchCardPending()) { renderLaunchCard(); return; }
+  if (screen == SCR_LOADING && launchSetUpShown) { launchSetUpShown = false; renderLaunchCard(); return; }
   // every menu draws its scene live (the main menu's tour, the hub's airport, the research terminal's preview): the
   // scenery a flight opens with streams in while the player chooses. vid: a full-screen picture instead of the scene
   // (the research terminal's boot screen)
@@ -5833,16 +6046,34 @@ void Game::render() {
       if (platformPresent) platformPresent();
       glUseProgram((GLuint)prog);
     };
+  } else if (screen == SCR_LOADING && !headless && loadReadyT < 0 && platformPresent && (loadMap || militaryFlight)) {
+    // the loading screen, drawn and shown from inside a long bake or warm-up (the hive craft, the XR-40's cockpit):
+    // on its own the screen would hold still until the flight opened. (Its aerial map was rendered by the frame
+    // before: never from inside a bake)
+    g_ren.bakeYield = [this] {
+      GLint prog = 0; glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
+      static auto last = std::chrono::steady_clock::now();
+      auto now = std::chrono::steady_clock::now();
+      const float dt = std::min(0.1f, std::chrono::duration<float>(now - last).count()); last = now;
+      realTime += dt; loadT += dt;
+      g_ren.clearScreen();
+      g_ren.uiBegin(); drawLoading(); g_ren.uiEnd();
+      platformPresent(); ++loadShownInside;
+      glUseProgram((GLuint)prog);
+    };
   } else if (g_ren.bakeYield && screen != SCR_RESEARCH) g_ren.bakeYield = nullptr;
   if (!vid) {
     // The loading screen, under its card (and under the frame drawn after them): the flight's views once each - inside
     // and out, and in the XR-40 a store of each kind and a young blast - before it opens. Building a body or linking a
     // program isn't all of it: drivers finish a program on its first draw. The first look inside the XR-40 took 90 s
     // on the software renderer, each look after it under one; its first bomb seen from outside as long.
-    if (screen == SCR_LOADING && !headless && loadReadyT < 0 && loadFrames >= 2 && !loadViewsDrawn && plane.spec && !crashed) {
+    if (screen == SCR_LOADING && !headless && loadReadyT < 0 && loadFrames >= 2 && loadWarmStep >= loadWarmItems() && !loadViewsDrawn && plane.spec && !crashed) {
       const int cm = camMode, baked = g_ren.bakeCount; const vec3 cp = camPos;
       const float size = std::max(plane.spec->span, plane.spec->fusLen);
-      for (int view : {cm == 1 ? 1 : 0, cm == 1 ? 0 : 1}) {   // (the view the flight opens with last: the frame after cuts from the other)
+      // (one a frame, the loading screen drawn and shown between them; the view the flight opens with last: the frame
+      // after cuts from the other)
+      const int order[2] = {cm == 1 ? 1 : 0, cm == 1 ? 0 : 1};
+      for (int view : {order[std::min(loadViewsStep, 1)]}) {
         camMode = view;
         camPos = view == 1 ? plane.pos + plane.q.rotate(kModels[plane.spec - kAircraft].eye)
                            : cm != 1 ? cp : plane.pos + plane.q.rotate(vec3(0, size * 0.3f, size * 1.4f));
@@ -5867,7 +6098,8 @@ void Game::render() {
       }
       camMode = cm; camPos = cp;
       g_ren.dropHistory();
-      loadViewsDrawn = g_ren.bakeCount == baked;   // (a body built at one's end was not drawn yet: again, next frame)
+      if (g_ren.bakeCount == baked) loadViewsStep++;   // (a body built at its end was not drawn yet: again, next frame)
+      loadViewsDrawn = loadViewsStep >= 2;
     }
     fp = buildFrame();
     std::vector<SpriteVert> a, b;
@@ -5884,6 +6116,7 @@ void Game::render() {
     if (screen == SCR_LOADING && loadReadyT < 0) ++loadFrames;
   } else g_ren.clearScreen();
   if(screen==SCR_RESEARCH){g_ren.onMeshProgress=nullptr;g_ren.onMeshBatch=nullptr;}
+  if (screen == SCR_LOADING) g_ren.bakeYield = nullptr;   // (only this frame's scene: an update never draws the loading screen)
   if (screen == SCR_RESEARCH && !resWarm) g_ren.bakeYield = nullptr;
   if (sceneOnly) return;
   if (photo.on && photo.capture && screen == SCR_FLIGHT) {   // (the shot: the scene just drawn, before any of the UI)
@@ -6180,6 +6413,12 @@ void Game::debugScene(const std::string& name) {
     if (!(mode == 7 && firstDrop > 0)) { dbgFollow = true; dbgFollowOff = dbgCamPos - plane.pos; }
     return;
   }
+  if (name == "rboom") {   // the XR-30 the moment it goes through Mach 1, the chase camera behind it: the boom's collar and rings
+    realTime = 20; resAirborne = true; launchResearch();
+    for (int i = 0; i < 60; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
+    plane.vel = plane.forward() * 346.f; audioMachArmed = true; toasts.clear();
+    return;
+  }
   if (name == "rjet" || name == "rjetc" || name == "rjetl" || name == "rjetd" || name == "rjetr") { realTime = 20; resAirborne = true; launchResearch(); if (name == "rjetc" || name == "rjetl" || name == "rjetd" || name == "rjetr") camMode = 1; for (int i = 0; i < 90; i++) { realTime += 1 / 30.f; update(1 / 30.f); } toasts.clear(); if (name == "rjetl") lookYaw = 1.75f; if (name == "rjetr") { lookYaw = -1.2f; lookPitch = -0.6f; } if (name == "rjetd") lookPitch = -0.75f; return; }
   if (name == "radio") { loadStations(); screen = SCR_HUB; showRadio = true; realTime = 20; radioScroll = 6; return; }
   if (name.size() == 4 && name.compare(0, 3, "hub") == 0) { screen = SCR_HUB; hubTab = name[3] - '0'; realTime = 20; return; }
@@ -6377,6 +6616,14 @@ void Game::debugScene(const std::string& name) {
     takeoffAnnounced = true;
     camQ = plane.q;
     if (name == "cockpit") camMode = 1;
+    if (name == "storm" && getenv("STRIKE")) {   // STRIKE=<metres ahead>,<degrees off the nose>,<seconds into it at the shot>: a stroke to the ground
+      float R = 1500.f, off = 0.f, at = 0.06f; sscanf(getenv("STRIKE"), "%f,%f,%f", &R, &off, &at);
+      const float a = (hdg + off) * DEG;
+      const vec3 foot = p + vec3(sinf(a) * R, 0.f, -cosf(a) * R);
+      makeStrike(vec3(foot.x + 150.f, std::max(wx.cloudBase, 300.f), foot.z - 80.f), vec3(foot.x, std::max(g_world.height(foot.x, foot.z), 0.f), foot.z), true, 7);
+      strikes.back().t = at - 0.1f;   // (the shot's three frames, a 30th of a second apart, on)
+      nextLightning = 1e9f;
+    }
     if (name == "hud" && getenv("TDSTAMP")) { tdStampT = realTime - 0.6f; tdStampFpm = (float)atof(getenv("TDSTAMP")); }   // (TDSTAMP=fpm: the touchdown stamp)
     if (name == "hud") {   // HUDDEMO=1: every warning, a tower call, failures and messages lit, to look at the layout
       if (getenv("HUDDEMO")) {
@@ -6469,6 +6716,17 @@ void Game::debugScene(const std::string& name) {
       if (crashed && crashTimer >= after) break;
     }
     if (!crashed) printf("crash: FAIL - never hit\n");
+    if (getenv("WRECKDBG"))   // each piece where it ended: down or not, at rest, how far it dug in, its lowest corner against the ground there
+      for (const WreckPiece& w : wreck) {
+        float low = 1e9f, gnd = 0.f;
+        const vec3 lo = w.body.lo - w.body.cg, hi = w.body.hi - w.body.cg;
+        for (int k = 0; k < 8; k++) {
+          const vec3 cw = w.c + w.q.rotate(vec3((k & 1) ? hi.x : lo.x, (k & 2) ? hi.y : lo.y, (k & 4) ? hi.z : lo.z) * 0.9f);
+          if (cw.y - wreckGround(cw.x, cw.z) < low) { low = cw.y - wreckGround(cw.x, cw.z); gnd = wreckGround(cw.x, cw.z); }
+        }
+        printf("  piece kind %d: %s%s, %.2f m dug in, lowest corner %+.2f m from the ground (%.1f m; %.1f under the surface's), %.1f m/s\n", w.kind, w.landed ? "down" : "in the air",
+               w.rest ? ", at rest" : "", w.bury, low, gnd, g_world.height(w.c.x, w.c.z, 6) - gnd, length(w.v));
+      }
     for (int i = 0; i < 5; i++) updateCamera(1 / 60.f);
     toasts.clear(); return;
   }
@@ -6826,21 +7084,54 @@ void Game::launchMilitary(int kind) {
   if (headless) { beginMilitaryLaunch(c); return; }
   pendingMilitaryLaunch = c;
   militaryLaunchFrameDrawn = militaryLaunchFramePresented = false;
-  loadT = 0; loadReadyT = -1; loadShown = 0; loadPend0 = 0; loadFrames = 0; loadViewsDrawn = false;
+  loadT = 0; loadReadyT = -1; loadShown = 0; loadPend0 = 0; loadFrames = 0; loadViewsDrawn = false; loadViewsStep = 0; loadWarmStep = 0; loadWarmAt = -1;
   loadStableFrames = 0; loadObservedFrame = -1; loadMap = false;
   screen = SCR_LOADING;
   in.pressed[K_ENTER] = in.pressed[' '] = false; in.mPressed[0] = false;
   in.buttonsPressed &= ~(PAD_A | PAD_START);
 }
 
+void Game::loadLogBegin() {
+  if (headless || saveDir.empty()) return;
+  loadLog.clear(); loadLogging = true; loadShownInside = 0; loadLogStart = loadLogLast = std::chrono::steady_clock::now();
+}
+void Game::loadLogTick() {
+  const auto now = std::chrono::steady_clock::now();
+  const double ms = std::chrono::duration<double, std::milli>(now - loadLogLast).count();
+  loadLogLast = now;
+  if (screen == SCR_LOADING && loadLog.size() < 4000) {
+    loadLog.push_back({ms, launchCardPending(), launchSetUpShown, loadFrames, std::max(0, g_ren.entPending), loadViewsStep, loadingShadowPending(), loadWarmStep, loadShownInside});
+    loadShownInside = 0;
+    return;
+  }
+  loadLogging = false;
+  if (!loadLog.empty()) loadLog.push_back({ms, false, false, loadFrames, std::max(0, g_ren.entPending), loadViewsStep, false, loadWarmStep, loadShownInside});   // (the last frame of it)
+  loadShownInside = 0;
+  FILE* f = fopen((saveDir + "/loading.log").c_str(), "w");
+  if (!f) return;
+  const double total = std::chrono::duration<double>(now - loadLogStart).count();
+  fprintf(f, "Somnium Volandi - the loading screen of the last launch: %s, %s\n%.2f s from the card to %s, %zu frames\n\n",
+          contract.title.c_str(), plane.spec ? plane.spec->name : "-", total, screen == SCR_FLIGHT ? "the flight" : "leaving it", loadLog.size());
+  fprintf(f, "frame       ms  what was on the screen\n");
+  for (size_t i = 0; i < loadLog.size(); i++) {
+    const LoadLogFrame& L = loadLog[i];
+    if (L.card) fprintf(f, "%5zu %8.1f  the card (the flight not set up yet)\n", i, L.ms);
+    else fprintf(f, "%5zu %8.1f  %s: scene frame %d, warmed %d of %d, %d scenery chunks to make, views drawn %d of 2%s%s\n", i, L.ms, L.setUp ? "set up, the loading screen alone" : i + 1 == loadLog.size() ? "the last" : "loading",
+                 L.frames, std::min(L.warm, loadWarmItems()), loadWarmItems(), L.pending, std::min(L.views, 2), L.shadows ? ", terrain shadows to do" : "",
+                 L.shown ? fmt(", shown %d times from inside a bake", L.shown).c_str() : "");
+  }
+  fclose(f);
+}
+
 bool Game::queueLaunch(const Contract& card, int spec, LaunchKind kind, std::function<void()> begin) {
   if (headless || launchRunning) return false;
   if (launchCardPending()) return true;   // (one launch at a time: a second press while the card is up does nothing)
+  loadLogBegin();
   PendingLaunch L; L.card = card; L.spec = spec; L.kind = kind; L.from = screen; L.paused = paused; L.begin = std::move(begin);
   pendingLaunch = std::move(L);
   launchFrameDrawn = launchFramePresented = false;
-  loadT = 0; loadReadyT = -1; loadShown = 0; loadPend0 = 0; loadFrames = 0; loadViewsDrawn = false;
-  loadStableFrames = 0; loadObservedFrame = -1; loadMap = false;
+  loadT = 0; loadReadyT = -1; loadShown = 0; loadPend0 = 0; loadFrames = 0; loadViewsDrawn = false; loadViewsStep = 0; loadWarmStep = 0; loadWarmAt = -1;
+  loadStableFrames = 0; loadObservedFrame = -1; loadMap = false; launchSetUpShown = false;
   screen = SCR_LOADING;
   in.pressed[K_ENTER] = in.pressed[' '] = false; in.mPressed[0] = false;
   in.buttonsPressed &= ~(PAD_A | PAD_START);

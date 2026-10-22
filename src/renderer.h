@@ -34,7 +34,7 @@ static const float kLogDepthFar = 2.0e7f;
 inline float logDepthC() { return 2.f / log2f(kLogDepthFar + 1.f); }
 
 struct SpriteVert { float x, y, z, u, v, r, g, b, a, kind, soft, bill = 0; };   // bill > 0: x,y,z is the centre of a camera-facing square of that half size
-enum SpriteKind { SPR_SMOKE = 0, SPR_GLOW = 1, SPR_RING = 2, SPR_RAIN = 3, SPR_FIRE = 4, SPR_SNOW = 5, SPR_SHOCK = 6, SPR_SPARK = 7, SPR_RIBBON = 8, SPR_FLAME = 9, SPR_ROUTE = 11 };
+enum SpriteKind { SPR_SMOKE = 0, SPR_GLOW = 1, SPR_RING = 2, SPR_RAIN = 3, SPR_FIRE = 4, SPR_SNOW = 5, SPR_SHOCK = 6, SPR_SPARK = 7, SPR_RIBBON = 8, SPR_FLAME = 9, SPR_ROUTE = 11, SPR_BOLT = 12, SPR_SPLASH = 13 };
 
 struct PlaneVisual {
   int wrBombSet = 0; // Somnus carried payload: plasma / penetrator / EMP
@@ -122,6 +122,7 @@ struct FrameParams {
   bool prefetchOn = false; vec3 prefetchPos;   // scenery to have the worker threads build ahead (the menu tour's next place)
   float prefetchNearR = 0.f; vec3 prefetchNearPos;   // > 0: and what stands within this of a second place, once the first is built (the hub's view, which the menu cuts to)
   float cloudCover = 0.3f, cloudBase = 1500, fogB = 0.0001f, wet = 0, snow = 0, lightning = 0, storm = 0;
+  vec3 lightningTop; float lightningGlow = 0;   // a stroke's light in the cloud round its top: where, and how bright
   float sunDim = 1.f;   // the weather's share of the sunlight (Game::computeSun): the lighting pass's sunLightAt times it
   // the sky's bodies (sky.h): the game's frame into the equator's (the stars), towards the moon, the share of it lit
   float skyRot[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1}; vec3 moonDir = vec3(-0.4f, 0.55f, 0.6f); float moonLit = 0.5f;
@@ -332,6 +333,7 @@ public:
   void setRenderScale(float s);   // the render resolution only: the TAA history stays at display resolution, no pop
   void warmSomnusStores(const FrameParams& fp); // explicit exterior hardware warmup even from cockpit view
   void warmEnemyTypes(); // explicit loading bake: no scene actors or phantom shadows
+  void warmEnemyType(int type); // one of them (the loading screen: one a frame)
   void renderScene(const FrameParams& fp, const std::vector<SpriteVert>& alphaSprites, const std::vector<SpriteVert>& addSprites);
   // A UI-free scene already rendered on this context, retained wholly on the GPU for instant loading cards.
   struct LoadingPreview {

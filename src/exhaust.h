@@ -9,6 +9,7 @@ struct ExhaustVisual {
   float axis[4][4] = {};             // normalized body-space exhaust direction xyz, vertical half-width / radius
   float power[4][4] = {};            // actual spool, reheat, per-engine intensity, Mach
   int engine[4] = {};                // source engine index after inactive nozzles are removed
+  float style = 0.f;                 // 0 a jet's exhaust, 1 the XR-40's plasma thrusters (plane_fx.glsl plumeOne)
 };
 
 inline float exhaustFinite(float x, float lo, float hi) {

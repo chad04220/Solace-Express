@@ -8,6 +8,9 @@
 // being stronger aloft; the fine detail drifts through the cloud bodies (uCloudDet), so wisps stream off their downwind
 // edges; the smaller billows rise through the cloud (uCloudBoil), the cumulus boiling.
 uniform vec3 uCloudDet; uniform float uCloudBoil;
+#ifndef PART_BAKE   // (not in the aircraft bodies' bake, which never draws a cloud: its programs, and their cache, stay as they were)
+uniform vec4 uLightningAt;   // a lightning stroke's light in the cloud round its top (xyz) and how bright (w)
+#endif
 float cloudDensity(vec3 p, int detail){
   float thick = 900.0 + 900.0*uCloudCover;
   float hf = (p.y - uCloudBase) / thick;
@@ -227,7 +230,14 @@ vec4 cloudLayer(vec3 ro, vec3 rd, float tmax, float jitter){
       float powder = mix(1.0, 1.0 - exp(-d*7.0), 0.6*(1.0 - max(mu, 0.0)));
       float hf = clamp((p.y - uCloudBase)/thick, 0.0, 1.0);
       vec3 c = sunC*ms*powder*11.0 + amb*(0.3 + 0.7*hf)*(1.0 - 0.4*uStorm)*(0.75 + 0.25*exp(-od*0.3));
+      // lightning: the flash through all of it, and the cloud round the stroke's top lit from inside (as bright as a
+      // couple of kilometres of cloud lets it be)
+#ifndef PART_BAKE
+      vec3 dl = (p - uLightningAt.xyz)*vec3(1.0, 1.6, 1.0);
+      c += vec3(0.8,0.85,1.0)*(uLightning*2.0 + uLightningAt.w*14.0*exp(-dot(dl, dl)/(900.0*900.0)));
+#else
       c += vec3(0.8,0.85,1.0)*uLightning*2.0;
+#endif
       float a = 1.0 - exp(-d*dts*0.016);
       float fogT = exp(-uFogB*t*0.6);
       L += T*a*mix(skyH, c, fogT);

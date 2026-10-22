@@ -1801,6 +1801,7 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
   glUniform1f(U(p, "uWet"), fp.wet);
   glUniform1f(U(p, "uSnow"), fp.snow);
   glUniform1f(U(p, "uLightning"), fp.lightning);
+  glUniform4f(U(p, "uLightningAt"), fp.lightningTop.x, fp.lightningTop.y, fp.lightningTop.z, fp.lightningGlow);
   glUniform1f(U(p, "uStorm"), fp.storm);
   glUniform2f(U(p, "uWindOff"), fp.windOff.x, fp.windOff.y);
   glUniform3f(U(p, "uWindV"), fp.wind.x, fp.wind.y, fp.wind.z);
@@ -1860,6 +1861,7 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
   glUniform4fv(U(p, "uFlame"), 1, pv.flame);
   glUniform4fv(U(p, "uVapor"), 1, pv.vapor);
   glUniform1i(U(p, "uExhaustCount"), pv.exhaust.count);
+  glUniform1f(U(p, "uExhaustStyle"), pv.exhaust.style);
   if (pv.exhaust.count > 0) {
     glUniform4fv(U(p, "uExhaustExit"), pv.exhaust.count, pv.exhaust.exit[0]);
     glUniform4fv(U(p, "uExhaustAxis"), pv.exhaust.count, pv.exhaust.axis[0]);

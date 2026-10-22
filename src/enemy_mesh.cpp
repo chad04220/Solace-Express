@@ -136,9 +136,12 @@ void Renderer::drawEnemyMeshes(const FrameParams& fp){
 }
 
 void Renderer::warmEnemyTypes() {
+ for(int type=0;type<kEnemyCraftTypes;type++)warmEnemyType(type);
+}
+void Renderer::warmEnemyType(int type) {
  enemyBake::Lease lease(enemyBakeState,true);if(!lease)return;
  EnemyBakeGLState savedGL;
- for(int type=0;type<kEnemyCraftTypes;type++)ensureEnemyMesh(type);
+ ensureEnemyMesh(type);
  // Warmup must never publish shadows for synthetic instances.
  enemyShOn=0;
 }

@@ -423,6 +423,18 @@ private:
   int phase = 0, lastHintPhase = -1;
   std::string hint;
   float lightning = 0, nextLightning = 5;
+  // a lightning stroke as seen (makeStrike): its channel from the cloud down to the ground - or across inside the cloud -
+  // with its branches, segment by segment (a to b, its glow's half width w and its brightness k, from the cloud's end:
+  // along 0..1, how far down the stepped leader has to reach it); the main channel first, main segments of it. The
+  // return stroke lights it all at once, and the restrokes the main channel again, at the times in restrike
+  struct Strike {
+    std::vector<vec3> a, b; std::vector<float> w, k, along; int main = 0;
+    float t = 0.f, restrike[4] = {}; int strokes = 1; bool ground = true; vec3 top, foot;
+    float flash(float at) const;   // its light at a time (0..1+: the return stroke's 1)
+  };
+  std::vector<Strike> strikes;
+  vec3 lightningTop; float lightningGlow = 0.f;   // the newest stroke's light in the cloud round its top (FrameParams)
+  void makeStrike(vec3 top, vec3 foot, bool ground, uint32_t seed);
   float prevGear = 1, prevFlaps = 0;
   bool takeoffAnnounced = false;
   float touchdownFpm = 0; bool touchedDown = false;
@@ -553,8 +565,9 @@ private:
   std::vector<Particle> particles;
   // crash wreckage: rigid pieces of the airframe, small debris chunks and the impact crater
   // (a piece: its centre of mass c, moving at v and turning at w, at orientation q from the airframe's frame; its box
-  // C, H and tears in the airframe's frame - breakup.h - and the body it flies on)
-  struct WreckPiece { vec3 c, v, w; quat q; vec3 C, H; bool rest; float fire; bool landed = false; int kind = BK_CENTRE, side = 0; bool rigidOnly = false; DebrisBody body; int cutN = 0; BreakCut cut[kMaxBreakCuts]; };
+  // C, H and tears in the airframe's frame - breakup.h - and the body it flies on; bury: how far into the ground it
+  // drove itself where it came down, its crater's floor that far over its lowest point; groundT: how long it has been down)
+  struct WreckPiece { vec3 c, v, w; quat q; vec3 C, H; bool rest; float fire; bool landed = false; int kind = BK_CENTRE, side = 0; bool rigidOnly = false; DebrisBody body; int cutN = 0; BreakCut cut[kMaxBreakCuts]; float bury = 0.f, groundT = 0.f; };
   struct Debris { vec3 p, v, w; quat q; float size; bool charred, rest; float burn = 0; DebrisBody body; };   // burn: seconds it trails fire
   struct Pop { vec3 p, v; float t, R; int piece; };   // a delayed secondary explosion (on a wreck piece when piece >= 0)
   std::vector<Pop> pops;
@@ -566,7 +579,7 @@ private:
   struct Pit { float x, z, R, D; };
   std::vector<Pit> pits;   // the pieces' own craters where they came down (partImpact)
   static constexpr int kMaxPits = 20;
-  void partImpact(vec3 p, vec3 v, float E, float fire, bool water);
+  float partImpact(vec3 p, vec3 v, float E, float fire, bool water);   // the depth of the pit it dug (0: none)
   void breakUp(vec3 impactVel, bool water, bool air = false);
   bool airBreak = false;
   float gTunnel = 0, gTunnelPin = -1;   // the g-force lens 0..1 (post_fs.glsl, g_lens.glsl); a debug scene's held strength (-1: none)
@@ -621,6 +634,14 @@ private:
   };
   std::optional<PendingLaunch> pendingLaunch;
   bool launchFrameDrawn = false, launchFramePresented = false, launchRunning = false;
+  bool launchSetUpShown = false;   // the frame after a queued launch set its flight up: the loading screen alone, no scene yet
+  // the loading screen's own record of each launch (loading.log in the save folder): every frame from the card to the
+  // flight - how long it took on the wall clock, and what the screen was doing - for a slow launch on a player's PC
+  struct LoadLogFrame { double ms; bool card, setUp; int frames, pending, views; bool shadows; int warm, shown; };
+  std::vector<LoadLogFrame> loadLog; bool loadLogging = false; int loadShownInside = 0;   // (loadShownInside: the loading screen shown from inside a bake, so far)
+  std::chrono::steady_clock::time_point loadLogStart, loadLogLast;
+  void loadLogBegin();
+  void loadLogTick();   // (each update: the frame just shown; written out once the loading screen is left)
   // true: queued (the caller returns; its launch runs once the card is shown). false: run it now (headless, or the
   // queued launch itself running)
   bool queueLaunch(const Contract& card, int spec, LaunchKind kind, std::function<void()> begin);
@@ -642,6 +663,8 @@ private:
   void warmCombatCollision();
   void prefetchCombatCollision();
   void hiveVisual(FrameParams& fp);
+  int loadWarmItems() const;   // the loading screen's warm-up items before the flight's views: each hive craft, then the XR-40's stores
+  float loadSetupDone() const;   // the loading screen's scene setup, 0..1 (its first stage bar)
   hive::WorldCallbacks hiveWorld();
   std::string hiveObjectiveText() const;
   void drawCombatPractice(float x, float y, float width);
@@ -669,13 +692,13 @@ private:
   void updateWreck(float dt);
   float wreckGround(float x, float z) const;
   void refreshGroundPits();   // g_groundPits from this flight's pits (each frame, before the physics and the drawing)
-  struct RingBurst { vec3 c, ax, ay, col; float t; };
+  struct RingBurst { vec3 c, ax, ay, col; float t; bool flash = true; };   // (flash: a burst of light at its start too - not a sonic boom's)
   std::vector<RingBurst> bursts;   // checkpoint shockwaves
   float sparkAccum = 0;
   Rng sparkRng{77};
   bool ringGeom(int i, vec3& c, vec3& ax, vec3& ay) const;
   std::vector<vec3> rainDrops;
-  float dustAccum = 0;
+  float dustAccum = 0, sprayAccum = 0;   // (dust off rough ground; spray off a wet runway: puffs owed)
 
   // debrief
   std::vector<PayoutLine> payout; int stars = 0; bool lastSuccess = false; std::string debriefTitle;
@@ -764,7 +787,7 @@ private:
   float ckZoom = 1.f, ckZoomT = 1.f;
   CockpitFocusZoom cockpitFocus;
   QualityGovernor autoRes;   // Auto resolution (quality_governor.h): starts at the full picture
-  float loadT = 0, loadReadyT = -1, loadShown = 0; int loadPend0 = 0, loadFrames = 0, loadStableFrames = 0, loadBakeSeen = 0, loadObservedFrame = -1; bool loadMap = false, loadViewsDrawn = false;   // pre-flight loading screen (loadViewsDrawn: Game::render)
+  float loadT = 0, loadReadyT = -1, loadShown = 0; int loadPend0 = 0, loadFrames = 0, loadStableFrames = 0, loadBakeSeen = 0, loadObservedFrame = -1; bool loadMap = false, loadViewsDrawn = false; int loadViewsStep = 0, loadWarmStep = 0, loadWarmAt = -1;   // pre-flight loading screen (loadViewsDrawn, loadViewsStep - the flight's views drawn so far: Game::render; loadWarmStep - the hive craft and stores warmed so far, one a frame: Game::hiveVisual)
   bool gpsMapValid = false; vec2 gpsMapC; float gpsMapHalf = 0; int gpsMapN = 0;   // cached GPS aerial image
   bool uiHidden = false, bumperFired = false; float bumperHold = 0;   // LB + RB held 1 s: hide / show the flight UI
   // bound action state: keyboard key or gamepad button

@@ -509,13 +509,30 @@ void Game::somnusVisual(FrameParams& fp) {
     }
 }
 
+int Game::loadWarmItems() const {
+  const bool hive=militaryFlight || (researchFlight && resCard<0 && specIdx==kSomnus);
+  return (hive?kEnemyCraftTypes:0)+(specIdx==kSomnus?1:0);
+}
+// the loading screen's scene setup, 0..1: two scene frames, the warm-up items (hiveVisual), the flight's two views (render)
+float Game::loadSetupDone() const {
+  const int warm=headless?0:loadWarmItems(), views=headless||!plane.spec||crashed?0:2;
+  const int done=std::min(loadFrames,2)+std::min(loadWarmStep,warm)+(loadViewsDrawn?views:std::min(loadViewsStep,views));
+  return clampf(done/float(2+warm+views),0.f,1.f);
+}
+
 void Game::hiveVisual(FrameParams& fp) {
   fp.enemyN=0; fp.hiveOrdnanceN=0;
   const bool hive=militaryFlight || (researchFlight && resCard<0 && specIdx==kSomnus);
   if(screen==SCR_LOADING) {
     // Explicit cache warmup has no fake scene instances and cannot cast phantom shadows. Every XR-40 flight carries
     // stores, so their programs come before any flight opens (a first release compiled them: two seconds at the drop).
-    if(!headless) { if(hive) g_ren.warmEnemyTypes(); if(specIdx==kSomnus) g_ren.warmSomnusStores(fp); }
+    // One item a frame, the loading screen drawn and shown between them and from inside each bake (all of them on
+    // the first frame held the research launch's loading screen still for seconds)
+    if(!headless && loadWarmAt!=loadFrames && loadWarmStep<loadWarmItems()) {
+      loadWarmAt=loadFrames;
+      if(hive && loadWarmStep<kEnemyCraftTypes) g_ren.warmEnemyType(loadWarmStep); else g_ren.warmSomnusStores(fp);
+      ++loadWarmStep;
+    }
     return;
   }
   if(!hive) return;

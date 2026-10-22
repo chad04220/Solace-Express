@@ -503,7 +503,7 @@ void Game::drawLoading() {
   g_ren.text(weatherX,cy+12*s,fs(10,9),"CONDITIONS",dim,1,0,false);
   g_ren.text(weatherX,cy+29*s,fs(12,10),fitLoading(weather.describe(),cw*.40f,fs(12,10)),C_TEXT,1);
   // Separate measured stage bars reveal the work behind the overall percentage.
-  const float scene=clampf(loadFrames/2.f,0.f,1.f);
+  const float scene=loadSetupDone();
   const float chunks=loadPend0>0?clampf(1.f-float(std::max(0,g_ren.entPending))/loadPend0,0.f,1.f):scene;
   const float lighting=loadFrames>=2&&!loadingShadowPending()?1.f:0.f;
   const float checks=loadReadyT>=0?1.f:clampf(loadStableFrames/2.f,0.f,1.f);
@@ -517,7 +517,10 @@ void Game::drawLoading() {
   // progress / ready prompt
   float by = cy+139*s, bw = cw, bh = 6*s;
   if (loadReadyT < 0) {
-    g_ren.text(cx, by - 19 * s, fs(12,10), loadFrames < 2 ? "01 / 04  Preparing flight scene" : g_ren.entPending > 0 ? "02 / 04  Loading nearby scenery" : loadingShadowPending() ? "03 / 04  Preparing terrain shadows" : "04 / 04  Checking flight readiness", C_TEXT, 0.9f, 0, false);
+    const int warmN = headless || pending ? 0 : loadWarmItems(), hiveN = warmN - (specIdx == kSomnus ? 1 : 0);
+    const std::string step = loadWarmStep < warmN ? (loadWarmStep < hiveN ? fmt("01 / 04  Preparing the hive craft  %d / %d", loadWarmStep + 1, hiveN) : std::string("01 / 04  Preparing the stores")) :
+      loadFrames < 2 ? "01 / 04  Preparing flight scene" : !loadViewsDrawn && !headless ? ((loadViewsStep == 0) == (camMode == 1) ? "01 / 04  Preparing the cockpit view" : "01 / 04  Preparing the outside view") : g_ren.entPending > 0 ? "02 / 04  Loading nearby scenery" : loadingShadowPending() ? "03 / 04  Preparing terrain shadows" : "04 / 04  Checking flight readiness";
+    g_ren.text(cx, by - 19 * s, fs(12,10), step, C_TEXT, 0.9f, 0, false);
     g_ren.text(cx + bw, by - 19 * s, fs(12,10), fmt("%d%%", std::min(99, (int)(clampf(loadShown, 0.f, 1.f) * 100.f))), accent, 1, 2, false);
     g_ren.rect(cx, by, bw, bh, accent, 0.12f, 2 * s);
     if (loadShown > 0.f) g_ren.rectGrad(cx, by, bw * loadShown, bh, accent * 0.7f, accent, 1, 2 * s);

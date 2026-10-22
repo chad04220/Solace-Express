@@ -1,3 +1,19 @@
+## What's new in v3.53.0
+
+### Loading
+- **The research flight's loading screen no longer freezes.** After **Initiate flight**, the XR-40's loading screen used to stand still at 0% until the flight began, while the game prepared the hive's four craft, the bombs and both views of the aircraft in one go. It now does one thing at a time and keeps redrawing the screen while each is built, and its progress line says what it's preparing ("Preparing the hive craft 2 / 4", "Preparing the cockpit view").
+- **A record of each launch** is kept in `loading.log` in the save folder: how long every loading frame took and what the screen was doing. If a launch is still slow on your PC, that file shows where the time went.
+
+### Crashes
+- **Wreckage digs in instead of bouncing.** A piece that comes down hard enough to dig a crater drives itself into it, partly buried, and stays there. One landing in the crash's own crater beds into it too. Everything else slides and tumbles to a stop without springing back up. Small chunks that dig a pit stick in it at the angle they hit.
+
+### Effects
+- **Thrusters.** The XR-40's plasma thrusters now look like its own: a longer violet-white jet with a white-hot ring at each nozzle and shock cells that show well below full power. Where the jets hit the ground in a hover, the ground glows violet and throws sparks. Every jet's plume has a finer layer of turbulence rolling along its edge.
+- **Sonic boom.** Breaking Mach 1 sends out two shock rings and flashes a collar of condensation round the airframe for a moment, thicker in damp air. It no longer lights up the sky with a flash as it used to (a boom gives off no light). The boom heard from outside shakes the camera.
+- **Rain.** Heavy rain now has depth: fainter streaks carry on 30 to 110 m out instead of ending a few metres from the eye. Near the ground, drops splash: rings spreading on the ground and on water, and, close by, little crowns of droplets on land. A wet runway throws spray up behind the main wheels at speed.
+- **Lightning.** Real strokes: a branching, zigzag channel from the cloud base to the ground, a faint leader feeling its way down, then the blinding return stroke and two to four re-strokes that flicker. Some flashes crawl along under the cloud, and some stay hidden inside it and light it from within. The cloud round each stroke glows, the ground where it strikes flashes, and the thunder comes from the middle of the channel.
+- **Smoke, dust, fire and fireballs** have billowing, ragged edges of their own, each puff different and turning slowly as it drifts. Smoke is lit as a ball would be, its thin edges glowing with the sun behind it. Fire has rising tongues and a paler, hotter heart.
+
 ## What's new in v3.52.1
 
 A release about smoothness: fewer stutters in flight and in the menus, and the world prepared faster. Nothing new to learn.

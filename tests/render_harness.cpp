@@ -154,34 +154,43 @@ struct GameTest {
       g_ren.entSync = true;
       for (int i = 0; i < 400; i++) { game.realTime = 3.f; offscreen(); if (i >= 2 && g_ren.entPending == 0 && !game.loadingShadowPending()) break; }
       g_ren.entSync = false;
-      for (int craft : {0, 1}) for (bool inside : {false, true}) { game.prewarmCraft = craft; game.prewarmInside = inside; game.realTime = 3.f; offscreen(); }
+      std::vector<int> crafts{0, 1};
+      if (getenv("SEAMLESS_RESEARCH") && atoi(getenv("SEAMLESS_RESEARCH"))) crafts.push_back(kSomnus);   // (the craft the research flight flies, warmed as the launch warms it)
+      for (int craft : crafts) for (bool inside : {false, true}) { game.prewarmCraft = craft; game.prewarmInside = inside; game.realTime = 3.f; offscreen(); }
       game.prewarmCraft = -1; game.prewarmInside = false; game.realTime = 0.f;
       printf("prewarm %.1f s, %.0f MB resident\n", std::chrono::duration<double>(clk::now() - t0).count(), residentMB());
     }
     struct Seg { std::string name; std::vector<double> u, r; int flagged = 0; };
     std::vector<Seg> segs;
     int frameNo = 0;
+    // the screen as the player sees it: shown at each frame's end and from inside a long bake (platformPresent); the
+    // longest it held still, and how often a bake showed it
+    auto lastShown = clk::now(); double stillMs = 0, stillWorst = 0; int shownInside = 0;
+    auto shown = [&] { const auto n = clk::now(); stillMs = std::max(stillMs, std::chrono::duration<double, std::milli>(n - lastShown).count()); lastShown = n; };
+    game.platformPresent = [&] { glFinish(); shown(); shownInside++; };
     auto begin = [&](const std::string& name) { segs.push_back(Seg{name, {}, {}, 0}); printf("-- %s (%.0f MB resident)\n", name.c_str(), residentMB()); };
     auto median = [](std::vector<double> v) { if (v.empty()) return 0.0; std::sort(v.begin(), v.end()); return v[v.size() / 2]; };
     auto frame = [&](const char* what = "") {
       Seg& s = segs.back();
-      const int miss0 = g_shaderCacheMisses, bake0 = g_ren.bakeCount, gen0 = g_scenery.syncBuilt;
+      const int miss0 = g_shaderCacheMisses, bake0 = g_ren.bakeCount, gen0 = g_scenery.syncBuilt, inside0 = shownInside;
+      stillMs = 0;
       const long long us0 = g_shaderCompileUs; const double genMs0 = g_scenery.syncBuildMs;
       const auto t0 = clk::now();
       game.update(1.f / 60.f);
       const auto t1 = clk::now();
       game.render(); glFinish();
       const auto t2 = clk::now();
-      game.framePresented(); game.in.endFrame();
+      game.framePresented(); game.in.endFrame(); shown(); stillWorst = std::max(stillWorst, stillMs);
       const double u = std::chrono::duration<double, std::milli>(t1 - t0).count(), r = std::chrono::duration<double, std::milli>(t2 - t1).count();
       const double mu = median(s.u), mr = median(s.r);
       const bool slow = s.u.size() >= 3 && (u > std::max(8.0, 3.0 * mu) || r > 1.6 * mr + 40.0);
       s.u.push_back(u); s.r.push_back(r);
-      if (slow || (s.u.size() <= 3 && (u > 8.0 || (s.u.size() == 1 && r > 400.0)))) {
+      static const bool every = getenv("SEAMLESS_EVERY") && atoi(getenv("SEAMLESS_EVERY"));   // (every frame printed)
+      if (slow || every || (s.u.size() <= 3 && (u > 8.0 || r > 400.0))) {
         s.flagged += slow;
-        printf("  frame %5d %-22s update %7.1f ms (median %5.1f)  render %7.1f ms (median %6.1f)  compiled %d (%.0f ms)  baked %d  scenery made here %d (%.0f ms)  screen %d\n",
+        printf("  frame %5d %-22s update %7.1f ms (median %5.1f)  render %7.1f ms (median %6.1f)  compiled %d (%.0f ms)  baked %d  scenery made here %d (%.0f ms)  screen %d  still %.0f ms (shown %d inside)\n",
                frameNo, what, u, mu, r, mr, (int)g_shaderCacheMisses - miss0, (g_shaderCompileUs - us0) / 1000.0, g_ren.bakeCount - bake0,
-               g_scenery.syncBuilt - gen0, g_scenery.syncBuildMs - genMs0, (int)game.screen);
+               g_scenery.syncBuilt - gen0, g_scenery.syncBuildMs - genMs0, (int)game.screen, stillMs, shownInside - inside0);
         fflush(stdout);
       }
       if (frameNo % 100 == 0) printf("  frame %5d: %.0f MB resident\n", frameNo, residentMB());
@@ -196,6 +205,26 @@ struct GameTest {
                median(s.r), *std::max_element(s.r.begin(), s.r.end()), s.flagged);
       }
     };
+    // ---- SEAMLESS_RESEARCH=1: this alone - the research terminal opened from the main menu, warmed, and an XR-40
+    // research flight initiated from it at Meadowbrook, on the ground, through its loading screen into the flight
+    if (getenv("SEAMLESS_RESEARCH") && atoi(getenv("SEAMLESS_RESEARCH"))) {
+      begin("main menu"); game.screen = SCR_MENU; frames(30);
+      begin("research: terminal warming");
+      game.resCraft = kSomnus; game.resAirport = std::max(0, g_world.findAirport("MDB")); game.resAirborne = false; game.resCard = -1;
+      game.screen = SCR_RESEARCH; game.resOpened = game.realTime;
+      game.resWarm = true; game.resWarmFrames = 0; game.resBakeSeen = g_ren.bakeCount; game.resWork = 0.f; game.resPend0 = 0;
+      for (int i = 0; i < 3000 && game.resWarm; i++) frame("warming");
+      begin("research: terminal"); frames(60);
+      begin("research: initiate, loading screen");
+      game.launchResearch(); stillWorst = 0;
+      for (int i = 0; i < 6000 && game.screen == SCR_LOADING && game.loadReadyT < 0; i++) frame("loading");
+      frames(30, "establishing shot");
+      game.in.pressed[K_ENTER] = true; frame("into the flight");
+      printf("loading: the screen held still at most %.0f ms\n", stillWorst);
+      begin("research: flight"); frames(120);
+      summary();
+      return game.screen == SCR_FLIGHT ? 0 : 1;
+    }
     // ---- the menus (SEAMLESS_MENUS=0: straight to the flight)
     const bool menus = !(getenv("SEAMLESS_MENUS") && !atoi(getenv("SEAMLESS_MENUS")));
     if (menus) {
