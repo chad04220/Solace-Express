@@ -1,3 +1,8 @@
+## What's new in v3.53.1
+
+- **Cheaper smoke and fire.** In v3.53.0 the new billowing smoke, dust and fire worked out their pattern pixel by pixel, which tripled what they cost to draw: a crash's smoke took 3.4 ms of an RTX 3070 laptop's time, up from 1 ms in v3.52.1. They now read the pattern from a texture the clouds already use, which is far cheaper on a graphics card, and they look the same. The next diagnostics will show by how much.
+- **For the diagnostics:** the benchmark now lists what the game's slowest update in each scene was spent on, part by part. The crash scene has one update of about 290 ms when the results come up, in both v3.52.1 and v3.53.0, that couldn't be traced from here.
+
 ## What's new in v3.53.0
 
 ### Loading

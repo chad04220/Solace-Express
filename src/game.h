@@ -2,6 +2,7 @@
 #pragma once
 #include "quality_governor.h"
 #include <array>
+#include <chrono>
 #include <functional>
 #include <optional>
 #include <set>
@@ -168,8 +169,19 @@ public:
   void render();
   void framePresented();   // platform calls only after swapping a rendered frame onto the window
   void shutdown();
+  // the slowest update since the last reset, part by part (each part of it that took half a millisecond or more):
+  // what a hitch in an update was spent on (the benchmark prints it)
+  std::string slowestUpdateText() const;
+  void resetSlowestUpdate();
 
 private:
+  struct UpdateParts { std::vector<std::pair<const char*, double>> parts; double total = 0; };
+  UpdateParts updParts, slowestUpdate;
+  struct PartTimer {   // (a part of an update, timed to its end and kept in updParts if it took half a millisecond or more)
+    Game& g; const char* name; std::chrono::steady_clock::time_point t0;
+    PartTimer(Game& game, const char* n) : g(game), name(n), t0(std::chrono::steady_clock::now()) {}
+    ~PartTimer() { const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count(); if (ms >= 0.5) g.updParts.parts.push_back({name, ms}); }
+  };
   // ---------------------------------------------------------------- state
   Career career;
   // Every change to the career is a transaction: the change is made on a copy, the copy is saved, and only a saved

@@ -1624,6 +1624,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         const int measuredSceneStatus = g->benchmarkSceneStatus();
         glFinish();
         LARGE_INTEGER f0, f1; QueryPerformanceCounter(&f0);
+        g->resetSlowestUpdate();
         for (int i = 0; i < sampleFrames && !game.quit; i++) {
           Sample s; QueryPerformanceCounter(&s.begin);
           g->update(1.f / 60.f); QueryPerformanceCounter(&s.updateEnd);
@@ -1675,6 +1676,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         fprintf(bf, "  fresh_gpu_samples=%zu/%d query_overwrites=%llu; trailing pending GPU samples not force-read\n", gpuRaw.size(), N, (unsigned long long)(g_ren.gpuSamplesOverwritten - overwritten0));
         printSummary("frame work wall", wall, false); printSummary("app present interval", present, true);
         printSummary("CPU update wall", update, false); printSummary("CPU render/submit wall", submit, false);
+        if (bf && !update.empty() && *std::max_element(update.begin(), update.end()) > 20.0)   // (a hitch in the update: what it was spent on)
+          fprintf(bf, "  slowest update, part by part (ms): %s\n", g->slowestUpdateText().c_str());
         printSummary("SwapBuffers wall", swap, false); printSummary("GPU renderScene raw delayed", gpuRaw, false);
         printWeather(g, "measured-end");
         if (bf) {

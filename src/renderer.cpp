@@ -2007,6 +2007,7 @@ void Renderer::drawSprites(const FrameParams& fp, float texW, float texH, float 
   glUniform1f(U(progSprite, "uPlanetR"), fp.pano > 0.f ? 0.f : planetRadius());
   glUniform3f(U(progSprite, "uCamR"), fp.camRight.x, fp.camRight.y, fp.camRight.z);
   glUniform3f(U(progSprite, "uCamU"), fp.camUp.x, fp.camUp.y, fp.camUp.z);
+  glActiveTexture(GL_TEXTURE0 + 13); glBindTexture(GL_TEXTURE_2D, texCloudCov); glUniform1i(U(progSprite, "uSpriteNoise"), 13);   // (the puffs' billows)
   glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texDepth); glUniform1i(U(progSprite, "uDepth"), 0);
   glUniform2f(U(progSprite, "uRes"), texW, texH);
   glUniform2f(U(progSprite, "uUVS"), uvsX, uvsY);

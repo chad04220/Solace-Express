@@ -4,13 +4,10 @@ in vec2 vUV; in vec4 vCol; in float vDist; in vec2 vKind; in vec3 vWorld;
 out vec4 oColor;
 uniform sampler2D uDepth; uniform vec2 uRes; uniform vec2 uUVS; uniform vec3 uSunDir; uniform vec3 uSunCol; uniform vec3 uAmb; uniform float uFogB; uniform float uTime;
 uniform vec3 uCamPos; uniform vec3 uCamR; uniform vec3 uCamU;   // (the vertex shader's: a billboard's sides in the world)
-// value noise for the billows of smoke, dust and fire
-float sHash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }
-float sNoise(vec2 p){
-  vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);
-  return mix(mix(sHash(i), sHash(i + vec2(1.0, 0.0)), f.x), mix(sHash(i + vec2(0.0, 1.0)), sHash(i + vec2(1.0, 1.0)), f.x), f.y);
-}
-float sFbm(vec2 p){ return 0.5*sNoise(p) + 0.3*sNoise(p*2.03 + 1.7) + 0.2*sNoise(p*4.11 - 3.1); }
+// the billows of smoke, dust and fire: the clouds' baked, tileable fbm (four octaves, 16 units across) - one fetch
+// (three octaves of hashed value noise worked out in every pixel of the big overlapping puffs tripled the sprites' cost)
+uniform sampler2D uSpriteNoise;
+float sFbm(vec2 p){ return textureLod(uSpriteNoise, p*(1.0/16.0), 0.0).r*0.9375; }
 void main(){
   float sceneT = texture(uDepth, gl_FragCoord.xy/uRes*uUVS).r;
   int kind = int(vKind.x + 0.5);

@@ -700,6 +700,7 @@ void main(){
       const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
       if (ms > 5.0) printf("  update %d: %.1f ms\n", i, ms);
     }
+    printf("slowest update, part by part (ms): %s\n", game.slowestUpdateText().c_str());
     for (int i = 0; i < 3; i++) game.render();
   }
   if (getenv("GROUNDCOUNT")) {   // the main view's ground over one frame, as the analysis counts it (renderer.h groundStats)

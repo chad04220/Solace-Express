@@ -2325,6 +2325,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
 }
 
 void Game::endFlight(bool success, const std::string& reason, FlightOutcome outcome) {
+  PartTimer ptEnd(*this, "flight end");
   if (militaryFlight) {
     if(militarySettled) return;
     militarySettled=true;
@@ -2375,8 +2376,7 @@ void Game::endFlight(bool success, const std::string& reason, FlightOutcome outc
     const std::string f = Career::checkrideFault(contract, result);
     if (!f.empty()) { success = false; result.success = false; result.outcome = OUT_CHECKRIDE_FAILED; result.failReason = "Checkride not passed: " + f; debriefTitle = result.failReason; }
   }
-  coaching = landingCoaching();
-  lastMark = landingMark(result, *plane.spec);
+  { PartTimer pt(*this, "flight end: coaching"); coaching = landingCoaching(); lastMark = landingMark(result, *plane.spec); }
   if (isolatedFlight) {   // a practice flight or a trial: back to the hub, nothing settled
     profileFlightEnd(success);
     const bool trial = contract.type == CT_TRIAL;
@@ -2394,6 +2394,7 @@ void Game::endFlight(bool success, const std::string& reason, FlightOutcome outc
   { std::vector<PayoutLine> lines; int st = 0;
     bool jobLeg = career.job && career.job->state == Career::JobState::ACTIVE && career.job->c.id == c.id;
     bool jobGoesOn = false;
+    PartTimer pt(*this, "flight end: career settled and saved");
     commit([&](Career& k) {
       k.attemptOpen = false;
       if (!jobLeg) {   // (a free flight flown while a job waits at its stop: the job stays as it is)
@@ -2430,13 +2431,13 @@ void Game::endFlight(bool success, const std::string& reason, FlightOutcome outc
     bool all = true; for (const Contract& l : Career::legendaryContracts()) all &= profile.count("legend." + l.id) > 0.f;
     if (all) award("legend");
   }
-  profileFlightEnd(success);
-  profileCareerCheck();
+  { PartTimer pt(*this, "flight end: profile"); profileFlightEnd(success); profileCareerCheck(); }
   if (g_music.owns()) g_music.sting(success ? STING_SUCCESS : STING_FAIL); else g_audio.trigger(success ? SFX_SUCCESS : SFX_FAIL);
   if (success && c.payout > 0) g_audio.trigger(SFX_CASH);
   debriefT0 = realTime;
   screen = SCR_DEBRIEF;
   paused = false; showMap = false;
+  PartTimer pt(*this, "flight end: announced");
   announceFlightEnd(result.outcome==OUT_CHECKRIDE_FAILED?"Checkride not passed":success?"Flight complete":crashed?"Flight ended after impact":"Flight ended",coaching);
 }
 
@@ -2841,7 +2842,7 @@ void Game::updateFlight(float dt) {
     updateWeather(h);
     updateFailures(h);
     updateResearchCard(h);
-    plane.step(h, wx, gameTime + h * k);
+    { PartTimer pt(*this, "flight model"); plane.step(h, wx, gameTime + h * k); }
     if (plane.seamShift.x != 0.f || plane.seamShift.z != 0.f) { prevPos += plane.seamShift; followSeam(plane.seamShift); plane.seamShift = vec3(); }
     if (benchPin) { plane.pos = benchPinPos; plane.q = benchPinQ; plane.w = vec3(); }   // (a timing scene held in place: flying, going nowhere)
     if (plane.apWindEvent != apWindSaid) {   // (the autopilot went around for a wind that turned behind it on the final: Plane::step)
@@ -2908,7 +2909,7 @@ void Game::updateFlight(float dt) {
     lightningGlow = strikes.empty() ? 0.f : strikes.back().flash(strikes.back().t);
     if (!strikes.empty()) lightningTop = strikes.back().top;
   }
-  updateCloudWake(simDt);
+  { PartTimer pt(*this, "cloud wake"); updateCloudWake(simDt); }
 
   updateUfo(simDt);
   // AI traffic
@@ -2920,7 +2921,7 @@ void Game::updateFlight(float dt) {
   }
   for (auto& f : traffic.puffs) spawn(f.p, f.v, f.life, f.size, f.grow, f.col, f.alpha, f.kind, 1.f, 0.f);
   for (auto& b : traffic.booms) { g_audio.triggerAt(SFX_BOOM, b.first, b.second); shake(0.3f * clampf(b.second, 0.f, 1.f)); }
-  updateSomnus(simDt);
+  { PartTimer pt(*this, "XR-40 systems"); updateSomnus(simDt); }
   updateHive(simDt);
   if(screen!=SCR_FLIGHT) return;
   // Continuous, individually tracked traffic engines provide the pass and its real Doppler shift.
@@ -2975,7 +2976,7 @@ void Game::updateFlight(float dt) {
       endFlight(false, plane.ev.crashReason);
       return;
     }
-    updateWreck(dt);
+    { PartTimer pt(*this, "wreck"); updateWreck(dt); }
     camYaw += dt * 0.12f;   // slow orbit around the crash site
     if (crashTimer > crashEndT && screen == SCR_FLIGHT) endFlight(false, plane.ev.crashReason);
     return;
@@ -2988,7 +2989,7 @@ void Game::updateFlight(float dt) {
     bool air = plane.ev.crashReason.find("Structural") != std::string::npos && plane.agl() > 4.f;   // overstressed in flight: it comes apart in the air
     g_audio.triggerAt(water && !air ? SFX_SPLASH : air ? SFX_METAL : SFX_IMPACT, plane.pos, 1.f);
     if (!water && plane.fuel > 1.f) g_audio.triggerAt(SFX_CRASH, plane.pos, clampf(.35f+sqrtf(plane.fuel)*.035f,.35f,1.f));
-    breakUp(impactVel, water, air);
+    { PartTimer pt(*this, "break-up"); breakUp(impactVel, water, air); }
     plane.vel = vec3(); plane.w = vec3();
     if (camMode == 1 || camMode == 3) camMode = 2;
     camZoom = std::max(camZoom, air ? 2.6f : 1.8f); camPitch = 0.3f;
@@ -3108,7 +3109,7 @@ void Game::updateFlight(float dt) {
     }
     tipOn = vapK > 0.f;
   }
-  if (plane.spec->special) jetEffects(simDt);
+  if (plane.spec->special) { PartTimer pt(*this, "jet effects"); jetEffects(simDt); }
   // GPS breadcrumb trail
   trailT += dt;
   if (trailT > 2.f && !plane.onGround) { trailT = 0; trail.push_back(vec2(plane.pos.x, plane.pos.z)); if (trail.size() > 500) trail.erase(trail.begin()); }
@@ -5830,11 +5831,22 @@ void Game::feedAudio() {
 }
 
 // ------------------------------------------------------------------ main update / render
+std::string Game::slowestUpdateText() const {
+  std::string t = fmt("%.1f ms", slowestUpdate.total);
+  for (const auto& p : slowestUpdate.parts) t += fmt("; %s %.1f", p.first, p.second);
+  return t;
+}
+void Game::resetSlowestUpdate() { slowestUpdate = UpdateParts(); }
+
 void Game::update(float dt) {
+  // (the update timed whole and part by part: the slowest kept, for the benchmark to say what a hitch was spent on)
+  struct Whole { Game& g; std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
+    ~Whole() { g.updParts.total = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count(); if (g.updParts.total > g.slowestUpdate.total) g.slowestUpdate = g.updParts; } } whole{*this};
+  updParts.parts.clear();
   if (loadLogging) loadLogTick();
   g_ren.beginRegionUploadFrame(); // one shared detail + horizon GPU budget per displayed frame
   if (screen != SCR_FLIGHT) { rumbleLo = rumbleHi = 0.f; shakeTrauma = shakeBuffet = 0.f; }   // (the motors and the shake are the flight's)
-  if (screen != SCR_REGION_LOADING) { const std::string want = screenWorld(); if (!want.empty()) loadCareerWorld(want, screen); }
+  if (screen != SCR_REGION_LOADING) { PartTimer pt(*this, "career world"); const std::string want = screenWorld(); if (!want.empty()) loadCareerWorld(want, screen); }
   if (screen == SCR_REGION_LOADING) {
     realTime += std::min(dt, .1f); lastDt = std::min(dt, .05f);
     if (in.pressed[K_F11]) wantFullscreenToggle = true;
@@ -5842,12 +5854,12 @@ void Game::update(float dt) {
     updateRegionLoading(std::min(dt, .25f));
     return;
   }
-  updateEarthSurfaceContext(); // establish the collision snapshot protection before physics reads World
+  { PartTimer pt(*this, "earth surface"); updateEarthSurfaceContext(); } // establish the collision snapshot protection before physics reads World
   if (pendingCareer && (screen == SCR_HUB || screen == SCR_DEBRIEF || screen == SCR_MENU)) {   // a settlement or purchase that couldn't be saved: tried again now and then
     retryT += dt;
-    if (retryT > 3.f) { retryT = 0; retryCommit(); }
+    if (retryT > 3.f) { retryT = 0; PartTimer pt(*this, "career save retry"); retryCommit(); }
   }
-  updateEarthInstall();
+  { PartTimer pt(*this, "earth install"); updateEarthInstall(); }
   // the render resolution: native, a fixed scale, or adjusted to hold the frame-rate target (Settings)
   fpsAvg = lerpf(fpsAvg, dt, 1.f - expf(-dt * 3.f));   // (a third of a second, whatever the frame rate)
   maxFrameWin = std::max(maxFrameWin, dt); maxFrameT += dt;
@@ -5917,9 +5929,9 @@ void Game::update(float dt) {
     if (resWarmFrames > 2 * resCraftCount() + 3 && !baked && g_ren.entPending == 0 && !loadingShadowPending()) { resWarm = false; resWarmCraft = -1; resWarmCk = false; g_ren.entBudgetMs = 2.5f; resWork = 1.f; }
   }
   if (screen == SCR_FLIGHT && (actKeyP(ACT_RADIO) || actJoyP(ACT_RADIO) || (!paused && actPadP(ACT_RADIO)))) showRadio = !showRadio;
-  radio.poll();
-  updateMusic();
-  updateSteam(dt);
+  { PartTimer pt(*this, "radio"); radio.poll(); }
+  { PartTimer pt(*this, "music"); updateMusic(); }
+  { PartTimer pt(*this, "steam"); updateSteam(dt); }
   if (screen == SCR_HUB) { static float careerCheckT = 0; if ((careerCheckT += dt) > 1.f) { careerCheckT = 0; profileCareerCheck(); } }   // (licences, the fleet, the airline: achievements)
   for (size_t i = 0; i < achShow.size() && i < 1; i++) achShow[i].t += dt;   // (the banner on show)
   if (!achShow.empty() && achShow.front().t > 4.5f) achShow.erase(achShow.begin());
@@ -5946,12 +5958,12 @@ void Game::update(float dt) {
       Input frameIn; bool saved = false;   // key presses act once: the catch-up steps see the held state without the press edges
       for (int k = 0; k < nSim && screen == SCR_FLIGHT && !paused; k++) {
         float h = simDt / nSim;
-        updateFlight(h);
-        if (screen == SCR_FLIGHT) updateParticles(h * timeAccel);
+        { PartTimer pt(*this, "flight"); updateFlight(h); }
+        if (screen == SCR_FLIGHT) { PartTimer pt(*this, "particles"); updateParticles(h * timeAccel); }
         if (k == 0 && nSim > 1) { frameIn = in; saved = true; in.endFrame(); }
       }
       if (saved) in = frameIn;
-      if (screen == SCR_FLIGHT) updateCamera(dt);
+      if (screen == SCR_FLIGHT) { PartTimer pt(*this, "camera"); updateCamera(dt); }
       if (screen == SCR_FLIGHT && !crashed) {   // the finals the autopilot may plan next, profiled ahead (Plane::wantFinals): the GPS pick, the field it flies to, the job's
         if (apDest >= 0) Plane::wantFinals(apDest);
         if (plane.apAirport >= 0) Plane::wantFinals(plane.apAirport);
@@ -5964,9 +5976,9 @@ void Game::update(float dt) {
       }
     }
   } else if (screen == SCR_LOADING) {
-    updateLoading(dt);
+    PartTimer pt(*this, "loading"); updateLoading(dt);
   } else if (screen == SCR_DEBRIEF) {
-    if (crashed) { crashTimer += dt; updateWreck(dt); updateParticles(dt); }   // the wreck keeps settling/sinking behind the results
+    if (crashed) { PartTimer pt(*this, "debrief wreck"); crashTimer += dt; updateWreck(dt); updateParticles(dt); }   // the wreck keeps settling/sinking behind the results
   } else {
     wx = Weather(); wx.cloudCover = 0.35f; wx.cloudBase = 1500; wx.visibility = 45000; wx.windSpeed = 4;
     timeOfDay = screen == SCR_MENU ? menuShot(realTime).tod : 15.8f;
@@ -5978,9 +5990,9 @@ void Game::update(float dt) {
     wx.cloudDrift = cloudOff; wx.cloudDetail = cloudDet; wx.cloudBoil = cloudBoil;
   }
   if (screen == SCR_REGION_LOADING) return;
-  updateEarthFlight(); // once per displayed frame, including paused background preparation
-  updateComms(dt);
-  feedAudio();
+  { PartTimer pt(*this, "earth flight"); updateEarthFlight(); } // once per displayed frame, including paused background preparation
+  { PartTimer pt(*this, "comms"); updateComms(dt); }
+  { PartTimer pt(*this, "audio"); feedAudio(); }
 }
 
 void Game::renderLaunchCard() {
