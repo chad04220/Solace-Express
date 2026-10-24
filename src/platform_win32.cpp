@@ -1578,6 +1578,11 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
           fflush(bf);
         }
       }
+      if (bf) {   // (the career types' performance, which the job board plans with: learned at the launch, or by a scene)
+        int learned = 0; std::string missing;
+        for (int i : kCareerAircraft) { if (Plane::perfLearned(&kAircraft[i])) learned++; else missing += std::string(missing.empty() ? "" : ", ") + kAircraft[i].name; }
+        fprintf(bf, "career aircraft performance learned before the scenes: %d of %d%s%s\n\n", learned, kNumAircraft, missing.empty() ? "" : "; not: ", missing.c_str());
+      }
       g_ren.entSync = true;
       g_ren.syncTiming = false;   // normal async GPU queries; never serialized per-pass debug timing
       bool allValid = true;

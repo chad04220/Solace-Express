@@ -187,6 +187,7 @@ public:
   bool travel(const Destination& d, std::string* msg);
   const Contract* nextStory() const;
   void refreshBoard();
+  static inline thread_local double boardMs = 0;   // (this thread's boards drawn since the game zeroed it, ms: what a settlement's board cost)
   // Which aircraft can fly a contract and how it would be sourced
   enum Source { SRC_NONE = 0, SRC_LESSON, SRC_RENT, SRC_OWNED, SRC_MILITARY };
   // Failures and maintenance (C7). An owned aircraft wears with the hours and the hard landings; its condition sets

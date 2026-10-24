@@ -323,6 +323,10 @@ public:
   // fly-by-wire rate command of the research craft: full-stick pitch and roll rates (rad/s)
   float fbwPitchMax(float V) const { V = std::max(V, 1.f); return spec->special == 2 ? clampf(80.f * G0 / V, 2.0f, 6.0f) : clampf(66.f * G0 / V, 1.8f, 5.2f); }
   static const PerfModel& perf(const AircraftSpec* s);   // learned once per type (aircraft_perf.cpp)
+  // a type learned while noting is on (the game's update, which names it as a part of the update): its index and ms
+  static void perfNoting(bool on);
+  static bool perfLearned(const AircraftSpec* s);   // (learned already: perf() would return at once)
+  static std::vector<std::pair<int, double>> perfNoted();   // (the notes since the last call)
   // The trees and buildings over both of a field's finals, as apPlan samples them, profiled ahead on a worker
   // (g_sceneryProfiles) for the plans made later in flight: asked for as the field becomes a destination. A plan made
   // before its profile is in samples the game's scenery as it did, building what is missing there

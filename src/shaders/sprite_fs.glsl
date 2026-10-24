@@ -29,6 +29,7 @@ void main(){
     vec2 cr = mat2(cos(ang), -sin(ang), sin(ang), cos(ang))*c;
     float n = sFbm(cr*2.1 + seed*37.0);
     float a = smoothstep(1.0, 0.15, r2 + (n - 0.5)*0.75); a *= a*(0.7 + 0.45*n);
+    if (a < 0.001) discard;   // (the quad's corners and the torn edge: nothing to light or blend - a fifth of a puff)
     vec3 back = cross(uCamR, uCamU);
     vec3 nw = normalize(uCamR*c.x + uCamU*c.y + back*sqrt(max(1.0 - r2, 0.0)));
     float diff = 0.5 + 0.5*max(dot(nw, normalize(uSunDir + vec3(0.0, 0.3, 0.0))), 0.0);
@@ -68,6 +69,7 @@ void main(){
     float n = sFbm(cr*2.4 + vec2(seed*23.0, -uTime*1.3));
     float rr = r2 + (n - 0.5)*0.8;
     float a = smoothstep(1.0, 0.15, rr);
+    if (a < 0.001) discard;
     float core = smoothstep(0.55, 0.0, rr);
     o = vec4(vCol.rgb*(0.7 + 0.7*core + 0.25*n), vCol.a*a);
   } else if (kind == 8) { // vapour ribbon (lit): soft across its width (v), continuous along its length
@@ -122,6 +124,7 @@ void main(){
     float n = sFbm(vec2(c.x*2.3 + seed*17.0, c.y*1.6 - uTime*(2.2 + 1.5*seed)));
     float rr = r2 + (n - 0.5)*0.9 - c.y*0.15;
     float a = smoothstep(1.0, 0.0, rr), core = smoothstep(0.45, 0.0, rr);
+    if (a < 0.02) discard;   // (additive: a*a*3 under a 255th, and outside the heart)
     o = vec4((vCol.rgb*a*a*3.0 + vec3(1.0, 0.8, 0.5)*core*core*dot(vCol.rgb, vec3(0.6)))*vCol.a, 0.0);
   } else {                // snow flake (lit as the rain)
     float a = smoothstep(1.0, 0.2, r2);

@@ -538,9 +538,13 @@ void Game::saveGame() {
 }
 bool Game::commit(const std::function<void(Career&)>& change) {
   Career cand = pendingCareer ? *pendingCareer : career;
-  change(cand);
+  Career::boardMs = 0;
+  { PartTimer pt(*this, "career: the change"); change(cand); }
+  if (Career::boardMs >= 0.5) updParts.parts.push_back({"career: job board drawn", Career::boardMs});
   if ((headless && saveDir.empty()) || diskless) { career = cand; pendingCareer.reset(); return true; }   // (tests, tools: no disk)
-  if (cand.save(joinPath(saveDir, "career.sav"))) { career = cand; pendingCareer.reset(); hasSave = true; saveWhy.clear(); return true; }
+  bool saved = false;
+  { PartTimer pt(*this, "career: saved"); saved = cand.save(joinPath(saveDir, "career.sav")); }
+  if (saved) { career = cand; pendingCareer.reset(); hasSave = true; saveWhy.clear(); return true; }
   pendingCareer = cand; retryT = 0;
   saveWhy = "Couldn't save the career (disk full or folder not writable)";
   toast(saveWhy + " - will retry", vec3(1.f, 0.4f, 0.3f));
@@ -5840,9 +5844,20 @@ void Game::resetSlowestUpdate() { slowestUpdate = UpdateParts(); }
 
 void Game::update(float dt) {
   // (the update timed whole and part by part: the slowest kept, for the benchmark to say what a hitch was spent on)
+  // (an aircraft type's performance learned in an update is named as a part of it: that's a flight model's test sorties)
   struct Whole { Game& g; std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
-    ~Whole() { g.updParts.total = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count(); if (g.updParts.total > g.slowestUpdate.total) g.slowestUpdate = g.updParts; } } whole{*this};
+    ~Whole() {
+      Plane::perfNoting(false);
+      for (const auto& n : Plane::perfNoted()) g.updParts.parts.push_back({learnedPart(n.first), n.second});
+      g.updParts.total = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count(); if (g.updParts.total > g.slowestUpdate.total) g.slowestUpdate = g.updParts;
+    }
+    static const char* learnedPart(int spec) {
+      static std::string names[kAircraftCount];
+      if (names[spec].empty()) names[spec] = fmt("performance learned: %s", kAircraft[spec].name);
+      return names[spec].c_str();
+    } } whole{*this};
   updParts.parts.clear();
+  Plane::perfNoting(true);
   if (loadLogging) loadLogTick();
   g_ren.beginRegionUploadFrame(); // one shared detail + horizon GPU budget per displayed frame
   if (screen != SCR_FLIGHT) { rumbleLo = rumbleHi = 0.f; shakeTrauma = shakeBuffet = 0.f; }   // (the motors and the shake are the flight's)

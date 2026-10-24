@@ -1,6 +1,8 @@
 // Somnium Volandi - learning each aircraft's envelope by flying it (see PerfModel in aircraft.h)
 #include "aircraft.h"
 #include "aero.h"
+#include <atomic>
+#include <chrono>
 #include <mutex>
 #include <cstdio>
 #include <cstring>
@@ -27,6 +29,15 @@ vec3 seaPoint() {
 
 static PerfModel s_perf[kAircraftCount]; static int s_perfState[kAircraftCount] = {};   // 0 not learned, 1 learning (provisional numbers), 2 learned
 static std::recursive_mutex s_perfM[kAircraftCount];   // (one per type: different types can be learned on different threads at once)
+static std::atomic<bool> s_noting{false};
+static std::mutex s_notesM; static std::vector<std::pair<int, double>> s_notes;
+void Plane::perfNoting(bool on) { s_noting = on; }
+bool Plane::perfLearned(const AircraftSpec* s) {
+  const int idx = (int)(s - kAircraft);
+  if (idx < 0 || idx >= kAircraftCount) return false;
+  std::lock_guard<std::recursive_mutex> lk(s_perfM[idx]); return s_perfState[idx] == 2;
+}
+std::vector<std::pair<int, double>> Plane::perfNoted() { std::lock_guard<std::mutex> lk(s_notesM); std::vector<std::pair<int, double>> n; n.swap(s_notes); return n; }
 // The learned models on disk, stamped with the build that learned them (another build learns them again)
 bool Plane::perfLoad(const std::string& path, const std::string& stamp) {
   FILE* f = fopen(path.c_str(), "rb"); if (!f) return false;
@@ -53,6 +64,7 @@ const PerfModel& Plane::perf(const AircraftSpec* sp) {
   std::lock_guard<std::recursive_mutex> lk(m[idx]);
   if (state[idx]) return cache[idx];   // (while learning, the test sorties fly on the provisional numbers below)
   state[idx] = 1;
+  const auto learnT0 = std::chrono::steady_clock::now();
   const AircraftSpec& s = *sp;
   PerfModel& P = cache[idx];
   Weather calm; calm.windSpeed = 0; calm.turbulence = 0; calm.gust = 0;
@@ -207,6 +219,7 @@ const PerfModel& Plane::perf(const AircraftSpec* sp) {
     }
   }
   state[idx] = 2;
+  if (s_noting) { std::lock_guard<std::mutex> lk(s_notesM); s_notes.push_back({idx, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - learnT0).count()}); }
   return P;
 }
 

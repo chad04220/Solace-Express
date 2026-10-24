@@ -1,3 +1,8 @@
+## What's new in v3.54.1
+
+- **Cheaper smoke and fire, again.** v3.53.1 halved what the billowing smoke cost to draw (a crash's smoke from 3.4 ms to 1.8 ms on an RTX 3070 laptop), but it still cost almost twice what the plain puffs of v3.52.1 did. The corners of every puff and its torn edges, where nothing shows, are now skipped instead of being lit and blended. They look exactly the same.
+- **For the diagnostics:** the benchmark found the crash scene's 300 ms pause when the results come up. It's the career working out the job board again after the flight, not saving: the diagnostics never write to the disk. Here, the board takes 3 ms when every aircraft's performance is known, but about a quarter of a second for each aircraft it has to learn first. So the benchmark now says which aircraft's performance was learned before the scenes began, and its slowest-update breakdown names the job board and any aircraft whose performance was learned in the middle of an update.
+
 ## What's new in v3.54.0
 
 The game's music, written again from the ground up: composed pieces played by a synthesised orchestra and band, in a concert hall, mixed and mastered.

@@ -8,6 +8,7 @@
 #include "region_travel.h"
 #include "finite_float.h"
 #include <charconv>
+#include <chrono>
 #include <cmath>
 #include <limits>
 #ifdef _WIN32
@@ -757,6 +758,8 @@ Contract Career::recoveryContract() const {
   return c;
 }
 void Career::refreshBoard() {
+  struct Timed { std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
+    ~Timed() { boardMs += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count(); } } timed;
   board.clear();
   if (region != g_world.regionId || location < 0 || location >= (int)g_world.airports.size()) return;   // (drawn where the career is: its world loaded)
   auto snowy = [](const Airport& a) {   // (snow falls at the islands' cold south, and in a region's cold)
