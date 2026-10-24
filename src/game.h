@@ -23,6 +23,7 @@
 #include "career.h"
 #include "hive_combat.h"
 #include "hive_loadout.h"
+#include "xr40_battle.h"
 #include "menu_plan_cache.h"
 #include "menu_preview.h"
 #include "renderer.h"
@@ -112,6 +113,7 @@ class Game {
   friend struct SoakTest;
 public:
   ~Game();
+  bool battleOnly = false; // selected by XR40Battle.exe before init; never changes in a session
   bool botControl = false;  // tests drive plane.ctl directly
   Input in;
   bool quit = false;
@@ -121,7 +123,7 @@ public:
   // research jets' too). With a pacer, each is a step of its own (menuStep, then itemSteps in prewarmItems' order)
   // and `progress` gets the pacer's fraction
   void prewarm(const std::function<void(float, const std::string&)>& progress, bool allCraft = false, class LoadPacer* pace = nullptr, int menuStep = -1, const std::vector<int>* itemSteps = nullptr);
-  static std::vector<std::pair<int, bool>> prewarmItems(bool allCraft);   // (aircraft, cockpit) in the order prewarm builds them
+  static std::vector<std::pair<int, bool>> prewarmItems(bool allCraft, bool xr40Only = false);   // (aircraft, cockpit) in the order prewarm builds them
   // what preparing an aircraft's body (inside: its cockpit's) is doing: 0 starting, 1 read ready-built from the aircraft
   // folder, 2 read from this PC's mesh cache, 3 building it, 4 compiling its shader programs
   static std::string prewarmLabel(int craft, bool inside, int stage);
@@ -623,6 +625,23 @@ private:
     int shots = 0, dropped = 0;   // laser bolts fired, bombs released (the test cards count them)
     float overheatSaid = -1e9f;   // when the overheat warning was last spoken (flightClock)
   } somnus;
+  xr40::Battle battle;
+  xr40::Config battleConfig;
+  int battleTheater = 0, battleWeather = 0;
+  bool battleResultsSaved = false, battleShowSettings = false;
+  struct BattleRecord { int sorties=0, wins=0, best=0, kills=0; } battleRecord;
+  std::string battleSaveError;
+  void initBattle();
+  void launchBattle();
+  void returnToBattle();
+  void finishBattle(bool success, const std::string& reason);
+  void updateBattle(float dt, const hive::PlayerSnapshot& player);
+  void drawBattleMenu();
+  void drawBattlePause();
+  void drawBattleDebrief();
+  void drawBattleHud(const FrameParams& fp);
+  void battlePreviewCamera(FrameParams& fp);
+  bool saveBattleRecord();
   hive::Combat hiveCombat;
   hive::Loadout combatLoadout;
   hive::ForwardSet practiceForward = hive::ForwardSet::Pulse;
@@ -934,6 +953,7 @@ private:
   void drawResearch(const FrameParams& fp);   // game_research_ui.cpp
   struct ResLayout { float lx, lw, rx, rw, top, bot, px0, px1, cx, cy, r; };   // the terminal's columns and preview ring
   ResLayout researchLayout() const;
+  ResLayout battleLayout() const;
   ResLayout militaryLayout() const;
   void drawMilitary(const FrameParams& fp);
   void drawMilitaryPause();

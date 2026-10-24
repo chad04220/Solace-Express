@@ -26,6 +26,10 @@
 
 ## The game
 
+**XR-40 standalone battle simulator:** this branch also builds `XR40Battle.exe`,
+an independent combat game with four operations, the original XR-40 Somnus,
+configurable equipment, resupply and extraction. See [play, build and code analysis](docs/XR40_BATTLE.md).
+
 You learn to fly at Meadowbrook's flight school, then work. You rent small planes to haul cargo and bigger ones to fly
 passengers, earn your Private, Commercial and Airline Transport licences, and buy aircraft of your own for longer,
 harder contracts: mountain strips, glacier runways, volcano fields, medevacs against the clock and night freight in

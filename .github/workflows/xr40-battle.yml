@@ -1,0 +1,67 @@
+name: XR-40 Battle
+on:
+  push:
+    branches: ['codex/xr40-*']
+  pull_request:
+    paths: ['src/**', 'tests/xr40*', 'tools/mesh_assets/**', 'tools/package_xr40.py', 'CMakeLists.txt', '.github/workflows/xr40-battle.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: xr40-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build -DXR40_BATTLE_ONLY=ON -DSANITIZE=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo
+      - run: cmake --build build --target xr40_battle_test xr40_battle_fastmath_test xr40_battle_game_test --parallel 2
+      - run: ctest --test-dir build --output-on-failure
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+          UBSAN_OPTIONS: print_stacktrace=1
+  geometry:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq libegl1 libgl1-mesa-dri libegl-mesa0
+      - run: cmake -S . -B build -DXR40_BATTLE_ONLY=ON -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build --target aircraft_mesh_export --parallel 2
+      - name: Fresh full-quality XR-40 exterior and cockpit
+        run: build/aircraft_mesh_export --xr40 out/xr40-aircraft
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          GALLIUM_DRIVER: llvmpipe
+          MESA_SHADER_CACHE_DISABLE: 'true'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xr40-geometry
+          path: out/xr40-aircraft
+          if-no-files-found: error
+  windows:
+    needs: [checks, geometry]
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: cmake -S . -B build -A x64 -DXR40_BATTLE_ONLY=ON
+      - run: cmake --build build --config Release --target XR40Battle xr40_battle_test xr40_battle_fastmath_test xr40_battle_game_test --parallel 2
+      - run: ctest --test-dir build -C Release --output-on-failure
+      - uses: actions/download-artifact@v4
+        with:
+          name: xr40-geometry
+          path: out/xr40-aircraft
+      - name: Validate consumer source and package portable product
+        run: python tools/package_xr40.py --exe build/Release/XR40Battle.exe --aircraft out/xr40-aircraft --source-manifest build/gen/aircraft_geometry_source.json --output out/XR40Battle-windows-x64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: XR40Battle-windows-x64
+          path: out/XR40Battle-windows-x64.zip
+          if-no-files-found: error
+          compression-level: 0

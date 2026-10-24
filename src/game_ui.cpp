@@ -291,6 +291,7 @@ std::string Game::fmtAlt(float m) const { return set.metric ? fmt("%.0f m", m) :
 // ------------------------------------------------------------------ toasts
 void Game::drawToasts() {
   float s = S(), y = 128 * s;
+  if (battleOnly) { s=std::min(s,std::min(g_ren.W/1280.f,g_ren.H/800.f));y=128*s; }
   bool flightRail = screen == SCR_FLIGHT && hudOn && !(showMap && uiAnim.count(0x6e61u) && uiAnim[0x6e61u] > 0.6f);
   if (screen != SCR_FLIGHT) y = g_ren.H - 120 * s;
   if (flightRail) {   // the right message column: newest at the top, each sliding in from the screen's edge
@@ -2690,6 +2691,7 @@ void Game::hudWarnIcon(int kind, float cx, float cy, float sz, vec3 c, float a) 
 }
 
 void Game::drawHud(const FrameParams& fp) {
+  if (battleOnly) { drawBattleHud(fp); return; }
   if (!plane.spec) return;
   float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
   if (crashed && crashTimer > 0.8f && crashTimer < crashEndT - 1.f) {   // the crash sequence can be skipped
@@ -3533,6 +3535,7 @@ void Game::drawGps() {
 
 // ------------------------------------------------------------------ hidden research menu (U + I on the main menu)
 void Game::drawPause() {
+  if (battleOnly && !settingsFromPause) { drawBattlePause(); return; }
   if (freeFlight && freeRegionMap) { drawRegionPicker(); return; }
   if (freeFlight && freeEarthPicker) { drawEarthAirportPicker(); return; }
   if (militaryFlight && !settingsFromPause) { drawMilitaryPause(); return; }
@@ -4041,6 +4044,7 @@ void Game::drawFinaleCard() {
 }
 
 void Game::drawDebrief() {
+  if (battleOnly) { drawBattleDebrief(); return; }
   if (isMilitaryContract(contract.type)) { drawMilitaryDebrief(); return; }
   float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
   // (it comes in: the title, then the lines one after another, the total counting up to what was earned)

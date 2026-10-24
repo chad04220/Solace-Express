@@ -86,6 +86,7 @@ Scenery::Scenery(int workerCount, const World* src) : async(new Async()), source
   int hw = (int)std::thread::hardware_concurrency();
   int n = workerCount >= 0 ? workerCount : std::clamp(hw - 1, 0, 6);    // leave the main / GL thread its own core
   if (source) ownCache.reset(new RegionCache());
+  else (void)regionCache(); // construct before g_scenery finishes: its workers join before this static cache is destroyed
   for (int t = 0; t < n; t++)
     async->threads.emplace_back([this] {
       Async& A = *async;

@@ -16,13 +16,14 @@ void Game::loadProfile() {
 }
 
 void Game::saveProfile() {
+  if (battleOnly) return;
   if (diskless || (headless && saveDir.empty())) return;
   profile.save(profilePath(saveDir));
 }
 
 // An achievement earned: kept, listed in the next debrief, and shown (a banner and a chime, one at a time)
 void Game::award(const std::string& id) {
-  if (botControl || dbgCam) return;
+  if (battleOnly || botControl || dbgCam) return;
   if (!profile.earn(id)) return;
   flightAch.push_back(id);
   achShow.push_back({id, 0.f});

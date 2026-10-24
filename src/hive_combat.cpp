@@ -368,16 +368,17 @@ void Combat::tickActor(Actor& a,const PlayerSnapshot& player,const WorldCallback
     }
   }
   float range=length(displacement(a.position,player.position));
-  bool armed=player.alive && range<(a.type==Type::Archon?3500.f:1800.f);
+  const float signature=floatValidation::finite(player.signature)?clampf(player.signature,.05f,1.f):1.f;
+  bool armed=player.alive && range<(a.type==Type::Archon?3500.f:1800.f)*signature;
   if(a.type==Type::Bastion) {
     // Outside defense, bomb the player's predicted flight path instead of remaining inert.
-    armed=objective>=0 ? length(displacement(a.position,target))<1800 : player.alive && range<1800;
+    armed=objective>=0 ? length(displacement(a.position,target))<1800 : player.alive && range<1800*signature;
     if(objective<0)target+=limited(player.velocity*.75f,400);
   }
   if(a.type==Type::Cantor)armed=false; // Relay is its dedicated weapon; no unannounced hitscan aura.
   const vec3 candidateAim=canonical(target+(a.type==Type::Bastion?vec3():limited(player.velocity*.35f,200)));
   auto aligned=[&](vec3 aim){return inForwardFireCone(a,displacement(weaponSocket(a,a.shotsFired),aim));};
-  if((a.phase==Phase::Telegraph || a.phase==Phase::Firing) && !aligned(a.aim)) {
+  if((a.phase==Phase::Telegraph || a.phase==Phase::Firing) && (!aligned(a.aim) || (signature<1.f && objective<0 && !armed))) {
     // A fly-by may carry the locked aim behind the nose during charge/burst.
     // Reposition and telegraph a fresh solution instead of firing backwards.
     a.phase=Phase::Approach;a.timer=.2f;a.shotsRemaining=0;
