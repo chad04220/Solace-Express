@@ -1,3 +1,19 @@
+## What's new in v3.54.0
+
+The game's music, written again from the ground up: composed pieces played by a synthesised orchestra and band, in a concert hall, mixed and mastered.
+
+### The score
+- **Written, not just generated.** Each mood is now a piece of music: chord progressions voiced so the harmony moves smoothly from one chord to the next, a real tune, and sections that build and fall back (an opening, the theme, a second strain, a fuller return, a quiet passage) before it goes round again. No two passes are quite the same: the timing breathes, the arpeggios and the drummer vary.
+- **The main menu** has the game's theme, "Somnium", in D major: the flute over harp, strings and pads, then the horn with the flute an octave above it, brass, timpani and cymbal swells.
+- **The hub** is a swung jazz tune in G: the vibraphone has the melody, an electric piano comps, a walking upright bass and brushes keep time, a nylon guitar joins in, and the flute takes a chorus.
+- **The cruise** (with **Music in the cruise** on in Settings) is a slow wash in E that sits under the engines: pads over a low drone, two bars a chord, high bells, electric piano and harp, no drums.
+- **The finale** brings the theme back for the whole orchestra, with a hymn-like second strain.
+- **The instruments** are all made in the game, the way the real ones make their sound: the harp, guitar and upright bass are plucked strings; the electric piano, vibraphone and celesta are built from their real overtones; the flute and horn slur from note to note with breath and vibrato; the timpani are tuned to the chord.
+- **A real room and a finished mix.** A concert-hall reverb, an echo in time with the music, every instrument balanced against the rest, and gentle mastering that keeps it full without ever clipping.
+
+### Cues
+- **A job done, a failed flight, a licence, an achievement and a medal** each have a short composed fanfare in the key of whatever's playing, and the music dips a little under it. **The cabin's applause** is a crowd of separate people clapping. **A trial's gate chimes** ring on a celesta with a vibraphone under it, climbing the scale as you thread the gates.
+
 ## What's new in v3.53.1
 
 - **Cheaper smoke and fire.** In v3.53.0 the new billowing smoke, dust and fire worked out their pattern pixel by pixel, which tripled what they cost to draw: a crash's smoke took 3.4 ms of an RTX 3070 laptop's time, up from 1 ms in v3.52.1. They now read the pattern from a texture the clouds already use, which is far cheaper on a graphics card, and they look the same. The next diagnostics will show by how much.

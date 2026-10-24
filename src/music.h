@@ -1,11 +1,14 @@
-// Somnium Volandi - the game's own music: a small generative score played through the audio engine's music ring
-// (the internet radio's), so the radio and the score never play at once. Moods: the main menu's theme, the hub's
-// lighter groove, a quiet ambience for the cruise (Settings), the finale; and short stingers over them (a job done,
-// a flight failed, a licence, an achievement, a medal). Everything is synthesised: sine-table pads and bass, FM bells
-// and plucks, a soft shaker, a stereo reverb and a gentle limiter
+// Somnium Volandi - the game's own music: a generative score played through the audio engine's music ring (the
+// internet radio's), so the radio and the score never play at once. Moods: the main menu's theme, the hub's swung
+// groove, an ambient wash for the cruise (Settings), the finale's reprise of the theme; and short cues over them (a
+// job done, a flight failed, a licence, an achievement, a medal, a cabin's applause) and a gate run's climbing chimes.
+// It is all written out and synthesised here (music.cpp): composed themes and progressions, voiced to move smoothly
+// and arranged in sections; a small orchestra and band of synthesised instruments; a hall reverb, a delay and a
+// mastering compressor and limiter
 #pragma once
 #include <atomic>
 #include <cstdint>
+#include <memory>
 #include <mutex>
 #include <thread>
 #include <vector>
@@ -17,33 +20,17 @@ enum MusicSting { STING_SUCCESS = 0, STING_FAIL, STING_LICENCE, STING_ACHIEVEMEN
 class MusicGen {
 public:
   explicit MusicGen(float sampleRate = 48000.f, uint32_t seed = 1);
+  ~MusicGen();
+  MusicGen(const MusicGen&) = delete;
+  MusicGen& operator=(const MusicGen&) = delete;
   void setMood(int mood);   // the old mood's notes ring out, the new one starts at once (its pads swell in)
-  int mood() const { return moodNow; }
-  void sting(int kind);     // a short phrase over whatever plays, in its key
+  int mood() const;
+  void sting(int kind);     // a short cue over whatever plays, in its key
   void note(int step);      // one chime, step notes up the key's major pentatonic (a gate run climbs through them)
-  void render(float* stereo, int frames);   // interleaved, about -6 dBFS at its loudest
-
-  struct Voice { int inst = -1; float f = 0, t = 0, vel = 0, dur = 0, pan = 0, ph1 = 0, ph2 = 0, ph3 = 0, rel = -1; };
-  struct Event { double at; int inst; int midi; float vel, dur, pan; };
+  void render(float* stereo, int frames);   // interleaved, peaks held under -1.5 dBFS
+  struct Impl;
 private:
-  float sr;
-  uint32_t rng;
-  int moodNow = MOOD_NONE;
-  double now = 0;           // samples since the start
-  double beatAt = 0;        // when the next beat falls (samples)
-  int beat = 0, chord = 0, pattern = 0, melDeg = 2;
-  float gain = 0, gainTo = 0;
-  std::vector<Voice> voices;
-  std::vector<Event> events;
-  // the reverb: four combs and two allpasses a side
-  std::vector<float> comb[2][4], ap[2][2];
-  int combI[2][4] = {}, apI[2][2] = {};
-  float combLp[2][4] = {};
-  float urand();
-  void play(int inst, int midi, float vel, float dur, float pan);
-  void releasePads();
-  void onBeat();
-  void schedule(double at, int inst, int midi, float vel, float dur, float pan) { events.push_back({at, inst, midi, vel, dur, pan}); }
+  std::unique_ptr<Impl> d;
 };
 
 // The player: a thread keeps the engine's music ring topped up while the score has it. own(true) takes the ring

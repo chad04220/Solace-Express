@@ -65,21 +65,29 @@ int main() {
     printf("%-7s rms %.3f, peak %.3f, silent seconds %d, non-finite %d, %.1f ms of CPU a second: %s\n", names[m], rms, peak, quietSec, bad, ms / 60, ok ? "ok" : "FAIL");
     fails += !ok;
   }
-  {   // a change of mood: no step between one sample and the next bigger than the music makes by itself
+  {   // a change of mood: no step between one sample and the next bigger than the music makes by itself - at the switch
+      // (where cutting the old mood's notes would click) than the old mood's, after it than either mood's own (the
+      // hub's drums come in at once)
+    auto maxStep = [](const std::vector<float>& b, size_t from, size_t to) {
+      float m = 0; for (size_t i = std::max<size_t>(from, 2); i < to; i++) m = std::max(m, fabsf(b[i] - b[i - 2])); return m;
+    };
     MusicGen g(sr, 5); g.setMood(MOOD_MENU);
     std::vector<float> b((size_t)sr * 2 * 4);
     g.render(b.data(), (int)sr * 4);
-    float maxStep = 0;
-    for (size_t i = 2; i < b.size(); i++) maxStep = std::max(maxStep, fabsf(b[i] - b[i - 2]));
+    const float menuStep = maxStep(b, 0, b.size());
     g.setMood(MOOD_HUB);
     g.render(b.data(), (int)sr * 4);
-    float switchStep = 0;
-    for (size_t i = 2; i < b.size(); i++) switchStep = std::max(switchStep, fabsf(b[i] - b[i - 2]));
+    const size_t edge = (size_t)(sr * 0.05f) * 2;
+    const float atSwitch = maxStep(b, 0, edge), after = maxStep(b, edge, b.size());
+    MusicGen h(sr, 5); h.setMood(MOOD_HUB);
+    std::vector<float> c((size_t)sr * 2 * 4); h.render(c.data(), (int)sr * 4);
+    const float hubStep = maxStep(c, 0, c.size());
     g.setMood(MOOD_NONE);
     g.render(b.data(), (int)sr * 4);
     double tail = 0; for (size_t i = b.size() - (size_t)sr; i < b.size(); i++) tail += b[i] * b[i];
-    const bool ok = switchStep < std::max(0.25f, maxStep * 2.f) && sqrt(tail / sr) < 0.01;
-    printf("Mood change: largest step %.3f (menu alone %.3f); fades to %.4f rms after a stop: %s\n", switchStep, maxStep, sqrt(tail / sr), ok ? "ok" : "FAIL");
+    const bool ok = atSwitch < std::max(0.25f, menuStep * 2.f) && after < std::max(0.25f, std::max(menuStep, hubStep) * 2.f) && sqrt(tail / sr) < 0.01;
+    printf("Mood change: largest step at the switch %.3f (menu alone %.3f), after it %.3f (hub alone %.3f); fades to %.4f rms after a stop: %s\n",
+           atSwitch, menuStep, after, hubStep, sqrt(tail / sr), ok ? "ok" : "FAIL");
     fails += !ok;
   }
   const char* sn[STING_COUNT] = {"success", "fail", "licence", "achievement", "medal", "applause"};
