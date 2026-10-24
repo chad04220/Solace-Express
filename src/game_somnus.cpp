@@ -355,6 +355,7 @@ void Game::detonate(vec3 p, bool water, hive::BombSet kind, const vec3* queryOri
 void Game::updateSomnus(float dt) {
   SomnusState& W = somnus;
   bool wr = plane.spec && plane.spec->special == 2 && !crashed;
+  if (battleOnly) W.cloakOn = battle.updateCloak(dt,W.cloakOn,W.wantFire || W.bombQueue>0);
   // cloak: the field spreads from the nose to the tail (and collapses from the tail back)
   float tgt = wr && W.cloakOn ? 1.f : 0.f;
   // move toward the target and stop on it (at exactly 1 the old ramp took the fading branch every other frame, so the
@@ -544,6 +545,27 @@ void Game::hiveVisual(FrameParams& fp) {
     v.state[0]=clampf(length(a.velocity)/hive::roleSpec(a.type).cruise,.25f,1.f);
     v.state[1]=a.type==hive::Type::Cantor?(a.relayTarget && a.relayInterrupted<=0?.85f:0.f):a.phase==hive::Phase::Telegraph?.5f:a.phase==hive::Phase::Firing?1.f:0.f;
     v.state[2]=a.shield; v.state[3]=a.relayInterrupted>0?1.f:0.f;
+  }
+  if(battleOnly && battle.active()) {
+    auto beam=[&](vec3 from,vec3 to,vec3 color,float radius) {
+      if(fp.fx.beams>=12)return; // preserve four slots for the enemy relays/player weapons
+      const int n=fp.fx.beams++;float* a=fp.fx.beamA[n];float* b=fp.fx.beamB[n];float* c=fp.fx.beamStyle[n];
+      a[0]=from.x;a[1]=from.y;a[2]=from.z;a[3]=radius;
+      b[0]=to.x;b[1]=to.y;b[2]=to.z;b[3]=.6f;
+      c[0]=color.x;c[1]=color.y;c[2]=color.z;c[3]=1;
+    };
+    const bool extract=battle.phase==xr40::Phase::Extraction || (battle.phase==xr40::Phase::Relief && battle.config.mode==xr40::Mode::Survival);
+    const vec3 center=extract?battle.extraction:battle.supply;
+    const float radius=extract?350.f:250.f;
+    // Eight bright gate segments lie on the horizontal plane through the actual trigger sphere.
+    for(int i=0;i<8;++i) {
+      const float a=i*PI/4,b=(i+1)*PI/4;
+      beam(center+vec3(cosf(a)*radius,0,sinf(a)*radius),center+vec3(cosf(b)*radius,0,sinf(b)*radius),vec3(.3f,.9f,1.f),1.4f);
+    }
+    if(battle.config.mode==xr40::Mode::Defense && hiveCombat.mission.config.objectiveCount) {
+      const vec3 p=hiveCombat.mission.config.objectives[0].position;
+      for(int i=0;i<4;++i) {float a=i*PI*.5f;beam(p+vec3(cosf(a)*36,-20,sinf(a)*36),p+vec3(0,65,0),vec3(1,.65f,.25f),2.f);}
+    }
   }
   // The support relay is an interruptible line-of-sight link, visually distinct from a damage bolt.
   for(const auto& a:hiveCombat.actors) if(a.alive && a.relayTarget && a.relayInterrupted<=0 && fp.fx.beams<16) {

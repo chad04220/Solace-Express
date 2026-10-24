@@ -38,6 +38,7 @@ struct PlayerSnapshot {
   std::array<BodyBox, MaxPlayerBoxes> bodyBoxes{};
   int bodyBoxCount = 0; // Authored aircraft body-local boxes; orientation includes bank via up.
   bool alive = true, scanning = false;
+  float signature = 1.f; // sensor range multiplier; cloak does not remove collision or existing projectiles
 };
 struct Actor {
   uint32_t id = 0;

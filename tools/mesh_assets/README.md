@@ -6,6 +6,12 @@ ambient occlusion, model dimensions, moving hulls, rigid parts or animation.
 Every release bundle contains the exterior and cockpit of all 15 aircraft,
 including the research fleet: 30 independently identified meshes.
 
+The separate **XR-40 Battle** product uses `aircraft_mesh_export --xr40 DIRECTORY`
+and `tools/package_xr40.py`, with an explicit two-view report scoped to
+`XR40Battle`. It uses the same full-quality production builder and source hashes.
+The all-aircraft validator below continues to require all 30 views; the standalone
+workflow is documented in [XR40_BATTLE.md](../../docs/XR40_BATTLE.md).
+
 The portable files contain the exact production float32 and uint32 payloads.
 There is no quantization, decimation, normal repacking, animation flattening or
 other quality reduction in this export path. The production builder's existing

@@ -675,6 +675,7 @@ void Game::continuationWaivers(Career::LaunchPlan& p, const Contract& c, int spe
 // paid fees), a research sortie relaunches (the review of v3.31.0, C1: Restart made practice and trials career
 // flights, and reset a job leg's clock and comfort)
 void Game::restartFlight() {
+  if (battleOnly) { launchBattle(); return; }
   if (freeFlight) { launchFreeFlight(); return; }
   if (haul.on) { toast("A long haul can't be restarted in flight: end the flight to call it off", vec3(1.f, 0.75f, 0.35f)); return; }
   if (researchFlight) { launchResearch(); return; }
@@ -742,7 +743,7 @@ procedural::Descriptor Game::chartRegion() const {
 // The generated regions round the flight on the horizon (Renderer::updateRegionHorizon), whatever the flight: they are
 // where the Earth goes on past the islands' sea. On the real Earth, its far patches there (earth_far.h)
 void Game::updateHorizon() {
-  if (!g_ren.ok || screen != SCR_FLIGHT || g_world.repeating) return;
+  if (battleOnly || !g_ren.ok || screen != SCR_FLIGHT || g_world.repeating) return;
   g_ren.earthHorizon = realEarthPlay() ? earthCharts::pack() : nullptr;
   const procedural::Descriptor region = chartRegion();
   vec3 camera = dbgCam ? dbgCamPos : camPos;
@@ -1626,6 +1627,7 @@ void Game::init(bool buildWorld, const std::function<void(float, const std::stri
   auto report = [&](int done, const std::string& detail) { if (progress) progress(done / units, detail); };
   report(0, "Preparing career systems");
   if (buildWorld) g_world.build();
+  if (battleOnly) { initBattle(); if (progress) progress(1.f,"XR-40 battle systems ready"); return; }
   buildStory();
   loadSettings();
   applyUiPalette();
@@ -2140,6 +2142,7 @@ Game::~Game() {
 }
 
 void Game::shutdown() {
+  if (battleOnly) saveBattleRecord();
   regionalSurface::clearFlightContext();
   retireEarthPrefetch();
   if (earthRetireJob.valid()) { try { earthRetireJob.get(); } catch (...) {} }
@@ -2325,6 +2328,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
 }
 
 void Game::endFlight(bool success, const std::string& reason, FlightOutcome outcome) {
+  if (battleOnly) { finishBattle(success,reason); return; }
   PartTimer ptEnd(*this, "flight end");
   if (militaryFlight) {
     if(militarySettled) return;
@@ -2828,7 +2832,7 @@ void Game::updateFlight(float dt) {
     const std::string why = warpBlocker();
     if (!why.empty()) { timeAccel = 1; toast("Time warp off - " + why, vec3(1, 0.8f, 0.45f)); }
   }
-  if(militaryFlight || hiveCombat.aliveCount()>0 || hiveCombat.mission.status==hive::MissionStatus::Active) timeAccel=1;
+  if(battleOnly || militaryFlight || hiveCombat.aliveCount()>0 || hiveCombat.mission.status==hive::MissionStatus::Active) timeAccel=1;
   float simDt = dt * timeAccel;
   vec3 prevPos = plane.pos;
   refreshGroundPits();   // (what the wheels, the weapons and the wreckage meet this frame)
@@ -2911,11 +2915,11 @@ void Game::updateFlight(float dt) {
   }
   { PartTimer pt(*this, "cloud wake"); updateCloudWake(simDt); }
 
-  updateUfo(simDt);
+  if (!battleOnly) updateUfo(simDt);
   // AI traffic
-  traffic.enabled = set.traffic && !militaryFlight;
+  traffic.enabled = set.traffic && !militaryFlight && !battleOnly;
   traffic.audioObserver = dbgCam ? dbgCamPos : camPos;
-  if(!militaryFlight) airlineTraffic(simDt);
+  if(!militaryFlight && !battleOnly) airlineTraffic(simDt);
   if (traffic.update(simDt, plane.pos, plane.vel, plane.onGround || crashed, plane.spec->span) && !crashed && !plane.ev.crashed) {
     plane.ev.crashed = true; plane.ev.crashReason = "Mid-air collision";
   }
@@ -3035,7 +3039,7 @@ void Game::updateFlight(float dt) {
     // (the rating on the touchdown scale the settlement pays by: career.h touchdownGrade - spoken, and stamped on the HUD)
     callout(fmt("%s  %.0f fpm", touchdownGradeCall(touchdownGrade(fpm)), fpm));
     tdStampT = realTime; tdStampFpm = fpm; arrivalTold = false;
-    profileTouchdown(fpm, tdRunway);   // (airport stamps, butter, the type's softest: game_profile.cpp)
+    if (!battleOnly) profileTouchdown(fpm, tdRunway);   // (airport stamps, butter, the type's softest: game_profile.cpp)
     shake(clampf(fabsf(fpm) / 750.f, 0.12f, 0.8f));
     float gs = length(vec3(plane.vel.x, 0, plane.vel.z));
     for (int side = -1; side <= 1; side += 2) {
@@ -3046,13 +3050,13 @@ void Game::updateFlight(float dt) {
     }
   }
   if (!plane.onGround) result.maxBank = std::max(result.maxBank, fabsf(plane.bankDeg()));
-  profileTick(dt);   // (landmarks found, sightings, the distance flown)
-  updateSightseeing();
+  if (!battleOnly) profileTick(dt);   // (landmarks found, sightings, the distance flown)
+  if (!battleOnly) updateSightseeing();
   if (contract.type == CT_TRIAL && trialT0 >= 0.f && trialT1 < 0.f)   // (the ghost's track: where this run was, every kGhostDt s from the first gate)
     while ((float)ghostRec.size() * kGhostDt <= flightClock - trialT0 && ghostRec.size() < 100000) ghostRec.push_back(plane.pos);
   // rolling dust / spray
   float gs = length(vec3(plane.vel.x, 0, plane.vel.z));
-  updateJobMeters(simDt, gs);   // (simulated time: at 4x the patient rides four seconds of turbulence a frame)
+  if (!battleOnly) updateJobMeters(simDt, gs);   // (simulated time: at 4x the patient rides four seconds of turbulence a frame)
   if (plane.onGround && plane.groundRough > 0.3f && gs > 4.f) {
     dustAccum += dt * gs * 0.6f;
     int rw = g_world.onRunway(plane.pos.x, plane.pos.z, 3);
@@ -3258,6 +3262,7 @@ bool Game::loadingShadowPending() const {
   return g_ren.tshRequiredPending(direction.y);
 }
 void Game::updateLoading(float dt) {
+  if (battleOnly && !pendingLaunch && (in.pressed[K_ESC] || (in.buttonsPressed & PAD_B))) { returnToBattle(); return; }
   // Back always wins over setup, including the update immediately after the first presented card.
   if (pendingLaunch) {
     if (in.pressed[K_ESC] || (in.buttonsPressed & PAD_B)) {
@@ -4677,7 +4682,8 @@ void Game::menuTour(FrameParams& fp) {
   fp.fade = smoothstepf(0.f, 0.9f, u) * smoothstepf(kMenuShotLen, kMenuShotLen - 0.9f, u);   // cut through black
 }
 
-std::vector<std::pair<int, bool>> Game::prewarmItems(bool allCraft) {
+std::vector<std::pair<int, bool>> Game::prewarmItems(bool allCraft, bool xr40Only) {
+  if (xr40Only) return {{kSomnus,false},{kSomnus,true}};
   std::vector<std::pair<int, bool>> todo;
   for (int i = 0; i < kAircraftCount; i++) if (allCraft || !kAircraft[i].special) { todo.push_back({i, false}); todo.push_back({i, true}); }
   return todo;
@@ -4714,7 +4720,7 @@ void Game::prewarm(const std::function<void(float, const std::string&)>& progres
   for (int i = 0; !quit; i++) {
     realTime = 3.f; frame();
     firstPending = std::max(firstPending, g_ren.entPending);
-    const bool ready = i >= 2 && g_ren.entPending == 0 && !loadingShadowPending();
+    const bool ready = i >= 2 && (battleOnly || (g_ren.entPending == 0 && !loadingShadowPending()));
     if (pace) {
       const float chunks = firstPending > 0 ? 1.f - float(g_ren.entPending) / firstPending : (i >= 2 ? 1.f : 0.f);
       pace->setSub(ready ? 1.f : std::min(0.95f, 0.8f * chunks + (loadingShadowPending() ? 0.f : 0.15f)));
@@ -4725,7 +4731,7 @@ void Game::prewarm(const std::function<void(float, const std::string&)>& progres
   g_ren.entSync = sync;
   // every light aircraft's body (outside, and the cockpit's when that is in use; with allCraft the research jets' too):
   // a frame that wants one bakes it, or loads it from the cache
-  const std::vector<std::pair<int, bool>> todo = prewarmItems(allCraft);
+  const std::vector<std::pair<int, bool>> todo = prewarmItems(allCraft,battleOnly);
   for (size_t k = 0; k < todo.size() && !quit; k++) {
     prewarmCraft = todo[k].first; prewarmInside = todo[k].second;
     if (pace && itemSteps && k < itemSteps->size()) pace->begin((*itemSteps)[k]);
@@ -4757,7 +4763,34 @@ void Game::prewarm(const std::function<void(float, const std::string&)>& progres
   }
 }
 
+void Game::battlePreviewCamera(FrameParams& fp) {
+  const char* codes[]={"LHK","SMP","CAP"};
+  resAirport=std::max(0,g_world.findAirport(codes[std::clamp(battleTheater,0,2)]));
+  const auto& a=g_world.airports[resAirport];const auto& spec=kAircraft[kSomnus];
+  const ResLayout l=battleLayout();
+  Plane model;model.reset(&spec,a.pos()+vec3(0,700,0),a.heading,spec.maxFuel,85,true,160);
+  model.gear=0;model.ctl.throttle=model.engineSpool=.4f;model.nozzle=0;
+  model.q=quat::axisAngle(vec3(0,1,0),-a.heading*DEG);
+  fillPlaneVisual(fp.plane,model,0,prewarmInside);
+  fp.plane.wr[6][3]=float(practiceForward);fp.plane.wrBombSet=int(practiceBomb);fp.plane.wr[6][0]=1;
+  fp.plane.wr[4][1]=fp.plane.wr[4][2]=1;
+  researchView.select(kSomnus);
+  const float s=std::min(S(),std::min(g_ren.W/1280.f,g_ren.H/800.f)),W=float(g_ren.W),H=float(g_ren.H);
+  fp.fovY=32*DEG;float th=tanf(fp.fovY*.5f);
+  float radius=H*.5f*spec.fusLen*.36f/(std::max(60.f*s,.38f*std::min(l.px1-l.px0,l.bot-l.top))*th*researchView.zoom);
+  const float yaw=researchView.yaw,pitch=researchView.pitch;
+  fp.camPos=model.pos+model.q.rotate(vec3(sinf(yaw)*cosf(pitch),sinf(pitch),-cosf(yaw)*cosf(pitch)))*radius;
+  const auto axes=menuPreviewAxes(model.pos-fp.camPos,(l.cx-W*.5f)/(W*.5f)*th*W/H,(H*.5f-l.cy)/(H*.5f)*th);
+  fp.camBack=-axes.forward;fp.camRight=axes.right;fp.camUp=axes.up;
+  // A dedicated room avoids streaming the entire archipelago for a menu.
+  fp.hangarPreview=true;fp.hangarSize=radius*3;fp.hangarOrigin=model.pos-vec3(0,fp.hangarSize*.28f,0);
+  fp.prefetchOn=false;fp.trafficN=0;fp.ufoOn=false;fp.dispMode=fp.feedRig=0;
+  fp.cloudCover=fp.fogB=fp.wet=fp.snow=fp.storm=0;fp.planeTerrSh=1;fp.landLight=0;fp.vignette=.25f;
+  if(prewarmInside) {fp.camPos=model.pos+model.q.rotate(kModels[kSomnus].eye);fp.camBack=-model.forward();fp.camRight=model.right();fp.camUp=model.up();}
+}
+
 void Game::menuBackgroundCamera(FrameParams& fp) {
+  if (battleOnly) { battlePreviewCamera(fp); return; }
   if (screen == SCR_MENU && !getenv("MENUORBIT")) { menuTour(fp); return; }
   if (screen == SCR_RESEARCH) { researchPreviewCamera(fp); return; }
   if (screen == SCR_HUB && hubTab == TAB_CONTRACTS && hubList == 2) { militaryPreviewCamera(fp); return; }
@@ -5846,7 +5879,7 @@ void Game::update(float dt) {
   if (loadLogging) loadLogTick();
   g_ren.beginRegionUploadFrame(); // one shared detail + horizon GPU budget per displayed frame
   if (screen != SCR_FLIGHT) { rumbleLo = rumbleHi = 0.f; shakeTrauma = shakeBuffet = 0.f; }   // (the motors and the shake are the flight's)
-  if (screen != SCR_REGION_LOADING) { PartTimer pt(*this, "career world"); const std::string want = screenWorld(); if (!want.empty()) loadCareerWorld(want, screen); }
+  if (!battleOnly && screen != SCR_REGION_LOADING) { PartTimer pt(*this, "career world"); const std::string want = screenWorld(); if (!want.empty()) loadCareerWorld(want, screen); }
   if (screen == SCR_REGION_LOADING) {
     realTime += std::min(dt, .1f); lastDt = std::min(dt, .05f);
     if (in.pressed[K_F11]) wantFullscreenToggle = true;
@@ -5854,12 +5887,12 @@ void Game::update(float dt) {
     updateRegionLoading(std::min(dt, .25f));
     return;
   }
-  { PartTimer pt(*this, "earth surface"); updateEarthSurfaceContext(); } // establish the collision snapshot protection before physics reads World
+  if (!battleOnly) { PartTimer pt(*this, "earth surface"); updateEarthSurfaceContext(); } // establish the collision snapshot protection before physics reads World
   if (pendingCareer && (screen == SCR_HUB || screen == SCR_DEBRIEF || screen == SCR_MENU)) {   // a settlement or purchase that couldn't be saved: tried again now and then
     retryT += dt;
     if (retryT > 3.f) { retryT = 0; PartTimer pt(*this, "career save retry"); retryCommit(); }
   }
-  { PartTimer pt(*this, "earth install"); updateEarthInstall(); }
+  if (!battleOnly) { PartTimer pt(*this, "earth install"); updateEarthInstall(); }
   // the render resolution: native, a fixed scale, or adjusted to hold the frame-rate target (Settings)
   fpsAvg = lerpf(fpsAvg, dt, 1.f - expf(-dt * 3.f));   // (a third of a second, whatever the frame rate)
   maxFrameWin = std::max(maxFrameWin, dt); maxFrameT += dt;
@@ -5909,7 +5942,7 @@ void Game::update(float dt) {
     if (in.buttonsPressed & PAD_LB) { hubTab = (hubTab + nTabs - 1) % nTabs; g_audio.trigger(SFX_CLICK); }
   }
   bool padCombo = in.pad && (in.buttons & PAD_LS) && (in.buttons & PAD_RS) && (in.buttonsPressed & (PAD_LS | PAD_RS));
-  if (screen == SCR_MENU && ((in.down['U'] && in.down['I'] && (in.pressed['U'] || in.pressed['I'])) || padCombo)) {
+  if (!battleOnly && screen == SCR_MENU && ((in.down['U'] && in.down['I'] && (in.pressed['U'] || in.pressed['I'])) || padCombo)) {
     screen = SCR_RESEARCH; resOpened = realTime; g_audio.trigger(SFX_BEEP); award("classified");
     resWarm = true; resWarmFrames = 0; resBakeSeen = g_ren.bakeCount;   // the terminal's boot screen shows at once; the craft and its airport warm behind it
     resWork = 0.f; resPend0 = 0;
@@ -5928,7 +5961,7 @@ void Game::update(float dt) {
     resWork = std::max(resWork, 0.25f * views + 0.65f * chunks + 0.10f * (lit ? 1.f : 0.f));
     if (resWarmFrames > 2 * resCraftCount() + 3 && !baked && g_ren.entPending == 0 && !loadingShadowPending()) { resWarm = false; resWarmCraft = -1; resWarmCk = false; g_ren.entBudgetMs = 2.5f; resWork = 1.f; }
   }
-  if (screen == SCR_FLIGHT && (actKeyP(ACT_RADIO) || actJoyP(ACT_RADIO) || (!paused && actPadP(ACT_RADIO)))) showRadio = !showRadio;
+  if (!battleOnly && screen == SCR_FLIGHT && (actKeyP(ACT_RADIO) || actJoyP(ACT_RADIO) || (!paused && actPadP(ACT_RADIO)))) showRadio = !showRadio;
   { PartTimer pt(*this, "radio"); radio.poll(); }
   { PartTimer pt(*this, "music"); updateMusic(); }
   { PartTimer pt(*this, "steam"); updateSteam(dt); }
@@ -5964,7 +5997,7 @@ void Game::update(float dt) {
       }
       if (saved) in = frameIn;
       if (screen == SCR_FLIGHT) { PartTimer pt(*this, "camera"); updateCamera(dt); }
-      if (screen == SCR_FLIGHT && !crashed) {   // the finals the autopilot may plan next, profiled ahead (Plane::wantFinals): the GPS pick, the field it flies to, the job's
+      if (!battleOnly && screen == SCR_FLIGHT && !crashed) {   // the finals the autopilot may plan next, profiled ahead (Plane::wantFinals): the GPS pick, the field it flies to, the job's
         if (apDest >= 0) Plane::wantFinals(apDest);
         if (plane.apAirport >= 0) Plane::wantFinals(plane.apAirport);
         if (plane.apHoldFor >= 0) Plane::wantFinals(plane.apHoldFor);
@@ -5990,7 +6023,7 @@ void Game::update(float dt) {
     wx.cloudDrift = cloudOff; wx.cloudDetail = cloudDet; wx.cloudBoil = cloudBoil;
   }
   if (screen == SCR_REGION_LOADING) return;
-  { PartTimer pt(*this, "earth flight"); updateEarthFlight(); } // once per displayed frame, including paused background preparation
+  if (!battleOnly) { PartTimer pt(*this, "earth flight"); updateEarthFlight(); } // once per displayed frame, including paused background preparation
   { PartTimer pt(*this, "comms"); updateComms(dt); }
   { PartTimer pt(*this, "audio"); feedAudio(); }
 }
@@ -6015,7 +6048,7 @@ void Game::framePresented() {
 }
 
 void Game::render() {
-  if (screen != SCR_REGION_LOADING) { const std::string want = screenWorld(); if (!want.empty()) loadCareerWorld(want, screen); }
+  if (!battleOnly && screen != SCR_REGION_LOADING) { const std::string want = screenWorld(); if (!want.empty()) loadCareerWorld(want, screen); }
   if (screen == SCR_REGION_LOADING) {
     g_ren.clearScreen(); g_ren.uiBegin(); drawRegionLoading(); drawPadCursor(); g_ren.uiEnd();
     return;
@@ -6145,7 +6178,7 @@ void Game::render() {
   }
   uiDt = clampf(realTime - uiLastT, 0.f, 0.1f); uiLastT = realTime;
   switch (screen) {
-    case SCR_MENU: drawMenu(); break;
+    case SCR_MENU: if (battleOnly) drawBattleMenu(); else drawMenu(); break;
     case SCR_FREE_FLIGHT: drawFreeFlightSetup(fp); break;
     case SCR_HUB: drawHub(); break;
     case SCR_FLIGHT:
@@ -7294,6 +7327,7 @@ void Game::spawnPracticeWave() {
   toast("Practice wave spawned (8 craft maximum)",vec3(.7f,.6f,1));
 }
 std::string Game::hiveObjectiveText() const {
+  if (battleOnly) return battle.objective(hiveCombat.aliveCount());
   const auto& m=hiveCombat.mission;
   if (m.status==hive::MissionStatus::Extract) return fmt("RETURN TO EXTRACTION  %.0f m",length(hiveCombat.displacement(plane.pos,m.config.extraction)));
   if(m.config.kind==hive::MissionKind::Recon) {
@@ -7386,6 +7420,7 @@ void Game::updateHive(float dt) {
     const float speed=mission && mission->id==military::HighAltitudeIntel?sqrtf(plane.vel.x*plane.vel.x+plane.vel.z*plane.vel.z):length(plane.vel);
     p.scanning=mission && military::sensorEnvelope(*mission,plane.pos.y,speed,roof);
   }
+  if (battleOnly) p.signature=1.f-.88f*somnus.stealth;
   p.up=plane.up();
   auto box=[&](vec3 center,vec3 halfExtent) {
     if(p.bodyBoxCount<hive::MaxPlayerBoxes) p.bodyBoxes[p.bodyBoxCount++]={center,halfExtent};
@@ -7419,11 +7454,12 @@ void Game::updateHive(float dt) {
     box(vec3(0,m.vt[4]+m.vt[0]*.5f,m.vt[5]+m.vt[1]*.5f),vec3(.12f,m.vt[0]*.5f,m.vt[1]*.5f));
   }
   hiveCombat.step(dt,p,hiveWorld(),paused);
+  if (battleOnly) battle.observe(hiveCombat);
   for(int i=0;i<hiveCombat.eventCount;++i) {
     const auto& e=hiveCombat.events[i];
     vec3 at=plane.pos+hiveCombat.displacement(plane.pos,e.position);
     if(e.type==hive::EventType::PlayerDamage && !crashed) {
-      militaryHull=std::max(0.f,militaryHull-e.value);
+      militaryHull=std::max(0.f,militaryHull-e.value*(battleOnly?battle.damageScale():1.f));
       plane.w+=vec3(.015f,.009f,.02f)*std::min(e.value,30.f);
       g_audio.triggerAt(SFX_IMPACT,at,clampf(e.value*.025f,.12f,.65f));
       if(militaryHull<=0) { plane.ev.crashed=true; plane.ev.crashReason="Hull lost to Hive fire"; }
@@ -7448,6 +7484,7 @@ void Game::updateHive(float dt) {
     if(e.type==hive::EventType::ScanComplete) toast("Intelligence site recorded",vec3(.3f,1,.7f));
   }
   hiveCombat.clearEvents();
+  if (battleOnly) { updateBattle(dt,p); return; }
   if (hiveCombat.mission.status == hive::MissionStatus::Active) audioExtractSaid = false;
   if (hiveCombat.mission.status == hive::MissionStatus::Extract && !audioExtractSaid) {
     audioExtractSaid = true; toast("OBJECTIVES COMPLETE - RETURN TO EXTRACTION",vec3(.3f,1,.7f));

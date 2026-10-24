@@ -363,11 +363,20 @@ static void pollPad(Input& in) {
   in.buttons = m;
 }
 
+#if defined(SOMNIUM_XR40_BATTLE)
+static constexpr bool kBattleBuild = true;
+static constexpr const char* kAppFolder = "\\XR40Battle";
+static constexpr const wchar_t* kWindowTitle = L"XR-40 Battle | Somnium Volandi";
+#else
+static constexpr bool kBattleBuild = false;
+static constexpr const char* kAppFolder = "\\SomniumVolandi";
+static constexpr const wchar_t* kWindowTitle = L"Somnium Volandi";
+#endif
 static std::string userDir() {
   char buf[MAX_PATH] = {};
   DWORD n = GetEnvironmentVariableA("APPDATA", buf, MAX_PATH);
   if (!n) return ".";
-  std::string d = std::string(buf) + "\\SomniumVolandi";   // (a new start: the old names' folders are left as they are)
+  std::string d = std::string(buf) + kAppFolder;   // (a new start: the old names' folders are left as they are)
   CreateDirectoryA(d.c_str(), nullptr);
   return d;
 }
@@ -377,7 +386,7 @@ static std::string userDir() {
 static std::string photosDir() {
   char buf[MAX_PATH] = {};
   if (SHGetFolderPathA(nullptr, CSIDL_MYPICTURES, nullptr, SHGFP_TYPE_CURRENT, buf) != S_OK || !buf[0]) return "";
-  return std::string(buf) + "\\Somnium Volandi";
+  return std::string(buf) + (kBattleBuild ? "\\XR-40 Battle" : "\\Somnium Volandi");
 }
 
 // Child process: SomniumVolandi.exe --build-shader-cache "<dir>" compiles every program into the binary cache and
@@ -511,7 +520,7 @@ struct AircraftShaderHelpers {
     if (GlobalMemoryStatusEx(&ms)) n = std::clamp((int)(((long long)ms.ullAvailPhys - (1536ll << 20)) / (512ll << 20)), 1, n);
     char exe[MAX_PATH] = {}; GetModuleFileNameA(nullptr, exe, MAX_PATH);
     QueryPerformanceCounter(&t0);
-    for (const std::vector<int>& share : Renderer::afShareItems(n)) {
+    for (const std::vector<int>& share : Renderer::afShareItems(n,kBattleBuild?kSomnus:-1)) {
       if (share.empty()) continue;
       std::string cmd = std::string("\"") + exe + "\" --build-aircraft-shaders \"" + cacheDir + "\" ";
       for (size_t k = 0; k < share.size(); k++) cmd += (k ? "," : "") + std::to_string(share[k]);
@@ -603,11 +612,12 @@ static std::string cacheDirFor(const std::string& exeDir, const std::string& sav
     }
     RemoveDirectoryA(d.c_str());
   };
-  const std::string olds[] = {exeDir + "\\shadercache", saveDir + "\\shadercache"};
+  const std::string suffix=kBattleBuild?"\\xr40-shadercache":"\\shadercache";
+  const std::string olds[] = {exeDir + suffix, saveDir + suffix};
   char local[MAX_PATH] = {};
   const DWORD n = GetEnvironmentVariableA("LOCALAPPDATA", local, MAX_PATH);
   if (n && n < MAX_PATH) {
-    const std::string dir = std::string(local) + "\\SomniumVolandi";
+    const std::string dir = std::string(local) + kAppFolder;
     if (GetFileAttributesA(dir.c_str()) == INVALID_FILE_ATTRIBUTES)
       for (const std::string& old : olds)
         if (GetFileAttributesA(old.c_str()) != INVALID_FILE_ATTRIBUTES && MoveFileExA(old.c_str(), dir.c_str(), 0)) break;
@@ -648,6 +658,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   SetProcessDPIAware();
   timeBeginPeriod(1);
   static Game game;
+  game.battleOnly = kBattleBuild;
   g_game = &game; s_pacingGame = &game;
   game.saveDir = userDir();
   game.photoDir = photosDir();
@@ -668,7 +679,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     if (strstr(GetCommandLineA(), "--test-crash")) { volatile int* none = nullptr; *none = 1; }   // (checks the reports end to end)
   }
   // Steam (steam.h): before the window, as Valve asks, when steam_api64.dll is beside the exe; never in a tool's run
-  if (!toolLaunch(GetCommandLineA())) steam::init(game.assetDir);
+  if (!kBattleBuild && !toolLaunch(GetCommandLineA())) steam::init(game.assetDir);
 
   WNDCLASSEXW wc = {sizeof(wc)};
   wc.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
@@ -681,7 +692,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   int ww = std::min(1600, sw * 4 / 5), wh = ww * 9 / 16;
   RECT r = {0, 0, ww, wh};
   AdjustWindowRect(&r, WS_OVERLAPPEDWINDOW, FALSE);
-  g_hwnd = CreateWindowExW(0, wc.lpszClassName, L"Somnium Volandi", WS_OVERLAPPEDWINDOW, (sw - (r.right - r.left)) / 2, (sh - (r.bottom - r.top)) / 2,
+  g_hwnd = CreateWindowExW(0, wc.lpszClassName, kWindowTitle, WS_OVERLAPPEDWINDOW, (sw - (r.right - r.left)) / 2, (sh - (r.bottom - r.top)) / 2,
                            r.right - r.left, r.bottom - r.top, nullptr, nullptr, hInst, nullptr);
   g_hdc = GetDC(g_hwnd);
   PIXELFORMATDESCRIPTOR pfd = {sizeof(pfd), 1, PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER, PFD_TYPE_RGBA, 32};
@@ -857,7 +868,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   const int stMenu = tool ? -1 : pace.add("menu", 12, 0.f, "MENU SCENERY");
   std::vector<int> meshSteps;
   if (!tool)
-    for (const auto& it : Game::prewarmItems(true)) meshSteps.push_back(pace.add("mesh" + std::to_string(it.first) + (it.second ? "c" : "o"),9,9.f,"AIRCRAFT"));
+    for (const auto& it : Game::prewarmItems(true,kBattleBuild)) meshSteps.push_back(pace.add("mesh" + std::to_string(it.first) + (it.second ? "c" : "o"),9,9.f,"AIRCRAFT"));
   pace.begin(stStart);
   std::thread compileThread;
   if (ctx2) compileThread = std::thread([&] {
@@ -1044,7 +1055,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     if (FILE* f = fopen((g_shaderCacheDir + "\\compile_time.txt").c_str(), "w")) { fprintf(f, "%.1f\n", compileSecs); fclose(f); }
   CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
   pace.begin(stInit);
-  introFrame(pace.fraction(), perfFresh ? "Loading your career  |  learning how each aircraft flies (once)" : "Loading your career and the aircraft performance", 1.f);
+  introFrame(pace.fraction(), kBattleBuild ? "Preparing XR-40 battle systems" : perfFresh ? "Loading your career  |  learning how each aircraft flies (once)" : "Loading your career and the aircraft performance", 1.f);
   game.diskless = tool;   // (diagnostics and other tools: the player's career and settings are never written)
   game.init(false, [&](float f, const std::string& what) { pace.setSub(f); introFrame(pace.fraction(), what, 1.f); });
   if (game.quit) { stopIntro(false); return 0; }

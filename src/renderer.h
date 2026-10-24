@@ -714,7 +714,7 @@ public:
   // side by side into the cache (platform_win32.cpp); buildAfItem builds one as the first frame that wants it would
   static int afItemCount();
   static void afItemOf(int item, int& model, int& kind);   // kind: 0 the mesh pass's, 1 objects, 2 shadow proxy, 3 effects
-  static std::vector<std::vector<int>> afShareItems(int helpers);
+  static std::vector<std::vector<int>> afShareItems(int helpers, int onlyModel = -1);
   void buildAfItem(int item);
 private:
   GLuint screenFbo = 0;

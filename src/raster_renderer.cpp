@@ -115,9 +115,10 @@ static float afItemCost(int item) {
   static const float light[3] = {2.4f, 5.8f, 1.0f}, xr30[3] = {5.1f, 10.3f, 4.3f}, xr40[3] = {9.5f, 12.6f, 7.3f};
   return kind == 3 ? 3.7f : model == kSomnus ? xr40[kind] : model == kResearchJet ? xr30[kind] : light[kind];
 }
-std::vector<std::vector<int>> Renderer::afShareItems(int helpers) {
+std::vector<std::vector<int>> Renderer::afShareItems(int helpers, int onlyModel) {
   std::vector<int> order(afItemCount());
   std::iota(order.begin(), order.end(), 0);
+  if (onlyModel>=0) order.erase(std::remove_if(order.begin(),order.end(),[&](int item){ int model,kind;afItemOf(item,model,kind);return model!=onlyModel; }),order.end());
   std::stable_sort(order.begin(), order.end(), [](int a, int b) { return afItemCost(a) > afItemCost(b); });
   std::vector<std::vector<int>> share(std::max(helpers, 1));
   std::vector<float> load(share.size(), 0.f);
