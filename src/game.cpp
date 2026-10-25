@@ -1533,6 +1533,33 @@ void Game::cancelFreeFlightSetup() {
 }
 
 // (a landplane chosen at a seaplane base: nowhere for it to stand, so it starts over the lane instead)
+// The field a float plane is coming down at: the nearest within 4 km (an amphibian may land at any, on whichever
+// surface it has), or -1
+int Game::amphibianField() const {
+  float d; const int ai = g_world.nearestAirport(plane.pos.x, plane.pos.z, &d);
+  return ai >= 0 && d < 4000.f ? ai : -1;
+}
+
+// The gear warning: low and slow near the field with the gear wrong for it - a retractable gear not down at the
+// destination; an amphibian's wheels down for a water lane, or up for a runway, while it is coming down (not climbing
+// away from the field it left: docs/WINGS_OVER_WATER.md)
+bool Game::gearWarning() const {
+  const AircraftSpec& s = *plane.spec;
+  if (!s.retract || plane.onGround || plane.agl() >= 200 || plane.ias >= s.vref * 1.5f) return false;
+  if (s.floats) {
+    const int ai = amphibianField();
+    return ai >= 0 && plane.vel.y < -0.5f && (g_world.airports[ai].water() ? plane.gear > 0.01f : plane.gear < 0.99f);
+  }
+  return plane.gear < 0.99f && length(plane.pos - g_world.airports[contract.to].pos()) < 4000.f;
+}
+
+bool Game::atDock() const {
+  if (!plane.onWater) return false;
+  for (const Airport& a : g_world.airports)
+    if (a.water() && a.dockLen > 0.f) { const vec3 h = a.dockHead(); if (hypotf(plane.pos.x - h.x, plane.pos.z - h.z) < 15.f) return true; }
+  return false;
+}
+
 bool Game::freeStartsAirborne() const {
   return freeAirport >= 0 && freeAirport < (int)g_world.airports.size() && g_world.airports[freeAirport].water() &&
          validAircraft(freeCraft) && !kAircraft[freeCraft].floats;
@@ -1591,7 +1618,8 @@ void Game::launchFreeFlight() {
   earthPosition = regionTravel::Chart(flightRegion.origin).position(plane.pos);
   toasts.clear();
   toast(std::string(s.name) + " / FREE FLIGHT", vec3(0.6f, 1.f, 0.8f), false);
-  toast(freeAirborne ? "Already airborne. Fly anywhere, then return from the pause menu." : "Full tanks. Release the parking brake when ready.", vec3(0.8f, 0.9f, 1.f));
+  toast(c.startAirborne ? "Already airborne. Fly anywhere, then return from the pause menu." :
+        plane.onWater ? expandHint("Full tanks, moored at the dock. Cast off ({parkingBrake}) when ready.", padPrompts(), true) : "Full tanks. Release the parking brake when ready.", vec3(0.8f, 0.9f, 1.f));
 }
 
 void Game::returnToFreeFlight() {
@@ -2271,6 +2299,10 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
   }
   float hdg = reverse ? h0 + 180.f : h0;
   vec3 start = a.threshold(reverse) + (reverse ? -a.dir() : a.dir()) * 30.f;
+  if (a.water() && s.floats && !c.startAirborne && a.dockLen > 0.f) {   // a float plane at a seaplane base: moored at its dock, facing out
+    const FloatStations fs = floatStations(s);
+    start = a.berth(2.6f + fs.x + fs.beam * 0.5f); hdg = a.berthHeading();   // (the pontoon's 2.3 m half width, its fenders, a hand's breadth)
+  }
   float payloadKg = (float)c.cargoKg + c.pax * 85.f + 85.f;
   combatBasePayload=payloadKg;
   float fuel = launchPlan.fuelLoadKg;
@@ -2308,7 +2340,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
       if (d < best) { best = d; sightReq = i; }
     }
   }
-  takeoffAnnounced = c.startAirborne; touchedDown = false; touchdownFpm = 0; stillTimer = 0; tdRunway = -2;   // (an airborne start has no takeoff to announce)
+  takeoffAnnounced = c.startAirborne; touchedDown = false; touchdownFpm = 0; stillTimer = 0; tdRunway = -2; gearAdvised = false;   // (an airborne start has no takeoff to announce)
   engineAutoStarted = false; startDelay = 1.2f;
   parkingBrake = !c.startAirborne;   // a start on the ground is parked: the brake is released to roll
   if (!plane.onGround) settleAirborneStart();
@@ -2377,7 +2409,7 @@ void Game::endFlight(bool success, const std::string& reason, FlightOutcome outc
   result.fuelUsedKg = std::max(0.f, fuelStart - plane.fuel);
   result.fuelLeftKg = std::max(0.f, plane.fuel);
   result.fuelLeftFrac = plane.spec->maxFuel > 0 ? clampf(plane.fuel / plane.spec->maxFuel, 0.f, 1.f) : 1.f;
-  result.shutDownAtStand = success && plane.onGround && !plane.engineRunning && parkingBrake && g_world.onRunway(plane.pos.x, plane.pos.z, 6.f) < 0;
+  result.shutDownAtStand = success && plane.onGround && !plane.engineRunning && parkingBrake && (plane.onWater ? atDock() : g_world.onRunway(plane.pos.x, plane.pos.z, 6.f) < 0);
   result.touchdownFpm = touchdownFpm;
   result.late = contract.timeLimitMin > 0 && (jobClockBase + flightClock) / 60.f > contract.timeLimitMin;
   result.landed = touchedDown && plane.onGround;
@@ -2711,10 +2743,19 @@ void Game::flightControls(float dt) {
     else toast("Autopilot ON: the stick trims heading and altitude, throttle sets speed", vec3(0.6f, 1, 0.6f));
   }
   if (plane.spec->special == 2) somnusControls(dt);
-  if (actKeyP(ACT_PARK) || actJoyP(ACT_PARK) || (!showMap && actPadP(ACT_PARK))) { parking = !parking; toast(parking ? "Parking brake SET" : "Parking brake released", vec3(1, 0.85f, 0.5f)); }
+  // on the water the same control moors the aircraft (once all but stopped: the physics makes the lines fast) and
+  // casts it off (docs/WINGS_OVER_WATER.md)
+  if (actKeyP(ACT_PARK) || actJoyP(ACT_PARK) || (!showMap && actPadP(ACT_PARK))) {
+    if (plane.onWater && !parking && length(vec3(plane.vel.x, 0.f, plane.vel.z)) > 1.5f) toast("Too fast to moor: slow to a stop first", vec3(1, 0.7f, 0.4f));
+    else {
+      parking = !parking;
+      toast(plane.onWater ? (parking ? (atDock() ? "Moored at the dock" : "Moored") : "Cast off") : parking ? "Parking brake SET" : "Parking brake released", vec3(1, 0.85f, 0.5f));
+    }
+  }
   float wb = std::max(actDown(ACT_BRAKE) ? 1.f : 0.f, joyAxis(AX_BRAKE));   // (toe brakes: as far as they are pressed)
-  if (wb > 0 && parking && plane.onGround && length(plane.vel) > 2.f) parking = false;
+  if (wb > 0 && parking && plane.onGround && !plane.onWater && length(plane.vel) > 2.f) parking = false;
   c.brake = parking ? 1.f : wb;
+  plane.moorWanted = parking;
   // autopilot: Z / right stick click. With an autoland airport picked on the GPS it flies there and lands;
   // otherwise it holds heading, altitude and speed
   if (actPressed(ACT_AP)) {
@@ -3031,6 +3072,21 @@ void Game::updateFlight(float dt) {
     if (plane.ev.touchdown && takeoffAnnounced && atcF.goAround && !atcF.goAroundUnable) result.landedAgainstGoAround = true;
     if (plane.onGround) { appLow = false; appHigh = false; if (result.tdPastThrM >= 0 && length(plane.vel) > 1.f) result.stopLeftM = A.length - along; }   // (while still rolling: its direction says which end)
   }
+  // an amphibian's gear advisory (docs/WINGS_OVER_WATER.md): once on each approach, sinking through 150 m within 4 km
+  // of a field, what the gear is set for against what the field is; re-armed on the ground or climbing back through 300 m
+  if (plane.spec->floats && plane.spec->retract) {
+    const float agl = plane.agl();
+    if (plane.onGround || agl > 300.f) gearAdvised = false;
+    else if (!gearAdvised && agl < 150.f && plane.vel.y < -0.5f) {
+      const int ai = amphibianField();
+      if (ai >= 0) {
+        gearAdvised = true;
+        const bool water = g_world.airports[ai].water(), down = plane.gear > 0.5f;
+        if (water != down) toast(water ? "Gear is up for a water landing" : "Gear is down for a runway landing", vec3(0.6f, 1, 0.7f));
+        else { toast(water ? "Gear is DOWN - a water landing: raise it" : "Gear is UP - a runway landing: lower it", vec3(1, 0.5f, 0.3f)); g_audio.trigger(SFX_BEEP); }
+      }
+    }
+  }
   // touchdown
   if (plane.ev.touchdown && takeoffAnnounced) {
     float fpm = -plane.ev.touchdownVs * 196.85f;
@@ -3038,8 +3094,9 @@ void Game::updateFlight(float dt) {
     tdRunway = g_world.onRunway(plane.pos.x, plane.pos.z, 10.f);   // (the arrival's evidence: the last touchdown's runway, or -1 off every runway)
     const GearStations audioGear = gearStations(*plane.spec);
     const AudioSurface contactSurface=tdRunway>=0?AudioSurface(g_world.airports[tdRunway].surface):AudioSurface::Grass;
-    // A belly arrival has no tyres to spin up; its metal contact is emitted above.
-    if(!result.bellyLanding) for (float side : {-1.f,1.f}) g_audio.touchdown(
+    // A belly arrival has no tyres to spin up; its metal contact is emitted above. Floats meet the water with a splash
+    if (plane.onWater) g_audio.triggerAt(SFX_SPLASH, plane.pos, clampf(fpm / 500.f, .25f, .9f));
+    else if(!result.bellyLanding) for (float side : {-1.f,1.f}) g_audio.touchdown(
       plane.pos+plane.q.rotate(vec3(side*audioGear.track,-plane.gearHeight(),audioGear.mainZ)),
       clampf(fpm/600.f,.15f,.8f),length(vec3(plane.vel.x,0,plane.vel.z)),contactSurface);
     // (the rating on the touchdown scale the settlement pays by: career.h touchdownGrade - spoken, and stamped on the HUD)
@@ -3048,8 +3105,8 @@ void Game::updateFlight(float dt) {
     profileTouchdown(fpm, tdRunway);   // (airport stamps, butter, the type's softest: game_profile.cpp)
     shake(clampf(fabsf(fpm) / 750.f, 0.12f, 0.8f));
     float gs = length(vec3(plane.vel.x, 0, plane.vel.z));
-    for (int side = -1; side <= 1; side += 2) {
-      const GearStations gst = gearStations(*plane.spec);   // (at the main wheels)
+    for (int side = -1; side <= 1 && !plane.onWater; side += 2) {
+      const GearStations gst = gearStations(*plane.spec);   // (at the main wheels: their smoke; on the water, none)
       vec3 wp = plane.pos + plane.q.rotate(vec3(side * gst.track, -plane.gearHeight(), gst.mainZ));
       int n = (int)clampf(gs * 0.3f, 4, 18);
       for (int i = 0; i < n; i++) spawn(wp, plane.vel * 0.3f + vec3((rand() % 100 - 50) * 0.02f, 0.5f, (rand() % 100 - 50) * 0.02f), 2.5f + (rand() % 100) * 0.01f, 0.6f, 1.8f, vec3(0.75f, 0.75f, 0.76f), 0.45f, SPR_SMOKE, 2.f, 0.2f);
@@ -3214,16 +3271,16 @@ void Game::updateFlight(float dt) {
       if (onField && wpsLeft && !parkingBrake) {
         if (stillTimer >= 1.25f && stillTimer - dt < 1.25f) {   // (the first line as recorded for the voice)
           toast("Checkpoints remaining - take off again to continue", vec3(1, 0.8f, 0.4f));
-          toast(expandHint("Or set the parking brake ({parkingBrake}) to end the leg here", padPrompts(), true), vec3(1, 0.8f, 0.4f), false);
+          toast(expandHint(plane.onWater ? "Or moor ({parkingBrake}) to end the leg here" : "Or set the parking brake ({parkingBrake}) to end the leg here", padPrompts(), true), vec3(1, 0.8f, 0.4f), false);
         }
       } else if (waits) {
         if (!arrivalTold) {
           arrivalTold = true;
           if (arrivedAt(ap)) {
             toast(fmt("Welcome to %s", g_world.airports[ap].name), vec3(0.6f, 1, 0.7f), false);
-            toast(expandHint("Taxi clear of the runway, then set the parking brake ({parkingBrake}) to finish", padPrompts(), true), vec3(0.85f, 0.95f, 1.f), false);
+            toast(expandHint(plane.onWater ? "Taxi to the dock, then moor ({parkingBrake}) to finish" : "Taxi clear of the runway, then set the parking brake ({parkingBrake}) to finish", padPrompts(), true), vec3(0.85f, 0.95f, 1.f), false);
             if (contract.payout > 0 && !engineShutDown) toast(expandHint("Shut down first (hold {engine}) for the airmanship bonus", padPrompts(), true), vec3(0.85f, 0.95f, 1.f), false);
-          } else toast(expandHint(fmt("Landed at %s: set the parking brake ({parkingBrake}) to end the flight here, or take off again", g_world.airports[ap].name), padPrompts(), true), vec3(1, 0.8f, 0.4f), false);
+          } else toast(expandHint(fmt(plane.onWater ? "Alighted at %s: moor ({parkingBrake}) to end the flight here, or take off again" : "Landed at %s: set the parking brake ({parkingBrake}) to end the flight here, or take off again", g_world.airports[ap].name), padPrompts(), true), vec3(1, 0.8f, 0.4f), false);
         }
       } else if (onField && arrivedAt(ap) && !wpsLeft) { endFlight(true, ""); return; }
       else if (onField) { result.divertedTo = ap; endFlight(false, fmt(wpsLeft ? "Leg ended at %s with checkpoints remaining" : "Diverted to %s", g_world.airports[ap].name), OUT_DIVERTED); return; }
@@ -5704,11 +5761,9 @@ void Game::updateComms(float dt) {
   if (crashed && !commsCrashSeen) { atc.cancel(); commsCrashSeen = true; }
   if (!crashed) commsCrashSeen = false;
   if (screen == SCR_FLIGHT && !crashed && flightClock > 2.f) {   // the HUD's warnings (game_ui.cpp), spoken as they come on
-    const AircraftSpec& spc = *plane.spec;
-    const Airport& d = g_world.airports[contract.to];
     bool w[4] = {plane.stallWarn > 0.8f && !plane.onGround && plane.ias > 10.f,
                  !plane.onGround && plane.agl() < 120 && plane.vel.y < -7.f,
-                 spc.retract && plane.gear < 0.99f && !plane.onGround && plane.agl() < 200 && length(plane.pos - d.pos()) < 4000.f && plane.ias < spc.vref * 1.5f,
+                 gearWarning(),
                  !plane.engineRunning && engineAutoStarted && plane.starterTime <= 0 && !plane.glideOnly() && !(engineShutDown && plane.onGround)};   // (a failed engine has no restart to advise; one shut down at the stand, none needed)
     const char* say[4] = {"STALL", "PULL UP", "GEAR!", nullptr};
     for (int i = 0; i < 4; i++) {
@@ -5799,9 +5854,10 @@ void Game::feedAudio() {
     for (int e = 0; e < 4; e++) ap.engineHealth[e] = plane.fail.engineHealth[e];
     ap.airspeed = plane.airspeed; ap.groundSpeed = length(vec3(plane.vel.x, 0, plane.vel.z)); ap.onGround = plane.onGround; ap.rough = plane.groundRough;
     static_assert(SURF_ASPHALT==int(AudioSurface::Paved) && SURF_GRASS==int(AudioSurface::Grass) &&
-      SURF_GRAVEL==int(AudioSurface::Gravel) && SURF_SNOW==int(AudioSurface::Snow) && SURF_SAND==int(AudioSurface::Sand),"audio ground materials match the world");
+      SURF_GRAVEL==int(AudioSurface::Gravel) && SURF_SNOW==int(AudioSurface::Snow) && SURF_SAND==int(AudioSurface::Sand) &&
+        SURF_WATER==int(AudioSurface::Water),"audio ground materials match the world");
     int groundAirport=plane.onGround?g_world.onRunway(plane.pos.x,plane.pos.z,4.f):-1;
-    ap.groundSurface=groundAirport>=0?AudioSurface(g_world.airports[groundAirport].surface):AudioSurface::Grass;
+    ap.groundSurface=plane.onWater?AudioSurface::Water:groundAirport>=0?AudioSurface(g_world.airports[groundAirport].surface):AudioSurface::Grass;
     ap.stallWarn = plane.onGround ? 0.f : plane.stallWarn; ap.stallIsShaker = s.engineType == ENG_JET || s.license == LIC_ATP;
     ap.gearMoving = plane.gear > 0.01f && plane.gear < 0.99f; ap.flapsMoving = fabsf(plane.flaps - plane.ctl.flaps) > 0.02f;
     ap.gearDown = plane.gear; ap.flaps = plane.flaps;

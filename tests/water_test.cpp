@@ -1,9 +1,12 @@
 // Float hydrodynamics (docs/WINGS_OVER_WATER.md): the Kittiwake A9 on the open sea and at its edges, flown through the
 // flight model as a pilot flies it - at rest, a take-off run through the hump onto the step, a landing, the classic
 // mistakes (the wheels down for the water, too hard an arrival, a beach at speed), the water rudders, weathervaning, a
-// rough sea, a runway met with the wheels up - and a landplane on the water, which still ditches.
+// rough sea, a runway met with the wheels up - moored at a seaplane base's dock and cast off, and a landplane on the
+// water, which still ditches.
 #include "../src/aircraft.h"
+#include "../src/entities.h"
 #include "test_world.h"
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -183,6 +186,43 @@ int main() {
       if (speed < 5) check(!p.ev.crashed, "run in onto a beach at a walking pace it grounds gently");
       else check(p.ev.crashed && p.ev.crashReason == "Ran aground", "run onto a beach at speed it is aground (" + p.ev.crashReason + ")");
     }
+  }
+  {   // moored at a seaplane base's dock (Verde Bay): a fresh wind on its beam pushes it toward the pontoon; it rides it out
+      // on its lines, clear of the dock; cast off, it taxis out along the dock and away
+    const Airport& a = g_world.airports[g_world.findAirport("VBY")];
+    const FloatStations f = floatStations(K);
+    const vec3 berth = a.berth(2.6f + f.x + f.beam * 0.5f);
+    const float h0 = a.berthHeading();
+    const vec3 head = a.dockHead();   // (the pontoon is solid to a float, its deck clear of a wing: Scenery::collide)
+    check(g_scenery.collide(head + vec3(0, 0.3f, 0), 0.3f) == EK_SEADOCK + 1 && !g_scenery.collide(head + vec3(0, 2.2f, 0), 0.3f) &&
+          !g_scenery.collide(berth + vec3(0, 0.3f, 0), 0.3f), "the dock's pontoon is solid at the waterline, clear above its deck and at the berth");
+    Plane p; p.reset(&K, berth, h0, fuel(), kLoad, false);
+    p.engineRunning = true; p.moorWanted = true;
+    float drift = 0, swing = 0, t = 0;
+    for (; t < 60 && !p.ev.crashed; t += 1 / 60.f) {
+      p.ctl.throttle = 0; p.step(1 / 60.f, wind(9, h0 + 90.f), t);
+      if (t > 3) { drift = std::max(drift, dist2d(p.pos, berth)); swing = std::max(swing, fabsf(wrapAngle((p.heading() - h0) * DEG)) / DEG); }
+    }
+    std::printf("  moored in a 9 m/s beam wind: %s, %.2f m off its berth at most, %.1f deg of swing\n", p.ev.crashed ? p.ev.crashReason.c_str() : "held", drift, swing);
+    check(!p.ev.crashed && p.moored && drift < 1.f && swing < 10.f, "moored at the dock it rides out a 9 m/s wind on its beam, clear of the pontoon");
+    p.moorWanted = false;
+    const float t0 = t;
+    for (; t < t0 + 40 && !p.ev.crashed; t += 1 / 60.f) { p.ctl.throttle = 0.2f; hold(p, p.pitchDeg(), h0); p.step(1 / 60.f, wind(9, h0 + 90.f), t); }
+    std::printf("  cast off: %s, %.0f m from the berth after 40 s\n", p.ev.crashed ? p.ev.crashReason.c_str() : "taxiing", dist2d(p.pos, berth));
+    check(!p.ev.crashed && !p.moored && dist2d(p.pos, berth) > 40.f, "cast off, it taxis away from the dock");
+  }
+  {   // on its idle it slows to a walking pace on the water (an arrival waits for 2.5 m/s), and moors there
+    Plane p; p.reset(&K, sea, 90, fuel(), kLoad, false);
+    for (int i = 0; i < 120; i++) p.step(1 / 60.f, wind(), i / 60.f);
+    p.engineRunning = true; p.vel = p.forward() * 6.f;
+    float t = 0;
+    for (; t < 60 && !p.ev.crashed; t += 1 / 60.f) { p.ctl.throttle = 0; hold(p, p.pitchDeg(), 90); p.step(1 / 60.f, wind(), t); }
+    const float idle = length(vec3(p.vel.x, 0, p.vel.z));
+    std::printf("  idle on the water: %.2f m/s\n", idle);
+    check(!p.ev.crashed && idle < 2.5f, "on its idle it slows below the 2.5 m/s an arrival waits for");
+    p.moorWanted = true; const vec3 at = p.pos;
+    for (const float t0 = t; t < t0 + 30 && !p.ev.crashed; t += 1 / 60.f) { p.ctl.throttle = 0; p.step(1 / 60.f, wind(), t); }
+    check(!p.ev.crashed && p.moored && dist2d(p.pos, at) < 4.f, "moored where it stopped, it stays there");
   }
   {   // a landplane on the water ditches, as before
     Plane p; p.reset(&kAircraft[1], sea + vec3(0, 4, 0), 90, 60, 100, true, kAircraft[1].vref);

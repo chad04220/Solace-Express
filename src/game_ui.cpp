@@ -2926,8 +2926,7 @@ void Game::drawHud(const FrameParams& fp) {
   // ================================================================ warnings: icons under the band, the edges lit
   bool stall = (plane.stallWarn > 0.8f && !plane.onGround && plane.ias > 10.f) || hudDemo;
   bool pullUp = (!plane.onGround && plane.agl() < 120 && plane.vel.y < -7.f) || hudDemo;
-  bool nearDest = length(plane.pos - d.pos()) < 4000.f;
-  bool gearW = (spc.retract && plane.gear < 0.99f && !plane.onGround && plane.agl() < 200 && nearDest && plane.ias < spc.vref * 1.5f) || hudDemo;
+  bool gearW = gearWarning() || hudDemo;
   bool engOff = (!plane.engineRunning && engineAutoStarted && plane.starterTime <= 0 && !plane.glideOnly() && !(engineShutDown && plane.onGround)) || hudDemo;
   {
     float pulse = 0.5f + 0.5f * sinf(realTime * 7.f);
@@ -3158,7 +3157,7 @@ void Game::drawHud(const FrameParams& fp) {
         g_ren.text(cx + 7 * s, cy + 5 * s, 10 * s, t, on ? C_TEXT : C_DIM, on ? 1.f : 0.6f, 0, false);
         cx -= 6 * s;
       };
-      chip("LDG LT", C_ACCENT, landingLight); chip("BRAKE", C_WARN, plane.ctl.brake > 0.5f); chip("AP", APC, plane.apOn);
+      chip("LDG LT", C_ACCENT, landingLight); if (plane.onWater) chip("MOORED", C_WARN, plane.moored); else chip("BRAKE", C_WARN, plane.ctl.brake > 0.5f); chip("AP", APC, plane.apOn);
       if (plane.apOn) { std::string ap = plane.apStatus; float aw = g_ren.textWidth(ap, 11 * s); cx -= aw; g_ren.text(cx, sy + 17 * s, 11 * s, ap, APC, 1, 0, false); cx -= 10 * s; }
       rx = cx;
     }

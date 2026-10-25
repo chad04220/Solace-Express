@@ -255,6 +255,7 @@ void Plane::reset(const AircraftSpec* s, vec3 position, float headingDeg, float 
   cd0 = aeroCD0(aeroModel(*s), *s, std::max(speed, 30.f), 1.225f, speed / 340.f);
   nozzle = 0; mach = 0;
   onWater = false; floatWet = 0.f; seaFetchT = -1.f; floatGround = floatGroundRunway = false; floatGroundSpeed = 0.f;
+  moorWanted = moored = false;
   if (airborne) {
     vel = forward() * speed; engineRunning = true; engineSpool = 0.7f; ctl.throttle = 0.7f;
     rpm = s->engineType == ENG_PISTON ? s->maxRpm * 0.88f : s->maxRpm; n1 = 90;
@@ -863,6 +864,22 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   floatGround = floatGroundRunway = false; floatGroundSpeed = 0.f;
   if (s.floats && altAgl < 8.f) keels = floatContacts(dt, wx, time, cg, Fw, Tw, afloat);
   else floatWet = 0.f;
+  // moored: the lines made fast where the bow and stern stations were once afloat and all but stopped (under 1.5 m/s);
+  // each a stiff, well-damped spring in the horizontal (a period of some 6 s), so the aircraft rides the chop and
+  // swings a little in the gusts but stays at its dock. Cast off (moorWanted false) or out of the water, they are let go
+  if (!moorWanted || !afloat) moored = false;
+  else {
+    const FloatStations fs = floatStations(s);
+    const vec3 bowB(0.f, fs.keelY + fs.depth, fs.bowZ), sternB(0.f, fs.keelY + fs.depth, fs.sternZ);
+    if (!moored && length(vec3(vel.x, 0.f, vel.z)) < 1.5f) { moored = true; moorBow = pos + q.rotate(bowB); moorStern = pos + q.rotate(sternB); }
+    if (moored)
+      for (int k = 0; k < 2; k++) {
+        const vec3 pb = k ? sternB : bowB, pw = pos + q.rotate(pb), vp = vel + q.rotate(cross(w, pb));
+        const vec3 to = (k ? moorStern : moorBow) - pw;
+        const vec3 f(m * (0.6f * to.x - 1.f * vp.x), 0.f, m * (0.6f * to.z - 1.f * vp.z));
+        Fw += f; Tw += cross(pb - cg, q.conj().rotate(f));
+      }
+  }
   wasOnGround = onGround;
   onGround = anyWheel || keels;
   onWater = afloat && !anyWheel;

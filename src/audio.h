@@ -7,7 +7,7 @@
 #include <vector>
 
 enum class AudioSpace { Listener, Cabin, Airframe, World };
-enum class AudioSurface { Paved, Grass, Gravel, Snow, Sand };
+enum class AudioSurface { Paved, Grass, Gravel, Snow, Sand, Water };   // (Water: a float plane on a seaplane base's lane)
 struct AudioSource {
   AudioSpace space = AudioSpace::World;
   vec3 position, velocity;

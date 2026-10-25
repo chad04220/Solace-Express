@@ -228,6 +228,9 @@ public:
   // far the floats are in (0 dry .. 1 the whole float down to its deck: on the step at speed little more than the keel),
   // and the chop it rides (m, the sea's local amplitude: sheltered water calm, the open coast rough in the wind)
   bool onWater = false; float floatWet = 0, seaChop = 0;
+  // moored (docs/WINGS_OVER_WATER.md): asked for by the parking brake on the water, made once the aircraft is afloat
+  // and all but stopped there - two lines, from each float's bow and stern station, held to where they were made fast
+  bool moorWanted = false, moored = false; vec3 moorBow, moorStern;
   bool sceneryHits = true;   // collide with trees and buildings (off for the quote's background flight: the scenery isn't thread-safe)
   // the trees and buildings its autopilot plans the final over (apPlan): nullptr the game's (g_scenery); a background
   // flight's own, made on its thread (the game's is the game thread's alone: its chunks are replaced and trimmed there).

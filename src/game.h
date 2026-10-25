@@ -206,6 +206,10 @@ private:
   bool freeFlight = false;
   int freeCraft = 0, freeAirport = 0;
   bool freeStartsAirborne() const;
+  bool atDock() const;   // afloat beside a seaplane base's dock (its berth within 15 m)
+  int amphibianField() const;   // the field a float plane is coming down at (nearest within 4 km), or -1
+  bool gearWarning() const;     // the HUD's GEAR warning (and its call): the gear wrong for the field, low and slow
+  bool gearAdvised = false;     // an amphibian's gear advisory said on this approach (re-armed climbing away)
   bool freeAirborne = false, freeLaunchPending = false;
   // One active chart plus one immutable background candidate. Initial/menu replacements gate readers.
   std::vector<procedural::Descriptor> freeRegions;

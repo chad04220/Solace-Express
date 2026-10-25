@@ -67,6 +67,10 @@ struct Airport {
   bool water() const { return surface == SURF_WATER; }
   float dockX = 0, dockZ = 0, dockDirX = 0, dockDirZ = 0, dockLen = 0;
   vec3 dockHead() const { return vec3(dockX + dockDirX * dockLen, 0.f, dockZ + dockDirZ * dockLen); }
+  // where a float plane lies alongside the pontoon (the fuel pump's side, its left float to the dock), its centre line
+  // `off` m out from the dock's, facing out along it (heading in degrees)
+  vec3 berth(float off) const { return dockHead() + vec3(-dockDirZ, 0.f, dockDirX) * off; }
+  float berthHeading() const { return atan2f(dockDirX, -dockDirZ) * 57.2957795f; }
   // derived
   vec3 dir() const { float h = heading * DEG; return vec3(sinf(h), 0, -cosf(h)); }
   vec3 pos() const { return vec3(x, elev, z); }

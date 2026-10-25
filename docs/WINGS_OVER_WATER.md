@@ -113,9 +113,25 @@ begins in the air on the approach.
 
 ### Mooring ends a flight on the water
 
-On the water there is no parking brake to set. The same control moors the aircraft when it has stopped at its dock (or
-anywhere slow within the base): the leg ends there as setting the brake ends it ashore, with the same airmanship bonus
-for shutting the engine down first.
+On the water there is no parking brake to set. The same control moors the aircraft once it is all but stopped (under
+1.5 m/s; faster, it says to slow down first) and casts it off again. Moored, two lines hold it from each float's bow
+and stern station to where they were made fast: stiff, well-damped springs in the horizontal (a period of some six
+seconds), so it rides the chop and swings a little in the gusts but stays put (`water_test`: within half a metre of
+its berth in a 9 m/s wind on the beam). The leg ends moored as setting the brake ends it ashore. The airmanship bonus
+for shutting down first is paid moored at the dock, as ashore it is paid clear of the runway.
+
+A float plane's flight from a seaplane base starts moored at the dock, alongside the pontoon on the fuel pump's side
+(its left float to the dock), facing out along it: cast off and taxi out to the lane. Its idle creep on the water is a
+walking pace or less, so it can be stopped at the dock on the engine and the water rudders alone. The dock is solid
+as its pier, gangway and pontoon (the pontoon only half a metre up), so a float that runs into it is a collision while
+a wing passes over it.
+
+### The gear advisory
+
+An amphibian's wheels must be up for the water and down for a runway, and getting it wrong is the type's classic
+accident. Sinking through 150 m within 4 km of a field, the aircraft says once what its gear is set for against what
+the field is ("Gear is up for a water landing", or, wrong, "Gear is DOWN - a water landing: raise it", with a chime).
+The HUD's GEAR warning follows the same rule for an amphibian: wheels down near a water lane, or up near a runway.
 
 ## Phases
 

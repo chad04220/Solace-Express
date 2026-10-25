@@ -1606,6 +1606,43 @@ struct GameTest {
                waits, shut, noEngineOff, delivered, scale, ok ? "ok" : "FAIL");
         fails += !ok;
       }
+      {   // on the water (docs/WINGS_OVER_WATER.md): a float plane's job from a seaplane base starts moored at its dock; at
+          // the destination's water lane it is asked to moor, and moored at the dock with the engine off it delivers with
+          // the shutdown bonus
+        Game q; q.initHeadless(); q.career.license = LIC_CPL; q.set.traffic = false;
+        Contract c; c.id = "WATER_TEST"; c.title = "Island hopper"; c.type = CT_PAX; c.from = g_world.findAirport("PBL"); c.to = g_world.findAirport("VBY");
+        c.pax = 3; c.payout = 1500; c.minLicense = LIC_CPL; c.wx = Weather(); c.wx.windSpeed = 0; c.wx.gust = 0; c.wx.turbulence = 0;
+        q.career.location = c.from;
+        q.beginCareerFlight(c, kKittiwake, Career::SRC_RENT); q.botControl = false; q.failuresArmed = false;
+        const bool moored = q.screen == SCR_FLIGHT && q.plane.onWater && q.atDock() && q.parkingBrake;
+        const Airport& a = g_world.airports[c.to];
+        const FloatStations f = floatStations(kAircraft[kKittiwake]);
+        auto afloat = [&](vec3 l) { l.y = -f.keelY - 0.3f * f.depth; return l; };
+        q.takeoffAnnounced = true; q.touchedDown = true; q.touchdownFpm = 100; q.engineAutoStarted = true; q.plane.sceneryHits = false;
+        q.tdRunway = c.to; q.parkingBrake = false; q.plane.engineRunning = true; q.plane.moored = false;
+        auto hold = [&](vec3 loc, float hdg, int frames, int key = 0, bool press = false) {
+          for (int i = 0; i < frames && q.screen == SCR_FLIGHT; i++) {
+            if (key) { q.in.down[key] = true; q.in.pressed[key] = press && i == 0; }
+            q.plane.pos = afloat(loc); q.plane.vel = vec3(); q.plane.w = vec3(); q.plane.q = quat::axisAngle(vec3(0, 1, 0), -hdg * DEG);
+            q.plane.ctl.gearDown = false; q.plane.gear = 0.f; q.update(0.05f);
+            q.in.endFrame();
+          }
+          if (key) q.in.down[key] = false;
+        };
+        hold(a.pos(), a.heading, 80);
+        bool asked = false; for (auto& t : q.toasts) asked |= t.text.find("moor") != std::string::npos;
+        const bool waits = q.screen == SCR_FLIGHT && q.arrivalAt == c.to && asked;
+        const vec3 berth = a.berth(2.6f + f.x + f.beam * 0.5f);
+        hold(berth, a.berthHeading(), 10);
+        hold(berth, a.berthHeading(), 30, q.set.keyBind[ACT_ENGINE]);
+        hold(berth, a.berthHeading(), 40, q.set.keyBind[ACT_PARK], true);
+        bool bonus = false; for (auto& l : q.payout) bonus |= l.label == "Taxied clear and shut down";
+        const bool delivered = q.screen == SCR_DEBRIEF && q.lastSuccess && bonus;
+        const bool ok = moored && waits && delivered;
+        printf("On the water: starts moored at the dock %d, asked to moor on the lane %d, moored at the dock with the engine off delivers with the bonus %d: %s\n",
+               moored, waits, delivered, ok ? "ok" : "FAIL");
+        fails += !ok;
+      }
       {   // a checkpoint job's leg ends safely at a field (the review of v3.44.0, CAR-5): stopped on a runway with checkpoints
           // left it waits to take off again, and the parking brake ends the leg there with the checkpoint flown carried; a
           // hold instruction ignored on that leg is still charged at the delivery, through a save and reload (CAR-6)
