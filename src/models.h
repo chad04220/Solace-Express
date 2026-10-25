@@ -15,7 +15,8 @@ struct ModelDef {
   float vt[6];
   // engines: 0 nose piston, 1 nose turboprop, 2 wing piston nacelles, 3 wing turboprop nacelles, 4 aft jets
   int engine; float nacX, nacY, nacR, nacZ0, nacLen, spinnerR, propR;
-  // gear: 0 fixed tricycle with spats, 1 fixed tricycle, 2 taildragger tundra, 3 retract into nacelles, 4 retract into wing/body
+  // gear: 0 fixed tricycle with spats, 1 fixed tricycle, 2 taildragger tundra, 3 retract into nacelles, 4 retract into wing/body,
+  // 5 floats with amphibious wheels folding into them (the spec's floats: plane_sdf.glsl floatHull)
   int gear; float wheelR;
   int cargoPod;
   int winCount; float winZ0, winZ1, winY, winW, winH;  // passenger windows (winY relative to centre line)

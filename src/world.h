@@ -31,8 +31,9 @@ static const int HMAX_LEVELS = 5;
 static const int TP_LEVELS = 7;           // terrain envelope mesh: cell bounds from HM_N cells (level 0) to 32 per side
 static const int TP_CHUNK = 32;           // cells per side of one envelope mesh chunk
 
-enum Surface { SURF_ASPHALT = 0, SURF_GRASS, SURF_GRAVEL, SURF_SNOW, SURF_SAND };
-inline const char* surfaceName(int s) { static const char* n[] = {"Asphalt", "Grass", "Gravel", "Snow", "Sand"}; return n[s]; }
+// SURF_WATER: a seaplane base's water lane (docs/WINGS_OVER_WATER.md) - the sea, marked by buoys, never ground
+enum Surface { SURF_ASPHALT = 0, SURF_GRASS, SURF_GRAVEL, SURF_SNOW, SURF_SAND, SURF_WATER };
+inline const char* surfaceName(int s) { static const char* n[] = {"Asphalt", "Grass", "Gravel", "Snow", "Sand", "Water"}; return n[s]; }
 inline bool surfaceRough(int s) { return s != SURF_ASPHALT; }
 
 struct Airport {

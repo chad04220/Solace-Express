@@ -241,6 +241,17 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
     }
     if (int(gM[0].z + 0.5) == 4 && lp.z < gM[16].w + 0.3) { m.alb = vec3(0.85); m.metal = 1.0; m.rough = 0.18; }
   } else if (mid == 6) { m.alb = vec3(0.025); m.rough = 0.85; }
+#if HAS_FLOATS
+  else if (mid == 7) {   // a float's hull (gear 5): the livery above its chine, a boot stripe, the bottom in hard-wearing
+                         // dark paint, a non-slip walkway along the middle of the deck
+    FloatSt fs = floatSt();
+    float chine = fs.keel + floatKeelRise(fs, lp.z) + floatHalfBeam(fs, lp.z)*0.36397, x = abs(lp.x) - fs.x;
+    m.alb = gColBase; m.rough = 0.3;
+    if (lp.y < chine + 0.09) { m.alb = vec3(0.055, 0.065, 0.075); m.rough = 0.5; }
+    else if (lp.y < chine + 0.15) m.alb = gColStripe;
+    if (ln.y > 0.85 && abs(x) < 0.45*floatHalfBeam(fs, lp.z) && lp.y > floatDeck(fs, lp.z) - 0.04) { m.alb = vec3(0.11); m.rough = 0.92; }
+  }
+#endif
   else if (mid == 8) { m.alb = gM[11].x > 0.5 && length(lp.xz) > 1.2 && lp.y > -0.3 ? gColBase*0.95 : vec3(0.6, 0.61, 0.63); m.metal = 0.5; m.rough = 0.35; }
 #if HAS_FLEET
   else if (FLEET_ON && mid == 10) {
@@ -465,7 +476,11 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
 #endif
   else {
     vec3 nT; vec4 tx;
+#if HAS_FLOATS
+    if (mid == 1 || mid == 2 || mid == 3 || mid == 5 || mid == 7) {
+#else
     if (mid == 1 || mid == 2 || mid == 3 || mid == 5) {
+#endif
       if (m.rough > 0.1) { tx = triSample(lp, ln, M_PAINT, 0.9, nT); m.alb *= tx.rgb*1.03; m.rough = mix(m.rough, tx.a, 0.6); m.nrm = nT; }
     }
     else if (mid == 6) { tx = triSample(lp, ln, M_RUBBER, 0.35, nT); m.alb = tx.rgb; m.rough = tx.a; m.nrm = nT; }

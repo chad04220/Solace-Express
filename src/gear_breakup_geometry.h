@@ -106,6 +106,13 @@ inline Pose mainPose(const AircraftSpec& s, const ModelDef& m, const GearStation
     float hw, hh, cy; modelSection(m, mz, hw, hh, cy);
     return {vec3(hw * (m.gear == 2 ? .8f : m.gear == 0 ? .75f : .7f), cy - hh * (m.gear == 1 ? .85f : .8f), mz), quat()};
   }
+  if (s.floats) {   // a float's main swings forward and up into it, about a pivot in the float (plane_parts.glsl floatMainOf)
+    const FloatStations f = floatStations(s);
+    const vec2 W(radius - gh, mz), T(f.keelY + radius + .05f, mz - .55f), middle = (W + T) * .5f, delta = T - W;
+    const float py = f.keelY + .62f, pz = middle.y - delta.x * (py - middle.x) / (fabsf(delta.y) > 1e-4f ? delta.y : 1e-4f);
+    const vec2 a = W - vec2(py, pz), b = T - vec2(py, pz);
+    return {vec3(track, py, pz), quat::axisAngle(vec3(1, 0, 0), amount * atan2f(a.x * b.y - a.y * b.x, a.x * b.x + a.y * b.y))};
+  }
   if (m.gear == 3) {
     const NacFold f = nacFold(m, gs, gh);
     return {f.hinge, quat::axisAngle(vec3(1, 0, 0), amount * f.angle)};

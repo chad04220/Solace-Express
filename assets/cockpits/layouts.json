@@ -710,6 +710,65 @@
         0.17,
         0.55
       ]
+    },
+    {
+      "model": 15,
+      "name": "Kittiwake A9",
+      "design": "The Longshore's utility workbench re-trimmed for the water: the same broad pilot scan and upright single-engine column, sea-blue upholstery against pale grey trim",
+      "pilot": [
+        -0.365,
+        0.325,
+        0.018,
+        1.38
+      ],
+      "copilot": [
+        0.388,
+        0.378,
+        -0.03,
+        1.08
+      ],
+      "systems": [
+        -0.02,
+        0.354,
+        0.052,
+        1.28
+      ],
+      "status": [
+        0,
+        0.6,
+        0.1,
+        0.098
+      ],
+      "structure": [
+        0.161,
+        0.01,
+        0.024,
+        0.024
+      ],
+      "controls": [
+        0.39,
+        0.3,
+        0.0,
+        0.602
+      ],
+      "pedestal": [
+        0.115,
+        0.18,
+        0.355,
+        0.055
+      ],
+      "trim": [
+        0.52,
+        0.55,
+        0.55,
+        0.28
+      ],
+      "cloth": [
+        0.1,
+        0.22,
+        0.3,
+        0.18
+      ]
     }
   ]
 }

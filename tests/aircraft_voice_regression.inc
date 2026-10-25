@@ -13,8 +13,8 @@
       named &= ok && tx.ids.size() == 4 && tx.ids[2] == std::string("fragment.nyx.craft_") + kAircraft[i].id && voice.text(tx.ids[2]) == kAircraft[i].name;
       for (const auto& id : tx.ids) decoded &= voice.has(id) && voice.decodes(id);
     }
-    check(roster, "all 15 aircraft retain exact displayed identity, count and Nyx priority");
-    check(named && decoded, "all 15 aircraft speak their own recorded names, every clip decoded");
+    check(roster, "all 16 aircraft retain exact displayed identity, count and Nyx priority");
+    check(named && decoded, "all 16 aircraft speak their own recorded names, every clip decoded");
 
     // A partial/broken pack must still fail closed: fallback is for absent name metadata,
     // never permission to pretend a required clip (or an indexed name) was available.

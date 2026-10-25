@@ -6,7 +6,7 @@ import json, math, re, sys, os, hashlib
 from pathlib import Path
 root=Path(os.environ.get('COCKPIT_CONTRACT_ROOT',Path(__file__).resolve().parents[1]))
 layout=json.loads((root/'assets/cockpits/layouts.json').read_text())['aircraft']
-source=(root/'src/models.cpp').read_text(); blocks=source.split('// ----------------------------------------------------------------')[1:16]
+source=(root/'src/models.cpp').read_text(); blocks=source.split('// ----------------------------------------------------------------')[1:17]
 number=r'[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?'
 models=[]
 for i,block in enumerate(blocks):

@@ -19,7 +19,7 @@
 
 struct AircraftSpec;
 
-enum BreakKind { BK_PROP = 0, BK_NACELLE, BK_GEAR, BK_STRUT, BK_CANARD, BK_TAIL, BK_FIN, BK_WING, BK_NOSE, BK_AFT, BK_CENTRE, BK_COUNT };
+enum BreakKind { BK_PROP = 0, BK_NACELLE, BK_GEAR, BK_STRUT, BK_CANARD, BK_TAIL, BK_FIN, BK_WING, BK_NOSE, BK_AFT, BK_CENTRE, BK_FLOAT, BK_COUNT };
 static const int kMaxBreakPieces = 16;
 struct BreakPiece { vec3 C, H; int kind; int side; bool rigidOnly = false; vec3 massCenter; };   // rigidOnly: owns complete gear parts, not a slice of surrounding skin
 

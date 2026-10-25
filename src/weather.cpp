@@ -256,4 +256,33 @@ Sample wind(const Weather& wx, const Local& L, vec3 p, float agl, float time, ve
   return S;
 }
 
+// ---- the sea
+float seaFetch(const Weather& wx, float x, float z) {
+  const vec3 d = windDir(wx);   // (looked along against it: the water the wind has crossed to get here)
+  for (float r = 120.f; r < 6000.f; r *= 1.3f)
+    if (g_world.height(x - d.x * r, z - d.z * r, 3) > 0.f) return r;
+  return 6000.f;
+}
+
+float seaChop(const Weather& wx, float fetch) {
+  // a wind sea grows with the square of the wind (Pierson-Moskowitz), held to a third of a metre in the islands, and in
+  // proportion to its fetch below 3 km of open water; a few centimetres of ripple always
+  const float U = wx.windSpeed + 0.5f * wx.gust;
+  return 0.02f + clampf(0.0035f * U * U, 0.f, 0.32f) * clampf(fetch / 3000.f, 0.12f, 1.f);
+}
+
+float seaSurface(const Weather& wx, float chop, float x, float z, float time) {
+  // three trains running down the wind and fanned a little either side of it, at the deep-water phase speed of their
+  // wavelengths (13, 7.3 and 4.1 m: a float's own length and shorter, so it pitches and slaps over them)
+  static const float L[3] = {13.f, 7.3f, 4.1f}, A[3] = {0.5f, 0.32f, 0.18f}, turn[3] = {0.f, 0.38f, -0.31f}, ph[3] = {0.f, 2.1f, 4.4f};
+  const vec3 d = windDir(wx);
+  float h = 0.f;
+  for (int i = 0; i < 3; i++) {
+    const float c = cosf(turn[i]), s = sinf(turn[i]), k = 2.f * PI / L[i];
+    const float dx = d.x * c - d.z * s, dz = d.x * s + d.z * c;
+    h += A[i] * sinf(k * (x * dx + z * dz) - sqrtf(G0 * k) * time + ph[i]);
+  }
+  return chop * h;
+}
+
 }  // namespace wxfield

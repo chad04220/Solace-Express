@@ -29,7 +29,7 @@ void addStrip(Bounds& b, const AeroStrip& st, float tc) {
 }
 
 const char* breakKindName(int kind) {
-  static const char* n[BK_COUNT] = {"propeller", "nacelle", "gear leg", "strut", "canard", "tailplane", "fin", "wing", "nose", "tail cone", "centre section"};
+  static const char* n[BK_COUNT] = {"propeller", "nacelle", "gear leg", "strut", "canard", "tailplane", "fin", "wing", "nose", "tail cone", "centre section", "float"};
   return kind >= 0 && kind < BK_COUNT ? n[kind] : "?";
 }
 
@@ -118,10 +118,11 @@ int breakPieces(const AircraftSpec& s, float gearDown, float gearHeight, BreakPi
       float py=s.special?gearBreakup::jetBelly(m,z,0.f)+.40f:botAt(m,z)+nwr+.07f;
       for(int i=0;i<2;++i) py=s.special?std::max(gearBreakup::jetBelly(m,z,0.f),gearBreakup::jetBelly(m,z+py-nw.y,0.f))+.40f:
                                               std::max(botAt(m,z),botAt(m,z+py-nw.y))+nwr+.07f;
+      if(s.floats) { const FloatStations f=floatStations(s); py=f.keelY+floatKeelRise(f,z)+.45f; }   // (the bows' pair: plane_parts.glsl floatNosePivot)
       pivot=vec3(0,py,z);nr=quat::axisAngle(vec3(1,0,0),-.5f*PI*clampf((1-gearDown)*1.25f,0,1));
     }
     Bounds nose;grow(nose,pivot,vec3(.20f));grow(nose,place(nw,pivot,nr),vec3(.12f));
-    const float offset=s.special?.10f:galleon?.25f:m.gear==3?.15f:0.f;
+    const float offset=s.special?.10f:galleon?.25f:m.gear==3?.15f:s.floats?gs.track:0.f;
     const float half=s.taildragger?.079f:s.special?.114f:galleon?.159f:m.gear==3?.114f:.099f;
     // The breakup API has no steering angle. Bound the entire permitted steering
     // sweep, with extra travel margin, so a turned tyre/pant never lies outside it.
@@ -218,6 +219,14 @@ int breakPieces(const AircraftSpec& s, float gearDown, float gearHeight, BreakPi
       b.lo.z = std::min(b.lo.z, zA); b.hi.z = std::max(b.hi.z, zB);
       if (sd > 0) { b.lo.x = xr; b.hi.x += 0.3f; } else { b.hi.x = -xr; b.lo.x -= 0.3f; }
       push(fromBounds(b, BK_WING, sd));
+    }
+  }
+  // a float plane's floats, each whole (their struts stay with the fuselage, the wheels in them are the gear's own)
+  if (s.floats) {
+    const FloatStations f = floatStations(s);
+    for (int sd = -1; sd <= 1; sd += 2) {
+      const float x0 = f.x - 0.5f * f.beam - 0.06f, x1 = f.x + 0.5f * f.beam + 0.06f;
+      push(fromLoHi(vec3(sd < 0 ? -x1 : x0, f.keelY - 0.1f, f.bowZ - 0.08f), vec3(sd < 0 ? -x0 : x1, f.keelY + f.depth + 0.06f, f.sternZ + 0.4f), BK_FLOAT, sd));
     }
   }
   // the fuselage in three: the nose (cockpit, cabin ahead of the wing, the engine in it), the tail cone, the centre section

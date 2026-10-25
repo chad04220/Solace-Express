@@ -1521,6 +1521,7 @@ fragment.nyx.craft_xr20_reverie	nyx/fragment.nyx.craft_xr20_reverie.wav	XR-20 Re
 fragment.nyx.craft_xr40_somnus	nyx/fragment.nyx.craft_xr40_somnus.wav	XR-40 Somnus	nyx	40	fragment		
 fragment.nyx.craft_thistledown_l4	nyx/fragment.nyx.craft_thistledown_l4.wav	Thistledown L4	nyx	40	fragment		
 fragment.nyx.craft_galleon_180	nyx/fragment.nyx.craft_galleon_180.wav	Galleon 180	nyx	40	fragment		
+fragment.nyx.craft_kittiwake_a9	nyx/fragment.nyx.craft_kittiwake_a9.wav	Kittiwake A9	nyx	40	fragment		
 @atom.nyx.craft_dawnlark	fragment.nyx.craft_dawnlark
 @craft.Dawnlark T2	dawnlark
 @atom.nyx.craft_ambler	fragment.nyx.craft_ambler
@@ -1551,3 +1552,5 @@ fragment.nyx.craft_galleon_180	nyx/fragment.nyx.craft_galleon_180.wav	Galleon 18
 @craft.Thistledown L4	thistledown_l4
 @atom.nyx.craft_galleon_180	fragment.nyx.craft_galleon_180
 @craft.Galleon 180	galleon_180
+@atom.nyx.craft_kittiwake_a9	fragment.nyx.craft_kittiwake_a9
+@craft.Kittiwake A9	kittiwake_a9

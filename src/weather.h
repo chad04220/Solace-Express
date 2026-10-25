@@ -56,4 +56,13 @@ struct Sample {
 };
 Sample wind(const Weather& wx, const Local& L, vec3 p, float agl, float time, vec3 airOff, float span);
 
+// The sea the floats ride (docs/WINGS_OVER_WATER.md). The open water upwind of a point - its fetch, m, out to 6 km: in
+// the lee of the land the wind has had no room to raise a sea; the chop the wind raises over that fetch (a wave's
+// amplitude, m: a sheltered lagoon stays glassy while the open coast runs a third of a metre); and the sea's surface at a
+// point and instant - sea level and that chop, a few short waves running down the wind. The renderer's sea is a flat
+// plane with a wave normal map, so the chop is kept to what a float can be seen to ride.
+float seaFetch(const Weather& wx, float x, float z);
+float seaChop(const Weather& wx, float fetch);
+float seaSurface(const Weather& wx, float chop, float x, float z, float time);
+
 }  // namespace wxfield

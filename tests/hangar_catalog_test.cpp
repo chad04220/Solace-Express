@@ -10,10 +10,11 @@ int main() {
   // These are persisted identities, not list positions. Additions must never shift them.
   static_assert(kWavecrest == 8 && kVigil == 9 && kResearchJet == 10 && kReverie == 11 && kSomnus == 12,
                 "Existing aircraft indices must remain save/shader compatible");
-  static_assert(kThistledown == 13 && kGalleon == 14 && kAircraftCount == 15 && kNumAircraft == 11,
-                "The two conventional aircraft append to the existing roster");
+  static_assert(kThistledown == 13 && kGalleon == 14 && kKittiwake == 15 && kAircraftCount == 16 && kNumAircraft == 12,
+                "The conventional aircraft and the amphibian append to the existing roster");
   const char* ids[] = {"dawnlark", "ambler", "scrubrunner", "skerry", "longshore", "archipel", "emissary", "cutwater_s6", "wavecrest_c6",
-                      "xr10_vigil", "xr30_nocturne", "xr20_reverie", "xr40_somnus", "thistledown_l4", "galleon_180"};
+                      "xr10_vigil", "xr30_nocturne", "xr20_reverie", "xr40_somnus", "thistledown_l4", "galleon_180",
+                      "kittiwake_a9"};
   for (int spec = 0; spec < kAircraftCount; ++spec) check(std::strcmp(kAircraft[spec].id, ids[spec]) == 0, "Stable aircraft identity changed");
   check(hangarCatalogCount() == kAircraftCount, "Catalog must include every aircraft once");
   bool seen[kAircraftCount] = {};
@@ -29,7 +30,8 @@ int main() {
     }
     if (row < 9) check(spec == row, "Existing career order must remain unchanged");
   }
-  check(hangarSpecAt(9) == kThistledown && hangarSpecAt(10) == kGalleon, "New conventional aircraft precede research teasers");
+  check(hangarSpecAt(9) == kThistledown && hangarSpecAt(10) == kGalleon && hangarSpecAt(11) == kKittiwake,
+        "New conventional aircraft and the amphibian precede research teasers");
   const int ordered[] = {kVigil, kReverie, kResearchJet, kSomnus};
   const char* names[] = {"XR-10", "XR-20", "XR-30", "XR-40"};
   for (int i = 0; i < 4; ++i) {
@@ -61,5 +63,5 @@ int main() {
   std::fseek(f, 72, SEEK_SET);
   for (int spec : kCareerAircraft) { PerfModel p; check(std::fread(&p, sizeof p, 1, f) == 1 && p.vs1 == 1000.f + spec, "Written cache preserves explicit career order"); }
   std::fclose(f); std::remove(cache);
-  std::puts("All 15 identities unique; 11 career/free-flight entries; four locked research entries; stable cache mapping: PASS");
+  std::puts("All 16 identities unique; 12 career/free-flight entries; four locked research entries; stable cache mapping: PASS");
 }

@@ -104,6 +104,17 @@ const AircraftSpec kAircraft[] = {
    2800000, 4600000, 6800000, 0.34f, 0.040f, 0.050f, LIC_ATP, 1600000, 18000,
    42.60f, 2.05f, -0.487805f, -3.55f, 1, 0,
    vec3(0.94f, 0.95f, 0.96f), vec3(0.08f, 0.28f, 0.40f), 0, 0.78f, 2.5f, -1.0f, true, 3.65f, .5f, 3.45f, 1.55e-5f, 0, 11000, 230, .625f, 79000},
+  // Kittiwake A9: a single-turboprop utility amphibian on amphibious floats (docs/WINGS_OVER_WATER.md) - nine seats, the
+  // wheels folding up into the floats. Half a tonne heavier than a landplane of its size for its floats, and a taller fin
+  // for their side area ahead of the centre of gravity. Its floats hang below on struts: the wheels 2.75 m below the
+  // origin, the floats' centre lines 1.45 m either side. Full cabin envelope, 3.9 t maximum; range game-scaled.
+  {"kittiwake_a9", "Kittiwake A9", "Single-turboprop amphibian", ENG_TURBOPROP, 1, 0, 3, 1100, 1900,
+   2450, 400, 900, 9, 26.0f, 15.9f, 1.70f,
+   0.32f, 5.0f, 1.60f, 0.90f, 0.040f, 0.005f, 0.060f, 0.76f,
+   600000, 30, 32, 37, 76, 120, 600, false, false, true,
+   13000, 16000, 27000, 0.42f, 0.052f, 0.070f, LIC_CPL, 165000, 1900,
+   11.6f, 0.90f, 1.08f, -1.80f, 0, 0,
+   vec3(0.94f, 0.94f, 0.91f), vec3(0.05f, 0.36f, 0.52f), 0, 0, 3.8f, -1.52f, true, 2.75f, .2f, 1.45f, 0, 0, 0, 0, 0, 3900, true},
 };
 // clang-format on
 static_assert(sizeof(kAircraft) / sizeof(kAircraft[0]) == kAircraftCount, "Aircraft table must match roster count");
@@ -243,6 +254,7 @@ void Plane::reset(const AircraftSpec* s, vec3 position, float headingDeg, float 
   // drag comes from the airframe's shape (aero.cpp), evaluated every step at the speed and air density of the moment
   cd0 = aeroCD0(aeroModel(*s), *s, std::max(speed, 30.f), 1.225f, speed / 340.f);
   nozzle = 0; mach = 0;
+  onWater = false; floatWet = 0.f; seaFetchT = -1.f; floatGround = floatGroundRunway = false; floatGroundSpeed = 0.f;
   if (airborne) {
     vel = forward() * speed; engineRunning = true; engineSpool = 0.7f; ctl.throttle = 0.7f;
     rpm = s->engineType == ENG_PISTON ? s->maxRpm * 0.88f : s->maxRpm; n1 = 90;
@@ -252,6 +264,14 @@ void Plane::reset(const AircraftSpec* s, vec3 position, float headingDeg, float 
     pos.y = g_world.height(pos.x, pos.z, 7) + gearHeight() + (s->taildragger ? 0.25f : 0.05f);
     onGround = wasOnGround = true; ctl.brake = 1;
     if (s->taildragger) q = q * quat::axisAngle(vec3(1, 0, 0), atanf(0.2f) - 0.005f);  // sit on mains + tail wheel
+    int surface = -1; const int lane = g_world.onRunway(pos.x, pos.z, 0.f, &surface);
+    if (s->floats && (g_world.height(pos.x, pos.z, 7) < -0.5f || (lane >= 0 && surface == SURF_WATER))) {
+      // afloat: the wheels up in the floats, the keels a third of their depth in (it settles to its own draft)
+      const FloatStations fs = floatStations(*s);
+      gear = 0; ctl.gearDown = false;
+      pos.y = -fs.keelY - 0.3f * fs.depth;
+      onWater = true;
+    }
   }
 }
 
@@ -285,7 +305,38 @@ GearStations gearStations(const AircraftSpec& s) {
     // gravity: at 4% they stood near the wings' leading edges)
     g.mainZ = 0.10f * L;
   }
+  // a float plane's amphibious wheels: the mains at each float's step, the nose wheels in its bow, either side (two)
+  if (s.floats) g.noseZ = g.mainZ - (kFloatBowShare - kFloatNoseWheel) * kFloatLength * L;
   return g;
+}
+
+// A float as a float plane carries one: its length about the fuselage's less the tail cone, its step (the mains' station)
+// a little aft of the centre of gravity with 58% of the float ahead of it, its beam a tenth of its length and its depth
+// a little less; its keel as far below the wheels' line as the amphibious wheels stand out of it
+FloatStations floatStations(const AircraftSpec& s) {
+  FloatStations f{};
+  if (!s.floats) return f;
+  const GearStations g = gearStations(s);
+  const float len = kFloatLength * s.fusLen;
+  f.x = g.track; f.wheelDrop = 0.30f;
+  f.keelY = -(gearHeightOf(s) - f.wheelDrop);
+  f.stepZ = g.mainZ;
+  f.bowZ = f.stepZ - kFloatBowShare * len; f.sternZ = f.stepZ + (1.f - kFloatBowShare) * len;
+  f.beam = kFloatBeam * len; f.depth = kFloatDepth * len;
+  return f;
+}
+
+float floatKeelRise(const FloatStations& f, float z) {
+  if (z <= f.stepZ) {   // the forebody: flat back from the step, sweeping up over its front 40% to the bow
+    const float u = clampf((z - f.bowZ) / std::max(0.4f * (f.stepZ - f.bowZ), 0.1f), 0.f, 1.f);   // (0 at the bow)
+    return (1.f - u) * (1.f - u) * 0.62f * f.depth;
+  }
+  return 0.06f + (z - f.stepZ) * tanf(8.f * DEG);   // the afterbody: the step's height, then up at 8 deg to the stern
+}
+
+float floatHalfBeam(const FloatStations& f, float z) {
+  if (z < f.stepZ) return 0.5f * f.beam * std::max(sqrtf(clampf((z - f.bowZ) / (0.45f * (f.stepZ - f.bowZ)), 0.f, 1.f)), 0.18f);   // (rounding in over the front of the bow)
+  return 0.5f * f.beam * (0.35f + 0.65f * clampf((f.sternZ - z) / (0.6f * (f.sternZ - f.stepZ)), 0.f, 1.f));   // (narrowing aft)
 }
 
 float Plane::gearHeight() const { return gearHeightOf(*spec); }
@@ -336,6 +387,10 @@ void Plane::step(float dt, const Weather& wx, float time) {
     apPlan(apHoldFor, false, wx, false); bool okF = apPlanWhy.empty();
     if (okR || okF) { apEngage(AP_APPR, apHoldFor, wx); if (apDecline.empty()) apWindEvent = 2; }
   }
+  if (spec->floats) {   // the sea the floats ride here: its fetch looked for once a second, its chop from that and the wind
+    if ((seaFetchT -= dt) <= 0.f) { seaFetchT = 1.f; seaFetch = wxfield::seaFetch(wx, pos.x, pos.z); }
+    seaChop = wxfield::seaChop(wx, seaFetch);
+  }
   for (int i = 0; i < N && !ev.crashed; i++) substep(h, wx, time + h * i);
   windAvg = flightTime <= 0.f ? windVel : lerp(windAvg, windVel, 1.f - expf(-dt / 1.5f));
   flightTime += dt;
@@ -346,6 +401,108 @@ void Plane::step(float dt, const Weather& wx, float time) {
 }
 
 struct Contact { vec3 p; int kind; };  // kind 0 main L, 1 main R, 2 nose/tail wheel, 3+ structure
+
+// ---------------- the floats (docs/WINGS_OVER_WATER.md). Each float is sampled at stations along its keel; at each one the
+// water acts on the length of float about it:
+//  - buoyancy: the weight of the sea its V-bottomed section displaces;
+//  - the planing pressure: the water's momentum turned by the bottom moving into it, rho U Vn per unit area (U the flow
+//    along the keel, Vn into the bottom: the trim, the keel's own sweep up to the bow and the float sinking all make it),
+//    so the float climbs onto its step as the speed builds; a heave damping on top, quadratic in Vn;
+//  - skin friction on the wetted girth, and the keel's resistance to sliding sideways (a lifting term in the speed and a
+//    cross-flow term in the slip: with the fin aft of the floats' centre of lateral resistance it weathervanes);
+//  - the bow wave's drag, peaking at the hump (a length Froude number near one) and gone once it is on the step;
+//  - the water rudders at the sterns, down below 9 m/s; the wheels' drag where they hang in the water.
+// Where the ground comes up to a keel (a beach, the shallows, a runway with the wheels up) the keel is a skid on it.
+bool Plane::floatContacts(float dt, const Weather& wx, float time, vec3 cg, vec3& Fw, vec3& Tw, bool& afloat) {
+  (void)dt;
+  const AircraftSpec& s = *spec;
+  const FloatStations fs = floatStations(s);
+  const float rhoW = 1025.f;   // (sea water)
+  const float tanDr = tanf(20.f * DEG), sinDr = sinf(20.f * DEG), cosDr = cosf(20.f * DEG);   // (the bottoms' deadrise: a V of 20 deg)
+  const float Cpl = 0.35f, Cheave = 1.2f, Cf = 0.006f, Cside = 1.2f, Ckeel = 1.5f, Cwave = 0.16f;
+  const int K = 12;
+  const float lenF = fs.sternZ - fs.bowZ, dz = lenF / K;
+  // (the keel's skid on the ground: the wheels' spring shared along the keels, half again as stiff)
+  const float kSkid = s.emptyMass * 2.2f * G0 / 0.10f * 0.25f, cSkid = 2.f * 0.8f * sqrtf(kSkid * s.emptyMass * 0.15f);
+  bool touched = false;
+  float wetSum = 0.f;
+  afloat = false;
+  auto apply = [&](vec3 at, vec3 fWorld) { Fw += fWorld; Tw += cross(at - cg, q.conj().rotate(fWorld)); };
+  for (int side = -1; side <= 1; side += 2) {
+    float vol = 0.f, uSum = 0.f; vec3 cb(0, 0, 0);   // this float's displacement (m^3), its forward speed through the water (weighted) and its centre
+    for (int j = 0; j < K; j++) {
+      const float z = fs.bowZ + (j + 0.5f) * dz;
+      const float rise = floatKeelRise(fs, z), hb = floatHalfBeam(fs, z);
+      const float slope = (floatKeelRise(fs, z + 0.05f) - floatKeelRise(fs, z - 0.05f)) / 0.1f;
+      const vec3 pk(side * fs.x, fs.keelY + rise, z);
+      const float deckH = std::max(fs.depth - 0.8f * rise, 0.12f);   // (keel to deck here)
+      const vec3 pw = pos + q.rotate(pk);
+      const vec3 vc = vel + q.rotate(cross(w, pk)), vb = q.conj().rotate(vc);
+      const float gy = g_world.height(pw.x, pw.z, 7);
+      int surf = -1; const int rw = g_world.onRunway(pw.x, pw.z, 2.f, &surf);
+      const bool sea = gy < -0.05f || (rw >= 0 && surf == SURF_WATER);
+      if (sea) {
+        const float d = wxfield::seaSurface(wx, seaChop, pw.x, pw.z, time) - pw.y;   // (immersed this far)
+        if (d > 0.f) {
+          const float dd = std::min(d, deckH + 0.05f), hv = hb * tanDr;
+          const float area = dd <= hv ? dd * dd / tanDr : hb * hv + 2.f * hb * (dd - hv);
+          const float girth = dd <= hv ? 2.f * dd / sinDr : 2.f * hb / cosDr + 2.f * (dd - hv);
+          const float wide = dd <= hv ? 2.f * dd / tanDr : 2.f * hb;   // (the planing bottom's wetted width)
+          const vec3 n(0.f, -1.f / sqrtf(1.f + slope * slope), slope / sqrtf(1.f + slope * slope));   // the bottom's outward normal
+          const vec3 t = normalize(vec3(0.f, slope, 1.f));                                             // and the keel's line, aft
+          const float vn = dot(vb, n), ut = dot(vb, t), U = fabsf(ut), wetF = smoothstepf(0.f, 0.05f, d);
+          const float buoy = rhoW * G0 * area * dz;
+          float Fn = rhoW * wide * dz * (Cpl * U * std::max(vn, 0.f) + Cheave * vn * fabsf(vn)) * wetF;
+          Fn = std::max(Fn, -0.6f * buoy);   // (the water lets go of a rising float: no more than a little suction)
+          vec3 fb = n * (-Fn);
+          fb += t * (-(ut > 0.f ? 1.f : -1.f) * 0.5f * rhoW * Cf * girth * dz * ut * ut);
+          const float side_ = std::min(dd, deckH) * dz;
+          fb.x -= 0.5f * rhoW * side_ * (Cside * vb.x * fabsf(vb.x) + Ckeel * U * vb.x);
+          apply(pk, q.rotate(fb) + vec3(0.f, buoy, 0.f));
+          vol += area * dz; cb += pk * (area * dz); uSum += -vb.z * area * dz;
+          wetSum += dd / deckH;
+          touched = afloat = true;
+        }
+      }
+      // the ground under the keel: a beach, the shallows' bottom, a runway met with the wheels up
+      const float pen = std::max(gy, sea ? -1e9f : 0.f) - pw.y;
+      if (pen > 0.f && (!sea || gy > pw.y)) {
+        const float nF = std::max(0.f, kSkid * pen - cSkid * vc.y);
+        vec3 f(0.f, nF, 0.f);
+        const vec3 vh(vc.x, 0.f, vc.z); const float vl = length(vh);
+        if (vl > 0.05f) f = f - vh * (nF * (rw >= 0 && !surfaceRough(surf) && surf != SURF_WATER ? 0.35f : 0.5f) / vl);
+        apply(pk, f);
+        touched = true; floatGround = true; floatGroundSpeed = std::max(floatGroundSpeed, vl);
+        if (rw >= 0 && surf != SURF_WATER) floatGroundRunway = true;
+      }
+    }
+    if (vol > 0.f) {
+      // the bow wave's drag: the hump
+      cb = cb / vol;
+      const float u = uSum / vol, Fr = fabsf(u) / sqrtf(G0 * lenF);
+      const float D = rhoW * G0 * vol * Cwave * expf(-(Fr - 0.95f) * (Fr - 0.95f) / (0.38f * 0.38f));
+      const vec3 vh(vel.x, 0.f, vel.z); const float vl = length(vh);
+      if (vl > 0.05f) apply(cb, vh * (-D / vl));
+      // the water rudder at its stern, down below 9 m/s; steering with the pedals
+      const float down = smoothstepf(9.f, 5.f, fabsf(u));
+      if (down > 0.f) apply(vec3(side * fs.x, fs.keelY + floatKeelRise(fs, fs.sternZ), fs.sternZ - 0.15f),
+                            q.rotate(vec3(-ctl.yaw * down * 0.5f * rhoW * 0.06f * 1.6f * (u * fabsf(u) + 0.3f), 0.f, 0.f)));
+    }
+    // the wheels, down, in the water: the mains at the step and the nose wheels in the bow drag the floats down by the
+    // head - landed on the water with them down, the aircraft goes over on its nose
+    if (gear > 0.3f && afloat) {
+      const float noseZ = fs.bowZ + kFloatNoseWheel * lenF;
+      for (float z : {fs.stepZ, noseZ}) {
+        const vec3 pk(side * fs.x, fs.keelY + floatKeelRise(fs, z) - fs.wheelDrop * gear, z), pw = pos + q.rotate(pk);
+        if (wxfield::seaSurface(wx, seaChop, pw.x, pw.z, time) <= pw.y) continue;
+        const vec3 vc = vel + q.rotate(cross(w, pk));
+        apply(pk, vc * (-0.5f * rhoW * 1.0f * 0.12f * gear * length(vc)));
+      }
+    }
+  }
+  floatWet = clampf(wetSum / (2.f * K), 0.f, 1.f);
+  return touched;
+}
 
 void Plane::substep(float dt, const Weather& wx, float time) {
   const AircraftSpec& s = *spec;
@@ -557,6 +714,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   if (wheels) {
     cs.push_back({vec3(-gst.track, -gh, gst.mainZ), 0}); cs.push_back({vec3(gst.track, -gh, gst.mainZ), 1});
     if (s.taildragger) cs.push_back({vec3(0, -gh + gst.tailY, gst.tailZ), 2});
+    else if (s.floats) { cs.push_back({vec3(-gst.track, -gh, gst.noseZ), 2}); cs.push_back({vec3(gst.track, -gh, gst.noseZ), 2}); }   // (one in each float's bow)
     else cs.push_back({vec3(0, -gh, gst.noseZ), 2});
   }
   cs.push_back({vec3(0, -R, -0.45f * L), 3});           // nose / prop
@@ -592,12 +750,24 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     vec3 pw = pos + q.rotate(c.p);
     float gy = g_world.height(pw.x, pw.z, 7);
     if (sceneryHits) gy = pitGround(pw.x, pw.z, gy);   // (down into what the game has dug: the player's aircraft, not the background quote's)
-    bool water = gy < 0.3f && g_world.onRunway(pw.x, pw.z, 30) < 0;
+    int laneSurface = -1; const int lane = g_world.onRunway(pw.x, pw.z, 30, &laneSurface);
+    bool water = gy < 0.3f && (lane < 0 || laneSurface == SURF_WATER);   // (a seaplane base's water lane is the sea)
     float surf = std::max(gy, 0.f);
     float pen = surf - pw.y;
     if (pen <= 0) continue;
     vec3 vc = vel + q.rotate(cross(w, c.p));
     float spd = length(vel);
+    if (water && s.floats) {
+      // the floats ride the water (floatContacts) and the wheels in it drag there; the rest of the airframe in it has gone over
+      if (c.kind <= 2) continue;
+      if (spd > 2.5f || pen > 0.5f) {
+        ev.crashed = true;
+        ev.crashReason = c.kind == 3 ? (gear > 0.5f ? "Nosed over: landed on the water with the wheels down" : "Dug the floats' bows in and went over on its nose")
+                       : c.kind == 5 ? "A wingtip caught the water and it cartwheeled" : c.kind == 4 ? "The tail dug into the water" : "Capsized";
+        return;
+      }
+      continue;
+    }
     if (water && spd > 1.f) { ev.crashed = true; ev.crashReason = "Ditched in the sea"; return; }
     bool bellySkid = false;
     if (c.kind >= 3) {
@@ -688,11 +858,30 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   // wheels stop dead instead of creeping a step's acceleration)
   if (holdN > 0) brakeHold = clampf(brakeHold + holdV / holdN * m / dt * 0.5f, -m * 30.f, m * 30.f); else brakeHold = 0;
   for (int i = 0; i < 3; ++i) wheelMotion[i].step(dt, wheelSpeed[i], wheelContact[i], i < 2 ? ctl.brake : 0.f);
+  // a float plane's floats: on the water, or skidding on their keels where the ground comes up to them
+  bool afloat = false, keels = false;
+  floatGround = floatGroundRunway = false; floatGroundSpeed = 0.f;
+  if (s.floats && altAgl < 8.f) keels = floatContacts(dt, wx, time, cg, Fw, Tw, afloat);
+  else floatWet = 0.f;
   wasOnGround = onGround;
-  onGround = anyWheel;
-  groundRough = anyWheel ? roughSum / 3.f : 0.f;
-  if (anyWheel && !wasOnGround && flightTime > 2.f) {
+  onGround = anyWheel || keels;
+  onWater = afloat && !anyWheel;
+  groundRough = anyWheel ? roughSum / 3.f : onWater ? clampf(0.15f + 2.5f * seaChop, 0.f, 1.f) : floatGround ? 0.8f : 0.f;
+  if (onGround && !wasOnGround && flightTime > 2.f) {
     ev.touchdown = true; ev.touchdownVs = vel.y; ev.touchdownSpeed = length(vel);
+    if (keels && !anyWheel) {   // the floats meet the water, or the ground
+      // (an amphibian's classic accident: the wheels down for the water, the nose wheels in the floats' bows dig in)
+      if (afloat && gear > 0.5f && ev.touchdownSpeed > 10.f) { ev.crashed = true; ev.crashReason = "Nosed over: landed on the water with the wheels down"; return; }
+      if (-vel.y > (afloat ? 5.5f : 3.5f)) {
+        ev.crashed = true; ev.crashReason = fmt(afloat ? "Hit the water too hard - %.0f fpm" : "Landed on the floats too hard - %.0f fpm", -vel.y * 196.85f); return;
+      }
+    }
+  }
+  if (floatGround && !anyWheel) {
+    // the keels on the ground: on a runway it slides to a stop, the floats scraped (damaged, as a belly landing is);
+    // anywhere else - a beach, the shallows - it is aground unless it came in at a walking pace
+    if (floatGroundRunway) { if (!afloat && floatGroundSpeed > 3.f) ev.bellyLanding = true; }
+    else if (floatGroundSpeed > 12.f) { ev.crashed = true; ev.crashReason = "Ran aground"; return; }
   }
 
   // buildings

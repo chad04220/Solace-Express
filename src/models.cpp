@@ -166,6 +166,17 @@ const ModelDef kModels[] = {
     4,.57f,0,
     32,-13.6f,12.0f,.46f,.155f,.215f,
     vec3(-.72f,.92f,-16.30f),2,-20.00f,-17.52f,.42f,-15.80f },
+  // ---------------------------------------------------------------- Kittiwake A9 (single-turboprop amphibian on floats)
+  // A strut-braced high wing over a clean utility cabin, the turboprop's long nose, and a taller fin for the floats' side
+  // area. Gear 5: amphibious floats on struts (floatStations, plane_sdf.glsl), the small wheels folding up into them.
+  { {{-5.80f,.14f,.14f,-.10f},{-5.55f,.36f,.36f,-.10f},{-4.35f,.52f,.55f,-.05f},{-3.25f,.76f,.84f,.08f},{-0.50f,.78f,.86f,.10f},{2.05f,.54f,.61f,.20f},{4.95f,.16f,.30f,.45f},{5.80f,.06f,.14f,.50f}}, .48f,
+    {7.95f,1.95f,1.35f,.20f,.98f,-2.70f,2.0f,.14f}, 1,3.3f,0,.65f, 0,0,
+    {2.70f,1.40f,.95f,.20f,.55f,4.30f,0}, 0,
+    {2.30f,2.05f,1.00f,1.30f,.45f,3.70f},
+    1, 0,0,0,0,0, .17f,1.30f,
+    5, .24f, 0,
+    4, -2.0f,2.0f,.30f,.21f,.18f,
+    vec3(-.38f,.66f,-2.45f), 1, -4.05f,-2.95f,.40f,-2.10f },
 };
 // clang-format on
 static_assert(sizeof(kModels)/sizeof(kModels[0]) == kAircraftCount, "one authored model per aircraft roster entry");
@@ -263,7 +274,7 @@ vec3 modelTailTip(const ModelDef& m) {   // (the XR-20's: on its nozzle's upper 
 void modelCabinFit(int model, float panelZ, float foot[4], float seat[2]) {
   model=std::clamp(model,0,kAircraftCount-1); const ModelDef& m=kModels[model]; const vec3 E=m.eye;
   const bool compact=model==0||model==1||model==2||model==6||model==7||model==9||model==kThistledown;
-  const bool fleet=model<10||model==kThistledown||model==kGalleon;
+  const bool fleet=model<10||model==kThistledown||model==kGalleon||model==kKittiwake;
   const float drop=fleet?(compact?.64f:.73f):.80f;
   auto floorAt=[&](float x,float z) {
     float hw,hh,cy;stationAt(m,z,hw,hh,cy);float lo=cy-hh,hi=cy,mn=std::min(hw,hh),rr=mn*(.3f+.7f*m.roundness);
@@ -314,7 +325,7 @@ int modelCockpitFocusTargets(int model,CockpitFocusTarget* out,int capacity){
   if(!out || capacity<=0 || model<0 || model>=kAircraftCount)return 0;
   const ModelDef& m=kModels[model];const vec3 E=m.eye;const float panelZ=E.z-(m.cockpit==2?.85f:.68f);int count=0;
   auto add=[&](vec3 c,vec3 n,vec2 h){ if(count<capacity)out[count++]={c,normalize(n),h}; };
-  if(model<10||model==kThistledown||model==kGalleon){
+  if(model<10||model==kThistledown||model==kGalleon||model==kKittiwake){
     const auto& L=kCockpitLayouts[model].value;const bool glass=m.cockpit==2,twin=model==3||model==8;
     auto mount=[&](int i){return vec3(L[i][0],E.y-L[i][1],panelZ+L[i][2]+.050f);};
     for(int tile=0;tile<2;tile++){

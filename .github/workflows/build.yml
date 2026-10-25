@@ -118,7 +118,7 @@ jobs:
           python tools/mesh_assets/test_mesh_assets.py
           python tests/aircraft_mesh_workflow_test.py
 
-      - name: Bake all 30 full-quality aircraft bodies
+      - name: Bake all 32 full-quality aircraft bodies
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
           GALLIUM_DRIVER: llvmpipe

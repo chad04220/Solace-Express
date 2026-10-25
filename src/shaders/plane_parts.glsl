@@ -159,6 +159,9 @@ float gearDoorAngle(){ return smoothstep(0.0, 0.2, gPS.x)*(isGalleon()?1.72:1.45
 // footwell of a cabin drawn hollow
 float gearNoseShow(){
   bool inCabin = gPS.w > 0.5 && int(gM[0].y + 0.5) >= 3;
+#if HAS_FLOATS
+  if (int(gM[0].y + 0.5) == 5) inCabin = false;   // (a float plane's fold into its floats' bows, nowhere near it)
+#endif
   return inCabin ? 1.0 - smoothstep(0.3, 0.8, gearUp()) : 1.0;
 }
 // the elevator's deflection (rad) for the stick and trim c: 28 deg up for a pull, 20 down for a push (aero_strips.cpp
@@ -329,6 +332,48 @@ vec2 gearSwing(vec2 W, vec2 T, float py){
   vec2 a = W - vec2(py, pz), b = T - vec2(py, pz);
   return vec2(pz, atan(a.x*b.y - a.y*b.x, dot(a, b)));
 }
+#if HAS_FLOATS
+// A float plane's floats (gear 5, docs/WINGS_OVER_WATER.md): a planing hull either side on the mains' track, from the
+// physics' own stations (aircraft.cpp floatStations, floatKeelRise and floatHalfBeam, with aircraft.h's kFloat*
+// proportions), so the hull drawn is the hull that floats: its keel the amphibious wheels' 30 cm above their contact,
+// its step at the mains, 58% of it ahead of the step
+struct FloatSt { float x, keel, bow, step, stern, beam, depth; };
+FloatSt floatSt(){
+  float len = 0.82*gM[0].x;
+  FloatSt f; f.x = gM[18].x; f.keel = 0.30 - gM[19].x; f.step = gM[18].z;
+  f.bow = f.step - 0.58*len; f.stern = f.step + 0.42*len; f.beam = 0.105*len; f.depth = 0.10*len;
+  return f;
+}
+// the keel's rise over keel at z: forward of the step the bow's sweep up over its front 40%; behind it the step's 6 cm,
+// then 8 degrees up to the stern
+float floatKeelRise(FloatSt f, float z){
+  if (z <= f.step) { float u = clamp((z - f.bow)/max(0.4*(f.step - f.bow), 0.1), 0.0, 1.0); return (1.0 - u)*(1.0 - u)*0.62*f.depth; }
+  return 0.06 + (z - f.step)*0.140541;
+}
+float floatHalfBeam(FloatSt f, float z){
+  if (z < f.step) return 0.5*f.beam*max(sqrt(clamp((z - f.bow)/(0.45*(f.step - f.bow)), 0.0, 1.0)), 0.18);
+  return 0.5*f.beam*(0.35 + 0.65*clamp((f.stern - z)/(0.6*(f.stern - f.step)), 0.0, 1.0));
+}
+// the deck: full depth amidships, curving down over the bow's front half and a little towards the stern
+float floatDeck(FloatSt f, float z){
+  if (z < f.step) { float u = clamp((z - f.bow)/(0.5*(f.step - f.bow)), 0.0, 1.0); return f.keel + f.depth*(1.0 - 0.30*(1.0 - u)*(1.0 - u)); }
+  float t = clamp((z - f.step)/(f.stern - f.step), 0.0, 1.0); return f.keel + f.depth - 0.12*t*t;
+}
+// The main wheel (the right one) folds forward and up into its float: from its rest W to its stowed centre T (y, z),
+// clear of the keel, about a crosswise pivot P in the float on their bisector (gearSwing), ang its turn
+struct FloatMain { vec3 W; vec2 T; vec3 P; float ang; };
+FloatMain floatMainOf(){
+  FloatSt f = floatSt(); float wr = gM[18].y;
+  FloatMain m; m.W = vec3(f.x, wr - gM[19].x, f.step);
+  m.T = vec2(f.keel + wr + 0.05, f.step - 0.55);
+  float py = f.keel + 0.62;
+  vec2 sw = gearSwing(m.W.yz, m.T, py);
+  m.P = vec3(f.x, py, sw.x); m.ang = sw.y;
+  return m;
+}
+// both bows' nose wheels (one part): their pivot's height over the nose station; they swing a quarter turn aft about it
+float floatNosePivot(){ FloatSt f = floatSt(); return f.keel + floatKeelRise(f, gM[18].w) + 0.45; }
+#endif
 // A nacelle main (type 3, the right side's) folds forward into its nacelle: its wheels from their rest to the
 // nacelle's fullest section, about a pivot 22 cm over the nacelle's floor - on the bisector, so the leg stands raked a
 // little forward. (It rose straight up as far as the gear is tall, and the leg's top came out through the top of the
@@ -389,6 +434,11 @@ Pose gearNosePose(float s){
   int gtype = int(gM[0].y + 0.5);
   float up = gtype >= 3 ? gearUp() : 0.0;
   Pose X; X.R = partRxz(gPS.z); X.T = vec3(0.0, 0.0, gM[18].w);
+#if HAS_FLOATS
+  if (gtype == 5) {   // (the bows' castoring pair: drawn straight, a quarter turn aft about their pivot)
+    vec3 pl = vec3(0.0, floatNosePivot(), 0.0); X.R = partRyz(-1.5707963*up); X.T = X.T + (pl - s*(X.R*pl)); return X;
+  }
+#endif
   if (gtype >= 3) { vec3 pl = vec3(0.0, gearNoseFold().x, 0.0); X.R = partRyz(-1.5707963*up)*X.R; X.T = X.T + (pl - s*(X.R*pl)); }
   return X;
 }
@@ -402,6 +452,9 @@ Pose gearPartPose(int k, vec2 sd){
   Pose X; X.R = mat3(1.0); X.T = vec3(0.0);
   if (k == PT_GEAR_MAIN) {
     if (gtype <= 2) { X.R = S; return X; } // fixed assembly, no fold about a retracting hinge
+#if HAS_FLOATS
+    if (gtype == 5) { FloatMain fm = floatMainOf(); mat3 Rf = partRyz(up*fm.ang); X.R = S*Rf; X.T = S*(fm.P - Rf*fm.P); return X; }
+#endif
     if (gtype == 3) { NacFold f = gearNacFold(); mat3 Rf = partRyz(up*f.ang); X.R = S*Rf; X.T = S*(f.P - Rf*f.P); }
     else if (gearSwingMain()) { GearSwing g = gearSwingOf(); mat3 Rf = gearSwingR(vec3(G0.x, G0.y - gh, mz) - g.H, -1.0, up); X.R = S*Rf; X.T = S*(g.H - Rf*g.H); }
     else { vec3 H = gearHinge(); mat3 Rf = gearFoldR(up); X.R = S*Rf; X.T = S*(H - Rf*H); }

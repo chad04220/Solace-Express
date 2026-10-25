@@ -2,7 +2,7 @@
 """Validate and losslessly package production SEAMSH01 aircraft assets (stdlib only).
 
 The exporter is the sole producer: this tool deliberately cannot import/rename a
-legacy driver-keyed cache. Every release contains all 15 exterior/cockpit pairs.
+legacy driver-keyed cache. Every release contains all 16 exterior/cockpit pairs.
 """
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ MAX_PART_TYPE = _validator_constant("kMaxPartType")
 PROFILE = 1
 HEADER_BYTES = 192
 MAX_FILE_BYTES = 512 * 1024 * 1024
-MODEL_COUNT = 15
+MODEL_COUNT = 16
 MANIFEST_NAME = "manifest.json"
 REPORT_NAME = "bake-report.json"
 IMPLEMENTATION = "production-strict-fresh-v1"
@@ -146,7 +146,7 @@ def aircraft_roster(source_root):
         raise AssetError("Aircraft roster declaration changed; update exporter validator") from exc
     roster = re.findall(r'\{"([^"\n]+)",\s*"([^"\n]+)"', table)
     require(len(roster) == MODEL_COUNT and len({item[0] for item in roster}) == MODEL_COUNT,
-            "Expected exactly 15 unique aircraft; update bundle contract with roster changes")
+            "Expected exactly 16 unique aircraft; update bundle contract with roster changes")
     return roster
 
 
@@ -231,7 +231,7 @@ def inspect_directory(directory, source, roster):
             "Exporter binary/source digest mismatch; rebuild and rebake")
     require(report.get("format_version") == FORMAT_VERSION and report.get("algorithm_version") == ALGORITHM_VERSION,
             "Bake report format/algorithm mismatch")
-    require(report.get("asset_count") == MODEL_COUNT * 2, "Bake report does not contain all 30 aircraft bodies")
+    require(report.get("asset_count") == MODEL_COUNT * 2, "Bake report does not contain all 32 aircraft bodies")
     gl = report.get("gl", {})
     require(isinstance(gl, dict) and all(isinstance(gl.get(key), str) and gl[key] for key in ("vendor", "renderer", "version")),
             "Missing canonical producer GL provenance")
@@ -334,7 +334,7 @@ def extract(archive_path, output, source, roster):
     try:
         with zipfile.ZipFile(archive_path) as archive:
             entries = archive.infolist()
-            require(len(entries) == MODEL_COUNT * 2 + 2, "Bundle must contain exactly 30 meshes, manifest and bake report")
+            require(len(entries) == MODEL_COUNT * 2 + 2, "Bundle must contain exactly 32 meshes, manifest and bake report")
             seen = set()
             total = 0
             for info in entries:

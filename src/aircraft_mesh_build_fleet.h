@@ -36,6 +36,12 @@ inline bool gearPartBox(int type, const float* M, vec3& lo, vec3& hi, float& h) 
   const int gtype = (int)(m(0, 1) + 0.5f);
   const bool atlas = int(m(19,3)+.5f)/2 == kGalleon;
   if(type==PT_GEAR_MAIN && gtype<=2){lo=vec3(0.f,-gh-.1f,mz-wr-.7f);hi=vec3(track+.3f,1.5f,mz+wr+.7f);h=.005f;return true;}
+  if(gtype==5) {
+    // A float plane's amphibious wheels (plane_sdf.glsl floatMainShape, floatNoseShape): a main from its pivot in the
+    // float, at rest; the bows' pair on one part, either side of the nose station
+    if(type==PT_GEAR_MAIN){lo=vec3(track-.3f,-gh-.1f,mz-wr-.45f);hi=vec3(track+.3f,1.2f-gh,mz+wr+.45f);h=.005f;return true;}
+    if(type==PT_GEAR_NOSE){lo=vec3(-track-.3f,-gh-.1f,-.45f);hi=vec3(track+.3f,1.6f-gh,.45f);h=.005f;return true;}
+  }
   if(atlas) {
     // Galleon gearFold().H.z is 2.72 m; include the complete trunnion capsule.
     if(type==PT_GEAR_MAIN){lo=vec3(track-.65f,-gh-.1f,std::min(mz-1.28f,2.72f-.20f));hi=vec3(track+.65f,1.5f,mz+1.28f);h=.008f;return true;}
@@ -68,10 +74,10 @@ inline int parts(const float* M, bool inside, PartInst* out, int model) {
   const int gtype = (int)(M[1] + 0.5f); const bool tail = M[19 * 4 + 2] > 0.5f;
   for (int s = -1; s <= 1; s += 2) {
     out[n++] = {PT_GEAR_MAIN, (float)s, 0};
-    if (gtype >= 3) { out[n++] = {PT_GEAR_MDOOR, (float)s, -1}; out[n++] = {PT_GEAR_MDOOR, (float)s, 1}; }
+    if (gtype >= 3 && gtype != 5) { out[n++] = {PT_GEAR_MDOOR, (float)s, -1}; out[n++] = {PT_GEAR_MDOOR, (float)s, 1}; }   // (a float plane's wells have none)
   }
   if (tail) out[n++] = {PT_GEAR_TAIL, 0, 0};
-  else { out[n++] = {PT_GEAR_NOSE, 0, 0}; if (gtype >= 3) { out[n++] = {PT_GEAR_NDOOR, 0, -1}; out[n++] = {PT_GEAR_NDOOR, 0, 1}; } }
+  else { out[n++] = {PT_GEAR_NOSE, 0, 0}; if (gtype >= 3 && gtype != 5) { out[n++] = {PT_GEAR_NDOOR, 0, -1}; out[n++] = {PT_GEAR_NDOOR, 0, 1}; } }
   if (!inside) return n;
   if (reverie) { out[n++] = {PT_JET_STICK, 0, 0}; out[n++] = {PT_JET_THR, 0, 0}; out[n++] = {PT_PEDAL, 0, -1}; out[n++] = {PT_PEDAL, 0, 1}; return n; }   // the XR-20: side stick, throttle, one pair of pedals
   for (int s = -1; s <= 1; s += 2) { out[n++] = {PT_YOKE_SHAFT, (float)s, 0}; out[n++] = {PT_YOKE_WHEEL, (float)s, 0}; }   // the yokes: shaft, wheel

@@ -949,6 +949,12 @@ endif()
 add_dependencies(airport_slots_test shaders_gen)
 add_test(NAME airport_slots COMMAND airport_slots_test)
 
+add_executable(water_test tests/water_test.cpp ${CORE_OBJS})
+add_dependencies(water_test test_world)
+add_test(NAME float_hydrodynamics COMMAND water_test)
+set_tests_properties(float_hydrodynamics PROPERTIES FIXTURES_REQUIRED world
+  ENVIRONMENT "SOMNIUM_TEST_WORLD=${CMAKE_BINARY_DIR}/test_world.bin" COST 30)
+
 add_executable(jet_fuel_test tests/jet_fuel_test.cpp ${CORE_OBJS})
 add_dependencies(jet_fuel_test test_world)
 add_test(NAME jet_fuel COMMAND jet_fuel_test)

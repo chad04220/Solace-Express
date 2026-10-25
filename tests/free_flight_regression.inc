@@ -40,7 +40,7 @@
         q.endFlight(false, "", OUT_ABANDONED);
         all &= q.screen == SCR_FREE_FLIGHT && !q.freeFlight && !q.isolatedFlight;
       }
-      check(kNumAircraft == 11 && launches == 2 * kNumAircraft * (int)g_world.airports.size() && all, fmt("all %d aircraft/airport/start combinations launch and return", launches));
+      check(kNumAircraft == 12 && launches == 2 * kNumAircraft * (int)g_world.airports.size() && all, fmt("all %d aircraft/airport/start combinations launch and return", launches));
       check(ground && air && noFees, "runway parking, terrain-safe cruise starts, full tanks and zero fees");
       check(snapshot(q.career) == before && q.selHangar == kResearchJet && q.selAircraft == 3 && near(q.launchFuelKg, 12.f), "new-player career and career UI selections unchanged");
       q.cancelFreeFlightSetup();

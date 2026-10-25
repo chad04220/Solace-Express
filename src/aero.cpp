@@ -52,6 +52,12 @@ AeroModel build(const AircraftSpec& s) {
     else { nd = 0.55f + 0.3f * sqrtf(s.power / 1e5f); nl = 3.f * nd; }
     add("nacelles", s.engines * 0.9f * PI * nd * nl, nl, (1.f + 0.35f / (nl / nd)) * (jet ? 1.3f : 1.2f), 0.f);
   }
+  // floats (docs/WINGS_OVER_WATER.md): two long bodies, bluff at their steps, with their struts and spreader bars below
+  if (s.floats) {
+    const float fl = kFloatLength * L, fb = kFloatBeam * fl, fd = kFloatDepth * fl;
+    add("floats", 2.f * 0.85f * 2.f * (fb + fd) * fl, fl, 1.35f, 0.f);
+    a.extraDq += 0.12f;
+  }
   // drag areas that don't follow skin friction
   // New authored aircraft identify their struts from the actual model. A high cantilever wing
   // must not gain phantom strut drag just because its root is raised for cockpit visibility.

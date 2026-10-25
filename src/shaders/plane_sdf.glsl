@@ -298,6 +298,64 @@ vec2 gearFixedMainShape(vec3 ap){
   res = opU(res, vec2(spats, 1.0));
   return res;
 }
+#if HAS_FLOATS
+// ---- a float plane's floats (gear 5, plane_parts.glsl floatSt): each hull's section at z (q.x across its centre
+// line): the V of its bottom, 20 degrees of deadrise, up to a sharp chine, the sides rounded into the deck; the forebody
+// and the afterbody apart, so the step stands sharp between them. (The section changes along the hull by up to about
+// half a metre a metre at the bow: the distance is scaled to stay a bound.)
+float floatSection(FloatSt f, vec3 q, float keel){
+  float w = floatHalfBeam(f, q.z), yd = floatDeck(f, q.z), r = min(0.07, 0.4*w);
+  vec2 c = vec2(abs(q.x) - (w - r), q.y - (yd - r));
+  float sides = length(max(c, 0.0)) + min(max(c.x, c.y), 0.0) - r;
+  return max(sides, (keel + abs(q.x)*0.36397 - q.y)*0.93969);
+}
+float floatHull(FloatSt f, vec3 q){
+  float fore = max(floatSection(f, q, f.keel + floatKeelRise(f, min(q.z, f.step))), max(f.bow - q.z, q.z - f.step));
+  float aft = max(floatSection(f, q, f.keel + floatKeelRise(f, max(q.z, f.step))), max(f.step - q.z, q.z - f.stern));
+  return min(fore, aft)*0.8;
+}
+// what carries them (ap: the right side's body space): from each float's deck a strut up to the belly at the front
+// and one at the back, a diagonal between them (an N seen from the side), and a spreader bar across between the
+// floats under the fuselage at each pair; at each stern its water rudder, folded up as it flies
+float floatStruts(FloatSt f, vec3 ap){
+  float zf = f.step - 0.32*(f.step - f.bow), zr = f.step + 0.32;
+  vec3 sf = fusSection(zf), sr = fusSection(zr);
+  vec3 bf = vec3(sf.x*0.6, sf.z - sf.y*0.8, zf), br = vec3(sr.x*0.6, sr.z - sr.y*0.8, zr);   // (on the belly's curve)
+  vec3 df = vec3(f.x - 0.08, floatDeck(f, zf) - 0.03, zf), dr = vec3(f.x - 0.08, floatDeck(f, zr) - 0.03, zr);
+  float d = min(sdCapsule(ap, df, bf, 0.04), sdCapsule(ap, dr, br, 0.04));
+  d = min(d, sdCapsule(ap, df + vec3(0.0, 0.0, 0.08), br - vec3(0.0, 0.0, 0.06), 0.03));
+  d = min(d, sdCapsule(ap, vec3(0.0, df.y + 0.08, zf), df + vec3(0.0, 0.08, 0.0), 0.035));
+  d = min(d, sdCapsule(ap, vec3(0.0, dr.y + 0.08, zr), dr + vec3(0.0, 0.08, 0.0), 0.035));
+  return d;
+}
+float floatRudder(FloatSt f, vec3 ap){
+  vec3 q = ap - vec3(f.x, f.keel + floatKeelRise(f, f.stern) + 0.12, f.stern + 0.05);
+  q.yz = rot2(q.yz, 0.9);
+  return sdRoundBox(q - vec3(0.0, 0.0, 0.16), vec3(0.008, 0.07, 0.17), 0.006);
+}
+// The amphibious wheels at rest: the right main (body space) on a leg from its pivot in the float down to a fork
+// over the wheel; the bows' pair (the nose part's frame, at the nose station) each on a castoring leg and fork
+vec2 floatMainShape(vec3 l){
+  FloatMain fm = floatMainOf(); float wr = gM[18].y;
+  vec3 q = l - fm.W, crown = fm.W + vec3(0.0, wr + 0.07, 0.0);
+  float legs = sdCapsule(l, fm.P, crown, 0.045);
+  legs = min(legs, sdCapsule(l, crown - vec3(0.135, 0.0, 0.0), crown + vec3(0.135, 0.0, 0.0), 0.03));
+  legs = min(legs, sdCapsule(vec3(abs(q.x), q.yz), vec3(0.135, wr + 0.07, 0.0), vec3(0.135, 0.0, 0.0), 0.025));
+  vec2 res = opU(vec2(legs, 8.0), vec2(sdRoundCylX(q, wr, 0.08, 0.04), 6.0));
+  res = gearWheelDetails(q, res, wr, 0.08, true);
+  return gearLegDetails(l, res, fm.P, crown, 0.045, true, false);
+}
+vec2 floatNoseShape(vec3 l){
+  FloatSt f = floatSt(); float nwr = gearNoseR(), wy = nwr - gM[19].x;
+  vec3 q = vec3(abs(l.x) - f.x, l.y - wy, l.z);   // (from either bow wheel's centre)
+  float top = floatNosePivot() - wy, crown = nwr + 0.06;
+  float legs = sdCapsule(q, vec3(0.0, top, 0.0), vec3(0.0, crown, 0.0), 0.035);
+  legs = min(legs, sdCapsule(q, vec3(-0.105, crown, 0.0), vec3(0.105, crown, 0.0), 0.025));
+  legs = min(legs, sdCapsule(vec3(abs(q.x), q.yz), vec3(0.105, crown, 0.0), vec3(0.105, 0.0, 0.0), 0.02));
+  vec2 res = opU(vec2(legs, 8.0), vec2(sdRoundCylX(q, nwr, 0.055, 0.035), 6.0));
+  return gearWheelDetails(q, res, nwr, 0.055, false);
+}
+#endif
 vec2 gearMainShape(vec3 l, vec3 mount){
   vec4 G0 = gM[18], G1 = gM[19];
   int gtype = int(gM[0].y + 0.5);
@@ -355,6 +413,9 @@ vec2 gearMainShape(vec3 l, vec3 mount){
   return gearLegDetails(gtype == 4 ? vec3(2.0*track - l.x, l.yz) : l, res, mount, wc + vec3(0.0, 0.05, 0.0), shaft, true, !(gtype == 4 && gearSwingMain()));
 }
 vec2 gearNoseShape(vec3 l){
+#if HAS_FLOATS
+  if (int(gM[0].y + 0.5) == 5) return floatNoseShape(l);
+#endif
   vec4 G0 = gM[18], G1 = gM[19];
   int gtype = int(gM[0].y + 0.5);
   float wr = G0.y, gh = G1.x;
@@ -394,6 +455,9 @@ float gearDoorF(vec3 l, GearWell g){ float hzD = g.hz - 0.01; return sdBox(vec3(
 vec2 gearPartField(int k, vec3 l){
   int gtype = int(gM[0].y + 0.5);
   if (k == PT_GEAR_MAIN && gtype <= 2) return gearFixedMainShape(l);
+#if HAS_FLOATS
+  if (k == PT_GEAR_MAIN && gtype == 5) return floatMainShape(l);
+#endif
   if (k == PT_GEAR_MAIN) return gearMainShape(l, gtype == 3 ? gearNacFold().P : gearSwingMain() ? gearSwingOf().H : gearHinge());
   if (k == PT_GEAR_NOSE) return gearNoseShape(l);
   if (k == PT_GEAR_TAIL) return gearTailShape(l);
@@ -1133,6 +1197,21 @@ vec2 mapPlaneBody(vec3 p){
     pod = smin(pod, sdEllipsoid(p - vec3(0.0, sec.z - sec.y - 0.2, -3.0), vec3(0.42, 0.22, 0.8)), 0.2);
     res.x = smin(res.x, pod, 0.12);
   }
+#if HAS_FLOATS
+  // ---------------- floats (gear 5): the hulls, their struts and spreader bars, the water rudders - the airframe's own
+  if (gtype == 5) {
+    FloatSt fs = floatSt();
+    vec3 ap = vec3(abs(p.x), p.y, p.z);
+    float hx = 0.5*(fs.x + 0.5*fs.beam + 0.1), yLo = fs.keel - 0.08, yHi = fusSection(fs.step).z;
+    if (sdBox(ap - vec3(hx, 0.5*(yLo + yHi), 0.5*(fs.bow + fs.stern) + 0.2), vec3(hx, 0.5*(yHi - yLo), 0.5*(fs.stern - fs.bow) + 0.3)) < res.x + 0.1) {
+      res = opU(res, vec2(floatHull(fs, vec3(ap.x - fs.x, ap.yz)), 7.0));
+      float st = floatStruts(fs, ap);
+      if (inside > 0.5) st = max(st, -f);   // (their ends at the belly stay out of the hollow cabin)
+      res = opU(res, vec2(st, 1.0));
+      res = opU(res, vec2(floatRudder(fs, ap), 8.0));
+    }
+  }
+#endif
   // ---------------- landing gear (fixed types hang below the lower fuselage: a plane bounds them)
   // All main legs, the nose and tail wheels and the bays' doors are rigid parts (plane_parts.glsl
   // gearPartPose, gearPartField above): placed here by their poses, left out of the airframe's mesh bake. The wells are
@@ -1148,6 +1227,20 @@ vec2 mapPlaneBody(vec3 p){
     float side = p.x < 0.0 ? -1.0 : 1.0;
     if (retract) {
       float a = gearDoorAngle(), up = gearUp();
+#if HAS_FLOATS
+      if (gtype == 5) {   // the wells in each float, open through its bottom: the main's along its swing forward, the bow
+                          // wheel's along its fold aft; the main leg, swung (the bows' pair is the nose part, below)
+        FloatSt fs = floatSt(); FloatMain fm = floatMainOf();
+        vec3 fq = vec3(ap.x - fs.x, ap.yz);
+        float w = ap.y - fs.keel - floatKeelRise(fs, ap.z) - 0.05, yLo = fs.keel - 0.4;
+        float mTop = fm.T.x + wr + 0.05, mz0 = fm.T.y - wr - 0.07, mz1 = fm.W.z + wr + 0.07;
+        res = wellCut(res, sdBox(fq - vec3(0.0, 0.5*(yLo + mTop), 0.5*(mz0 + mz1)), vec3(0.17, 0.5*(mTop - yLo), 0.5*(mz1 - mz0))), w);
+        float nwr = gearNoseR(), py = floatNosePivot(), nTop = py + nwr + 0.05;
+        float nz0 = G0.w - nwr - 0.07, nz1 = G0.w + (py - nwr + gh) + nwr + 0.08;
+        res = wellCut(res, sdBox(fq - vec3(0.0, 0.5*(yLo + nTop), 0.5*(nz0 + nz1)), vec3(0.13, 0.5*(nTop - yLo), 0.5*(nz1 - nz0))), w);
+        if (gPartMode == -1) { mat3 Rf = partRyz(up*fm.ang); res = opU(res, floatMainShape(transpose(Rf)*(ap - fm.P) + fm.P)); }
+      } else
+#endif
       if (gtype == 3) {   // the nacelle's wheel bay and the slot the leg swings through; the near door (by the side of the
                           // bay's centre line); the leg, folded
         VBay b = gearVBay(false); NacFold f = gearNacFold();
@@ -1231,7 +1324,11 @@ vec2 mapPlaneBody(vec3 p){
           res=opU(res,gearMainShape(transpose(Rf)*(ap-f.H)+f.H,f.H));
         }
       }
+#if HAS_FLOATS
+      if (G1.z < 0.5 && gtype != 5) {   // the nose wheel's well along the belly and its near door (a float plane's: in its floats)
+#else
       if (G1.z < 0.5) {   // the nose wheel's well along the belly and its near door
+#endif
         VBay b = gearVBay(true);
         res = gearWellP(p, res, b.c, b.h, b.depth, b.below, b.pitch);
         float s = p.x > 0.0 ? 1.0 : -1.0;

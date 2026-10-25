@@ -36,7 +36,7 @@ has(sdf, "elseif(gPartMode==-1){res=opU(res,gearFixedMainShape(ap));}")
 assert sdf.count("gearFixedMainShape(ap)") == 1
 checks += 1
 has(parts, "if(gtype<=2){X.R=S;returnX;}")
-has(fleet, "for(ints=-1;s<=1;s+=2){out[n++]={PT_GEAR_MAIN,(float)s,0};if(gtype>=3)")
+has(fleet, "for(ints=-1;s<=1;s+=2){out[n++]={PT_GEAR_MAIN,(float)s,0};if(gtype>=3&&gtype!=5)")
 has(fleet, "if(type==PT_GEAR_MAIN&&gtype<=2){lo=vec3(0.f,-gh-.1f,mz-wr-.7f);hi=vec3(track+.3f,1.5f,mz+wr+.7f);")
 
 # Explicit assembly identity wins over position; a long leg's midpoint may be

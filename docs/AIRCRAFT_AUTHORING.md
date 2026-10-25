@@ -73,15 +73,16 @@ Today:
 | 12 | `xr40_somnus` | XR-40 Somnus | `kSomnus`; research, Tier B (`special = 2`, engine code 6), the only armed type |
 | 13 | `thistledown_l4` | Thistledown L4 | `kThistledown`; conventional career/free-flight piston tourer |
 | 14 | `galleon_180` | Galleon 180 | `kGalleon`; conventional career/free-flight twin-underwing transport, largest fleet airframe |
+| 15 | `kittiwake_a9` | Kittiwake A9 | `kKittiwake`; career/free-flight single-turboprop amphibian on floats (`floats`, gear type 5: `docs/WINGS_OVER_WATER.md`) |
 
 Rules and limits:
 
 1. **Aircraft identities are append-only.** Add a new row at the end of both `kAircraft[]` and `kModels[]`.
    Never insert before an existing row or renumber the research constants. Add its constant in `aircraft.h`, raise
    `kAircraftCount`, and append the constant to either `kCareerAircraft` or `kResearchAircraft` as appropriate.
-   Current career membership is `{0,1,2,3,4,5,6,7,8,13,14}`; research identities remain 9–12.
+   Current career membership is `{0,1,2,3,4,5,6,7,8,13,14,15}`; research identities remain 9–12.
 2. **Counts are not index limits for subsets.** `kAircraftCount` is the extent of the complete aligned tables and
-   sizes the aero/performance caches and `Renderer::kAfModels`. `kNumAircraft` is the count of career entries (11),
+   sizes the aero/performance caches and `Renderer::kAfModels`. `kNumAircraft` is the count of career entries (12),
    not an upper bound on their IDs. Iterate `for (int spec : kCareerAircraft)` for career/free flight; use
    `careerSpecAt`, `careerRowFor`, `isCareerAircraft` and `validCareerSelection` at UI/launch boundaries. Iterate
    `0 <= spec < kAircraftCount` for complete-roster rendering, prewarming and diagnostics.
@@ -169,7 +170,7 @@ struct ModelDef {
   float ht[7]; int ttail; // tailplane: half span, root chord, tip chord, LE sweep, y, LE z, dihedral (deg); T-tail flag (y and z then come from the fin)
   float vt[6];           // fin: height, root chord, tip chord, LE sweep, base y, root LE z
   int engine; float nacX, nacY, nacR, nacZ0, nacLen, spinnerR, propR;   // 0 nose piston, 1 nose turboprop, 2 wing piston nacelles, 3 wing turboprop nacelles, 4 aft jets; 5, 6 the XR-30 / XR-40 fields (reserved)
-  int gear; float wheelR; // 0 fixed tricycle with spats, 1 fixed tricycle, 2 taildragger tundra, 3 retracts into the nacelles (needs engine 3), 4 retracts into wing/body
+  int gear; float wheelR; // 0 fixed tricycle with spats, 1 fixed tricycle, 2 taildragger tundra, 3 retracts into the nacelles (needs engine 3), 4 retracts into wing/body, 5 floats with amphibious wheels (needs the spec's `floats`)
   int cargoPod;
   int winCount; float winZ0, winZ1, winY, winW, winH;   // passenger windows: count per side, first/last z, height above the section centre, half width, half height
   vec3 eye; int cockpit; // pilot's eye (left seat); 0 analog single cluster, 1 analog twin, 2 glass (PFDs, centre display, leather)

@@ -47,6 +47,9 @@ struct AircraftSpec {
   float jetDryTsfc = 0, jetWetTsfc = 0;
   float fuelCruiseAlt = 0, fuelCruiseTas = 0, fuelCruiseSpool = 0;
   float maxTakeoffMass = 0;     // explicit kg; zero preserves the legacy payload-based envelope
+  // amphibious floats (docs/WINGS_OVER_WATER.md): it floats, takes off and lands on the water, and its wheels (retract)
+  // fold up into the floats; floatStations sets them out, and its model row's gear type is 5 to match
+  bool floats = false;
   float maxFuelForPayload(float payloadKg) const { return std::max(0.f, std::min(maxFuel, maxMass() - emptyMass - std::max(0.f, payloadKg))); }
   // (0: a light aircraft's normal category, +3.8 / -1.52 flaps up; every type in the table sets its own)
   float gLimitPos() const { return gPos > 0 ? gPos : 3.8f; }
@@ -83,9 +86,10 @@ static const int kReverie = 11;      // XR-20 Reverie: forward-swept systems dem
 static const int kSomnus = 12;      // XR-40 Somnus stealth aerobatic research craft
 static constexpr int kThistledown = 13; // Thistledown L4: four-seat piston tourer
 static constexpr int kGalleon = 14;    // Galleon 180: twin-underwing transport
-static constexpr int kAircraftCount = 15; // all aircraft, including research
+static constexpr int kKittiwake = 15;  // Kittiwake A9: single-turboprop amphibian on floats (docs/WINGS_OVER_WATER.md)
+static constexpr int kAircraftCount = 16; // all aircraft, including research
 static constexpr int kResearchAircraft[] = {kVigil, kReverie, kResearchJet, kSomnus};
-static constexpr int kCareerAircraft[] = {0, 1, 2, 3, 4, 5, 6, 7, kWavecrest, kThistledown, kGalleon};
+static constexpr int kCareerAircraft[] = {0, 1, 2, 3, 4, 5, 6, 7, kWavecrest, kThistledown, kGalleon, kKittiwake};
 static constexpr int kNumAircraft = sizeof(kCareerAircraft) / sizeof(kCareerAircraft[0]); // career roster count, never an index bound
 inline constexpr bool validAircraft(int spec) { return spec >= 0 && spec < kAircraftCount; }
 inline constexpr int careerRowFor(int spec) {
@@ -113,6 +117,19 @@ static const vec3 kSomnusPods[4] = {vec3(-2.35f, -0.08f, -3.3f), vec3(2.35f, -0.
 // station, the nose wheel's station, a taildragger's tail wheel (station, height above the mains' contact)
 struct GearStations { float track, mainZ, noseZ, tailZ, tailY; };
 GearStations gearStations(const AircraftSpec& s);
+// A float plane's two floats, in the body frame, the same for the physics' water (Plane::substep) and the drawn model
+// (models.cpp packModel): each float's centre line at x = +-x; its keel at the step keelY (below the origin); from its
+// bow (bowZ) through the step (stepZ, where the main wheels stand) to its stern (sternZ); its beam and its depth keel to
+// deck at the step; and how far the amphibious wheels stand below the keel when they are down
+struct FloatStations { float x, keelY, bowZ, stepZ, sternZ, beam, depth, wheelDrop; };
+// a float's proportions: its length a share of the fuselage's; then, of its own length, the share ahead of the step,
+// the nose wheel's station from the bow, its beam and its depth (plane_sdf.glsl draws it from the same numbers)
+static constexpr float kFloatLength = 0.82f, kFloatBowShare = 0.58f, kFloatNoseWheel = 0.16f, kFloatBeam = 0.105f, kFloatDepth = 0.10f;
+FloatStations floatStations(const AircraftSpec& s);
+// the keel's height above keelY at a body z (the bow's sweep up forward of the step, the afterbody's rise behind it),
+// and the float's half beam there (tapering to the bow and the stern)
+float floatKeelRise(const FloatStations& f, float z);
+float floatHalfBeam(const FloatStations& f, float z);
 
 struct PerfModel {
   float vs1 = 0, vs0 = 0;          // stall speed clean / full flap (m/s), from the wing's CLmax at the test weight
@@ -205,6 +222,10 @@ public:
   bool engineRunning = false; float starterTime = 0;
   WheelMotion wheelMotion[3]; // main left, main right, nose/tail; cosmetic simulation state
   bool onGround = false, wasOnGround = false;
+  // a float plane on the water: afloat (onGround then too - it is down and steering on its rudders, not flying), how
+  // far the floats are in (0 dry .. 1 the whole float down to its deck: on the step at speed little more than the keel),
+  // and the chop it rides (m, the sea's local amplitude: sheltered water calm, the open coast rough in the wind)
+  bool onWater = false; float floatWet = 0, seaChop = 0;
   bool sceneryHits = true;   // collide with trees and buildings (off for the quote's background flight: the scenery isn't thread-safe)
   // the trees and buildings its autopilot plans the final over (apPlan): nullptr the game's (g_scenery); a background
   // flight's own, made on its thread (the game's is the game thread's alone: its chunks are replaced and trimmed there).
@@ -363,4 +384,11 @@ private:
   void somnusThrust(vec3& F, vec3& T, float podThrust, vec3 wd, vec3 Taero, vec3 surfMax, float dt);
   vec3 gust;
   float cd0 = 0.03f;
+  float seaFetchT = -1.f, seaFetch = 0.f;   // (the open water upwind, looked for once a second)
+  // this step: a keel met the ground (a beach, the shallows, a runway with the wheels up), its fastest speed over it,
+  // and whether it was a runway's
+  bool floatGround = false, floatGroundRunway = false; float floatGroundSpeed = 0.f;
+  // the floats on the water (or on the ground, wheels up): their forces into Fw (world) and Tw (body, about cg); true
+  // when they touch, afloat set when it is the water (substep's ground contacts)
+  bool floatContacts(float dt, const Weather& wx, float time, vec3 cg, vec3& Fw, vec3& Tw, bool& afloat);
 };

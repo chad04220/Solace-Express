@@ -72,7 +72,8 @@
 #define HAS_REVERIE (AF_MODEL == 11)
 #define HAS_THISTLEDOWN (AF_MODEL == 13)
 #define HAS_GALLEON (AF_MODEL == 14)
-#define HAS_FLEET_CABIN (AF_MODEL < 10 || AF_MODEL == 13 || AF_MODEL == 14)
+#define HAS_KITTIWAKE (AF_MODEL == 15)
+#define HAS_FLEET_CABIN (AF_MODEL < 10 || AF_MODEL == 13 || AF_MODEL == 14 || AF_MODEL == 15)
 #define MODEL_IS(n) ((n) == AF_MODEL && gModelId == (n))
 #else
 #define HAS_DAWNLARK HAS_FLEET
@@ -88,9 +89,12 @@
 #define HAS_REVERIE HAS_FLEET
 #define HAS_THISTLEDOWN HAS_FLEET
 #define HAS_GALLEON HAS_FLEET
+#define HAS_KITTIWAKE HAS_FLEET
 #define HAS_FLEET_CABIN HAS_FLEET
 #define MODEL_IS(n) (gModelId == (n))
 #endif
+// HAS_FLOATS: a float plane's floats, struts and amphibious wheels (gear 5: docs/WINGS_OVER_WATER.md) - the Kittiwake's
+#define HAS_FLOATS HAS_KITTIWAKE
 // The hit relative to the camera, exactly (gRelSet): the mesh pass's from its body-space vertex position, the march's
 // from its ray. The world point holds it only to the float spacing of world metres - 4 mm at the map's edges, a third
 // of a degree at arm's length - and what was taken from it (a cockpit's markings, gauge and bezel edges, panel
