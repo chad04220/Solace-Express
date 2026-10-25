@@ -23,7 +23,7 @@ bool connected(Radio& radio) {
   if(radio.state()==Radio::FAILED){printf("Radio: %s\n",radio.status().c_str());return false;}
   std::this_thread::sleep_for(std::chrono::milliseconds(5));
  }
- return false;
+ printf("Radio: still \"%s\" after 10 s\n",radio.status().c_str());return false;
 }
 std::pair<double,double> energy(float seconds) {
  double left=0,right=0;float pcm[960];
@@ -37,7 +37,7 @@ int main() {
  std::filesystem::create_directories(dir);const auto left=dir/"left.wav",right=dir/"right.wav";
  if(!fixture(left,44100,0)||!fixture(right,96000,1))return 2;
  g_audio.init(48000);AudioParams p;p.scene=true;p.engines=0;p.engineVol=0;g_audio.setParams(p);energy(.1f);
- Radio radio;check(radio.init(),"worker starts");radio.setVolume(.5f);
+ Radio radio;check(radio.init(),"radio initialises");radio.setVolume(.5f);
  radio.play(left.string());check(connected(radio),"44.1 kHz local PCM decodes through Media Foundation");
  auto e=energy(.1f);check(e.first>.001 && e.first>e.second*1.5,"decoded left channel reaches the spatial mixer");
  radio.stop();energy(.2f);e=energy(.1f);check(e.first+e.second<1e-9,"stop revokes buffered station audio");
