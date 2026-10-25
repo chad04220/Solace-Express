@@ -4688,6 +4688,7 @@ std::vector<std::pair<int, bool>> Game::prewarmItems(bool allCraft) {
   for (int i = 0; i < kAircraftCount; i++) if (allCraft || !kAircraft[i].special) { todo.push_back({i, false}); todo.push_back({i, true}); }
   return todo;
 }
+int Game::prewarmHiveItems(bool allCraft) { return allCraft ? kEnemyCraftTypes : 0; }
 std::string Game::prewarmLabel(int craft, bool inside, int stage) {
   const std::string what = std::string("the ") + kAircraft[craft].name + (inside ? "'s cockpit" : "'s body");
   switch (stage) {
@@ -4756,6 +4757,19 @@ void Game::prewarm(const std::function<void(float, const std::string&)>& progres
     g_ren.onBodyLoaded = nullptr; g_ren.onBakeStart = nullptr; g_ren.onMeshProgress = nullptr; g_ren.onMeshBatch = nullptr; g_onProgramBuild = nullptr;
   }
   prewarmCraft = -1; prewarmInside = false;
+  // the hive's craft (the XR-40's research sorties and Defense Command fly against them): built once after an update,
+  // then read from this PC's cache - here, under the intro, so neither launch has one to build behind its loading screen
+  // (the first research flight after an update built all four there, seconds each)
+  const int hiveN = prewarmHiveItems(allCraft);
+  for (int k = 0; k < hiveN && !quit; k++) {
+    const size_t step = todo.size() + k;
+    if (pace && itemSteps && step < itemSteps->size()) pace->begin((*itemSteps)[step]);
+    progress(pace ? pace->fraction() : 1.f, fmt("Preparing the hive craft   %d of %d", k + 1, hiveN));
+    g_ren.onBakeStart = [&] { progress(pace ? pace->fraction() : 1.f, fmt("Building the hive craft  (once after an update: kept for the next launch)   %d of %d", k + 1, hiveN)); };
+    g_ren.warmEnemyType(k);
+    g_ren.onBakeStart = nullptr;
+    if (pace) pace->setSub(1.f);
+  }
   realTime = 0.f;
   if (!quit) {
     if (pace) pace->end();

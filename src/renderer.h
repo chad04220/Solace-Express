@@ -335,6 +335,7 @@ public:
   void warmSomnusStores(const FrameParams& fp); // explicit exterior hardware warmup even from cockpit view
   void warmEnemyTypes(); // explicit loading bake: no scene actors or phantom shadows
   void warmEnemyType(int type); // one of them (the loading screen: one a frame)
+  bool enemyTypeWarm(int type) const { return type >= 0 && type < kEnemyCraftTypes && enemyMeshes[type].attempted; }   // (built or read already: nothing left to warm)
   void renderScene(const FrameParams& fp, const std::vector<SpriteVert>& alphaSprites, const std::vector<SpriteVert>& addSprites);
   // A UI-free scene already rendered on this context, retained wholly on the GPU for instant loading cards.
   struct LoadingPreview {

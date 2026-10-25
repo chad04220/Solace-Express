@@ -528,6 +528,8 @@ void Game::hiveVisual(FrameParams& fp) {
     // stores, so their programs come before any flight opens (a first release compiled them: two seconds at the drop).
     // One item a frame, the loading screen drawn and shown between them and from inside each bake (all of them on
     // the first frame held the research launch's loading screen still for seconds)
+    // (a hive craft the launch's prewarm already built or read takes no frame of its own)
+    while(!headless && hive && loadWarmStep<kEnemyCraftTypes && loadWarmStep<loadWarmItems() && g_ren.enemyTypeWarm(loadWarmStep)) ++loadWarmStep;
     if(!headless && loadWarmAt!=loadFrames && loadWarmStep<loadWarmItems()) {
       loadWarmAt=loadFrames;
       if(hive && loadWarmStep<kEnemyCraftTypes) g_ren.warmEnemyType(loadWarmStep); else g_ren.warmSomnusStores(fp);

@@ -858,6 +858,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   std::vector<int> meshSteps;
   if (!tool)
     for (const auto& it : Game::prewarmItems(true)) meshSteps.push_back(pace.add("mesh" + std::to_string(it.first) + (it.second ? "c" : "o"),9,9.f,"AIRCRAFT"));
+  if (!tool)   // (then the hive's craft, after the aircraft: prewarmHiveItems)
+    for (int k = 0; k < Game::prewarmHiveItems(true); k++) meshSteps.push_back(pace.add("mesh-hive" + std::to_string(k), 9, 9.f, "AIRCRAFT"));
   pace.begin(stStart);
   std::thread compileThread;
   if (ctx2) compileThread = std::thread([&] {
