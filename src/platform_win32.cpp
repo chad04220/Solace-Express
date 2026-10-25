@@ -1091,8 +1091,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
               afHelpers.lastBuilt, afHelpers.lastCount, afHelpers.lastSecs, afHelpers.lastItems);
     fprintf(f, "Ground photographs: %s\n", g_ren.matEnvScanned ? (g_ren.envMatCompressed ? "2K, block-compressed (BC3)" : "2K, uncompressed") : g_ren.matEnvFallbackScanned ? "512" : "none (procedural)");
     fprintf(f, "Foveated shading: %s\n", g_ren.vrsAvailable ? "available (NVIDIA variable-rate shading)" : "not available on this card (Auto resolution lowers the whole frame)");
-    fprintf(f, "Launch: shaders and islands %.1f s (islands %s), career %.1f s, renderer %.1f s, menu %.1f s, aircraft meshes %.1f s (%d built)\n",
-            pace.tookOf("start"), g_world.fromCache ? "from the cache" : "generated", pace.tookOf("career"), pace.tookOf("renderer"), pace.tookOf("menu"), pace.tookOf("mesh"), g_ren.bakeBuilt);
+    fprintf(f, "Launch: shaders and islands %.1f s (islands %s), career %.1f s, renderer %.1f s, ",
+            pace.tookOf("start"), g_world.fromCache ? "from the cache" : "generated", pace.tookOf("career"), pace.tookOf("renderer"));
+    if (tool) fprintf(f, "menu and aircraft meshes not prepared (a tool's run: its scenes prepare their own)\n");
+    else fprintf(f, "menu %.1f s, aircraft meshes %.1f s (%d built)\n", pace.tookOf("menu"), pace.tookOf("mesh"), g_ren.bakeBuilt);
     if (!g_ren.dispError.empty()) fprintf(f, "Display shader failed (cockpit screens disabled):\n%s\n", g_ren.dispError.c_str());
     if (!g_ren.proxyError.empty()) fprintf(f, "Shadow proxy shader failed (aircraft shadows from the shadow maps only):\n%s\n", g_ren.proxyError.c_str());
     if (!g_shaderNotes.empty()) fprintf(f, "%s", g_shaderNotes.c_str());   // (programs the driver's compiler rejected, and what built instead)

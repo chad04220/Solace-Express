@@ -143,6 +143,10 @@ struct GameTest {
     };
     for (int i : kCareerAircraft) Plane::perf(&kAircraft[i]);
     game.headless = false; g_ren.entSync = false; game.profile.welcomed = true;
+    // the release's layout: the loading screens' pictures beside the game (assets/loading here). Without them every
+    // launch took the aerial map instead, and the loading screen drawn from inside a bake - which waited for the map -
+    // was never seen as the islands' flights, which all have a picture, run it (SEAMLESS_PICTURES=0: the map)
+    if (!(getenv("SEAMLESS_PICTURES") && !atoi(getenv("SEAMLESS_PICTURES"))) && access("assets/loading/MDB.jpg", F_OK) == 0) game.assetDir = "assets";
     {   // the launch's prewarm (Game::prewarm) of what the session shows: the menu's scenery and terrain lighting, then the
         // bodies and cockpits of the menu's aircraft and the one flown. The launch warms every craft, but on the software
         // renderer each one's compiled programs stay in memory, some 14 GB for them all: the AI traffic, which would draw

@@ -6,6 +6,7 @@
 #include "hangar_catalog.h"
 #include "ui_identity.h"
 #include "load_pacer.h"
+#include "world_load_progress.h"
 #include <ctime>
 
 // High-tech glass UI: deep navy panels, cyan accents, amber for warnings
@@ -443,17 +444,20 @@ void Game::drawLoading() {
     unsigned tex = 0; int w = 0, h = 0; std::vector<uint8_t> px;
     // a picture rendered on this PC by render_loading.bat (.png) wins over the one that ships with the game (.jpg)
     for (const char* ext : {".png", ".jpg"})
-      if (!g_world.procedural && !tex && readImage((assetDir + "/loading/" + key + ext).c_str(), w, h, px)) tex = g_ren.makeTexture(px.data(), w, h);
+      if (!g_world.procedural && !tex && g_ren.ok && readImage((assetDir + "/loading/" + key + ext).c_str(), w, h, px)) tex = g_ren.makeTexture(px.data(), w, h);
     li = loadImg.emplace(key, tex).first;
   }
   unsigned pic = li == loadImg.end() ? 0 : li->second;
   const auto& preview = g_ren.loadingPreview();
   const bool retained = pendingService && !pic && preview.matches(flight.forceAircraft, flight.type-CT_MIL_RECON);
   if (retained) pic = preview.texture;
-  if (!military && !loadMap && !pic && !pending) {   // otherwise the aerial image of the airport, rendered once from the real terrain
+  if (!military && !loadMap && !pic && !pending && g_ren.ok) {   // otherwise the aerial image of the airport, rendered once from the real terrain
     loadMap = true; gpsMapValid = false;
     g_ren.renderMap(ap.x, ap.z, 2400.f, 1536);
   }
+  // (the backdrop in hand - the picture decoded, or the map rendered: the screen can now be drawn again from inside a
+  // bake, which must neither decode nor render)
+  if (!pending) loadBackdrop = true;
   float rt = loadReadyT >= 0 ? loadT - loadReadyT : 0.f;
   float cover = 1.f - smoothstepf(0.f, 1.4f, rt);   // the card fades out onto the live shot once the scenery is in
   if (cover > 0.001f && (!military || pic || pending)) {
@@ -1501,18 +1505,29 @@ void Game::drawRegionLoading() {
   const float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
   const float x = W * .12f, w = W * .76f, y = H * .29f;
   g_ren.rectGrad(0, 0, W, H, vec3(.008f, .025f, .045f), C_PANEL, 1);
-  g_ren.text(x, y, 12 * s, "FREE FLIGHT / REGION PREPARATION", C_ACCENT, 1, 0, false);
+  // what is being prepared, for whom: a free flight's region, the career's (its hub, or a flight's end there), or the
+  // islands again on the way back to the menu
+  const char* head = regionAfterLoad == SCR_FREE_FLIGHT ? "FREE FLIGHT / REGION PREPARATION" :
+    regionAfterLoad == SCR_HUB || regionAfterLoad == SCR_DEBRIEF ? "CAREER / REGION PREPARATION" : "RETURNING TO THE SOLACE ISLANDS";
+  g_ren.text(x, y, 12 * s, head, C_ACCENT, 1, 0, false);
   fitText(x, y + 34 * s, w, 30 * s, 18 * s, loadingRegion.name, C_TEXT);
+  // the bar: the stages' share of the work - the last region's readers drained, the build (the builder's own measure of
+  // its steps, World::buildConfigured), its map and buffers made, their upload a slice a frame - and never stepping back
   const int stage = regionLoadStage.load();
+  const float built = std::clamp(g_worldLoadProgress.load(), 0.f, 1.f);
+  const float done = stage == 0 ? 0.f : stage == 1 ? .04f + .78f * built : stage == 2 ? .84f : .88f + .12f * g_ren.worldUploadFraction();
+  regionShown = std::max(regionShown, regionShown + (done - regionShown) * 0.12f);   // (eased a frame at a time: drawn before the UI's clock)
   std::string detail = stage == 0 ? "Finishing background work from the previous region" :
-    stage == 1 ? (g_worldStage.load() == 1 ? "Checking the region cache" : "Generating terrain, airports, roads and settlements") :
+    stage == 1 ? (g_worldStage.load() == 1 ? std::string("Checking the region cache") : std::string(g_worldLoadTask.load())) :
     stage == 2 ? "Preparing the region's map and its terrain for the renderer" : "Uploading terrain and refreshing the renderer";
   if (!regionError.empty()) detail = "Region preparation failed: " + regionError;
-  fitText(x, y + 92 * s, w, 16 * s, 11 * s, detail, regionError.empty() ? C_DIM : C_WARN);
+  else detail += fmt("   %.0f s", regionLoadTime);
+  fitText(x, y + 92 * s, w - 60 * s, 16 * s, 11 * s, detail, regionError.empty() ? C_DIM : C_WARN);
   g_ren.rect(x, y + 131 * s, w, 4 * s, C_ACCENT, .12f, 2 * s);
   if (regionError.empty()) {
-    const float t = .5f + .5f * sinf(realTime * 1.7f);
-    g_ren.rect(x + t * w * .8f, y + 131 * s, w * .2f, 4 * s, C_ACCENT, .9f, 2 * s);
+    g_ren.text(x + w, y + 106 * s, 12 * s, fmt("%d%%", std::min(99, (int)(regionShown * 100.f))), C_ACCENT, 1, 2, false);
+    if (regionShown > 0.f) g_ren.rect(x, y + 131 * s, w * regionShown, 4 * s, C_ACCENT, .9f, 2 * s);
+    g_ren.glow(x + w * regionShown - 4 * s, y + 129 * s, 8 * s, 8 * s, C_ACCENT, .5f + .3f * sinf(realTime * 6.f), 4 * s, 14 * s);   // (alive while one long step runs)
   }
   g_ren.text(x, y + 155 * s, 12 * s, "The next region replaces the previous one. Your career is unchanged.", C_DIM, 1);
   if (!regionError.empty()) {

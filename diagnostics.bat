@@ -34,7 +34,8 @@ rem      cockpits in their own file (the heaviest scenes: if one stalls the GPU,
 rem   4. the pass-by-pass analysis (CPU vs GPU, resolution scaling, what each feature costs)
 rem   5. screenshots: the HUD with every warning lit, the research terminal and craft, the cockpits,
 rem      the hangar, the menu
-rem   6. startup.log (GPU, texture units, shader programs compiled, audio backend), error.log if the game left one, the
+rem   6. startup.log (GPU, texture units, shader programs compiled, audio backend), loading.log (the last flight launched
+rem      in play, its loading screen frame by frame), error.log if the game left one, the
 rem      settings file, the shader compile log and the cache's size
 cd /d "%~dp0"
 if not exist SomniumVolandi.exe (
@@ -53,6 +54,8 @@ if exist "%OUT%" rmdir /s /q "%OUT%"
 mkdir "%OUT%"
 rem (an error.log already there is an earlier launch's: kept apart, so the one collected at the end is these runs')
 if exist "%APPDATA%\SomniumVolandi\error.log" move /y "%APPDATA%\SomniumVolandi\error.log" "%OUT%\error_before.log" >nul
+rem (the loading screen of the last flight launched in play, frame by frame: taken first, before these runs launch any)
+if exist "%APPDATA%\SomniumVolandi\loading.log" copy /y "%APPDATA%\SomniumVolandi\loading.log" "%OUT%\loading.log" >nul
 if /i "%MODE%"=="shots" goto shots
 if /i "%MODE%"=="soak" goto soak
 

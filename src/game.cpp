@@ -5,6 +5,7 @@
 #include "earth_charts.h"
 #include "sky.h"
 #include "load_pacer.h"
+#include "world_load_progress.h"
 #include <chrono>
 #include <ctime>
 #include <thread>
@@ -778,14 +779,15 @@ void Game::loadFreeRegion(int index, GameScreen after) {
   regionalSurface::clearFlightContext(); earthFacilitiesPending = earthPromotionDeferred = false;
   freeRegion = index; loadingRegion = target; regionAfterLoad = after;
   regionPoseChange.reset(); earthFlight = earthCourseHold = false; earthDestination.reset();
-  regionLoadTime = 0; regionLoadStage = 0; regionError.clear(); regionCancel = false;
+  regionLoadTime = 0; regionShown = 0; regionLoadStage = 0; regionError.clear(); regionCancel = false;
+  g_worldLoadProgress = 0.f; g_worldLoadTask = "Finishing background work";   // (the builder's own progress, from nothing: not the last region's)
   freeRegionMap = false; screen = SCR_REGION_LOADING;
   freeFlight = isolatedFlight = researchFlight = militaryFlight = false;
   paused = showMap = showRadio = settingsFromPause = false;
   atc.cancel(); commsPending.clear(); toasts.clear(); traffic.reset();
   hiveCombat.reset(1, combatWrap());
   g_audio.setParams(AudioParams{});
-  gpsMapValid = loadMap = false;
+  gpsMapValid = loadMap = loadBackdrop = false;
   menuPlanCache = menuPlan::Cache{}; quoteFlown.clear();
   focusList.clear(); focusPrev.clear();
   in.pressed[K_ESC] = in.pressed[K_ENTER] = in.pressed[' '] = false;
@@ -805,7 +807,7 @@ void Game::loadFreeRegion(int index, GameScreen after) {
       g_groundPits.clear();
       regionLoadStage = 1;
       // (a real-Earth chart: its fine elevation fetched first where it can be - offline, a few seconds lost, then ETOPO's)
-      if (earthCharts::isEarthId(target.id)) if (auto* fetch = glo90()) { wantGlo90(target.origin); fetch->settle(40.0); }
+      if (earthCharts::isEarthId(target.id)) if (auto* fetch = glo90()) { g_worldLoadTask = "Fetching the chart's fine elevation"; wantGlo90(target.origin); fetch->settle(40.0); }
       // Release the old terrain first: a second full region is never resident.
       g_world = World{};
       if (target.authored) g_world.build(path, stamp, save);
@@ -1167,7 +1169,7 @@ void Game::updateEarthFlight() {
   earthPrefetch.reset(); earthPrefetchId.clear();
   earthRetireJob = std::async(std::launch::async, [old = std::move(retired), gpu = std::move(retiredGpu)]() mutable { old.reset(); gpu = Renderer::WorldUploadData{}; });
   atc.cancel(); commsPending.clear(); traffic.reset(); hiveCombat.reset(1, combatWrap());
-  gpsMapValid = loadMap = false;
+  gpsMapValid = loadMap = loadBackdrop = false;
   wreck.clear(); debris.clear(); pops.clear(); particles.clear(); pits.clear();
   bursts.clear(); trail.clear(); cloudWake.clear(); tipTrail[0].clear(); tipTrail[1].clear();
   for (auto& smoke : pieceTrail) smoke.clear();
@@ -1390,7 +1392,7 @@ void Game::slideEarthChart(const regionTravel::Chart& chart) {
   earthRetireJob = std::async(std::launch::async, [old = std::move(retired), gpu = std::move(retiredGpu)]() mutable { old.reset(); gpu = Renderer::WorldUploadData{}; });
   atc.cancel(); commsPending.clear(); hiveCombat.reset(1, combatWrap());
   traffic.carry(*regionPoseChange, [&](int old, float* lift) { return carriedAirport(old, lift); });   // (where they were)
-  gpsMapValid = loadMap = false;
+  gpsMapValid = loadMap = loadBackdrop = false;
   wreck.clear(); debris.clear(); pops.clear(); particles.clear(); pits.clear();
   bursts.clear(); trail.clear(); cloudWake.clear(); tipTrail[0].clear(); tipTrail[1].clear();
   for (auto& smoke : pieceTrail) smoke.clear();
@@ -2315,7 +2317,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
   // the player sees a loading screen while the scenery around the start is generated (tests fly straight away)
   screen = headless ? SCR_FLIGHT : SCR_LOADING;
   if (!loadLogging) loadLogBegin();
-  loadT = 0; loadReadyT = -1; loadShown = 0; loadPend0 = 0; loadFrames = 0; loadViewsDrawn = false; loadViewsStep = 0; loadWarmStep = 0; loadWarmAt = -1; loadStableFrames = 0; loadBakeSeen = g_ren.bakeCount; loadObservedFrame = -1; loadMap = false; dbgCam = dbgFollow = false; benchPin = false;
+  loadT = 0; loadReadyT = -1; loadShown = 0; loadPend0 = 0; loadFrames = 0; loadViewsDrawn = false; loadViewsStep = 0; loadWarmStep = 0; loadWarmAt = -1; loadStableFrames = 0; loadBakeSeen = g_ren.bakeCount; loadObservedFrame = -1; loadMap = loadBackdrop = false; dbgCam = dbgFollow = false; benchPin = false;
   atc.cancel(); atcF = AtcFlight(); hintsVoiced.clear(); commsPending.clear(); lessonVoiceWarned = false;   // (the last flight's calls go before this one's announcements)
   // (a hazard call is said only while the hazard holds: a "PULL UP" queued behind the tower played at 1,958 m, climbing -
   // the review of v3.44.0, AUD-3)
@@ -5850,6 +5852,7 @@ void Game::update(float dt) {
       Plane::perfNoting(false);
       for (const auto& n : Plane::perfNoted()) g.updParts.parts.push_back({learnedPart(n.first), n.second});
       g.updParts.total = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count(); if (g.updParts.total > g.slowestUpdate.total) g.slowestUpdate = g.updParts;
+      if (g.loadLogging) g.lastUpdate = g.updParts;
     }
     static const char* learnedPart(int spec) {
       static std::string names[kAircraftCount];
@@ -6030,6 +6033,10 @@ void Game::framePresented() {
 }
 
 void Game::render() {
+  // (timed, for the loading log: how long the frame's render took, and the bodies baked and programs compiled in it)
+  struct Timed { Game& g; std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now(); int bake0 = g_ren.bakeCount, miss0 = g_shaderCacheMisses; long long us0 = g_shaderCompileUs;
+    ~Timed() { g.lastRenderMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count(); g.lastRenderBaked = g_ren.bakeCount - bake0;
+               g.lastRenderCompiled = g_shaderCacheMisses - miss0; g.lastRenderCompileMs = (g_shaderCompileUs - us0) / 1000.0; } } timed{*this};
   if (screen != SCR_REGION_LOADING) { const std::string want = screenWorld(); if (!want.empty()) loadCareerWorld(want, screen); }
   if (screen == SCR_REGION_LOADING) {
     g_ren.clearScreen(); g_ren.uiBegin(); drawRegionLoading(); drawPadCursor(); g_ren.uiEnd();
@@ -6037,6 +6044,9 @@ void Game::render() {
   }
   if (screen == SCR_LOADING && launchCardPending()) { renderLaunchCard(); return; }
   if (screen == SCR_LOADING && launchSetUpShown) { launchSetUpShown = false; renderLaunchCard(); return; }
+  // (a flight set up without the card - restarted in place, a tool's: its loading screen alone first too, so its
+  // backdrop is in hand before the scene's first frame, the one most likely to bake, can show it from inside a bake)
+  if (screen == SCR_LOADING && !loadBackdrop && !headless) { renderLaunchCard(); return; }
   // every menu draws its scene live (the main menu's tour, the hub's airport, the research terminal's preview): the
   // scenery a flight opens with streams in while the player chooses. vid: a full-screen picture instead of the scene
   // (the research terminal's boot screen)
@@ -6073,10 +6083,12 @@ void Game::render() {
       if (platformPresent) platformPresent();
       glUseProgram((GLuint)prog);
     };
-  } else if (screen == SCR_LOADING && !headless && loadReadyT < 0 && platformPresent && (loadMap || militaryFlight)) {
+  } else if (loadingRedrawsInsideBakes()) {
     // the loading screen, drawn and shown from inside a long bake or warm-up (the hive craft, the XR-40's cockpit):
-    // on its own the screen would hold still until the flight opened. (Its aerial map was rendered by the frame
-    // before: never from inside a bake)
+    // on its own the screen would hold still until the flight opened. (Its backdrop - the shipped picture, or the
+    // aerial map - was decoded or rendered by a frame before: never from inside a bake. It waited for the map alone,
+    // which only a field without a picture renders: every flight in the islands has one, so their screens stood
+    // still through every bake)
     g_ren.bakeYield = [this] {
       GLint prog = 0; glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
       static auto last = std::chrono::steady_clock::now();
@@ -7009,7 +7021,7 @@ void Game::debugScene(const std::string& name) {
   if (name == "loading" || name == "loadingready" || name == "loadingair") {   // the pre-flight loading screen: card / live shot
     if (name == "loadingair") { resAirborne = true; resCraft = kResearchJet; launchResearch(); }
     else { Contract c = career.board.empty() ? Contract() : career.board[0]; if (career.board.empty()) { c.from = 0; c.to = 1; c.title = "Lesson 1: Takeoff and Climb"; } startFlight(c, 0, Career::SRC_OWNED); }
-    screen = SCR_LOADING; loadT = 0; loadReadyT = -1; loadMap = false; toasts.clear(); hint.clear();
+    screen = SCR_LOADING; loadT = 0; loadReadyT = -1; loadMap = loadBackdrop = false; toasts.clear(); hint.clear();
     if (name != "loading") { loadT = 3.f; loadReadyT = 0.f; loadShown = 1.f; }
     return;
   }
@@ -7112,7 +7124,7 @@ void Game::launchMilitary(int kind) {
   pendingMilitaryLaunch = c;
   militaryLaunchFrameDrawn = militaryLaunchFramePresented = false;
   loadT = 0; loadReadyT = -1; loadShown = 0; loadPend0 = 0; loadFrames = 0; loadViewsDrawn = false; loadViewsStep = 0; loadWarmStep = 0; loadWarmAt = -1;
-  loadStableFrames = 0; loadObservedFrame = -1; loadMap = false;
+  loadStableFrames = 0; loadObservedFrame = -1; loadMap = loadBackdrop = false;
   screen = SCR_LOADING;
   in.pressed[K_ENTER] = in.pressed[' '] = false; in.mPressed[0] = false;
   in.buttonsPressed &= ~(PAD_A | PAD_START);
@@ -7127,7 +7139,10 @@ void Game::loadLogTick() {
   const double ms = std::chrono::duration<double, std::milli>(now - loadLogLast).count();
   loadLogLast = now;
   if (screen == SCR_LOADING && loadLog.size() < 4000) {
-    loadLog.push_back({ms, launchCardPending(), launchSetUpShown, loadFrames, std::max(0, g_ren.entPending), loadViewsStep, loadingShadowPending(), loadWarmStep, loadShownInside});
+    LoadLogFrame L{ms, launchCardPending(), launchSetUpShown, loadFrames, std::max(0, g_ren.entPending), loadViewsStep, loadingShadowPending(), loadWarmStep, loadShownInside};
+    L.upd = lastUpdate.total; L.rnd = lastRenderMs; L.baked = lastRenderBaked; L.compiled = lastRenderCompiled; L.compileMs = lastRenderCompileMs;
+    for (const auto& p : lastUpdate.parts) if (p.second >= 20.0) L.parts += fmt("%s%s %.0f", L.parts.empty() ? "" : ", ", p.first, p.second);
+    loadLog.push_back(std::move(L));
     loadShownInside = 0;
     return;
   }
@@ -7142,10 +7157,18 @@ void Game::loadLogTick() {
   fprintf(f, "frame       ms  what was on the screen\n");
   for (size_t i = 0; i < loadLog.size(); i++) {
     const LoadLogFrame& L = loadLog[i];
-    if (L.card) fprintf(f, "%5zu %8.1f  the card (the flight not set up yet)\n", i, L.ms);
-    else fprintf(f, "%5zu %8.1f  %s: scene frame %d, warmed %d of %d, %d scenery chunks to make, views drawn %d of 2%s%s\n", i, L.ms, L.setUp ? "set up, the loading screen alone" : i + 1 == loadLog.size() ? "the last" : "loading",
+    if (L.card) fprintf(f, "%5zu %8.1f  the card (the flight not set up yet)", i, L.ms);
+    else fprintf(f, "%5zu %8.1f  %s: scene frame %d, warmed %d of %d, %d scenery chunks to make, views drawn %d of 2%s%s", i, L.ms, L.setUp ? "set up, the loading screen alone" : i + 1 == loadLog.size() ? "the last" : "loading",
                  L.frames, std::min(L.warm, loadWarmItems()), loadWarmItems(), L.pending, std::min(L.views, 2), L.shadows ? ", terrain shadows to do" : "",
                  L.shown ? fmt(", shown %d times from inside a bake", L.shown).c_str() : "");
+    // (a frame over 50 ms: its update and render, and what each did)
+    if (L.ms > 50.0) {
+      fprintf(f, "  [update %.0f ms%s%s; render %.0f ms", L.upd, L.parts.empty() ? "" : ": ", L.parts.c_str(), L.rnd);
+      if (L.baked) fprintf(f, ", %d bodies baked", L.baked);
+      if (L.compiled) fprintf(f, ", %d programs compiled (%.0f ms)", L.compiled, L.compileMs);
+      fprintf(f, "]");
+    }
+    fprintf(f, "\n");
   }
   fclose(f);
 }
@@ -7158,7 +7181,7 @@ bool Game::queueLaunch(const Contract& card, int spec, LaunchKind kind, std::fun
   pendingLaunch = std::move(L);
   launchFrameDrawn = launchFramePresented = false;
   loadT = 0; loadReadyT = -1; loadShown = 0; loadPend0 = 0; loadFrames = 0; loadViewsDrawn = false; loadViewsStep = 0; loadWarmStep = 0; loadWarmAt = -1;
-  loadStableFrames = 0; loadObservedFrame = -1; loadMap = false; launchSetUpShown = false;
+  loadStableFrames = 0; loadObservedFrame = -1; loadMap = loadBackdrop = false; launchSetUpShown = false;
   screen = SCR_LOADING;
   in.pressed[K_ENTER] = in.pressed[' '] = false; in.mPressed[0] = false;
   in.buttonsPressed &= ~(PAD_A | PAD_START);

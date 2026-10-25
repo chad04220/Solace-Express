@@ -189,6 +189,28 @@ struct GameTest {
         g.loadFrames==0 && g.loadReadyT<0,
         "after presentation the research flight is set up, behind the card, its first scene still to come");
     }
+    // The loading screen is drawn and shown from inside the scene's bakes once its backdrop is in hand: with the
+    // release's pictures (every field and craft in the islands has one) as with the aerial map. It waited for the map
+    // alone, so every flight in the islands stood still through its bakes - the research launch for seconds.
+    for(bool pictures:{true,false}) {
+      auto q=make();Game& g=*q;g.headless=false;g.screen=SCR_RESEARCH;
+      g.assetDir=pictures?std::string(SOMNIUM_ASSETS):std::string("no-pictures-here");
+      g.platformPresent=[]{};
+      g.resCraft=kSomnus;g.resCard=-1;g.resAirborne=false;g.resAirport=g.career.location;
+      g.launchResearch();g.render();g.framePresented();g.updateLoading(dt);
+      check(g.researchFlight && g.screen==SCR_LOADING && !g.loadingRedrawsInsideBakes(),
+        "set up, the loading screen isn't drawn from inside a bake before its backdrop is in hand");
+      g.render();
+      check(g.loadBackdrop && g.loadingRedrawsInsideBakes() && (pictures ? !g.loadImg.empty() && !g.loadMap : true),
+        std::string("after the set-up frame the loading screen can be shown from inside a bake (")+(pictures?"the field's picture":"no picture")+")");
+    }
+    {   // a flight set up without the card (restarted in place): its loading screen alone first all the same
+      auto q=make();Game& g=*q;g.headless=false;g.platformPresent=[]{};g.assetDir=SOMNIUM_ASSETS;
+      g.startFlight(g_story[0],1,Career::SRC_OWNED);
+      const int frames=g.loadFrames;g.render();
+      check(g.screen==SCR_LOADING && g.loadFrames==frames && g.loadBackdrop && g.loadingRedrawsInsideBakes(),
+        "a loading screen not queued draws itself alone before the scene's first frame");
+    }
     for(bool pad:{false,true}) {   // Back on the card: back where it was launched from, nothing set up
       auto q=make();Game& g=*q;g.headless=false;g.screen=SCR_RESEARCH;
       g.resCraft=kSomnus;g.resCard=-1;g.resAirborne=false;g.resAirport=g.career.location;

@@ -300,6 +300,7 @@ public:
   bool beginWorldUpload(const World& candidate, WorldUploadData&& data);
   bool pumpWorldUpload(size_t byteBudget = 2 * 1024 * 1024, double timeBudgetMs = 1.5);
   bool worldUploadReady() const;
+  float worldUploadFraction() const { return worldStage.ready ? 1.f : worldStage.slices.empty() ? 0.f : float(worldStage.nextSlice) / float(worldStage.slices.size()); }   // (the region loading screen's bar)
   regionalSurface::Handle worldUploadSurface() const { return worldStage.farProxy.surface; }
   // Accepted, resident GPU representation, independent of this frame's camera/FOV culling.
   regionalSurface::Handle drawableRegionSurface(const std::string& regionId) const;

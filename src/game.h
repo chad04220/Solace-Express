@@ -221,7 +221,7 @@ private:
   bool regionUploading = false;   // (that upload staged, a slice each loading frame, then published: updateRegionLoading)
   std::atomic<int> regionLoadStage{0}; // 0 draining readers, 1 building, 2 preparing the map and the upload, 3 uploading
   std::string regionError;
-  float regionLoadTime = 0;
+  float regionLoadTime = 0, regionShown = 0;   // (regionShown: the region loading bar, which never steps back)
   bool regionCancel = false, regionResumePaused = false;
   bool earthFlight = false, earthCourseHold = false;
   // A long haul in flight (Contract::longHaul): the contract as accepted, its destination region and airport, and the
@@ -649,7 +649,10 @@ private:
   bool launchSetUpShown = false;   // the frame after a queued launch set its flight up: the loading screen alone, no scene yet
   // the loading screen's own record of each launch (loading.log in the save folder): every frame from the card to the
   // flight - how long it took on the wall clock, and what the screen was doing - for a slow launch on a player's PC
-  struct LoadLogFrame { double ms; bool card, setUp; int frames, pending, views; bool shadows; int warm, shown; };
+  struct LoadLogFrame { double ms; bool card, setUp; int frames, pending, views; bool shadows; int warm, shown;
+    double upd = 0, rnd = 0; int baked = 0, compiled = 0; double compileMs = 0; std::string parts; };   // (the frame's update and render: what a long one did)
+  UpdateParts lastUpdate;   // (the update before this one, part by part: the loading log names a long one's parts)
+  double lastRenderMs = 0; int lastRenderBaked = 0, lastRenderCompiled = 0; double lastRenderCompileMs = 0;   // (the last render: its time, bodies baked, programs compiled)
   std::vector<LoadLogFrame> loadLog; bool loadLogging = false; int loadShownInside = 0;   // (loadShownInside: the loading screen shown from inside a bake, so far)
   std::chrono::steady_clock::time_point loadLogStart, loadLogLast;
   void loadLogBegin();
@@ -658,6 +661,9 @@ private:
   // queued launch itself running)
   bool queueLaunch(const Contract& card, int spec, LaunchKind kind, std::function<void()> begin);
   bool launchCardPending() const { return pendingMilitaryLaunch.has_value() || pendingLaunch.has_value(); }
+  // the loading screen is drawn and shown from inside a long bake while the flight's scene isn't ready: once its
+  // backdrop (picture or aerial map) is in hand, so drawing it there neither decodes nor renders
+  bool loadingRedrawsInsideBakes() const { return screen == SCR_LOADING && !headless && loadReadyT < 0 && platformPresent && loadBackdrop; }
   void cancelQueuedLaunch();
   Contract researchContract() const;     // a research flight's contract (launchResearch), for its card too
   Contract freeFlightContract() const;   // a Free Flight's (launchFreeFlight)
@@ -799,7 +805,7 @@ private:
   float ckZoom = 1.f, ckZoomT = 1.f;
   CockpitFocusZoom cockpitFocus;
   QualityGovernor autoRes;   // Auto resolution (quality_governor.h): starts at the full picture
-  float loadT = 0, loadReadyT = -1, loadShown = 0; int loadPend0 = 0, loadFrames = 0, loadStableFrames = 0, loadBakeSeen = 0, loadObservedFrame = -1; bool loadMap = false, loadViewsDrawn = false; int loadViewsStep = 0, loadWarmStep = 0, loadWarmAt = -1;   // pre-flight loading screen (loadViewsDrawn, loadViewsStep - the flight's views drawn so far: Game::render; loadWarmStep - the hive craft and stores warmed so far, one a frame: Game::hiveVisual)
+  float loadT = 0, loadReadyT = -1, loadShown = 0; int loadPend0 = 0, loadFrames = 0, loadStableFrames = 0, loadBakeSeen = 0, loadObservedFrame = -1; bool loadMap = false, loadBackdrop = false, loadViewsDrawn = false; int loadViewsStep = 0, loadWarmStep = 0, loadWarmAt = -1;   // pre-flight loading screen (loadViewsDrawn, loadViewsStep - the flight's views drawn so far: Game::render; loadWarmStep - the hive craft and stores warmed so far, one a frame: Game::hiveVisual)
   bool gpsMapValid = false; vec2 gpsMapC; float gpsMapHalf = 0; int gpsMapN = 0;   // cached GPS aerial image
   bool uiHidden = false, bumperFired = false; float bumperHold = 0;   // LB + RB held 1 s: hide / show the flight UI
   // bound action state: keyboard key or gamepad button
