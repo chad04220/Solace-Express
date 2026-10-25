@@ -304,7 +304,10 @@ int main(int argc,char** argv) {
   testRunwayShader(path);
   g_world.build();check(!g_world.fromCache,"world","preservation test must generate current world, not load an old cache");
   testWorldTerrain(path);
-  check(g_world.airports.size()==golden.size(),"world","airport/runway count changed");
+  // (4.0's seaplane bases are appended after the golden runways and shape nothing: the runways stand as they were)
+  size_t landCount=0;for(const Airport& a:g_world.airports)landCount+=!a.water();
+  check(landCount==golden.size(),"world","airport/runway count changed (seaplane bases aside)");
+  for(size_t ai=golden.size();ai<g_world.airports.size();++ai)check(g_world.airports[ai].water(),"world","only seaplane bases follow the golden runways");
   for(size_t ai=0;ai<golden.size()&&ai<g_world.airports.size();++ai){
     testDescriptors(golden[ai],g_world.airports[ai]);testTerrain(golden[ai],int(ai));testScenery(golden[ai]);
   }

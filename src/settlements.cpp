@@ -665,7 +665,7 @@ void addRacetrack(const World& world, const std::vector<SettlementField>& fields
       const vec2 p = at(track[k]);
       ok = settlementShare(fields, p.x, p.y) >= 1.3f && airportInfluence(world, p.x, p.y) <= 0.f && idx.nearest(p, 80.f, -1) > 1e8f &&
            world.groundHeight(p.x, p.y, 8) >= 4.f;
-      for (const Airport& a : world.airports) ok = ok && hypotf(p.x - a.x, p.y - a.z) >= 3000.f;
+      for (const Airport& a : world.airports) ok = ok && (a.water() || hypotf(p.x - a.x, p.y - a.z) >= 3000.f);
     }
     for (size_t k = 0; k < grounds.size() && ok; k++) {
       const vec2 p = at(grounds[k]);

@@ -5,6 +5,7 @@
 #include "earth_charts.h"
 #include "entities.h"
 #include "settlements.h"
+#include "airport_layout.h"
 #include "world.h"
 #include <algorithm>
 #include <cmath>
@@ -14,9 +15,24 @@
 
 namespace {
 float baseAt(const World& w, float x, float z, int c = 0) { float b[4]; w.sampleBase(x, z, b); return b[c]; }
+// clear of every seaplane base's water lane - its length and `ends` beyond each end, `sides` to either side of it - and
+// 60 m of its dock's jetty and mooring
+bool seaLaneClear(const World& w, float x, float z, float ends, float sides) {
+  for (const Airport& a : w.airports) {
+    if (!a.water()) continue;
+    const vec2 q = aptLocal(a, vec3(x, 0, z));
+    if (fabsf(q.x) < a.length * 0.5f + ends && fabsf(q.y) < a.width * 0.5f + sides) return false;
+    if (a.dockLen > 0.f) {
+      const vec2 d(a.dockDirX, a.dockDirZ), o(a.dockX, a.dockZ), p = vec2(x, z) - o;
+      const float u = std::clamp(p.x * d.x + p.y * d.y, 0.f, a.dockLen + 10.f);
+      if (length(p - d * u) < 60.f) return false;
+    }
+  }
+  return true;
+}
 bool clearOfRunways(const World& w, float x, float z, float r) {
   if (airportInfluence(w, x, z) > 0.f) return false;
-  for (const Airport& a : w.airports) if (hypotf(x - a.x, z - a.z) < r) return false;
+  for (const Airport& a : w.airports) if (!a.water() && hypotf(x - a.x, z - a.z) < r) return false;   // (a seaplane base's lane: seaLaneClear)
   return true;
 }
 
@@ -29,7 +45,7 @@ void windFarms(const World& world, std::vector<PlacedEnt>& out) {
   auto cold = [&](float x, float z) { float b[4]; world.sampleBase(x, z, b); return b[3]; };
   auto fit = [&](vec2 p) {   // (a turbine's own place: high, clear of the airfields, the settlements and the roads)
     if (base(p.x, p.y) < 80.f || base(p.x, p.y) > 700.f || cold(p.x, p.y) > 0.3f || airportInfluence(world, p.x, p.y) > 0.f) return false;
-    for (const Airport& a : world.airports) if (hypotf(p.x - a.x, p.y - a.z) < 6000.f) return false;
+    for (const Airport& a : world.airports) if (!a.water() && hypotf(p.x - a.x, p.y - a.z) < 6000.f) return false;
     if (settlementShare(world.settlements, p.x, p.y) < 2.f) return false;
     return roadEdgeDistance(world.roadGrid, p.x, p.y) > 40.f;
   };
@@ -609,7 +625,7 @@ void harbourBoats(const World& world, std::vector<PlacedEnt>& out) {
           const vec2 ab = pierB[k] - pierA[k]; const float u = std::clamp(((p.x - pierA[k].x) * ab.x + (p.y - pierA[k].y) * ab.y) / std::max(ab.x * ab.x + ab.y * ab.y, 1.f), 0.f, 1.f);
           near = length(pierA[k] + ab * u - p) < 80.f;
         }
-        if (shore && !near && clearOfRunways(world, x, z, 1500.f)) rows[j].push_back({d, p});
+        if (shore && !near && clearOfRunways(world, x, z, 1500.f) && seaLaneClear(world, x, z, 600.f, 120.f)) rows[j].push_back({d, p});
       }
     });
     std::vector<std::pair<float, vec2>> spots;
@@ -647,6 +663,8 @@ void sceneryBakeLandmarks(World& world) {
   fjordhavenDam(world, state, out);
   ferries(world, state);
   ferryTerminals(state, out);
+  for (const Airport& a : world.airports)   // (a seaplane base's dock's root: its office and windsock, airport_scenery.cpp)
+    if (a.water() && a.dockLen > 0.f) state.clearings.push_back(vec3(a.dockX - a.dockDirX * 20.f, a.dockZ - a.dockDirZ * 20.f, 40.f));
   harbourBoats(world, out);
   for (const PlacedEnt& c : civicLandmarks(world)) {   // (the cities': placed with their lots; their grounds cleared)
     out.push_back(c);

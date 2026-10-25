@@ -73,10 +73,43 @@ landing is.
 
 A water aerodrome is an `Airport` with `SURF_WATER`: its centre, heading, length and width describe the water lane.
 They are appended to the islands' table, so every existing airport keeps its index (saves, stamps, the story). They
-shape no terrain and clear no scenery (the islands' ground stays bit-for-bit what it was), carry no runway paint, edge
-lights or PAPI, and have no tower: an uncontrolled field, its traffic calls made on the common frequency. AI traffic
-doesn't use them. `onRunway` reports a water lane only to the callers that ask for one; the physics never mistakes
-one for ground.
+shape no terrain (the islands' ground stays bit-for-bit what it was: `runway_preservation_test`), take no slot in the
+ground shader's airport table, carry no runway paint, edge lights or PAPI, and have no tower: an uncontrolled field,
+its traffic calls made on the common frequency. AI traffic and the road network's airport links leave them out (a
+base's town is its road node). `onRunway` reports a water lane with its surface, and every physics caller that asks
+treats `SURF_WATER` as the sea, never as ground.
+
+The islands have seven, each lane 1000 m by 60 m, surveyed so that the lane, 200 m beyond each end and 50 m to either
+side lie in water at least 1.5 m deep, its approaches under a 1 in 18 slope for 3 km, as sheltered as the coast
+allows. No landmark or harbour boat stands on the lane or within 600 m of its ends (`airport_layout_test`):
+
+| Code | Base | Where |
+|---|---|---|
+| VBY | Verde Bay | a sheltered bay on Verdana's south-west coast, below Port Verde |
+| FJW | Fjordhaven Water | the fjord above Fjordhaven, steep-sided |
+| ICH | Ice Harbor | a fishing village on Nordholm's coast that no runway reaches |
+| PBL | Palm Bay Lagoon | glassy water behind Palm Bay's reef |
+| SLM | Saltmarsh | a marsh village on Verdana's south coast |
+| WVL | Westvale | a west-coast village's harbour, open to the Atlantic swell in a westerly |
+| TBY | Turtle Bay | Far Isle's resort lagoon |
+
+**The dock** is not authored: `World::seaplaneDocks` finds it when the world is built (and again from the world
+cache), as the nearest gentle shore (0.3 to 3 m above the sea) beside the lane but off it, its ends' 200 m and 90 m to
+either side, from which a jetty reaches open water within 10 m, a metre deep 20 m out and 2 m deep 30 to 70 m out
+across 24 m: room to moor alongside the head and turn away. The aircraft moors 25 m out (`Airport::dockHead`).
+
+**What is drawn** (`airport_scenery.cpp` `seaplaneBase`): ten buoys, yellow cans with a cross topmark, pairing the
+lane's edges at its ends, quarter points and middle; the dock (`EK_SEADOCK`: a timber pier on piles, a gangway down to
+a pontoon on white floats, fenders, cleats, the fuel pump and hose reel, a life ring); a small office on dry, level
+ground behind the dock; and a windsock beside it. Trees and houses keep clear of the dock. The minimap and the big map
+draw the lane dashed in blue, with a ring on the big map; Free Flight lists the bases with a SEAPLANE BASE tag.
+
+**Dispatch.** A water lane takes floats only (`surfaceOK`). The water run a float plane needs, `waterRunNeeded`, is
+`max(2 x take-off roll, landing roll) x 1.15`, from the distances the aircraft has learned (or `1.5 x runwayM` before
+it has learned them), floored at `runwayM` for a full cabin and lengthened 1/3000 per metre of elevation: water drag
+roughly doubles a float plane's take-off run, while its landing run on the water is short. Fuel at a seaplane base
+costs half as much again as at the islands' main fields. A Free Flight start at a base in an aircraft without floats
+begins in the air on the approach.
 
 ### Mooring ends a flight on the water
 

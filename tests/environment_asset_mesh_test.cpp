@@ -65,7 +65,8 @@ int main() {
     {5046,2598,1206,6774},{2676,1920,426,12756},{1182,858,582,1302},{2040,2040,1080,6216},{1566,1134,918,1998},   // stadium, quay, gantry, containers, ship,
     {1752,1140,396,2208},{732,660,276,1032},{828,798,270,2124},{1320,840,240,1434},   // pit garages, pit wall, grandstand, transporter,
     {5754,2538,1086,10782},{1752,1212,708,2256},{756,522,342,990},   // dam, ferry, yacht,
-    {570,234,54,1086},{744,504,330,2808}   // ferry pier, linkspan)
+    {570,234,54,1086},{744,504,330,2808},   // ferry pier, linkspan,
+    {1788,1224,564,2292},{360,216,108,648}   // seaplane dock, buoy)
   };
   size_t cursor=0;int totals[ENT_LODS]={};
   for(int k=0;k<EK_COUNT;++k) for(int lod=0;lod<ENT_LODS;++lod) {

@@ -205,6 +205,7 @@ private:
   // Its own selection and return screen keep the career's hangar and job card untouched.
   bool freeFlight = false;
   int freeCraft = 0, freeAirport = 0;
+  bool freeStartsAirborne() const;
   bool freeAirborne = false, freeLaunchPending = false;
   // One active chart plus one immutable background candidate. Initial/menu replacements gate readers.
   std::vector<procedural::Descriptor> freeRegions;

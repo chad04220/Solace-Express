@@ -32,6 +32,7 @@ inline float entRangeOf(const EntRanges& r, int k) {
   if (k == EK_ROADSIGN) return std::min(r.build, 2000.f);
   if (k == EK_STREETLAMP || k == EK_POLE) return std::min(r.build, 3000.f);
   if (k == EK_WINDSOCK || k == EK_TRUCK || k == EK_LOCALIZER) return std::min(r.build, 2500.f);
+  if (k == EK_BUOY) return std::min(r.build, 3500.f);   // (a water lane's: seen on the approach)
   if (k == EK_GA_PLANE || k == EK_JETBRIDGE || k == EK_MAST || k == EK_FLOODMAST || k == EK_BEACON) return std::min(r.build, 4500.f);
   if (k == EK_BUSH) return r.bush;
   if (entClass(k) == EC_TREE) return r.tree;

@@ -1814,6 +1814,7 @@ void Game::drawFreeFlightSetup(const FrameParams& fp) {
     const bool activate = focused && (in.pressed[K_ENTER] || in.pressed[' ']);
     if ((hov && in.mPressed[0]) || activate) { freeAirport = i; g_audio.trigger(SFX_CLICK); if (activate) in.pressed[K_ENTER] = in.pressed[' '] = false; }
     g_ren.text(px + 10 * s, ay + 7 * s, 13 * s, airport.code, C_ACCENT, 1);
+    if (airport.water()) g_ren.text(px + iw - 10 * s, ay + 8 * s, 10 * s, "SEAPLANE BASE", C_DIM, 0.9f, 2);
     g_ren.text(px + 10 * s, ay + 25 * s, 11 * s, ellipsize(airport.name, iw - 20 * s, 11 * s), C_TEXT, 1);
   }
   g_ren.text(px, airportBottom + 2 * s, 10 * s, fmt("%02d - %02d / %02d   SCROLL", airportFirst + 1, std::min(airportCount, airportFirst + airportVisible), airportCount), C_DIM, 0.85f, 0, false);
@@ -1821,11 +1822,14 @@ void Game::drawFreeFlightSetup(const FrameParams& fp) {
   const float setupY = y + h - 169 * s;
   header(px, setupY, iw, "START POSITION");
   const float half = (iw - 10 * s) * 0.5f;
-  if (button(px, setupY + 26 * s, half, 34 * s, "Runway", true, !freeAirborne)) freeAirborne = false;
-  if (button(px + half + 10 * s, setupY + 26 * s, half, 34 * s, "Airborne", true, freeAirborne)) freeAirborne = true;
+  const bool noStand = freeStartsAirborne();   // (a landplane at a seaplane base: it starts over the lane)
+  if (button(px, setupY + 26 * s, half, 34 * s, airport.water() ? "On the water" : "Runway", !noStand, !freeAirborne && !noStand)) freeAirborne = false;
+  if (button(px + half + 10 * s, setupY + 26 * s, half, 34 * s, "Airborne", true, freeAirborne || noStand)) freeAirborne = true;
   g_ren.text(px, setupY + 73 * s, 12 * s, ellipsize(std::string(airport.code) + " / " + airport.name, iw, 12 * s), C_TEXT, 1);
-  const bool shortRunway = !freeAirborne && airport.length < spec.runwayM;
-  g_ren.text(px, setupY + 93 * s, 11 * s, ellipsize(shortRunway ? fmt("%.0f m / Short runway: try airborne", airport.length) : fmt("%.0f m runway / %s", airport.length, surfaceName(airport.surface)), iw, 11 * s), shortRunway ? C_WARN : C_DIM, 1);
+  const bool shortRunway = !freeAirborne && !airport.water() && airport.length < spec.runwayM;
+  const std::string info = airport.water() ? fmt("%.0f m water lane / %s", airport.length, noStand ? "Seaplane base: floats only" : "Seaplane base")
+                         : shortRunway ? fmt("%.0f m / Short runway: try airborne", airport.length) : fmt("%.0f m runway / %s", airport.length, surfaceName(airport.surface));
+  g_ren.text(px, setupY + 93 * s, 11 * s, ellipsize(info, iw, 11 * s), shortRunway || noStand ? C_WARN : C_DIM, 1);
   if (button(px, y + h - 52 * s, iw, 36 * s, "Take flight", true, true)) { launchFreeFlight(); uiGlass = false; return; }
   uiGlass = false;
   if (in.pressed[K_ESC]) { in.pressed[K_ESC] = false; cancelFreeFlightSetup(); }
@@ -2640,8 +2644,12 @@ void Game::drawMinimap(float x, float y, float sz, float range) {
     if (!ins) continue;
     vec3 dir = a.dir();
     float k = sz / (2 * range);
-    g_ren.line(p.x - dir.x * a.length * 0.5f * k, p.y - dir.z * a.length * 0.5f * k, p.x + dir.x * a.length * 0.5f * k, p.y + dir.z * a.length * 0.5f * k, 3 * s, &a == &dest() ? C_ACCENT : vec3(1, 1, 1), 1);
-    g_ren.text(p.x + 6 * s, p.y + 4 * s, 11 * s, a.code, &a == &dest() ? C_ACCENT : vec3(1, 1, 1), 1);
+    const vec3 col = &a == &dest() ? C_ACCENT : a.water() ? vec3(0.45f, 0.8f, 1.f) : vec3(1, 1, 1);
+    for (int d = 0; d < (a.water() ? 3 : 1); d++) {   // (a seaplane base's water lane dashed)
+      const float t0 = a.water() ? -0.5f + d * 0.4f : -0.5f, t1 = a.water() ? t0 + 0.2f : 0.5f;
+      g_ren.line(p.x + dir.x * a.length * t0 * k, p.y + dir.z * a.length * t0 * k, p.x + dir.x * a.length * t1 * k, p.y + dir.z * a.length * t1 * k, 3 * s, col, 1);
+    }
+    g_ren.text(p.x + 6 * s, p.y + 4 * s, 11 * s, a.code, col, 1);
   }
   for (int i = wpIndex; i < (int)contract.wps.size(); i++) { bool ins; vec2 p = toS(contract.wps[i].x, contract.wps[i].z, ins); if (ins) g_ren.rect(p.x - 4 * s, p.y - 4 * s, 8 * s, 8 * s, vec3(0.3f, 1, 0.5f), 1, 4 * s); }
   float h = plane.heading() * DEG;
@@ -3379,9 +3387,17 @@ void Game::drawGps() {
     vec2 p = toS(a.x, a.z); if (!inside(p, -40 * s)) continue;
     vec3 dir = a.dir(); float hl = std::max(a.length * 0.5f * k, 6 * s);
     bool isDest = &a == &dest();
-    vec3 c = isDest ? MAG : i == nearest ? C_WARN : vec3(0.9f, 0.95f, 1.f);
-    seg(vec2(p.x - dir.x * hl, p.y - dir.z * hl), vec2(p.x + dir.x * hl, p.y + dir.z * hl), 4 * s, vec3(0.05f, 0.05f, 0.07f), 0.9f);
-    seg(vec2(p.x - dir.x * hl, p.y - dir.z * hl), vec2(p.x + dir.x * hl, p.y + dir.z * hl), 2 * s, c, 1.f);
+    vec3 c = isDest ? MAG : i == nearest ? C_WARN : a.water() ? vec3(0.45f, 0.8f, 1.f) : vec3(0.9f, 0.95f, 1.f);
+    if (a.water()) {   // a seaplane base: its water lane dashed between the end buoys, a ring at its middle
+      for (int d = 0; d < 3; d++) {
+        const float t0 = -1.f + d * 0.8f, t1 = t0 + 0.4f;
+        seg(vec2(p.x + dir.x * hl * t0, p.y + dir.z * hl * t0), vec2(p.x + dir.x * hl * t1, p.y + dir.z * hl * t1), 2.5f * s, c, 1.f);
+      }
+      g_ren.rectOutline(p.x - 4 * s, p.y - 4 * s, 8 * s, 8 * s, c, 1.f, 4 * s, 1.5f * s);
+    } else {
+      seg(vec2(p.x - dir.x * hl, p.y - dir.z * hl), vec2(p.x + dir.x * hl, p.y + dir.z * hl), 4 * s, vec3(0.05f, 0.05f, 0.07f), 0.9f);
+      seg(vec2(p.x - dir.x * hl, p.y - dir.z * hl), vec2(p.x + dir.x * hl, p.y + dir.z * hl), 2 * s, c, 1.f);
+    }
     if (isDest) for (int ring = 0; ring < 2; ring++) { float ph = fmodf(T * 0.7f + ring * 0.5f, 1.f), r = (8 + 30 * ph) * s; if (inside(p, r)) g_ren.rectOutline(p.x - r, p.y - r, 2 * r, 2 * r, MAG, (1 - ph) * e, r, 2 * s); }
     if (inside(p, 30 * s)) g_ren.text(p.x + 8 * s, p.y + 4 * s, 12 * s, a.code, c, e, 0, true);
     if (i == apDest) {   // autoland pick: cyan target ring

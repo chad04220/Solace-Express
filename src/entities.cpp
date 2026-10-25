@@ -248,6 +248,7 @@ const EntKindInfo kEntInfo[EK_COUNT] = {
   {"Race transporter", 1.3f, 4.1f, 8.3f}, {"Dam", 160.f, 72.f, 60.f},   // (the dam: its arch and powerhouse; its lake's edge beyond)
   {"Ferry", 9.f, 27.f, 50.f}, {"Yacht", 1.8f, 14.f, 5.2f},   // (from the sea: y 0 the waterline)
   {"Ferry pier", 7.f, 3.3f, 20.f}, {"Linkspan", 15.f, 14.f, 13.f},   // (the deck, solid; the ramp and its gantry)
+  {"Seaplane dock", 2.3f, 2.6f, 20.5f}, {"Buoy", 0.6f, 1.6f, 0.6f},   // (from the sea: y 0 the waterline)
 };
 
 static inline float h2(int a, int b) { return hash2i(a, b); }
@@ -475,6 +476,7 @@ void Scenery::generate(Chunk& ch, int cx, int cz, int level) {
     // lights every 60 m (amber over the last 600 m of a paved runway), green / red threshold bars, approach lights
     if (L == 1)
       for (const Airport& a : W.airports) {
+        if (a.water()) continue;   // (a seaplane base's lane is marked by its buoys: airport_scenery.cpp)
         vec3 c = a.pos(), dir = a.dir(), rt(-dir.z, 0, dir.x);
         float ext = a.length * 0.5f + 420.f;
         if (c.x + ext < C.x0 || c.x - ext > C.x1 || c.z + ext < C.z0 || c.z - ext > C.z1) continue;
@@ -848,6 +850,15 @@ void Scenery::trim(vec3 cam, float keepDetail, float keepAll, int frame) {
 // within 20 m, the airport buildings are measured from the layouts), and skip each chunk the query doesn't come within
 // that chunk's own reach of.
 static float outside(float v, float lo, float hi) { return v < lo ? lo - v : v > hi ? v - hi : 0.f; }
+
+// A seaplane dock's solid parts, in its own frame (entity_mesh_airport.inc EK_SEADOCK, z from the shore point): the
+// railed pier, the gangway, the pontoon half a metre up with the pump and life ring at its head. A float plane's wing
+// passes over the pontoon; its float lies alongside it
+static bool seaDockHit(float lx, float lz, float ly, float r) {
+  const float z = lz + kSeaDockMid;
+  auto in = [&](float hx, float z0, float z1, float top) { return fabsf(lx) < hx + r && z > z0 - r && z < z1 + r && ly < top + r * 0.5f; };
+  return in(1.6f, -8.f, 14.f, 2.55f) || in(0.65f, 14.f, 18.5f, 2.5f) || in(2.33f, 18.5f, 32.5f, 0.55f) || in(1.8f, 30.9f, 32.4f, 1.8f);
+}
 // Convert only inside the finite local chunk domain. Ocean queries can be many
 // charts away: reject them before integer conversion and never enumerate empty
 // coordinates between a distant query and the current chart.
@@ -920,6 +931,9 @@ int Scenery::collide(vec3 p, float r, Ent* entOut) {
             float rr = I.hx * e.sx * 0.85f, hh = I.h * e.sy * 0.92f;
             float q = (dx * dx + dz * dz) / ((rr + r) * (rr + r)) + (ly * ly) / ((hh + r) * (hh + r));
             if (q < 1.f) { if (entOut) *entOut = e; return k + 1; }
+          } else if (k == EK_SEADOCK) {
+            float c = cosf(e.yaw), s = sinf(e.yaw);
+            if (seaDockHit(c * dx - s * dz, s * dx + c * dz, ly, r)) { if (entOut) *entOut = e; return k + 1; }
           } else {
             float c = cosf(e.yaw), s = sinf(e.yaw);
             float lx = c * dx - s * dz, lz = s * dx + c * dz;

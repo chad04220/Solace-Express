@@ -1532,10 +1532,16 @@ void Game::cancelFreeFlightSetup() {
   // No hub return/save path: opening or closing this mode cannot create a career save.
 }
 
+// (a landplane chosen at a seaplane base: nowhere for it to stand, so it starts over the lane instead)
+bool Game::freeStartsAirborne() const {
+  return freeAirport >= 0 && freeAirport < (int)g_world.airports.size() && g_world.airports[freeAirport].water() &&
+         validAircraft(freeCraft) && !kAircraft[freeCraft].floats;
+}
+
 Contract Game::freeFlightContract() const {
   Contract c;
   c.id = "FREE_FLIGHT"; c.title = g_world.procedural && freeRegion >= 0 && freeRegion < (int)freeRegions.size() ? "Free Flight / " + freeRegions[freeRegion].name : "Free Flight"; c.type = CT_FERRY;
-  c.from = c.to = freeAirport; c.startAirborne = freeAirborne;
+  c.from = c.to = freeAirport; c.startAirborne = freeAirborne || freeStartsAirborne();
   c.brief = "Fly anywhere. Full tanks, no fees, and no career progress or penalties.";
   c.wx = Weather(); c.wx.timeOfDay = 12.f; c.wx.windSpeed = 3.f;
   c.wx.gust = 0; c.wx.turbulence = 0.05f; c.wx.cloudCover = 0.15f; c.wx.visibility = 60000.f;
@@ -1573,7 +1579,7 @@ void Game::launchFreeFlight() {
   earthFlight = true;
   earthPosition = regionTravel::Chart(flightRegion.origin).position(plane.pos);
   failPlan = FailPlan();
-  if (freeAirborne) {
+  if (c.startAirborne) {
     const Airport& a = g_world.airports[freeAirport];
     vec3 pos = plane.pos + plane.forward() * 1500.f;
     pos.y = std::max(a.elev, g_world.height(pos.x, pos.z)) + 900.f;
@@ -5095,7 +5101,7 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
   for (size_t ai = 0; ai < g_world.airports.size(); ai++) {
     const Airport& a = g_world.airports[ai];
     float d = length(a.pos() - fp.camPos);
-    if (d > 16000.f) continue;
+    if (d > 16000.f || a.water()) continue;   // (a seaplane base's lane: unlit, its buoys alone)
     vec3 dir = a.dir(), rt(-dir.z, 0, dir.x);
     if (lightI > 0.15f) {
       for (float u = -a.length * 0.5f; u <= a.length * 0.5f + 0.1f; u += 60.f)
@@ -7013,14 +7019,21 @@ void Game::debugScene(const std::string& name) {
     int ai = std::max(0, g_world.findAirport(name.substr(9).c_str()));
     Contract c; c.from = ai; c.to = (ai + 1) % (int)g_world.airports.size(); c.title = "Airport";
     c.wx = Weather(); c.wx.timeOfDay = 16.3f; c.wx.cloudCover = 0.3f; c.wx.visibility = 60000;
-    realTime = 20; startFlight(c, 0, Career::SRC_OWNED);
-    for (int i = 0; i < 10; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
     const Airport& a = g_world.airports[ai];
+    realTime = 20; startFlight(c, a.water() ? kKittiwake : 0, Career::SRC_OWNED);
+    for (int i = 0; i < 10; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
     vec3 ctr = a.pos(), d = a.dir(), r = normalize(cross(d, vec3(0, 1, 0)));
     float len = a.length;
     vec3 cam = ctr + r * (len * 0.3f + 200.f) - d * (len * 0.4f + 120.f);
     cam.y = std::max(a.elev, g_world.height(cam.x, cam.z)) + 90.f + len * 0.03f;
-    dbgCam = true; dbgFollow = false; dbgCamPos = cam; dbgCamLook = ctr + d * (len * 0.05f) + vec3(0, 5.f, 0);
+    vec3 look = ctr + d * (len * 0.05f) + vec3(0, 5.f, 0);
+    if (a.water() && a.dockLen > 0.f) {   // a seaplane base: over the shore behind its dock, out across the dock to the lane
+      const vec3 o(a.dockDirX, 0.f, a.dockDirZ), side = normalize(cross(o, vec3(0, 1, 0))), head = a.dockHead();
+      cam = vec3(a.dockX, 0.f, a.dockZ) - o * 110.f + side * 70.f;
+      cam.y = std::max(g_world.height(cam.x, cam.z), 0.f) + 45.f;
+      look = head + (ctr - head) * 0.25f;
+    }
+    dbgCam = true; dbgFollow = false; dbgCamPos = cam; dbgCamLook = look;
     toasts.clear(); hint.clear(); uiHidden = true; return;
   }
   if (name.compare(0, 3, "apt") == 0 && name.size() >= 6) {   // on the runway of an airport: apt<CODE>, e.g. aptHFS

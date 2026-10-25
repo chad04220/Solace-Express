@@ -32,10 +32,12 @@
       int launches = 0;
       for (int craft : kCareerAircraft) for (int airport = 0; airport < (int)g_world.airports.size(); ++airport) for (int airborne = 0; airborne < 2; ++airborne) {
         q.freeCraft = craft; q.freeAirport = airport; q.freeAirborne = airborne != 0; q.launchFreeFlight(); ++launches;
+        // (a landplane chosen at a seaplane base starts over its lane: nowhere there for it to stand)
+        const bool lift = airborne || (g_world.airports[airport].water() && !kAircraft[craft].floats);
         all &= q.screen == SCR_FLIGHT && q.freeFlight && q.isolatedFlight && !q.researchFlight && q.specIdx == craft && q.plane.spec == &kAircraft[craft];
-        all &= q.contract.from == airport && q.contract.to == airport && q.contract.startAirborne == (airborne != 0) && q.contract.wps.empty() && !q.contract.story;
+        all &= q.contract.from == airport && q.contract.to == airport && q.contract.startAirborne == lift && q.contract.wps.empty() && !q.contract.story;
         noFees &= q.source == Career::SRC_NONE && q.launchPlan.fees() == 0 && q.launchPlan.fuelCostEst == 0 && q.launchPlan.net == 0 && near(q.plane.fuel, kAircraft[craft].maxFuel) && q.failPlan.kind == 0;
-        if (airborne) air &= !q.plane.onGround && q.plane.agl() >= 899.f && q.plane.engineRunning && q.takeoffAnnounced && !q.parkingBrake && near(q.plane.ctl.brake, 0.f) && near(length(q.plane.vel), kAircraft[craft].cruise) && (!kAircraft[craft].retract || (near(q.plane.gear, 0.f) && !q.plane.ctl.gearDown));
+        if (lift) air &= !q.plane.onGround && q.plane.agl() >= 899.f && q.plane.engineRunning && q.takeoffAnnounced && !q.parkingBrake && near(q.plane.ctl.brake, 0.f) && near(length(q.plane.vel), kAircraft[craft].cruise) && (!kAircraft[craft].retract || (near(q.plane.gear, 0.f) && !q.plane.ctl.gearDown));
         else ground &= q.plane.onGround && q.parkingBrake && q.plane.ctl.brake > 0.99f && g_world.onRunway(q.plane.pos.x, q.plane.pos.z, 10.f) == airport;
         q.endFlight(false, "", OUT_ABANDONED);
         all &= q.screen == SCR_FREE_FLIGHT && !q.freeFlight && !q.isolatedFlight;

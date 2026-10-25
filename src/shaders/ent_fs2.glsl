@@ -652,6 +652,17 @@ void main(){
       else if (part == P_PAINT) { alb = mp.y > 0.45 ? vec3(0.88, 0.88, 0.86) : vec3(0.1, 0.25, 0.55); alb *= mix(0.6, 1.0, smoothstep(-0.2, 0.3, wy)); rough = 0.4; }
       else if (part == P_WALL) { alb = vec3(0.9, 0.9, 0.87); rough = 0.5; }
       else { alb = vec3(0.12); metal = 0.6; rough = 0.5; }
+    } else if (uKind == K_SEADOCK) {   // a seaplane dock: weathered timber, white floats green at the waterline, black fenders and reel,
+                                       // the fuel pump and the life ring red, galvanised steel
+      if (part == P_WOOD) { alb = vec3(0.44, 0.39, 0.33)*(0.75 + 0.35*vn3(vec3(lp.x*6.0, lp.y*0.6, lp.z*0.4))); alb *= mix(0.45, 1.0, smoothstep(-0.3, 1.2, wy)); rough = 0.9; }
+      else if (part == P_PAINT) { alb = mix(vec3(0.3, 0.4, 0.24), vec3(0.86, 0.87, 0.85), smoothstep(-0.05, 0.2, wy)); rough = 0.45; }
+      else if (part == P_STRIPE) { alb = vec3(0.72, 0.08, 0.05); rough = 0.4; }
+      else if (part == P_DARK) { alb = vec3(0.03); rough = 0.8; }
+      else { alb = vec3(0.55, 0.56, 0.58); metal = 0.7; rough = 0.4; }
+    } else if (uKind == K_BUOY) {   // a water lane's buoy: yellow, weed at its waterline; its topmark black
+      if (part == P_PAINT) { alb = vec3(0.95, 0.7, 0.05)*(0.9 + 0.1*vn3(lp*3.0)); alb = mix(alb*vec3(0.35, 0.45, 0.25), alb, smoothstep(-0.05, 0.12, wy)); rough = 0.4; }
+      else if (part == P_STRIPE) { alb = vec3(0.04); rough = 0.5; }
+      else { alb = vec3(0.3); metal = 0.6; rough = 0.5; }
     } else if (uKind == K_SHIPWRECK) {   // a wreck: rust through the old black paint, white gone to grey on her house, weed below the tide
       float rust = smoothstep(0.4, 0.8, vn3(lp*vec3(0.22, 0.55, 0.22)) + 0.35*vn3(lp*1.9) + (part == P_PAINT ? 0.0 : 0.18));
       vec3 coat = part == P_WALL ? vec3(0.66, 0.64, 0.58) : part == P_PAINT ? vec3(0.07, 0.07, 0.075) : vec3(0.28, 0.26, 0.24);

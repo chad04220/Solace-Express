@@ -37,13 +37,17 @@ enum EntKind {
   EK_DAM,   // (the Fjordhaven reservoir's: world.h Reservoir)
   EK_FERRY, EK_BOAT,   // (on the sea: the ferries between the islands, moving; the boats moored off the coastal towns)
   EK_FERRYPIER, EK_LINKSPAN,   // (a ferry terminal's causeway, in 40 m lengths, and the linkspan at its head)
+  EK_SEADOCK, EK_BUOY,   // (a seaplane base's: its dock - pier, gangway, pontoon - and its water lane's buoys)
   EK_COUNT
 };
 // The road network's bridges (bridges.h) are no kind of entity: each is drawn as its own mesh where it stands
 // (bridge_mesh.h). This is their material's id in the scenery programs (ent_fs1.glsl K_BRIDGE) and what Scenery::collide
 // reports for them (kBridgeKind + 1)
 static const int kBridgeKind = EK_COUNT;
-static_assert(kBridgeKind == 80, "ent_fs1.glsl K_BRIDGE");
+static_assert(kBridgeKind == 82, "ent_fs1.glsl K_BRIDGE");
+// A seaplane dock runs 40.5 m from 8 m inland of its shore point out over the water; its entity stands at the middle,
+// this far out from the shore point (entity_mesh_airport.inc EK_SEADOCK, airport_scenery.cpp seaplaneBase)
+static constexpr float kSeaDockMid = 12.25f;
 enum EntClass { EC_TREE = 0, EC_ROCK, EC_BUILDING };
 inline int entClass(int k) { return k <= EK_BUSH ? EC_TREE : k <= EK_SEASTACK ? EC_ROCK : EC_BUILDING; }
 // Distance thinning of the small, numerous kinds (trees, bushes, boulders): an instance is drawn while its key is below

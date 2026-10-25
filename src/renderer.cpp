@@ -618,7 +618,8 @@ std::vector<uint8_t> Renderer::prepareWorldMinimap(const World& world) {
     if (h > 0 && mk[1] > 0.05f) c = lerp(c, vec3(0.78f, 0.72f, 0.66f), smoothstepf(0.05f, 0.4f, mk[1]));
     if (h > 0 && mk[3] > 0.2f) c = lerp(c, vec3(0.62f, 0.62f, 0.32f), mk[3] * 0.35f);
     if (mk[0] * ROAD_RANGE < 14.f) c = vec3(0.35f, 0.33f, 0.3f);
-    if (world.onRunway(x, z, 40) >= 0) c = vec3(0.12f, 0.12f, 0.14f);
+    int surf = -1;
+    if (world.onRunway(x, z, 40, &surf) >= 0 && surf != SURF_WATER) c = vec3(0.12f, 0.12f, 0.14f);
     size_t o = ((size_t)j * N + i) * 4;
     img[o] = (uint8_t)(clampf(c.x, 0, 1) * 255); img[o + 1] = (uint8_t)(clampf(c.y, 0, 1) * 255); img[o + 2] = (uint8_t)(clampf(c.z, 0, 1) * 255); img[o + 3] = 255;
   } });
@@ -928,13 +929,14 @@ void Renderer::renderMap(float cx, float cz, float half, int N) {
 // its buildings' world bounds and their boxes' range (traceBoxes skips an airport the ray misses)
 Renderer::AirportSlots Renderer::airportSlots(const World& world, float cx, float cz) {
   AirportSlots out;
-  const int count = (int)world.airports.size();
+  // (a seaplane base has no ground to paint: its lane is the sea, its buoys scenery - the land fields alone take slots)
+  std::vector<int> all;
+  for (int i = 0; i < (int)world.airports.size(); i++) if (!world.airports[i].water()) all.push_back(i);
+  const int count = (int)all.size();
   std::vector<int> order(std::min(count, 16), -1);
-  if (count <= 16) for (int i = 0; i < count; i++) order[i] = i;
+  if (count <= 16) for (int i = 0; i < count; i++) order[i] = all[i];
   else {   // (each slot says its airport's side itself, sides: any airport in any slot)
     auto far = [&](int i) { return hypotf(world.airports[i].x - cx, world.airports[i].z - cz); };
-    std::vector<int> all(count);
-    for (int i = 0; i < count; i++) all[i] = i;
     std::partial_sort(all.begin(), all.begin() + 16, all.end(), [&](int a, int b) { const float da = far(a), db = far(b); return da != db ? da < db : a < b; });
     for (int k = 0; k < 16; k++) order[k] = all[k];
   }

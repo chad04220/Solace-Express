@@ -450,8 +450,9 @@ Career::Source Career::canFly(const Contract& c, int si, std::string* why) const
   const Airport* ends[] = {&g_world.airports[c.from], &arrivalAirport(c)};
   for (const Airport* ap : ends) {
     const Airport& a = *ap;
-    if (!surfaceOK(s, a.surface)) return no(fmt("Cannot use %s runway at %s", surfaceName(a.surface), a.code));
-    if (a.length < s.runwayNeeded(a.elev)) return no(fmt("%s runway too short (%.0f m, needs %.0f m)", a.code, a.length, s.runwayNeeded(a.elev)));
+    if (!surfaceOK(s, a.surface)) return no(a.water() ? fmt("%s is a seaplane base: floats only", a.code) : fmt("Cannot use %s runway at %s", surfaceName(a.surface), a.code));
+    const float need = a.water() ? s.waterRunNeeded(a.elev) : s.runwayNeeded(a.elev);   // (aircraft_perf.cpp runwayOK)
+    if (a.length < need) return no(fmt("%s %s too short (%.0f m, needs %.0f m)", a.code, a.water() ? "water lane" : "runway", a.length, need));
   }
   if (c.timeLimitMin > 0 && km * 1000.f / Plane::perf(&s).cruiseV / 60.f > c.timeLimitMin * 0.8f) return no(fmt("Too slow to make the %.0f minute deadline", c.timeLimitMin));
   if (const int oi = ownedIndexFor(si); oi >= 0 && here(fleet[oi])) { if (routeOf(oi) >= 0) return no("On an airline route - recall it in the Airline tab"); return SRC_OWNED; }

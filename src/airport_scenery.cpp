@@ -308,11 +308,45 @@ void groundLife(Placer& P, const Airport& a, const AptLayout& L) {
     }
   }
 }
+// A seaplane base (docs/WINGS_OVER_WATER.md): its lane's buoys, a pair abreast at each end and every 250 m along both
+// sides 5 m out; its dock (World::seaplaneDocks) from the shore, and behind it, on dry ground, the base's office facing
+// the water and its windsock beside the dock's root
+void seaplaneBase(const Airport& a, std::vector<AptItem>& out) {
+  const World& W = sceneryWorld();
+  for (int s = -1; s <= 1; s += 2)
+    for (float u = -a.length * 0.5f; u <= a.length * 0.5f + 1.f; u += 250.f) {
+      const vec3 p = aptWorld(a, u, s * (a.width * 0.5f + 5.f), 0.f);
+      out.push_back({EK_BUOY, {p.x, 0.f, p.z, 0.f, 1.f, 1.f, 1.f, 0.5f}});
+    }
+  if (a.dockLen <= 0.f) return;
+  const vec2 o(a.dockX, a.dockZ), d(a.dockDirX, a.dockDirZ), r(-d.y, d.x);
+  const float yaw = atan2f(d.x, d.y);
+  out.push_back({EK_SEADOCK, {o.x + d.x * kSeaDockMid, 0.f, o.y + d.y * kSeaDockMid, yaw, 1.f, 1.f, 1.f, 0.5f}});
+  auto lowest = [&](vec2 c, float hx, float hz, float& lo, float& hi) {   // (the ground under a footprint facing the water)
+    lo = 1e9f; hi = -1e9f;
+    for (int k = 0; k < 9; k++) {
+      const vec2 q = c + r * (hx * ((k % 3) - 1)) + d * (hz * ((k / 3) - 1));
+      const float g = W.groundHeight(q.x, q.y, 7); lo = std::min(lo, g); hi = std::max(hi, g);
+    }
+  };
+  const float sc = 0.6f, hx = kEntInfo[EK_FBO].hx * sc, hz = kEntInfo[EK_FBO].hz * sc;
+  for (float back = 14.f; back <= 70.f; back += 4.f) {   // (the nearest dry, level enough ground straight behind the dock)
+    const vec2 c = o - d * back + r * (hx + 3.f);
+    float lo, hi; lowest(c, hx, hz, lo, hi);
+    if (lo < 0.6f || hi - lo > 2.5f) continue;
+    out.push_back({EK_FBO, {c.x, lo - 0.05f, c.y, yaw, sc, sc, sc, 0.35f}});
+    break;
+  }
+  const vec2 w = o - d * 8.f - r * 9.f;
+  const float gw = W.groundHeight(w.x, w.y, 7);
+  if (gw > 0.4f) out.push_back({EK_WINDSOCK, {w.x, gw - 0.05f, w.y, 0.f, 1.f, 1.f, 1.f, 0.5f}});
+}
 }  // namespace
 
 void airportItems(int ai, std::vector<AptItem>& out) {
   out.clear();
   const Airport& a = sceneryWorld().airports[ai];
+  if (a.water()) { seaplaneBase(a, out); return; }
   AptLayout L = aptLayout(a, ai);
   Placer P{a, L, out, 0x9E3779B9u ^ (uint32_t)(ai * 2654435761u)};
   if (L.paved) paved(P, a, L); else strip(P, a, L);

@@ -50,11 +50,12 @@ Grid makeGrid(const World& world) {
       // (an airfield's grounds - world.cpp airportLimits - end 550 m beyond a rectangle 260 m past its runway's ends and
       // at most 420 m to either side of it: farther from every runway's centre than that rectangle's corner, nothing to ask)
       bool near = false;
-      for (const Airport& a : world.airports) near = near || hypotf(x - a.x, z - a.z) < hypotf(a.length * 0.5f + 820.f, 980.f);
+      for (const Airport& a : world.airports) near = near || (!a.water() && hypotf(x - a.x, z - a.z) < hypotf(a.length * 0.5f + 820.f, 980.f));
       if (!near) continue;
       float grounds, cap; airportGroundsCap(world, x, z, grounds, cap);
       g.blocked[Grid::idx(i, j)] = grounds > 0.001f;
       for (const Airport& a : world.airports) {
+        if (a.water()) continue;   // (a seaplane base's lane is on the sea: nothing to keep a road off)
         const vec2 q = aptLocal(a, vec3(x, 0, z));
         if (fabsf(q.x) < a.length * 0.5f + 300.f && fabsf(q.y) < a.width * 0.5f + 100.f) g.blocked[Grid::idx(i, j)] = 2;
       }
@@ -492,7 +493,9 @@ RoadNetwork buildRoadNetwork(const World& world) {
     net.nodes.push_back({world.towns[t].x, world.towns[t].z, world.towns[t].kind, g.island[c]});
   }
   for (size_t ai = 0; ai < world.airports.size(); ai++) {
-    const Airport& a = world.airports[ai]; const AptLayout L = aptLayout(a, (int)ai);
+    const Airport& a = world.airports[ai];
+    if (a.water()) { net.nodes.push_back({a.x, a.z, 3, -1}); continue; }   // (a seaplane base: on no island, no road of its own)
+    const AptLayout L = aptLayout(a, (int)ai);
     const float u = L.termU + (L.paved ? 0.f : 80.f), v = L.paved ? L.lotV1 + 18.f : L.bldV + 40.f;
     // the landside gate, past the car park (the access road starts there and finds its way out across the grounds),
     // clear of the runway's protected strip

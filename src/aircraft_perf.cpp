@@ -224,11 +224,24 @@ const PerfModel& Plane::perf(const AircraftSpec* sp) {
 }
 
 bool surfaceOK(const AircraftSpec& s, int surface) {
+  if (surface == SURF_WATER) return s.floats;   // (a seaplane base's lane: floats only)
   if (surface == SURF_ASPHALT) return true;
   if (surface == SURF_GRASS || surface == SURF_SAND) return s.runwayM < 900;
   return s.roughOK;
 }
-bool runwayOK(const AircraftSpec& s, const Airport& a) { return surfaceOK(s, a.surface) && a.length >= s.runwayNeeded(a.elev); }
+bool runwayOK(const AircraftSpec& s, const Airport& a) { return surfaceOK(s, a.surface) && a.length >= (a.water() ? s.waterRunNeeded(a.elev) : s.runwayNeeded(a.elev)); }
+
+// A water lane's need: a float plane's take-off run through the hump onto the step is about twice its ground roll
+// (water_test: 382 m against 195), its landing run on the water shorter than on a runway - the larger of the two with
+// the runway's margin. Until the type is learned, its published runway half again: an amphibian's distance over the
+// obstacle off the water is about one and a half times its distance off a runway (its run twice as long, its climb
+// the same)
+float AircraftSpec::waterRunNeeded(float elev) const {
+  const PerfModel& P = Plane::perf(this);
+  float base = special || P.toRoll <= 0 || P.ldgRoll <= 0 ? 1.5f * runwayM : std::max(2.f * P.toRoll, P.ldgRoll) * 1.15f;
+  if (fullCabinEnvelope) base = std::max(base, runwayM);
+  return base * (1.0f + elev / 3000.0f);
+}
 
 float AircraftSpec::runwayNeeded(float elev) const {
   const PerfModel& P = Plane::perf(this);

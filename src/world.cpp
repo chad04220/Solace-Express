@@ -117,6 +117,24 @@ static const Airport kAirports[] = {
    "Remote resort island far to the south-east. Plan your fuel."},
   {"ORC", "Orchard Valley", -14000, 4000, 210, 30, 800, 20, SURF_GRASS, 0,
    "Inland farming co-op field among orchards and vineyards."},
+  // 4.0's seaplane bases (docs/WINGS_OVER_WATER.md), appended: every field above keeps its index. Each a water lane
+  // 1000 m by 60 m, surveyed clear - its own length and 200 m more at each end, 50 m more either side - in water at
+  // least 1.5 m deep, its approaches under a 1 in 18 slope for 3 km, as sheltered as the coast allows, with a shore
+  // within a short jetty of it for the dock (World::build: seaplaneDocks). Floats only.
+  {"VBY", "Verde Bay", -25000, 14700, 0, 70, 1000, 60, SURF_WATER, 0,
+   "A sheltered bay on Verdana's south-west coast, below Port Verde. A marked water lane, a dock and fuel."},
+  {"FJW", "Fjordhaven Water", 18200, -25600, 0, 80, 1000, 60, SURF_WATER, 0,
+   "The fjord's calm water above Fjordhaven. Steep sides: expect downdrafts off the slopes."},
+  {"ICH", "Ice Harbor", 31100, -24400, 0, 110, 1000, 60, SURF_WATER, 0,
+   "A fishing village on Nordholm's coast that no runway reaches. Cold water and an icy dock."},
+  {"PBL", "Palm Bay Lagoon", 26600, 22400, 0, 120, 1000, 60, SURF_WATER, 0,
+   "Glassy water behind Palm Bay's reef. The gentlest water landing in the islands."},
+  {"SLM", "Saltmarsh", -16000, 18200, 0, 60, 1000, 60, SURF_WATER, 0,
+   "A marsh village on Verdana's south coast, reached by water. Watch for the birds."},
+  {"WVL", "Westvale", -27900, -3600, 0, 0, 1000, 60, SURF_WATER, 0,
+   "A west-coast village's harbour, open to the Atlantic swell when the wind is in the west."},
+  {"TBY", "Turtle Bay", 37400, 31900, 0, 100, 1000, 60, SURF_WATER, 0,
+   "Far Isle's resort lagoon. The guests arrive by floatplane."},
 };
 
 struct Blob { float x, z, rx, rz, rot, amp, lush, cold; };
@@ -197,7 +215,7 @@ static void computeTexel(float x, float z, float out[4]) {
   }
   sceneryBaseMod(x, z, h, amp);
   for (const Airport& a : kAirports) {
-    if (beyondRunway(x - a.x, z - a.z, a.length)) continue;
+    if (a.water() || beyondRunway(x - a.x, z - a.z, a.length)) continue;   // (a seaplane base shapes no ground)
     float hd = a.heading * DEG, dx = x - a.x, dz = z - a.z;
     float u = fabsf(dx * sinf(hd) - dz * cosf(hd)), v = fabsf(dx * cosf(hd) + dz * sinf(hd));
     // Approach funnel: keep terrain below a glide corridor off both runway ends
@@ -237,7 +255,7 @@ static void airportLimits(const Airport* data, size_t count, float x, float z, f
   grounds = 0.f; cap = 1e9f;
   for (size_t i = 0; i < count; ++i) {
     const Airport& a = data[i];
-    if (beyondRunway(x - a.x, z - a.z, a.length)) continue;
+    if (a.water() || beyondRunway(x - a.x, z - a.z, a.length)) continue;
     float hd = a.heading * DEG, dx = x - a.x, dz = z - a.z;
     float u = fabsf(dx * sinf(hd) - dz * cosf(hd)), v = fabsf(dx * cosf(hd) + dz * sinf(hd));
     float d = u - a.length * 0.5f;
@@ -290,7 +308,7 @@ static float airportFunnelCeilingFor(const Airport* data, size_t count, float x,
   float ceiling = 1e9f;
   for (size_t i = 0; i < count; ++i) {
     const Airport& a = data[i];
-    if (beyondRunway(x - a.x, z - a.z, a.length)) continue;
+    if (a.water() || beyondRunway(x - a.x, z - a.z, a.length)) continue;
     float hd = a.heading * DEG, dx = x - a.x, dz = z - a.z;
     float u = fabsf(dx * sinf(hd) - dz * cosf(hd)), v = fabsf(dx * cosf(hd) + dz * sinf(hd));
     float d = u - a.length * 0.5f;
@@ -307,7 +325,7 @@ static float airportInfluenceFor(const Airport* data, size_t count, float x, flo
   float best = 0;
   for (size_t i = 0; i < count; ++i) {
     const Airport& a = data[i];
-    if (beyondRunway(x - a.x, z - a.z, a.length)) continue;
+    if (a.water() || beyondRunway(x - a.x, z - a.z, a.length)) continue;
     float hd = a.heading * DEG, dx = x - a.x, dz = z - a.z;
     float u = fabsf(dx * sinf(hd) - dz * cosf(hd)), v = fabsf(dx * cosf(hd) + dz * sinf(hd));
     float d = u - a.length * 0.5f;
@@ -403,6 +421,7 @@ void World::buildConfigured(const std::string& cachePath, const std::string& sta
   fromCache = !cachePath.empty() && loadCache(cachePath, stamp);
   if (fromCache) {
     loadStage(.60f,"Preparing cached terrain and lakes"); sceneryInit(); buildLakeMask();
+    seaplaneDocks();
     generationPhase(GenerationPhase::Settlements);
     loadStage(.68f,"Preparing cached settlements"); settlements = buildSettlementFields(*this); farms = farmsteadsOf(roads);
     generationPhase(GenerationPhase::Scenery);
@@ -479,6 +498,7 @@ void World::buildConfigured(const std::string& cachePath, const std::string& sta
     t[1] = lerpf(t[1], .7f + 24.f * wall, weight);
   }
   // the roads, routed over the finished natural ground (World::height grades them in from here on)
+  seaplaneDocks();   // (each seaplane base's dock, on its shore: the ground is settled from here on)
   generationPhase(GenerationPhase::Roads);
   loadStage(.34f,"Routing roads over terrain");
   roads = earthChart ? buildEarthRoads() : buildRoadNetwork(*this);
@@ -1037,6 +1057,38 @@ int World::onRunway(float x, float z, float margin, int* surface) const {
     if (fabsf(u) <= r.length * 0.5f + margin && fabsf(v) <= r.width * 0.5f + margin) { if (surface) *surface = r.surface; return r.airport; }
   }
   return -1;
+}
+
+// A seaplane base's dock: the nearest gentle shore (0.3 to 3 m above the sea) beside its lane - clear of the lane, its
+// ends' 200 m and 90 m to either side of it - from which a jetty reaches open water within 10 m, a metre deep by 20 m
+// out, and 2 m deep 30 to 70 m out across 24 m (room to moor alongside its head and turn away). The jetty runs out
+// from there; an aircraft moors 25 m out. A base with no such shore within 900 m has none (dockLen 0)
+void World::seaplaneDocks() {
+  for (Airport& a : airports) {
+    if (!a.water()) continue;
+    a.dockLen = 0.f;
+    const float hr = a.heading * DEG;
+    const vec2 d(sinf(hr), -cosf(hr)), p(cosf(hr), sinf(hr)), C(a.x, a.z);
+    float best = 1e9f; vec2 shore, out;
+    for (float r = 60.f; r <= 900.f && r < best; r += 10.f)
+      for (int k = 0; k < 144; k++) {
+        const vec2 s = C + vec2(cosf(k * 0.0436332f), sinf(k * 0.0436332f)) * r, q = s - C;
+        if (fabsf(q.x * d.x + q.y * d.y) < a.length * 0.5f + 200.f && fabsf(q.x * p.x + q.y * p.y) < a.width * 0.5f + 90.f) continue;
+        const float g = groundHeight(s.x, s.y, 8);
+        if (g < 0.3f || g > 3.f) continue;
+        for (int b = 0; b < 36; b++) {
+          const vec2 o(cosf(b * 0.1745329f), sinf(b * 0.1745329f));
+          bool ok = true;
+          for (float t = 10.f; t <= 30.f && ok; t += 5.f) ok = groundHeight(s.x + o.x * t, s.y + o.y * t, 8) < (t < 20.f ? 0.f : -1.f);
+          for (float t = 30.f; t <= 70.f && ok; t += 5.f)
+            for (float w : {-12.f, 0.f, 12.f}) ok = ok && groundHeight(s.x + o.x * t - o.y * w, s.y + o.y * t + o.x * w, 8) < -2.f;
+          if (ok) { best = r; shore = s; out = o; break; }
+        }
+        if (best <= r) break;
+      }
+    if (best > 1e8f) continue;
+    a.dockX = shore.x; a.dockZ = shore.y; a.dockDirX = out.x; a.dockDirZ = out.y; a.dockLen = 25.f;
+  }
 }
 
 float World::distanceKm(int a, int b) const {

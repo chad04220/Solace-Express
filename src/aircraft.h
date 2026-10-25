@@ -57,6 +57,7 @@ struct AircraftSpec {
   // the runway it needs: the longer of its learned take-off and landing distances at full weight (Plane::perf), 15% to
   // spare, longer with the field's elevation (runwayM until the type has been learned, and for the research jets)
   float runwayNeeded(float elev) const;
+  float waterRunNeeded(float elev) const;   // (a seaplane base's water lane: aircraft_perf.cpp)
   // Maximum take-off mass: jets have an explicit envelope. Legacy non-jets keep the
   // original three-quarter-tank/full-load convention. Full tanks can require less payload.
   float maxMass() const { return maxTakeoffMass > 0 ? maxTakeoffMass : emptyMass + maxFuel * 0.75f + cargoKg + pax * 85.f + 85.f; }
@@ -64,7 +65,8 @@ struct AircraftSpec {
 };
 
 // whether a type may use a field: its surface (grass and sand only for the short-field types, gravel and snow for the
-// rough-field ones) and its length (runwayNeeded). The career dispatches by it and the autoland lands by it.
+// rough-field ones, a seaplane base's water lane for float planes alone) and its length (runwayNeeded; on the water
+// waterRunNeeded). The career dispatches by it and the autoland lands by it.
 bool surfaceOK(const AircraftSpec& s, int surface);
 bool runwayOK(const AircraftSpec& s, const Airport& a);
 

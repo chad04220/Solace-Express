@@ -1523,6 +1523,49 @@ void buildAirportKind(MB& mb, int kind, int lod) {
         }
       break;
     }
+    case EK_SEADOCK: {   // a seaplane base's dock (out over the water along +z, y 0 the sea): a timber pier 3 m wide from the shore
+      // (z -8, its first 8 m over the land) to z 14, its deck 1.6 m up on piles, railed; a gangway down to a floating
+      // pontoon 4.4 m wide from z 18.5 to 32.5, its deck half a metre over the water on white floats, fendered along both
+      // sides where an aircraft lies; cleats, and at its head the fuel pump (P_STRIPE) and a life ring. Built from the
+      // shore line, then moved back kSeaDockMid so the entity stands at its middle (its box, Scenery::collide's, centred)
+      const size_t dock0 = mb.o.size();
+      mb.box(vec3(-1.5f, 1.35f, -8.f), vec3(1.5f, 1.6f, 14.f), P_WOOD, 0x3F);
+      for (float z = -4.f; z <= 14.f; z += 4.5f) for (float x : {-1.35f, 1.35f}) mb.cyl(vec3(x, -3.f, z), vec3(x, 1.35f, z), 0.15f, 0.15f, d0 ? 8 : 4, P_WOOD, false, false);
+      if (d1) for (float x : {-1.42f, 1.42f}) {
+        mb.box(vec3(x - 0.05f, 2.45f, -6.f), vec3(x + 0.05f, 2.55f, 14.f), P_WOOD, 0x3F);
+        for (float z = -6.f; z <= 14.f; z += 4.f) mb.box(vec3(x - 0.05f, 1.6f, z - 0.05f), vec3(x + 0.05f, 2.45f, z + 0.05f), P_WOOD, 0x33);
+      }
+      mb.quad(vec3(-0.6f, 1.6f, 14.f), vec3(0.6f, 1.6f, 14.f), vec3(0.6f, 0.62f, 18.6f), vec3(-0.6f, 0.62f, 18.6f), P_METAL, vec3(0, -2.f, 16.f));   // the gangway
+      mb.quad(vec3(-0.6f, 1.5f, 14.f), vec3(-0.6f, 0.52f, 18.6f), vec3(0.6f, 0.52f, 18.6f), vec3(0.6f, 1.5f, 14.f), P_METAL, vec3(0, 3.f, 16.f));
+      if (d1) for (float x : {-0.62f, 0.62f}) mb.cyl(vec3(x, 2.5f, 14.f), vec3(x, 1.5f, 18.6f), 0.03f, 0.03f, 4, P_METAL, false, false);   // (its hand rails)
+      mb.box(vec3(-2.2f, 0.42f, 18.5f), vec3(2.2f, 0.55f, 32.5f), P_WOOD, 0x3F);   // the pontoon's deck
+      for (float z = 19.5f; z <= 31.6f; z += 2.f) mb.box(vec3(-2.f, -0.35f, z - 0.8f), vec3(2.f, 0.42f, z + 0.8f), P_PAINT, 0x3F & ~4);   // (its floats)
+      if (d1) for (float x : {-2.25f, 2.25f}) mb.box(vec3(x - 0.08f, 0.12f, 19.f), vec3(x + 0.08f, 0.5f, 32.f), P_DARK, 0x3F);   // (the fenders)
+      if (d0) for (float z : {20.f, 26.f, 31.8f}) for (float x : {-1.95f, 1.95f}) mb.box(vec3(x - 0.06f, 0.55f, z - 0.16f), vec3(x + 0.06f, 0.66f, z + 0.16f), P_METAL, 0x3B);   // (cleats)
+      mb.box(vec3(-1.7f, 0.55f, 31.f), vec3(-0.9f, 1.8f, 31.8f), P_STRIPE, 0x3B);   // the fuel pump
+      if (d1) { mb.cyl(vec3(-1.3f, 1.2f, 30.9f), vec3(-1.3f, 1.2f, 30.5f), 0.32f, 0.32f, d0 ? 12 : 6, P_DARK, true, true);   // (its hose reel)
+                mb.cyl(vec3(1.6f, 0.55f, 32.f), vec3(1.6f, 1.7f, 32.f), 0.05f, 0.05f, 4, P_METAL, true, false);   // (the life ring's post)
+                mb.cyl(vec3(1.6f, 1.45f, 31.93f), vec3(1.6f, 1.45f, 32.07f), 0.34f, 0.34f, d0 ? 12 : 6, P_STRIPE, true, true); }
+      if (lod == 3) {   // (up close: a steel ladder down the pier's side to the water, the planks' gaps across the deck)
+        for (float o : {-0.22f, 0.22f}) mb.box(vec3(1.52f, -1.f, 12.f + o - 0.03f), vec3(1.58f, 1.6f, 12.f + o + 0.03f), P_METAL, 0x3F);
+        for (float y = -0.8f; y < 1.5f; y += 0.3f) mb.box(vec3(1.53f, y - 0.015f, 11.75f), vec3(1.57f, y + 0.015f, 12.25f), P_METAL, 0x3F);
+        for (float z = -7.5f; z < 14.f; z += 0.9f) mb.box(vec3(-1.49f, 1.6f, z - 0.012f), vec3(1.49f, 1.604f, z + 0.012f), P_DARK, 8);
+      }
+      for (size_t i = dock0; i < mb.o.size(); i++) mb.o[i].pz -= kSeaDockMid;
+      break;
+    }
+    case EK_BUOY: {   // a water lane's marker buoy (y 0 the sea): a can 1.1 m across riding 0.55 m out of the water, its conical
+      // top, a staff and a cross for a topmark (P_STRIPE)
+      mb.cyl(vec3(0, -0.6f, 0), vec3(0, 0.55f, 0), 0.55f, 0.55f, d0 ? 14 : d1 ? 10 : 6, P_PAINT, true, false);
+      mb.cyl(vec3(0, 0.55f, 0), vec3(0, 0.95f, 0), 0.55f, 0.1f, d0 ? 14 : d1 ? 10 : 6, P_PAINT, true, false);
+      if (d1) mb.cyl(vec3(0, 0.95f, 0), vec3(0, 1.35f, 0), 0.035f, 0.035f, 4, P_METAL, true, false);
+      if (d0) { mb.box(vec3(-0.14f, 1.32f, -0.03f), vec3(0.14f, 1.6f, 0.03f), P_STRIPE, 0x3F); mb.box(vec3(-0.03f, 1.32f, -0.14f), vec3(0.03f, 1.6f, 0.14f), P_STRIPE, 0x3F); }
+      if (lod == 3) {   // (up close: its lifting eyes on the cone, its band of retro-reflective tape)
+        for (float x : {-0.3f, 0.3f}) mb.cyl(vec3(x, 0.78f, -0.04f), vec3(x, 0.78f, 0.04f), 0.07f, 0.07f, 8, P_METAL, true, true);
+        mb.cyl(vec3(0, 0.3f, 0), vec3(0, 0.42f, 0), 0.56f, 0.56f, 16, P_STRIPE, false, false);
+      }
+      break;
+    }
     case EK_POLE: {   // a wooden pole, a crossarm, three insulators; up close, its three wires to the next pole along +z
       mb.cyl(vec3(0, -0.5f, 0), vec3(0, 9.f, 0), 0.14f, 0.11f, d0 ? 10 : d1 ? 6 : 4, P_WOOD, true, false);
       mb.box(vec3(-1.05f, 8.15f, -0.06f), vec3(1.05f, 8.3f, 0.06f), P_WOOD, lod == 2 ? 8 | 16 | 32 : 0x3F);

@@ -3,6 +3,7 @@
 // and again with each international field laid out as a hub (its long terminal of several buildings).
 #include "../src/airport_layout.h"
 #include "../src/entities.h"
+#include "../src/scenery.h"
 #include "test_world.h"
 #include <cstdio>
 
@@ -65,7 +66,41 @@ int main() {
     if (n < (L.paved ? 60 : 8)) { printf("  !! %s: only %d items\n", a.code, n); bad++; }
     fails += bad; total += n;
   };
-  for (int ai = 0; ai < (int)g_world.airports.size(); ai++) checkAirport(ai);
+  // a seaplane base (docs/WINGS_OVER_WATER.md): its buoys in pairs abreast every 250 m, 5 m outside its lane's edges, and
+  // nothing else on the lane or 200 m beyond its ends; its dock from a shore at least 0.3 m up out to water a metre deep
+  // or more at its head, and the berth beside the head as deep; its office on dry ground
+  auto checkWaterBase = [&](int ai) {
+    const Airport& a = g_world.airports[ai];
+    std::vector<AptItem> items; airportItems(ai, items);
+    int buoys = 0, docks = 0, bad = 0;
+    for (const auto& it : items) {
+      const vec2 q = aptLocal(a, vec3(it.e.x, 0, it.e.z));
+      if (it.kind == EK_BUOY) {
+        buoys++;
+        const float side = fabsf(q.y) - a.width * 0.5f;
+        if (side < 4.f || side > 6.f || fabsf(q.x) > a.length * 0.5f + 1.f) { printf("  !! %s: buoy at (%.0f, %.0f) off its lane's edge\n", a.code, q.x, q.y); bad++; }
+        continue;
+      }
+      if (fabsf(q.x) < a.length * 0.5f + 200.f && fabsf(q.y) < a.width * 0.5f + 30.f) { printf("  !! %s: %s at (%.0f, %.0f) on the lane\n", a.code, kEntInfo[it.kind].name, q.x, q.y); bad++; }
+      if (it.kind == EK_SEADOCK) {
+        docks++;
+        const vec3 head = a.dockHead(), berth = head + vec3(-a.dockDirZ, 0, a.dockDirX) * 4.4f;
+        if (g_world.groundHeight(a.dockX, a.dockZ) < 0.3f) { printf("  !! %s: the dock's root is in the water\n", a.code); bad++; }
+        if (g_world.groundHeight(head.x, head.z) > -1.f || g_world.groundHeight(berth.x, berth.z) > -1.f) { printf("  !! %s: the dock's head or berth is shallow\n", a.code); bad++; }
+      }
+      if (it.kind == EK_FBO && g_world.groundHeight(it.e.x, it.e.z) < 0.5f) { printf("  !! %s: the office stands in the water\n", a.code); bad++; }
+    }
+    for (const PlacedEnt& p : landmarks(g_world)) {   // (and nothing of the islands' own on the lane or its approaches)
+      const vec2 q = aptLocal(a, vec3(p.e.x, 0, p.e.z));
+      if (fabsf(q.x) < a.length * 0.5f + 600.f && fabsf(q.y) < a.width * 0.5f + 120.f) { printf("  !! %s: a %s at (%.0f, %.0f) on the lane\n", a.code, kEntInfo[p.kind].name, q.x, q.y); bad++; }
+    }
+    printf("%s %-26s %2d buoys, %d dock%s\n", a.code, a.name, buoys, docks, bad ? "  <-- problems" : "");
+    if (buoys != 10 || docks != 1) { printf("  !! %s: %d buoys, %d docks\n", a.code, buoys, docks); bad++; }
+    fails += bad; total += (int)items.size();
+  };
+  for (int ai = 0; ai < (int)g_world.airports.size(); ai++) {
+    if (g_world.airports[ai].water()) checkWaterBase(ai); else checkAirport(ai);
+  }
   // the international fields laid out as hubs (Airport::hub, the real Earth's large airports): the long terminal's
   // buildings, its gates and the stands past it clear of each other and of the runway, the taxiway and the exits
   int hubs = 0;

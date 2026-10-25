@@ -37,9 +37,12 @@ int main() {
   auto check = [&](bool ok, const char* code, const char* what) {
     checks++; if (!ok) { failed++; printf("FAIL: %s %s\n", code, what); }
   };
-  check(g_world.airports.size() == 16, "ALL", "all sixteen airport definitions present");
+  int land = 0, water = 0;
+  for (const Airport& a : g_world.airports) (a.water() ? water : land)++;
+  check(land == 16 && water == 7, "ALL", "all sixteen airfields and seven seaplane bases present");
   for (int ai = 0; ai < (int)g_world.airports.size(); ai++) {
     const Airport& a = g_world.airports[ai]; const Airport before = a;
+    if (a.water()) continue;   // (a seaplane base's own: airport_layout_test)
     const AptLayout L = aptLayout(a, ai);
     std::vector<AptItem> items, repeat; airportItems(ai, items); airportItems(ai, repeat);
     check(items.size() == repeat.size(), a.code, "stable object count");

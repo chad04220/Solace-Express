@@ -55,7 +55,18 @@ struct Airport {
   // building every 260 m or so, between the cargo sheds and the AI stands (aptLayout)
   bool hub = false;
   // fuel costs more the further the bowser had to come: hubs x1, regional fields x1.15, strips x1.4, snow and gravel x1.8
-  float fuelPriceMult() const { float m = size >= 2 ? 1.f : size == 1 ? 1.15f : 1.4f; return (surface == SURF_SNOW || surface == SURF_GRAVEL) ? std::max(m, 1.8f) : m; }
+  // (a seaplane base's comes by boat: x1.5)
+  float fuelPriceMult() const {
+    if (surface == SURF_WATER) return 1.5f;
+    float m = size >= 2 ? 1.f : size == 1 ? 1.15f : 1.4f; return (surface == SURF_SNOW || surface == SURF_GRAVEL) ? std::max(m, 1.8f) : m;
+  }
+  // A seaplane base (docs/WINGS_OVER_WATER.md): its "runway" a water lane marked by buoys on the sea, uncontrolled, no
+  // ground of its own - it shapes no terrain and its lane carries no paint or lights. Its dock (World::build,
+  // seaplaneDocks): where the jetty leaves the shore and the way it runs out over the water (unit, x z), its length;
+  // an aircraft moors alongside its head
+  bool water() const { return surface == SURF_WATER; }
+  float dockX = 0, dockZ = 0, dockDirX = 0, dockDirZ = 0, dockLen = 0;
+  vec3 dockHead() const { return vec3(dockX + dockDirX * dockLen, 0.f, dockZ + dockDirZ * dockLen); }
   // derived
   vec3 dir() const { float h = heading * DEG; return vec3(sinf(h), 0, -cosf(h)); }
   vec3 pos() const { return vec3(x, elev, z); }
@@ -223,6 +234,7 @@ public:
   int nearestAirport(float x, float z, float* distOut = nullptr) const;
 private:
   void buildConfigured(const std::string& cachePath, const std::string& stamp, bool save);
+  void seaplaneDocks();   // (each seaplane base's dock: Airport::dockX)
   void buildEarthTerrain();             // (world_earth.cpp: hm from the pack, the airports' grounds flattened)
   RoadNetwork buildEarthRoads() const;  // (the pack's roads, laid on that ground)
 };
