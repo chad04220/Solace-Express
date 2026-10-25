@@ -299,16 +299,16 @@ std::vector<Career::Destination> Career::destinations() const {
       std::sort(inReach.begin(), inReach.end(), [](const auto& a, const auto& b) { return a.first != b.first ? a.first < b.first : a.second.ident < b.second.ident; });
       for (const auto& [km, a] : inReach) {
         if (out.size() >= 12) break;
-        const auto chart = earthCharts::chartForAirport(a.ident);
-        if (!chart || chart->id == region) continue;
+        const auto chart = earthCharts::chartForAirport(a);   // (from the record in hand: a search by ident reads the whole pack)
+        if (chart.id == region) continue;
         int index = -1;
-        for (int i = 0, n = procedural::airportCount(chart->id); i < n && index < 0; i++)
-          if (const Airport* p = procedural::airportOf(chart->id, i); p && a.ident == p->code) index = i;
+        for (int i = 0, n = procedural::airportCount(chart.id); i < n && index < 0; i++)
+          if (const Airport* p = procedural::airportOf(chart.id, i); p && a.ident == p->code) index = i;
         if (index < 0) continue;
         bool dup = false;
-        for (const Destination& o : out) dup = dup || (o.id == chart->id && o.airport == index);
+        for (const Destination& o : out) dup = dup || (o.id == chart.id && o.airport == index);
         if (dup) continue;
-        Destination t; t.id = chart->id; t.airport = index; t.km = km;
+        Destination t; t.id = chart.id; t.airport = index; t.km = km;
         t.name = a.name + (a.municipality.empty() ? "" : ", " + a.municipality);
         t.fare = (int)(120. + 0.45 * t.km) / 10 * 10;
         t.minLicense = t.km <= 450. ? LIC_PPL : t.km <= 900. ? LIC_CPL : LIC_ATP;
@@ -913,15 +913,14 @@ void Career::refreshBoard() {
       for (const auto& field : fields) {
         if (added >= 2 || tried++ >= 8) break;
         const earth::AirportRecord& a = field.second;
-        const auto to = earthCharts::chartForAirport(a.ident);
-        if (!to) continue;
+        const auto to = earthCharts::chartForAirport(a);   // (from the record in hand, as the destinations are)
         int index = -1;
-        for (int i = 0, n = procedural::airportCount(to->id); i < n && index < 0; i++)
-          if (const Airport* p = procedural::airportOf(to->id, i); p && a.ident == p->code) index = i;
-        const Airport* B = index >= 0 ? procedural::airportOf(to->id, index) : nullptr;
+        for (int i = 0, n = procedural::airportCount(to.id); i < n && index < 0; i++)
+          if (const Airport* p = procedural::airportOf(to.id, i); p && a.ident == p->code) index = i;
+        const Airport* B = index >= 0 ? procedural::airportOf(to.id, index) : nullptr;
         if (!B) continue;
-        const geo::Position there = airportPlace(to->id, *B);
-        Contract c; c.from = location; c.to = index; c.toRegion = to->id; c.haulKm = (float)(geo::surfaceDistance(here, there) / 1000.);
+        const geo::Position there = airportPlace(to.id, *B);
+        Contract c; c.from = location; c.to = index; c.toRegion = to.id; c.haulKm = (float)(geo::surfaceDistance(here, there) / 1000.);
         c.id = fmt("X%u_%d", boardSeed, added);
         int si = -1;
         for (int k = 0; k < (int)access.size() && si < 0; k++) {   // (a type that can use both fields, drawn from those you can fly)

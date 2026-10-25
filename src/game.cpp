@@ -918,9 +918,7 @@ void Game::openEarthPicker() {
 // On the real Earth a route goes to a real airport: its chart's place (the runway's centre on the lattice), the
 // autopilot holding the course there as for a region
 void Game::setEarthAirportRoute(const earth::AirportRecord& airport) {
-  const auto chart = earthCharts::chartForAirport(airport.ident);
-  if (!chart) return;
-  setEarthDestination(*chart);
+  setEarthDestination(earthCharts::chartForAirport(airport));
   earthRouteIdent = airport.ident + " " + airport.name;
 }
 

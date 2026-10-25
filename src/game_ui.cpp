@@ -1682,11 +1682,10 @@ void Game::chooseEarthAirport(const earth::AirportRecord& airport) {
     setEarthAirportRoute(airport);
     return;
   }
-  const auto chart = earthCharts::chartForAirport(airport.ident);
-  if (!chart) return;
+  const auto chart = earthCharts::chartForAirport(airport);
   g_audio.trigger(SFX_CLICK);
   freeEarthPicker = false; freeEarthIdent = airport.ident;
-  chooseFreeRegion(*chart);
+  chooseFreeRegion(chart);
   loadFreeRegion(freeRegion);
 }
 

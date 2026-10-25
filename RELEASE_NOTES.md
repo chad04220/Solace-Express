@@ -1,3 +1,9 @@
+## What's new in v3.54.2
+
+### Smoother career on the real Earth
+- **No pause when the results come up.** With the real Earth's pack installed, every new career flies the real Earth beyond the islands, and its job board lists the real airports within reach. Finding which chart each of those airports sits in meant reading through every one of the pack's 29,000 airports, about 20 ms each time, a dozen times a board. The board is drawn again after every flight, on continuing your career, on buying or selling an aircraft and on dropping a job, so each of those stood still for about a third of a second (the benchmark's crash scene: 321 ms). Each airport's chart now comes straight from the airport the board already holds. The same board takes 4 ms, and the crash scene's pause is gone (6 ms). A career based beyond the islands paid up to 0.16 s more a board for its cross-country jobs; those are as quick now.
+- **Four airfields you couldn't pick.** Angaur (ANG), Harford Field (HAD), Ellen Church Field (CJJ) and Lost River 1 (LSR) have codes that are also a larger airport's three-letter code, and looking them up found that airport instead. Choosing one in Free Flight's airport list did nothing, and the cross-country jobs passed them over. They now work like any other.
+
 ## What's new in v3.54.1
 
 ### Loading screens

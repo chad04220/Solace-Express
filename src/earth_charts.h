@@ -38,7 +38,9 @@ std::optional<procedural::Descriptor> find(const std::string& id);
 // ocean. Elsewhere it is idAt's
 constexpr double kSolaceReach = 110000.0;
 std::string slideIdAt(double lat, double lon);
-// The chart to start from at an airport (its runway's centre on the lattice point nearest it)
+// The chart to start from at an airport (its runway's centre on the lattice point nearest it). From its record when
+// that is in hand: by its ident the whole pack is read to find it (18 ms with the global pack)
+procedural::Descriptor chartForAirport(const earth::AirportRecord& airport);
 std::optional<procedural::Descriptor> chartForAirport(const std::string& ident);
 // Airports by ident (exact, any case) and then by name or town (containing the query, any case), largest first;
 // with nothing asked, the largest of all

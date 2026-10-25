@@ -36,6 +36,14 @@ int main(int argc, char** argv) {
   printf("chart %s (%s) at %.5f, %.5f\n", chart->id.c_str(), chart->name.c_str(), chart->origin.latitude, chart->origin.longitude);
   check(earthCharts::find(chart->id).has_value() && earthCharts::find(chart->id)->id == chart->id, "the chart's id finds it again");
   check(!earthCharts::find("earth:01:2") && !earthCharts::find("earth:1:2x") && !earthCharts::find("earth:99999:0"), "malformed ids refused");
+  {   // (the job board and the picker take an airport's chart from its record: the same as its ident finds)
+    bool same = true; int airports = 0;
+    for (const auto& a : pack->airports(pack->box())) {
+      const auto byIdent = earthCharts::chartForAirport(a.ident);
+      same = same && byIdent && byIdent->id == earthCharts::chartForAirport(a).id; airports++;
+    }
+    check(same && airports > 0, "each airport's chart from its record is the one its ident finds (" + std::to_string(airports) + " airports)");
+  }
   const auto t0 = std::chrono::steady_clock::now();
   World w;
   w.buildProcedural(*chart, save, save.empty() ? "" : "earth-chart-test", !save.empty());

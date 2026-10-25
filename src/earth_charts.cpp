@@ -171,13 +171,19 @@ std::optional<procedural::Descriptor> find(const std::string& id) {
   return descriptorAt((int)la, (int)lo);
 }
 
+procedural::Descriptor chartForAirport(const earth::AirportRecord& a) {
+  double lat = a.lat, lon = a.lon;
+  if (!a.runways.empty() && a.runways[0].endsKnown) { lat = 0.5 * (a.runways[0].lat1 + a.runways[0].lat2); lon = 0.5 * (a.runways[0].lon1 + a.runways[0].lon2); }
+  return chartAt(lat, lon);
+}
 std::optional<procedural::Descriptor> chartForAirport(const std::string& ident) {
-  for (const auto& a : searchAirports(ident, 1)) {
-    if (lower(a.ident) != lower(ident)) break;
-    double lat = a.lat, lon = a.lon;
-    if (!a.runways.empty() && a.runways[0].endsKnown) { lat = 0.5 * (a.runways[0].lat1 + a.runways[0].lat2); lon = 0.5 * (a.runways[0].lon1 + a.runways[0].lon2); }
-    return chartAt(lat, lon);
-  }
+  // (the airport whose ident it is: never one whose IATA code it also is - five in the global pack, where the larger,
+  // found first by a search, hid the airport asked for)
+  auto p = pack();
+  if (!p) return std::nullopt;
+  const std::string q = lower(ident);
+  for (const auto& a : p->airports(p->box()))
+    if (lower(a.ident) == q) return chartForAirport(a);
   return std::nullopt;
 }
 
