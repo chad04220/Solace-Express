@@ -21,6 +21,11 @@ vec3 openSea() {   // (well clear of every coast)
   }
   return vec3(WORLD_HALF * 0.75f, 0, WORLD_HALF * 0.75f);
 }
+int saveVersion(const char* path) {   // (the save's first line, its key and version: the line ends as the platform writes it)
+  FILE* f = fopen(path, "r"); char key[64] = {}; int v = -1;
+  if (f) { if (fscanf(f, "%63s %d", key, &v) != 2 || std::string(key) != "somnium_save") v = -1; fclose(f); }
+  return v;
+}
 float cruiseAt75(const AircraftSpec& s) {   // (level at 1,500 m on the altitude hold, 75% power: the speed it settles at)
   Plane q; q.reset(&s, vec3(30000, 1500, 30000), 90, s.designFuel() * 0.5f, s.cargoKg * 0.5f, true, s.cruise);
   q.ctl.gearDown = !s.retract; q.gear = q.ctl.gearDown ? 1.f : 0.f; q.engineRunning = true; q.engineSpool = 0.75f;
@@ -125,12 +130,12 @@ int main() {
     // the save: version 9 with the fit; a career with nothing fitted writes what it always did
     const char* path = "hangar_test.sav";
     check(c.save(path), "the fitted career saves");
-    { FILE* f = fopen(path, "rb"); char head[32] = {}; if (f) { fgets(head, sizeof head, f); fclose(f); } check(std::string(head) == "somnium_save 9\n", "as version 9"); }
+    check(saveVersion(path) == 9, "as version 9");
     Career d; d.newGame();
     check(d.load(path) && d.fleet.size() == 1 && d.fleet[0].fit == c.fleet[0].fit && d.fleet[0].floatKit && d.airframe(0).maxFuel == c.airframe(0).maxFuel, "loaded: its floats, its kits, its tanks");
     Career e; e.newGame(); e.license = LIC_ATP; e.money = 100000; e.buy(1, &m);
     check(e.save(path), "a career with nothing fitted saves");
-    { FILE* f = fopen(path, "rb"); char head[32] = {}; if (f) { fgets(head, sizeof head, f); fclose(f); } check(std::string(head) == "somnium_save 6\n", "as version 6, as before"); }
+    check(saveVersion(path) == 6, "as version 6, as before");
     remove(path); remove((std::string(path) + ".bak").c_str()); remove((std::string(path) + ".tmp").c_str());
   }
   std::printf("Hangar: %d failures\n", failures);
