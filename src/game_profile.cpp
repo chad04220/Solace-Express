@@ -36,8 +36,11 @@ void Game::profileTouchdown(float fpm, int ap) {
   if (ap < 0 || ap >= (int)g_world.airports.size()) return;
   fpm = fabsf(fpm);
   const Airport& A = g_world.airports[ap];
-  if (profile.airports.insert(airportStamp(A)).second) {   // (a region's stamps are its own: Profile::airports)
-    const int N = (int)g_world.airports.size();
+  // (a region's stamps are its own: Profile::airports; its seaplane bases, surveyed beyond its airports, are not among
+  // them - World::surveySeaplaneBases)
+  const bool regionBase = g_world.procedural && g_world.regionRecipe && A.water();
+  if (!regionBase && profile.airports.insert(airportStamp(A)).second) {
+    const int N = g_world.procedural && g_world.regionRecipe ? (int)g_world.regionRecipe->airports.size() : (int)g_world.airports.size();
     if (g_world.procedural && g_world.regionRecipe) {
       const int n = profile.regionAirports(g_world.regionId);
       toast(fmt("Airport stamp: %s %s (%d of %d in the %s)", A.code, A.name, n, N, g_world.regionRecipe->descriptor.name.c_str()), vec3(1.f, 0.85f, 0.45f), false);

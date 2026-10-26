@@ -109,7 +109,8 @@ struct GameTest {
       game.freeCraft = 0; game.freeAirport = airport; game.freeAirborne = airborne; game.launchFreeFlight();
       launches &= game.screen == SCR_FLIGHT && game.freeFlight && game.isolatedFlight &&
         game.contract.from == airport && game.plane.spec == &kAircraft[0] && game.plane.fuel == kAircraft[0].maxFuel;
-      launches &= airborne ? game.plane.agl() >= 899.f :
+      // (a landplane at a seaplane base - World::surveySeaplaneBases - starts over its lane: nowhere there for it to stand)
+      launches &= airborne || g_world.airports[airport].water() ? game.plane.agl() >= 899.f :
         g_world.onRunway(game.plane.pos.x, game.plane.pos.z, 10.f) == airport && game.plane.onGround;
       for (int i = 0; i < 3; ++i) { game.update(1.f / 60.f); game.in.endFrame(); }
       game.restartFlight();

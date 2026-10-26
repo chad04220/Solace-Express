@@ -4,6 +4,8 @@
 #include "road_network.h"
 #include "bridges.h"
 #include "settlements.h"
+#include <deque>
+#include <memory>
 #include <string>
 #include <memory>
 
@@ -239,6 +241,11 @@ public:
 private:
   void buildConfigured(const std::string& cachePath, const std::string& stamp, bool save);
   void seaplaneDocks();   // (each seaplane base's dock: Airport::dockX)
+  bool seaplaneDock(Airport& a) const;   // one base's dock (false, dockLen 0: no shore within reach a jetty can serve)
+  // a generated region's seaplane bases, surveyed on its own ground and appended after its airports (World::
+  // surveySeaplaneBases); their names' storage, shared so an Airport's pointers stay good wherever the world is moved
+  void surveySeaplaneBases();
+  std::shared_ptr<std::deque<std::string>> seaplaneNames;
   void buildEarthTerrain();             // (world_earth.cpp: hm from the pack, the airports' grounds flattened)
   RoadNetwork buildEarthRoads() const;  // (the pack's roads, laid on that ground)
 };

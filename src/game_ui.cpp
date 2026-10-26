@@ -2072,7 +2072,8 @@ void Game::drawHubLogbook(float x, float y, float w, float h) {
       const bool region = g_world.procedural && g_world.regionRecipe;
       const std::string here = region ? g_world.regionRecipe->descriptor.name : std::string("the Solace Islands");
       if (region) { g_ren.text(px, py, 12 * s, "YOU ARE IN THE " + upperS(here), C_ACCENT, 1, 0, false); py += 26 * s; }
-      header(px, py, iw, fmt("AIRPORTS  %d / %d", region ? profile.regionAirports(g_world.regionId) : profile.islandAirports(), (int)g_world.airports.size())); py += 30 * s;
+      header(px, py, iw, fmt("AIRPORTS  %d / %d", region ? profile.regionAirports(g_world.regionId) : profile.islandAirports(),
+                             region && g_world.regionRecipe ? (int)g_world.regionRecipe->airports.size() : (int)g_world.airports.size())); py += 30 * s;
       for (const Airport& a : g_world.airports) {
         const bool got = profile.airports.count(airportStamp(a)) > 0;
         g_ren.rect(px, py + 3 * s, 10 * s, 10 * s, got ? vec3(1.f, 0.82f, 0.35f) : C_DIM * 0.4f, got ? 1.f : 0.5f, 5 * s);

@@ -168,6 +168,15 @@ void checkAirports() {
   for (size_t ai = 0; ai < g_world.airports.size(); ++ai) {
     const Airport& a = g_world.airports[ai]; const std::string label = a.code;
     check(a.code && a.name && codes.insert(a.code).second, label + " unique, owned airport identity");
+    if (a.water()) {   // a seaplane base (World::surveySeaplaneBases): after the region's airports, its lane deep water, its dock found
+      check(ai >= g_world.regionRecipe->airports.size(), label + " seaplane base follows the region's own airports");
+      bool deep = true;
+      for (float u = -a.length * .5f; u <= a.length * .5f; u += 100.f) for (float v : {-a.width * .5f, 0.f, a.width * .5f}) {
+        const vec3 p = aptWorld(a, u, v, 0); deep &= g_world.height(p.x, p.z) < -1.5f;
+      }
+      check(deep && a.dockLen > 0.f, label + " seaplane base lane is deep water, with its dock");
+      continue;
+    }
     check(a.elev > 1 && a.length >= 400 && a.width >= 15, label + " usable dry runway dimensions");
     const AptLayout layout = aptLayout(a, int(ai));
     float flatness = 0;

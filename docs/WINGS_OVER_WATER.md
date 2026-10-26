@@ -178,6 +178,27 @@ smoke and cleared with it.
 On the water the rolling sound is the floats' hiss through it: the `Water` audio surface gives the roll channel a
 broad wash round 650 Hz over the chop's slap, growing with the speed.
 
+### Seaplane bases in the generated regions
+
+A generated region gets its seaplane bases when its world is built (`World::surveySeaplaneBases`, on the region's own
+ground, before the roads and the scenery are laid): one in a small region, two in a larger one. Going out from each
+town in turn, the fields' towns first, the survey takes the nearest lane centre 0.5 to 3.5 km from the town that has
+water 2 m deep along the lane, 200 m past its ends and 80 m to either side. Its approaches must stay under a 1 in 18
+slope for 3 km, within the chart, clear of every field and base by 3.5 km, and it must have a dock (`World::seaplaneDock`,
+the same search the islands' docks use). Each lane centre gets one dock search and a region forty, so the survey stays
+cheap: under 10 ms in most regions, about 150 ms in the worst one sampled (which gives up and has none). It is
+deterministic, so a cached world finds the same bases. Of the first eleven generated regions in the catalog, nine have
+bases, seventeen bases in all, every one with its dock.
+
+The bases are appended after the region's own airports, so the indices its travel, long hauls and saves keep are
+unchanged. The region's recipe does not know them: its count of airports, which the "Charted" achievement and the
+profile's stamps go by, is the land fields'. A region's bases are not stamped. Their names, "<town> Seaplane Base",
+are stored with the world (`World::seaplaneNames`, shared, so an `Airport`'s pointers survive the world being moved).
+The real Earth's charts have none: their airports are the real ones.
+
+Two places that stepped through every airport now keep to the land fields: the research craft's launch sites (nowhere
+on a seaplane base to stand one) and the military reconnaissance objectives (a base has no tower or hangars).
+
 ## Phases
 
 Each phase is built, tested and committed on its own.

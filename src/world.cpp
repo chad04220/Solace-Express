@@ -421,7 +421,7 @@ void World::buildConfigured(const std::string& cachePath, const std::string& sta
   fromCache = !cachePath.empty() && loadCache(cachePath, stamp);
   if (fromCache) {
     loadStage(.60f,"Preparing cached terrain and lakes"); sceneryInit(); buildLakeMask();
-    seaplaneDocks();
+    surveySeaplaneBases(); seaplaneDocks();
     generationPhase(GenerationPhase::Settlements);
     loadStage(.68f,"Preparing cached settlements"); settlements = buildSettlementFields(*this); farms = farmsteadsOf(roads);
     generationPhase(GenerationPhase::Scenery);
@@ -498,7 +498,7 @@ void World::buildConfigured(const std::string& cachePath, const std::string& sta
     t[1] = lerpf(t[1], .7f + 24.f * wall, weight);
   }
   // the roads, routed over the finished natural ground (World::height grades them in from here on)
-  seaplaneDocks();   // (each seaplane base's dock, on its shore: the ground is settled from here on)
+  surveySeaplaneBases(); seaplaneDocks();   // (a generated region's seaplane bases, and each base's dock on its shore: the ground is settled from here on)
   generationPhase(GenerationPhase::Roads);
   loadStage(.34f,"Routing roads over terrain");
   roads = earthChart ? buildEarthRoads() : buildRoadNetwork(*this);
@@ -1063,9 +1063,10 @@ int World::onRunway(float x, float z, float margin, int* surface) const {
 // ends' 200 m and 90 m to either side of it - from which a jetty reaches open water within 10 m, a metre deep by 20 m
 // out, and 2 m deep 30 to 70 m out across 24 m (room to moor alongside its head and turn away). The jetty runs out
 // from there; an aircraft moors 25 m out. A base with no such shore within 900 m has none (dockLen 0)
-void World::seaplaneDocks() {
-  for (Airport& a : airports) {
-    if (!a.water()) continue;
+void World::seaplaneDocks() { for (Airport& a : airports) if (a.water()) seaplaneDock(a); }
+
+bool World::seaplaneDock(Airport& a) const {
+  {
     a.dockLen = 0.f;
     const float hr = a.heading * DEG;
     const vec2 d(sinf(hr), -cosf(hr)), p(cosf(hr), sinf(hr)), C(a.x, a.z);
@@ -1086,8 +1087,62 @@ void World::seaplaneDocks() {
         }
         if (best <= r) break;
       }
-    if (best > 1e8f) continue;
+    if (best > 1e8f) return false;
     a.dockX = shore.x; a.dockZ = shore.y; a.dockDirX = out.x; a.dockDirZ = out.y; a.dockLen = 25.f;
+  }
+  return true;
+}
+
+// A generated region's seaplane bases (docs/WINGS_OVER_WATER.md): one in a small region, two in a larger one, each a
+// water lane 1000 m by 60 m beside one of its towns, the nearest found going out from each town in turn (the fields'
+// towns first) - 2 m deep along it, 200 m past its ends and 80 m either side, its approaches under a 1 in 18 slope for
+// 3 km, within the chart and clear of every field and base. Appended after the region's airports, whose indices its
+// travel, long hauls and stamps keep; named for the town. The islands have their own (kAirports) and the real Earth's
+// charts none
+void World::surveySeaplaneBases() {
+  if (!regionRecipe || earthChart) return;
+  const size_t land = airports.size();
+  const size_t want = regionRecipe->descriptor.scale == procedural::Scale::Small ? 1 : 2;
+  auto deep = [&](float x, float z) { return groundHeight(x, z, 8) < -2.f; };
+  auto laneOK = [&](float cx, float cz, float hdg) {
+    const float hr = hdg * DEG;
+    const vec2 d(sinf(hr), -cosf(hr)), p(cosf(hr), sinf(hr));
+    for (float u = -700.f; u <= 700.f; u += 50.f)
+      for (float v : {-80.f, 0.f, 80.f}) if (!deep(cx + d.x * u + p.x * v, cz + d.y * u + p.y * v)) return false;
+    for (int e = -1; e <= 1; e += 2)
+      for (float s = 150.f; s <= 3000.f; s += 150.f)
+        for (float v : {-120.f, 0.f, 120.f}) {
+          const float u = e * (500.f + s), x = cx + d.x * u + p.x * v, z = cz + d.y * u + p.y * v;
+          if (std::max(fabsf(x), fabsf(z)) > WORLD_HALF - 1500.f || groundHeight(x, z, 8) > s / 18.f) return false;
+        }
+    for (const Airport& a : airports) if (hypotf(cx - a.x, cz - a.z) < a.length * 0.5f + 3500.f) return false;
+    return true;
+  };
+  int dockTries = 0;   // (a dock's search is the survey's dear part: a lane centre gets one, and the region forty)
+  for (size_t t = 0; t < towns.size() && airports.size() - land < want && dockTries < 40; t++) {
+    const Town& T = towns[t];
+    bool found = false;
+    for (float r = T.r + 500.f; r <= T.r + 3500.f && !found; r += 250.f)
+      for (int k = 0; k < 32 && !found; k++) {
+        const float a = k * (2.f * PI / 32.f), cx = T.x + cosf(a) * r, cz = T.z + sinf(a) * r;
+        if (!deep(cx, cz)) continue;
+        for (int hk = 0; hk < 12 && !found; hk++) {
+          if (!laneOK(cx, cz, hk * 15.f)) continue;
+          Airport probe{"", "", cx, cz, 0.f, (float)(hk * 15), 1000.f, 60.f, SURF_WATER, 0, ""};
+          dockTries++;
+          if (!seaplaneDock(probe)) break;   // (a base wants its dock - a shore within reach a jetty can serve: none here, on)
+          if (!seaplaneNames) seaplaneNames = std::make_shared<std::deque<std::string>>();
+          auto& N = *seaplaneNames;
+          const std::string pre = land ? std::string(airports[0].code).substr(0, 2) : std::string("SW");
+          N.push_back(pre + char('W' + (airports.size() - land)));
+          const char* code = N.back().c_str();
+          N.push_back(std::string(T.name) + " Seaplane Base");
+          const char* name = N.back().c_str();
+          N.push_back(std::string("A water lane beside ") + T.name + ", marked by buoys, with a dock and fuel. Floats only.");
+          airports.push_back(Airport{code, name, cx, cz, 0.f, (float)(hk * 15), 1000.f, 60.f, SURF_WATER, 0, N.back().c_str()});
+          found = true;
+        }
+      }
   }
 }
 
