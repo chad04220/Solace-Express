@@ -2120,7 +2120,36 @@ void Renderer::rasterHangar(const FrameParams& fp) {
   glUniform3f(U(progHangar, "uEye"), fp.camPos.x, fp.camPos.y, fp.camPos.z);
   glUniform3f(U(progHangar, "uBack"), fp.camBack.x, fp.camBack.y, fp.camBack.z);
   glUniform2f(U(progHangar, "uJit"), jitX, jitY); glUniform1f(U(progHangar, "uSize"), size);
+  glUniform1f(U(progHangar, "uLogDen"), log2f(40001.f));
   glBindVertexArray(vaoHangar); glDrawArrays(GL_TRIANGLES, 0, hangarVertexCount);
+  drawHangarDimensions(fp);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+// The same paint on the live world's apron (FrameParams::hangarApron), after the ground: its fragments write the raster
+// passes' logarithmic depth (kLogDepthFar), so the ground and the scenery hide it where they stand in front
+void Renderer::rasterApronDimensions(const FrameParams& fp) {
+  if (!progHangar) return;
+  glBindFramebuffer(GL_FRAMEBUFFER, fboGB);
+  GLenum gb[4] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
+  glDrawBuffers(4, gb); glViewport(0, 0, rw, rh);
+  glDisable(GL_BLEND); glDisable(GL_CULL_FACE); glDisable(GL_SCISSOR_TEST);
+  glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LEQUAL); glDepthMask(GL_TRUE);
+  glUseProgram(progHangar);
+  glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, texFont); glUniform1i(U(progHangar, "uFont"), 0);
+  const mat4 vp = viewProjRel(fp, .1f, 40000.f);
+  glUniformMatrix4fv(U(progHangar, "uVP"), 1, GL_FALSE, vp.m);
+  glUniform3f(U(progHangar, "uOrigin"), fp.hangarOrigin.x, fp.hangarOrigin.y, fp.hangarOrigin.z);
+  glUniform3f(U(progHangar, "uEye"), fp.camPos.x, fp.camPos.y, fp.camPos.z);
+  glUniform3f(U(progHangar, "uBack"), fp.camBack.x, fp.camBack.y, fp.camBack.z);
+  glUniform2f(U(progHangar, "uJit"), jitX, jitY); glUniform1f(U(progHangar, "uSize"), std::max(12.f, fp.hangarSize));
+  glUniform1f(U(progHangar, "uLogDen"), 2.f / logDepthC());
+  drawHangarDimensions(fp);
+  glDepthFunc(GL_LESS);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void Renderer::drawHangarDimensions(const FrameParams& fp) {
   // Dimension paint shares the real floor's depth, light, shadow and TAA path.
   // It follows the parked aircraft, while the room and metre-scale props stay
   // fixed. Never substitute nominal physics dimensions for unavailable geometry.
@@ -2155,7 +2184,6 @@ void Renderer::rasterHangar(const FrameParams& fp) {
       glDrawArrays(GL_TRIANGLES, 0, (GLsizei)dimensions.size());
     }
   }
-  glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void Renderer::lightClassifiedHangar(const FrameParams& fp) {
@@ -2278,6 +2306,7 @@ void Renderer::renderScene(const FrameParams& fpFlat, const std::vector<SpriteVe
   if (fp.hangarPreview) rasterHangar(fp);
   else {
     timedRegionPass("rasterWorld", regionTerrainRenderMs, [&] { rasterWorld(fp); });
+    if (fp.hangarApron) rasterApronDimensions(fp);
     timedRegionPass("terrainShadow", regionShadowRenderMs, [&] { bakeTerrainShadow(fp); });
   }
   if (classified) { shOn = 0; shMovOn = false; shCabOn = false; }

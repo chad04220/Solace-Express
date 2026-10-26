@@ -145,7 +145,7 @@ struct GameTest {
       if(mode==1)hangar.selHangar=hangarSpecAt(i%hangarCatalogCount());
       if(mode==2)hangar.career.fleet[0].fuel=kAircraft[hangar.career.fleet[0].spec].maxFuel*((i%3)*.5f);
       auto preview=hangar.buildFrame();
-      check(preview.hangarPreview && preview.plane.model==hangar.selHangar,"Hangar preview follows selected aircraft");
+      check((preview.hangarPreview || preview.hangarApron) && preview.plane.model==hangar.selHangar,"Hangar preview follows selected aircraft");
       hangar.focusList.clear();g_ren.uiBegin();hangar.drawHub();
     }
     check(hangar.menuPlanCache.builds==0 && !hangar.quoteJob.valid() && hangar.quoteFlown.empty(),"Hangar steady/selection/fuel frames never plan or start flight quotes");

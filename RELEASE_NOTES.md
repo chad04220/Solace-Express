@@ -35,6 +35,15 @@
   faster.
 - Kits cost 5% to 12% of the aircraft's price each, and add half of what they cost to its sale value.
 
+### The hangar at the airport
+- **Your aircraft in front of a real hangar.** The hangar's preview (and Free Flight's) is no longer a room of its
+  own: the selected aircraft stands on the apron before one of the airport's hangars, live, at the hub's time of day
+  and weather, and its size reads against the building. Turn it, raise the view and zoom as before; its wingspan and
+  length are painted on the apron. Floodlights come on after dark.
+- **The research terminal flies.** Behind the terminal the selected XR craft flies a wide banked circuit through the
+  chosen field, low over the sea and climbing over the ridges, the islands streaming past under it. The orbit camera
+  rides with it.
+
 ### Saves
 - A career with floats or kits saves as version 9; one with nothing fitted saves as before.
 

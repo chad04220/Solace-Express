@@ -76,6 +76,8 @@ generated regions, each with its own airports, towns and sights, and the career 
   ferry flights and positioning tickets, and buy fuel at the departure. The job board quotes each job for the
   aircraft you pick: it flies the job on the autopilot in the background, then shows the time, the fuel, the costs
   and your net. Owned aircraft wear, need servicing and can fail in flight; the hangar sells insurance.
+- **A hangar at the airport.** The aircraft you're looking at stands on the apron in front of one of the field's own
+  hangars, rendered live, so its size reads against the buildings around it.
 - **A mechanic in the hangar.** Six kits for an aircraft you own: an engine overhaul, a composite propeller, a speed
   kit, a lightweight interior, long-range tanks and a STOL kit. Each changes how it flies in the flight model, and
   they stack.
@@ -91,7 +93,7 @@ generated regions, each with its own airports, towns and sights, and the career 
 <table>
   <tr>
     <td width="50%"><img src="docs/media/hub.jpg" alt="The career hub: the first lesson, the islands' map and the aircraft to fly it in"></td>
-    <td width="50%"><img src="docs/media/hangar.jpg" alt="The hangar: the Emissary 500, to buy new, used or financed"></td>
+    <td width="50%"><img src="docs/media/hangar.jpg" alt="The hangar: the Emissary 500 on the apron in front of a hangar at Solace Capital, to buy new, used or financed"></td>
   </tr>
 </table>
 

@@ -5,6 +5,7 @@
 #include "../src/menu_layout.h"
 #include "../src/models.h"
 #include "../src/military_missions.h"
+#include "../src/entities.h"
 #include "test_world.h"
 #include <chrono>
 #include <filesystem>
@@ -23,6 +24,28 @@ struct GameTest {
       const vec3 q = cross(s,e1); const float v = inv * dot(d,q);
       if (v < 0 || u+v > 1) continue;
       const float t = inv * dot(e2,q); if (t > .0001f && t < .9999f) return true;
+    }
+    return false;
+  }
+  // the live stand (docs/HANGAR.md): what the airport has placed - buildings, masts, parked aircraft, vehicles - as boxes
+  // turned by their yaw (Placer::put), and whether a sight line from the eye passes through one
+  static bool blockedByAirport(vec3 from, vec3 to, const std::vector<AptItem>& items) {
+    for (const AptItem& it : items) {
+      const EntKindInfo& I = kEntInfo[it.kind];
+      const float hx = I.hx * it.e.sx * .95f, hz = I.hz * it.e.sz * .95f, h = I.h * it.e.sy;
+      if (std::max(hx, hz) < .4f || h < .6f) continue;
+      const float cs = cosf(it.e.yaw), sn = sinf(it.e.yaw);
+      auto local = [&](vec3 p) { const float dx = p.x - it.e.x, dz = p.z - it.e.z; return vec3(cs*dx - sn*dz, p.y - it.e.y, sn*dx + cs*dz); };
+      const vec3 a = local(from), d = local(to) - a, lo(-hx, 0, -hz), hi(hx, h, hz);
+      float t0 = 0, t1 = 1;
+      for (int k = 0; k < 3 && t0 <= t1; ++k) {
+        const float o = k == 0 ? a.x : k == 1 ? a.y : a.z, v = k == 0 ? d.x : k == 1 ? d.y : d.z;
+        const float l = k == 0 ? lo.x : k == 1 ? lo.y : lo.z, u = k == 0 ? hi.x : k == 1 ? hi.y : hi.z;
+        if (std::fabs(v) < 1e-9f) { if (o < l || o > u) t1 = -1; continue; }
+        float ta = (l - o) / v, tb = (u - o) / v; if (ta > tb) std::swap(ta, tb);
+        t0 = std::max(t0, ta); t1 = std::min(t1, tb);
+      }
+      if (t0 <= t1) return true;
     }
     return false;
   }
@@ -120,29 +143,35 @@ struct GameTest {
         g.in = Input{}; g.focusNav = false;
         FrameParams base{}; g.hangarPreviewCamera(base);
         const auto room = hangarPreview::geometry(base.hangarSize);
+        // an unlocked aircraft stands in the live world before a hangar; a locked teaser keeps the dark showroom
+        check(base.hangarApron != base.hangarPreview && base.hangarPreview == hangarResearchLocked(craft), context+" live stand for the unlocked, showroom for the locked");
+        std::vector<AptItem> items;
+        if (base.hangarApron) airportItems(std::max(0, g_world.nearestAirport(base.hangarOrigin.x, base.hangarOrigin.z)), items);
+        const float floorY = base.hangarApron ? base.hangarOrigin.y - .03f : 0.f;
         bool clear = true, framed = true, grounded = true, safeEye = true, classified = true;
         for(float pitch:{-.5f,.15f,1.f}) {
           g.hangarView.pitch=pitch;FrameParams pitchBase{};g.hangarPreviewCamera(pitchBase);
         for (float zoom : {.75f,1.f,1.35f}) for (int turn = 0; turn < 24; ++turn) {
           g.hangarView.yaw = turn*15*DEG; g.hangarView.zoom = zoom;
           FrameParams fp{}; g.hangarPreviewCamera(fp);
-          safeEye &= length(fp.camPos-pitchBase.camPos)<.0001f && fp.camPos.y<fp.hangarSize*.60f && std::fabs(fp.camPos.x)<fp.hangarSize*1.2f;
+          safeEye &= length(fp.camPos-pitchBase.camPos)<(fp.hangarApron?.01f:.0001f) && (fp.hangarApron ? fp.camPos.y > g_world.groundHeight(fp.camPos.x, fp.camPos.z) + 1.f :
+                                                                    fp.camPos.y<fp.hangarSize*.60f && std::fabs(fp.camPos.x)<fp.hangarSize*1.2f);
           classified &= fp.hangarClassified==hangarResearchLocked(craft) && (!fp.hangarClassified || (fp.plN==0 && fp.plane.lensN==0 && fp.sealedCockpit));
           const float th = tanf(fp.fovY*.5f);
           for (vec3 p : {vec3(),vec3(a.span*.5f,0,0),vec3(-a.span*.5f,0,0),vec3(0,0,a.fusLen*.5f),vec3(0,0,-a.fusLen*.5f),vec3(0,a.fusRad*3,0)}) {
             const vec3 world = transformed(fp.plane,p), rel = world-fp.camPos;
-            clear &= !obstructed(fp.camPos,world,room);
+            clear &= fp.hangarApron ? !blockedByAirport(fp.camPos,world,items) : !obstructed(fp.camPos,world,room);
             const float z = -dot(rel,fp.camBack), x = W*.5f+dot(rel,fp.camRight)/z/th*H*.5f, y = H*.5f-dot(rel,fp.camUp)/z/th*H*.5f;
             framed &= z>0 && x>=L.previewX && x<=L.previewX+L.previewWidth && y>=L.previewY && y<=L.previewY+L.previewHeight;
           }
           const auto gs = gearStations(a); const auto& md = kModels[craft];
           const float gh = fp.plane.M[19*4], wr = a.special?.38f:md.wheelR, nr = a.special?.33f:a.taildragger?.1f:md.gear==3?wr*.75f:wr*.85f;
           const vec3 centres[] = {vec3(-gs.track,wr-gh,gs.mainZ),vec3(gs.track,wr-gh,gs.mainZ),vec3(0,a.taildragger?-gh+.11f*a.fusLen+.1f:nr-gh,a.taildragger?gs.tailZ:gs.noseZ)};
-          for (int wheel = 0; wheel < 3; ++wheel) grounded &= std::fabs(transformed(fp.plane,centres[wheel]).y-(wheel==2?nr:wr))<.0001f;
+          for (int wheel = 0; wheel < 3; ++wheel) grounded &= std::fabs(transformed(fp.plane,centres[wheel]).y-floorY-(wheel==2?nr:wr))<(fp.hangarApron?.002f:.0001f);
           grounded &= fp.plane.propCount==0 || (fp.plane.Pr[0]==0 && fp.plane.Pr[1]==0);
         }
         }
-        check(clear,context+" all yaw/pitch/zoom room triangles leave aircraft sightlines clear");
+        check(clear,context+" all yaw/pitch/zoom sightlines clear of the room, or of the airport round the stand");
         check(framed,context+" all yaw/pitch/zoom model bounds fit stage");
         check(grounded,context+" all yaw/pitch/zoom tyres stay grounded and props still");
         check(safeEye,context+" optical zoom never moves eye into walls or roof");

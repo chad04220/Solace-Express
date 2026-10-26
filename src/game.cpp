@@ -4908,6 +4908,84 @@ void Game::prewarm(const std::function<void(float, const std::string&)>& progres
   }
 }
 
+// The hangar's stand (docs/HANGAR.md): where the selected aircraft is shown in the live world - on the apron in front of
+// one of an airport's own hangars, nose out of its door, its tail a few metres short of it. The aircraft turns in place
+// there (the preview's turntable), so the circle it sweeps must be clear of everything the airport has placed (its
+// parked aircraft, floodlight masts, vehicles, other buildings), and so must the way to the camera, out over the apron
+// at the preview's azimuth. Of the hangars that leave both clear, the biggest building is chosen.
+struct HangarStand { bool ok = false; vec3 ground; float heading = 0; };
+static HangarStand hangarStandAt(int ai, const AircraftSpec& s) {
+  HangarStand best; float bestScore = -1e9f;
+  if (ai < 0 || ai >= (int)g_world.airports.size() || g_world.airports[ai].water()) return best;
+  const Airport& a = g_world.airports[ai];
+  std::vector<AptItem> items; airportItems(ai, items);
+  const float swept = 0.5f * std::max(s.span, s.fusLen) * 1.05f + 1.f;   // (the turntable's circle, a metre to spare)
+  // the clearance of a circle from an item's footprint (its box turned by its yaw: Placer::put)
+  auto clearOf = [&](const AptItem& it, vec3 c, float r) {
+    const EntKindInfo& I = kEntInfo[it.kind];
+    const float hx = I.hx * it.e.sx, hz = I.hz * it.e.sz;
+    if (std::max(hx, hz) < 0.4f || I.h * it.e.sy < 0.6f) return true;   // (edge lights, buoys: flat to the eye)
+    const float dx = c.x - it.e.x, dz = c.z - it.e.z, cs = cosf(it.e.yaw), sn = sinf(it.e.yaw);
+    const float lx = cs * dx - sn * dz, lz = sn * dx + cs * dz;
+    const float ox = std::max(fabsf(lx) - hx, 0.f), oz = std::max(fabsf(lz) - hz, 0.f);
+    return ox * ox + oz * oz > r * r;
+  };
+  for (size_t h = 0; h < items.size(); h++) {
+    const AptItem& hg = items[h];
+    if (hg.kind != EK_HANGAR && hg.kind != EK_ARCH_HANGAR && hg.kind != EK_T_HANGAR) continue;
+    const EntKindInfo& I = kEntInfo[hg.kind];
+    // (every hangar faces the runway: Placer::facing - out of its door is across the runway's line, towards it)
+    const vec3 rel = vec3(hg.e.x - a.x, 0, hg.e.z - a.z), along = a.dir();
+    vec3 out = -(rel - along * dot(rel, along));
+    if (length(out) < 1.f) continue;
+    out = normalize(out);
+    const vec3 door = vec3(hg.e.x, 0, hg.e.z) + out * (I.hz * hg.e.sz);
+    const vec3 c = door + out * (swept + 2.f);
+    bool clear = true;
+    for (size_t j = 0; j < items.size() && clear; j++) if (j != h) clear = clearOf(items[j], c, swept);
+    // the way to the camera: out over the apron at the preview's azimuth (hangarApronCamera), as far as its lens puts it
+    // (some 4.4 lengths: the craft fills the stage through a long lens) - what stands above the lowest sight line there
+    const float az = MenuPreviewView::defaultYaw, reach = 4.6f * std::max(s.span, s.fusLen) + 10.f;
+    const vec3 toCam = normalize(out * cosf(az) + vec3(-out.z, 0, out.x) * sinf(az));   // (the nose's way, turned to its right)
+    for (float d = swept + 2.f; d < reach && clear; d += 3.f)
+      for (size_t j = 0; j < items.size() && clear; j++)
+        if (j != h && kEntInfo[items[j].kind].h * items[j].e.sy > 1.f + d * 0.04f) clear = clearOf(items[j], c + toCam * d, 1.5f);
+    if (!clear) continue;
+    // level ground under the circle, dry land
+    float lo = 1e9f, hi = -1e9f;
+    for (int k = 0; k < 9; k++) {
+      const float t = k * 2.f * PI / 8.f, r = k == 8 ? 0.f : swept;
+      const float g = g_world.groundHeight(c.x + cosf(t) * r, c.z + sinf(t) * r);
+      lo = std::min(lo, g); hi = std::max(hi, g);
+    }
+    if (hi - lo > 0.6f || lo < 0.3f) continue;
+    const float score = (hg.kind == EK_HANGAR ? 1000.f : hg.kind == EK_ARCH_HANGAR ? 500.f : 0.f) + I.hx * hg.e.sx * I.h * hg.e.sy;
+    if (score <= bestScore) continue;
+    bestScore = score; best.ok = true;
+    best.ground = vec3(c.x, g_world.groundHeight(c.x, c.z), c.z);
+    best.heading = atan2f(out.x, -out.z) / DEG;
+  }
+  return best;
+}
+// (the airport the preview is at, else the nearest with a stand; kept per airport and type until either changes)
+static HangarStand hangarStandFor(int ai, int craft) {
+  static int lastAi = -2, lastCraft = -1; static std::string lastRegion; static size_t lastN = 0; static vec3 lastPos;
+  static HangarStand stand;
+  if (g_world.airports.empty()) return HangarStand{};
+  const vec3 at = g_world.airports[std::clamp(ai, 0, (int)g_world.airports.size() - 1)].pos();   // (the same world: its region, its fields)
+  if (ai == lastAi && craft == lastCraft && lastRegion == g_world.regionId && lastN == g_world.airports.size() && length(lastPos - at) < .01f) return stand;
+  lastAi = ai; lastCraft = craft; lastRegion = g_world.regionId; lastN = g_world.airports.size(); lastPos = at;
+  const AircraftSpec& s = kAircraft[craft];
+  stand = hangarStandAt(ai, s);
+  if (stand.ok || g_world.airports.empty()) return stand;
+  const vec3 from = g_world.airports[std::clamp(ai, 0, (int)g_world.airports.size() - 1)].pos();
+  std::vector<std::pair<float, int>> near;
+  for (int i = 0; i < (int)g_world.airports.size(); i++) if (i != ai) near.push_back({length(g_world.airports[i].pos() - from), i});
+  std::sort(near.begin(), near.end());
+  for (size_t k = 0; k < near.size() && k < 8 && !stand.ok; k++) stand = hangarStandAt(near[k].second, s);
+  return stand;
+}
+
 void Game::menuBackgroundCamera(FrameParams& fp) {
   if (screen == SCR_MENU && !getenv("MENUORBIT")) { menuTour(fp); return; }
   if (screen == SCR_RESEARCH) { researchPreviewCamera(fp); return; }
@@ -4940,17 +5018,26 @@ void Game::menuBackgroundCamera(FrameParams& fp) {
   if (screen == SCR_HUB) {   // the hub's flights start at either end of this runway: their scenery streams in while the player chooses, so the loading screen has nothing left to build
     const Airport& A = g_world.airports[ap];
     fp.prefetchOn = true; fp.prefetchPos = A.threshold(((int)(realTime * 2.f)) & 1);
+    // and first what stands round the hangar's stand, which the hangar's tab cuts to (hangarPreviewCamera)
+    if (const HangarStand st = hangarStandFor(ap, std::clamp(selHangar, 0, kAircraftCount - 1)); st.ok) { fp.prefetchNearPos = st.ground; fp.prefetchNearR = 600.f; }
   }
 }
 
-// A dedicated showroom is isolated from the flight simulation. Selection changes only the
-// displayed airframe; purchasing, fuel, wear and the active flight remain untouched.
+// The hangar's preview (the career's hangar, Free Flight's aircraft): the selected aircraft parked in the live world in
+// front of a hangar at the airport you're at, its own size against the building's and everything around it (docs/HANGAR.md).
+// A locked research teaser, and a world with no stand, keep the dedicated showroom, isolated from the flight simulation.
+// Selection changes only the displayed airframe; purchasing, fuel, wear and the active flight remain untouched.
 void Game::hangarPreviewCamera(FrameParams& fp) {
   const int craft = screen == SCR_FREE_FLIGHT ? validCareerSelection(freeCraft) : std::clamp(selHangar, 0, kAircraftCount - 1);
   hangarView.select(craft, screen == SCR_FREE_FLIGHT);
   const AircraftSpec& sp = kAircraft[craft];
   static Plane demo;
   if (demo.spec != &sp) demo.reset(&sp, vec3(0), 0, sp.maxFuel, 85, false, 0);
+  if (!hangarResearchLocked(craft) && !g_world.airports.empty()) {
+    const int ai = screen == SCR_FREE_FLIGHT ? std::clamp(freeAirport, 0, (int)g_world.airports.size() - 1) : std::max(0, hubField());
+    const HangarStand st = hangarStandFor(ai, craft);
+    if (st.ok) { hangarApronCamera(fp, demo, st.ground, st.heading); return; }
+  }
   // Spawn clearance is for physics to settle; a static showroom must sit on the
   // rendered tyres immediately. The main-wheel centres are (wr-gh, mainZ).
   // gearTailShape uses (-gh + .11*L + .1, tailZ), radius .1. Solve the
@@ -5023,6 +5110,64 @@ void Game::hangarPreviewCamera(FrameParams& fp) {
   fp.exposure = 1.f; fp.vignette = 0.32f;
 }
 
+// The stand in the live world (hangarPreviewCamera): the aircraft on its tyres on the apron, turned on the turntable,
+// and the camera out over the apron at the showroom's azimuth, elevation and lens - the hangar behind the aircraft, the
+// field and the sky round it as the hub has them (the time of day, the weather), the dimensions painted on the apron
+void Game::hangarApronCamera(FrameParams& fp, Plane& demo, vec3 ground, float heading) {
+  const AircraftSpec& sp = *demo.spec;
+  const int craft = std::max(0, typeOf(&sp));
+  const float gh = demo.gearHeight(), wr = kModels[craft].wheelR;   // (on its tyres: the showroom's solve)
+  float pitch = 0.f, height = gh;
+  if (sp.taildragger) {
+    const GearStations stations = gearStations(sp);
+    const float dy = .11f*sp.fusLen + .1f - wr, dz = stations.tailZ - stations.mainZ;
+    const float r = sqrtf(dy*dy + dz*dz);
+    pitch = atan2f(dy, dz) + asinf(clampf((wr-.1f)/r, -1.f, 1.f));
+    height = wr - (wr-gh)*cosf(pitch) + stations.mainZ*sinf(pitch);
+  }
+  const quat stand = quat::axisAngle(vec3(0, 1, 0), -heading * DEG);   // (nose out of the hangar's door)
+  demo.q = stand * quat::axisAngle(vec3(0, 1, 0), -(hangarView.yaw-MenuPreviewView::defaultYaw)) * quat::axisAngle(vec3(1, 0, 0), pitch);
+  demo.pos = ground + vec3(0, height, 0);
+  demo.vel = vec3(0); demo.onGround = true; demo.engineRunning = false;
+  demo.gear = 1.f; demo.flaps = 0; demo.nozzle = 0; demo.rpm = 0; demo.engineSpool = 0; demo.n1 = 0;
+  demo.ctl = Controls(); demo.ctl.throttle = 0; demo.ctl.gearDown = true;
+  fillPlaneVisual(fp.plane, demo, 0.f, false);
+  const float size = std::max(sp.span, sp.fusLen);
+  fp.hangarApron = true; fp.hangarSize = std::max(12.f, size);
+  fp.hangarOrigin = ground + vec3(0, 0.03f, 0);   // (the paint a few centimetres over the apron)
+  fp.trafficN = 0; fp.ufoOn = false; fp.feedRig = 0; fp.dispMode = 0; fp.landLight = 0;   // (nothing taxis through the stand)
+  fp.prefetchOn = true; fp.prefetchPos = ground;
+  if (fp.night > 0.05f) {   // after dark, the hangar's two floodlights over its door
+    const vec3 fwd = stand.rotate(vec3(0, 0, -1)), right = stand.rotate(vec3(1, 0, 0));
+    const float back = 0.5f * size * 1.05f + 3.f, reach = back + 2.f;
+    for (int side : {-1, 1}) if (fp.plN < 12) {
+      FrameParams::PointLight& light = fp.pl[fp.plN++];
+      light.pos = ground - fwd * back + right * (side * std::max(4.f, 0.3f * size)) + vec3(0, std::max(6.f, 0.28f * size), 0);
+      light.radius = 0.35f; light.col = vec3(1.f, 0.9f, 0.74f) * (reach * reach * 0.9f * fp.night);
+      light.cosCut = -2; light.dir = vec3(0, -1, 0); light.shadow = side == 1 ? reach * 2.f : 0;
+    }
+  }
+  const float s = S(), W = float(std::max(g_ren.W, 1)), H = float(std::max(g_ren.H, 1));
+  const HangarLayout L = hangarLayout(24*s, 126*s, W-48*s, H-146*s, s);
+  const float cx = L.previewX + L.previewWidth * 0.5f, cy = L.previewY + L.previewHeight * 0.5f;
+  const float radius = size * 0.65f;
+  const float pixels = std::max(1.f, std::min(L.previewWidth, L.previewHeight) * 0.40f);
+  const vec3 focus = demo.pos + vec3(0, sp.fusRad * 0.45f, 0);
+  const float elevation = clampf(hangarView.pitch, .04f, .35f);
+  const vec3 viewingRay = stand.rotate(vec3(sinf(MenuPreviewView::defaultYaw)*cosf(elevation), sinf(elevation), -cosf(MenuPreviewView::defaultYaw)*cosf(elevation)));
+  const float fitDistance = H * .5f * radius / (pixels * tanf(17.f * DEG));
+  const float distance = std::max(radius * 1.25f, fitDistance);
+  const float tangentDistance = std::sqrt(std::max(distance*distance-radius*radius, radius*radius*.25f));
+  const float th = H * .5f * radius / (pixels * tangentDistance * clampf(hangarView.zoom, MenuPreviewView::minZoom, MenuPreviewView::maxZoom));
+  fp.fovY = 2.f * atanf(th);
+  vec3 C = focus + viewingRay * distance;
+  C.y = std::max(C.y, g_world.groundHeight(C.x, C.z) + 1.2f);
+  const float nx = (cx-W*.5f)/(W*.5f), ny = (H*.5f-cy)/(H*.5f);
+  const auto axes = menuPreviewAxes(focus-C, nx*th*W/H, ny*th);
+  fp.camPos = C; fp.camBack = -axes.forward; fp.camRight = axes.right; fp.camUp = axes.up;
+  fp.vignette = 0.32f;
+}
+
 // The military terminal shows the exact mission-assigned airframe through the research scene's native renderer.
 // Its demo plane never enters the career fleet or the active flight session.
 void Game::militaryPreviewCamera(FrameParams& fp) {
@@ -5090,33 +5235,63 @@ void Game::militaryLoadingCamera(FrameParams& fp) {
   fp.prefetchOn=true; fp.prefetchPos=plane.pos; fp.vignette=.35f;
 }
 
-// The preview: the selected craft hangs in the air over the chosen launch site, at the sortie's time of day, and the
-// camera orbits it (drag to turn, wheel to zoom) framed so it sits in the middle of the terminal's preview ring
+// The preview: the selected craft flying - a wide circuit through the chosen launch site's field at a speed of its own,
+// banked round the turn, the islands and the sea streaming past under it at the sortie's time of day - and the camera
+// riding with it (drag to turn round it, wheel to zoom), level with the horizon, turned with its heading but not its
+// bank, framed so the craft sits in the middle of the terminal's preview ring
 int resCraftCount(); int resCraftAt(int k);   // game_research_ui.cpp
 void Game::researchPreviewCamera(FrameParams& fp) {
   researchView.select(resCraft);
   static Plane demo;
   const AircraftSpec& sp = kAircraft[resWarmCraft >= 0 ? resWarmCraft : resCraft];   // (warming up: every craft in turn)
   if (demo.spec != &sp) demo.reset(&sp, vec3(0, 600, 0), 0, 50, 85, true, 150);
-  const Airport& a = g_world.airports[std::clamp(resAirport, 0, (int)g_world.airports.size() - 1)];
-  vec3 P; float hdg;
-  if (resAirborne) {   // hanging in the air over the field, facing back towards it
-    P = a.pos() + a.dir() * 1800.f;
-    P.y = std::max(a.elev, g_world.height(P.x, P.z)) + 420.f + 1.2f * sinf(realTime * 0.6f);
-    hdg = a.heading + 180.f;
-    demo.q = quat::axisAngle(vec3(0, 1, 0), -hdg * DEG) * quat::axisAngle(vec3(0, 0, 1), 4.f * DEG * sinf(realTime * 0.35f)) * quat::axisAngle(vec3(1, 0, 0), 3.f * DEG);
-    demo.gear = 0; demo.ctl = Controls(); demo.ctl.throttle = 0.55f; demo.engineSpool = 0.55f; demo.n1 = 70.f; demo.onGround = false;
-  } else {   // parked where the flight starts: the runway's threshold, into the sortie's wind (startFlight's choice)
-    float hw0 = cosf((270.f - a.heading) * DEG), hw1 = cosf((270.f - a.heading - 180.f) * DEG);   // (a research sortie's wind is from 270)
-    bool reverse = hw1 > hw0;
-    hdg = reverse ? a.heading + 180.f : a.heading;
-    P = a.threshold(reverse) + (reverse ? -a.dir() : a.dir()) * 30.f;
-    demo.q = quat::axisAngle(vec3(0, 1, 0), -hdg * DEG);
-    demo.gear = 1; demo.ctl = Controls(); demo.ctl.throttle = 0.f; demo.engineSpool = 0.f; demo.n1 = 0.f; demo.onGround = true;
-    P.y = std::max(a.elev, g_world.height(P.x, P.z)) + demo.gearHeight() + (sp.taildragger ? 0.25f : 0.05f);
+  const int ai = std::clamp(resAirport, 0, (int)g_world.airports.size() - 1);
+  const Airport& a = g_world.airports[ai];
+  // the circuit: a 28-degree bank at its speed (a fast cruise, held to what reads as motion near the ground), through the
+  // field with the runway's heading, some 300 m over the ground: low over the sea, climbing over the ridges ahead in time
+  const float v = clampf(0.75f * sp.cruise, 140.f, 230.f), bankDeg = 28.f;
+  const float R = v * v / (9.81f * tanf(bankDeg * DEG));
+  const vec3 u1 = a.dir(), u2(-u1.z, 0, u1.x), centre = vec3(a.x, 0, a.z) - u1 * R;
+  auto at = [&](float t) { return centre + (u1 * cosf(t) + u2 * sinf(t)) * R; };
+  constexpr int kN = 180;
+  static int altAi = -1; static float altR = 0; static std::array<float, kN> alt{};
+  if (altAi != ai || altR != R) {   // (the height round the loop: the highest ground across a 600 m band, the most of it
+    altAi = ai; altR = R;            //  within 2 km either way, 300 m over that, smoothed into a flyable profile)
+    std::array<float, kN> g{}, m{};
+    for (int k = 0; k < kN; k++) {
+      const float t = k * 2.f * PI / kN; const vec3 q = at(t), out = normalize(q - centre);
+      g[k] = 0.f;
+      for (int j = -2; j <= 2; j++) { const vec3 r = q + out * (j * 150.f); g[k] = std::max(g[k], g_world.height(r.x, r.z)); }
+    }
+    const int w = std::max(1, (int)ceilf(2000.f / (2.f * PI * R / kN)));
+    for (int k = 0; k < kN; k++) { m[k] = g[k]; for (int j = -w; j <= w; j++) m[k] = std::max(m[k], g[((k + j) % kN + kN) % kN]); }
+    for (int pass = 0; pass < 6; pass++) {
+      std::array<float, kN> b = m;
+      for (int k = 0; k < kN; k++) b[k] = std::max(m[k], 0.25f * m[(k + kN - 1) % kN] + 0.5f * m[k] + 0.25f * m[(k + 1) % kN]);
+      m = b;
+    }
+    for (int k = 0; k < kN; k++) alt[k] = std::max(m[k], a.elev) + 300.f;
   }
-  demo.pos = P; demo.rpm = 0; demo.flaps = 0; demo.nozzle = 0;
-  fillPlaneVisual(fp.plane, demo, 0.f, resWarm && resWarmCk);   // (warming up, each craft's cockpit for a frame too: its cabin shell bakes now, not when the sortie opens)
+  auto altAt = [&](float t) {
+    float f = t / (2.f * PI) * kN; f -= floorf(f / kN) * kN;
+    const int k0 = (int)f % kN, k1 = (k0 + 1) % kN; const float u = f - floorf(f);
+    return alt[k0] + (alt[k1] - alt[k0]) * u;
+  };
+  const float th0 = v * realTime / R;   // (round the circle at its speed: over the field at the start of each lap)
+  vec3 P = at(th0); P.y = altAt(th0) + 12.f * sinf(realTime * 0.21f);
+  const float climb = (altAt(th0 + 400.f / R) - altAt(th0 - 400.f / R)) / 800.f;   // (the profile's slope: its nose follows)
+  const vec3 along = normalize(u2 * cosf(th0) - u1 * sinf(th0));
+  const float hdg = atan2f(along.x, -along.z) / DEG;
+  const quat yawQ = quat::axisAngle(vec3(0, 1, 0), -hdg * DEG);
+  // banked into the turn (the wing's lift towards the circle's centre), a little life in the roll and the pitch
+  const float roll = bankDeg + 1.5f * sinf(realTime * 0.53f), nose = 2.5f + atanf(climb) / DEG + 0.6f * sinf(realTime * 0.37f);
+  quat q = yawQ * quat::axisAngle(vec3(0, 0, 1), -roll * DEG) * quat::axisAngle(vec3(1, 0, 0), nose * DEG);
+  if (dot(q.rotate(vec3(0, 1, 0)), centre - vec3(P.x, 0, P.z)) < 0.f) q = yawQ * quat::axisAngle(vec3(0, 0, 1), roll * DEG) * quat::axisAngle(vec3(1, 0, 0), nose * DEG);
+  demo.q = q; demo.pos = P; demo.vel = (along + vec3(0, climb, 0)) * v;
+  demo.gear = 0; demo.ctl = Controls(); demo.ctl.throttle = 0.62f; demo.ctl.gearDown = false;
+  demo.engineRunning = true; demo.engineSpool = 0.62f; demo.n1 = 80.f; demo.onGround = false;
+  demo.rpm = 2400; demo.flaps = 0; demo.nozzle = 0;
+  fillPlaneVisual(fp.plane, demo, realTime * 250.f, resWarm && resWarmCk);   // (warming up, each craft's cockpit for a frame too: its cabin shell bakes now, not when the sortie opens)
   if (sp.special == 2) {
     // Preview the chosen hardware, not the live flight's old loadout. This is
     // visual-only: no ammunition, encounter or career state changes in the terminal.
@@ -5129,6 +5304,10 @@ void Game::researchPreviewCamera(FrameParams& fp) {
     }
   }
   resPrevPos = P; resPrevQ = demo.q;
+  // the ground 25 s ahead built before it gets there, and first the field the sortie opens at, kept built (the launch
+  // opens on it at once: updateLoading)
+  fp.prefetchOn = true; fp.prefetchPos = at(th0 + v * 25.f / R);
+  fp.prefetchNearPos = a.pos(); fp.prefetchNearR = 2000.f;
   // orbit
   ResLayout L = researchLayout();
   float W = (float)g_ren.W, H = (float)g_ren.H;
@@ -5138,9 +5317,8 @@ void Game::researchPreviewCamera(FrameParams& fp) {
   const float pixels=std::max(1.f,.40f*std::min(L.px1-L.px0,L.bot-L.top-56*S()));
   float D = (H * 0.5f / pixels) * ext / th / clampf(researchView.zoom,MenuPreviewView::minZoom,MenuPreviewView::maxZoom);
   float yaw = researchView.yaw, pit = clampf(researchView.pitch,-.5f,1.f);
-  if (!resAirborne) pit = std::max(pit, 0.04f);   // (on the ground the camera never dips below the apron)
-  vec3 C = P + demo.q.rotate(vec3(sinf(yaw) * cosf(pit), sinf(pit), -cosf(yaw) * cosf(pit))) * D;
-  if (!resAirborne) C.y = std::max(C.y, g_world.height(C.x, C.z) + 1.6f);
+  vec3 C = P + yawQ.rotate(vec3(sinf(yaw) * cosf(pit), sinf(pit), -cosf(yaw) * cosf(pit))) * D;
+  C.y = std::max(C.y, g_world.height(C.x, C.z) + 5.f);
   const auto axes=menuPreviewAxes(P-C,(L.cx-W*.5f)/(W*.5f)*th*W/H,(H*.5f-L.cy)/(H*.5f)*th);
   fp.camPos=C;fp.camBack=-axes.forward;fp.camRight=axes.right;fp.camUp=axes.up;
   fp.vignette = 0.75f;
@@ -6445,6 +6623,11 @@ void Game::debugScene(const std::string& name) {
   if (name == "menu") { screen = SCR_MENU; realTime = 20; return; }
   if (name.compare(0, 5, "menuT") == 0) { screen = SCR_MENU; realTime = (float)atof(name.c_str() + 5); return; }   // the menu tour at t seconds
   if (name == "hub") { screen = SCR_HUB; realTime = 20; return; }
+  if (name.compare(0, 7, "hangar_") == 0) {   // the hangar's preview of one aircraft: hangar_<type>[_<airport code>]
+    char code[8] = {}; int t = 1; sscanf(name.c_str() + 7, "%d_%7s", &t, code);
+    if (code[0] && g_world.findAirport(code) >= 0) career.location = g_world.findAirport(code);
+    screen = SCR_HUB; hubTab = TAB_HANGAR; selHangar = std::clamp(t, 0, kAircraftCount - 1); realTime = 20; return;
+  }
   if (name == "hangarfit") {   // the hangar's mechanic (docs/HANGAR.md): your own Ambler on floats with long-range tanks
     std::string m; career.money = 60000; career.buy(1, &m); career.buyFloats(0, &m); career.buyKit(0, KIT_TANKS, &m);
     screen = SCR_HUB; hubTab = TAB_HANGAR; selHangar = 1; realTime = 20; return;

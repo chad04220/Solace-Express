@@ -196,6 +196,7 @@ void main(){ vP=aP; vN=aN; vColour=aColour; vKind=int(aKind+.5);
 static const char* kFS = R"GLSL(#version 330 core
 in vec3 vP,vN,vColour; flat in int vKind;
 uniform vec3 uOrigin,uEye,uBack; uniform float uSize; uniform sampler2D uFont;
+uniform float uLogDen;   // log2 of the depth's far + 1: the showroom's 40001, or on the live apron the raster passes' (kLogDepthFar)
 layout(location=0) out vec4 oG0; layout(location=1) out vec4 oG1;
 layout(location=2) out vec4 oG2; layout(location=3) out vec4 oG3;
 vec2 oct(vec3 n){n/=abs(n.x)+abs(n.y)+abs(n.z);return n.y>=0.0?n.xz:(1.0-abs(n.zx))*sign(n.xz+vec2(1e-9));}
@@ -235,7 +236,7 @@ void main(){
  oG0=vec4(t,oct(n),3.0);oG1=vec4(sqrt(clamp(c,0.0,1.0)),rough);
  oG2=vec4(em,0.05);oG3=vec4(1,1,1,0);
  // Same logarithmic convention as the aircraft hull pass, exact per pixel.
- float w=-dot(rel,uBack);gl_FragDepth=log2(max(1e-6,1.0+w))/log2(40001.0);
+ float w=-dot(rel,uBack);gl_FragDepth=log2(max(1e-6,1.0+w))/uLogDen;
 }
 )GLSL";
 // Classified showroom: a clear screen-space outline of the actual aircraft.

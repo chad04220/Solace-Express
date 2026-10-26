@@ -99,6 +99,28 @@ The Ambler flown level at 75% power: 66.6 m/s on its wheels, 62.5 on floats.
 - **At the sale** an aircraft is worth half of what was fitted to it, over its own value.
 - **In Free Flight** the six types have an "On floats / On wheels" button beside the aircraft.
 
+## The hangar's preview: a stand at the airport
+
+The hangar's aircraft (and Free Flight's) are shown in the live world, not in a room of their own: the selected
+aircraft stands on the apron in front of one of the airport's hangars, nose out of the door, at the time of day and in
+the weather the hub has. Its size reads against the building behind it, the other hangars, the masts and the parked
+aircraft. A Dawnlark sits small before a maintenance hangar's door; a Galleon dwarfs Meadowbrook's buildings and fits
+Solace Capital's.
+
+- **The stand** (game.cpp `hangarStandAt`): among the airport's own hangars (`airportItems`: hangars, arch hangars,
+  T-hangars), the one before which the circle the aircraft sweeps as it turns is clear of everything the airport has
+  placed. The way out over the apron to the camera must be clear too, above the lowest sight line. The ground must be
+  level and dry. Of those, the biggest building wins. The career's hangar uses the field you're at; Free Flight uses
+  the departure you've picked. A seaplane base, or a field with no clear stand, uses the nearest airport that has one.
+  The stand is kept until the airport or the aircraft changes, and the hub's background builds what stands round it
+  ahead of the cut to the hangar's tab.
+- **The view:** the showroom's turntable and lens. The aircraft turns in place (ROTATE, drag); the camera stays out
+  over the apron at the same azimuth, its elevation and zoom as before, so the hangar stays behind the aircraft. No
+  traffic is drawn while you look. After dark the hangar's two floodlights over its door light it.
+- **The dimensions** are painted on the apron as they were on the showroom's floor
+  (`Renderer::rasterApronDimensions`), with the ground's own depth, so the scenery hides them where it stands in front.
+- A locked research teaser keeps the dark showroom and its silhouette.
+
 ## The mechanic
 
 The hangar's MECHANIC section lists the kits for the aircraft you own, each with what it does and its price, and

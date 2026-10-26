@@ -111,6 +111,7 @@ struct FrameParams {
   EnemyCraftVisual enemies[kMaxEnemyCraft]; // separate enemy registry; no player/catalog slots
   bool hangarClassified = false; // locked showroom: geometry-only, ultra-low light
   bool hangarPreview = false;  // isolated indoor preview; the aircraft uses its normal rendering path
+  bool hangarApron = false;    // the live world's preview (the aircraft on an apron before a hangar): its dimensions painted there
   vec3 hangarOrigin; float hangarSize = 12.f;  // floor centre and max airframe span/length, world metres
   std::vector<GroundVehicleVisual> groundVehicles;   // explicitly driven ground vehicles (none yet: the airport furniture is parked)
   vec3 camPos; vec3 camRight, camUp, camBack; float fovY = 1.0f;
@@ -566,6 +567,8 @@ private:
   int hangarVertexCount = 0, previousPreviewModel = -1; float hangarGeometrySize = 0;
   bool previousHangar = false, previousClassifiedHangar = false;
   void rasterHangar(const FrameParams& fp);
+  void rasterApronDimensions(const FrameParams& fp);   // the showroom's dimension paint on the live apron (hangarApron)
+  void drawHangarDimensions(const FrameParams& fp);    // (with progHangar bound for this view)
   void lightClassifiedHangar(const FrameParams& fp);
   const PlaneMesh* earlyMesh = nullptr;   // the player's mesh whose depth opens this frame's G-buffer (rasterWorld; drawEntities draws it)
   uint64_t trafficModelKey(const float* t) const;   // hullKey(slot 0) of a traffic aircraft's model

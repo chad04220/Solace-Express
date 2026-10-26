@@ -875,6 +875,7 @@ private:
   void feedAudio();
   void menuBackgroundCamera(FrameParams& fp);
   void hangarPreviewCamera(FrameParams& fp);
+  void hangarApronCamera(FrameParams& fp, class Plane& demo, vec3 ground, float heading);   // (the live world's stand)
   void menuTour(FrameParams& fp);   // main menu: a tour of the islands
   int hubField() const;   // the hub's airport when its world is loaded, else -1
   vec3 hubOrbitAt(vec3 centre) const;   // where the hub's camera circles round centre now (on the ground plane)
