@@ -1197,7 +1197,17 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         g_ren.entSync = false;
         auto frames = [&](int n) { for (int i = 0; i < n; i++) { g->update(1.f / 60.f); g->render(); SwapBuffers(g_hdc); } };
         auto timed = [&](int n) { frames(8); glFinish(); LARGE_INTEGER t0, t1; QueryPerformanceCounter(&t0); frames(n); glFinish(); QueryPerformanceCounter(&t1); return qpcMs(t0, t1) / n; };
-        frames(30);
+        // the probe of the own airframe's shading (5., below) builds a program of its own the first time it is asked
+        // for: built here, before anything is timed, and the card given half a second of frames after it to come back
+        // to its clocks. v4.0.0's analysis built it in the row's own settling frames - 3 to 11 s each, the airframe's
+        // shaders new to the driver after the update - and the GPU, idle through the build, ran the row's first timed
+        // frames slow: "costs -3 to -7 ms" in four scenes
+        g_ren.dbgOff = Renderer::kProbeMeshShade; frames(1); g_ren.dbgOff = 0;
+        {
+          LARGE_INTEGER w0, w1; QueryPerformanceCounter(&w0);
+          frames(30);
+          do { frames(1); QueryPerformanceCounter(&w1); } while (qpcMs(w0, w1) < 500.0);
+        }
         fprintf(af, "\n==================== %s ====================\n", sc.c_str());
         // the ground over one frame (renderer.h groundStats): its chunks, what depth was in before it was shaded (the
         // airframe's - from inside, the cockpit's walls - and the ground's own, the prepass), and its fragments: those

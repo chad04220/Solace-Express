@@ -54,6 +54,8 @@ void Renderer::ensureEnemyMesh(int type){
  auto& mesh=enemyMeshes[type];if(mesh.attempted)return;mesh.attempted=true;
  EnemyBakeGLState savedGL;
  setCompileStage((std::string("enemy mesh: ")+kEnemyCraftSpecs[type].id).c_str());
+ // (cleared on every way out: v4.0.0's compile.log named each program built after it - the analysis's - "enemy mesh: archon")
+ struct StageEnd{Renderer& r;~StageEnd(){r.setCompileStage("");}} stageEnd{*this};
  bakeCount++;
  std::string errorText;
  mesh.material=linkProgramCached(std::string("#version 330 core\n")+kEnemyMeshVS,enemyMeshFSAssembly(type),errorText);

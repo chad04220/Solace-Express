@@ -1315,7 +1315,9 @@ void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const f
     GLuint& probe = own >= 0 && prog != progPlaneMesh ? afOwn[own].probe : progPlaneMeshProbe;
     if (!probe) {
       float M[96]; if (own >= 0 && prog != progPlaneMesh) packModelOf(own, M);
+      setCompileStage("the analysis's airframe shading probe");
       std::string pe; probe = linkProgramCached(planeMeshVSAssembly(""), planeMeshFSAssembly((own >= 0 && prog != progPlaneMesh ? aircraftDefines(own, M) : std::string()) + "#define PROBE_MESH_SHADE\n"), pe);
+      setCompileStage("");
     }
     if (probe) prog = probe;
   }
