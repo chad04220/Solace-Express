@@ -230,7 +230,7 @@ void packModel(const AircraftSpec& s, int idx, float gh, float o[24 * 4]) {
   const ModelDef& m = kModels[idx];
   auto put = [&](int i, float a, float b, float c, float d) { o[i * 4] = a; o[i * 4 + 1] = b; o[i * 4 + 2] = c; o[i * 4 + 3] = d; };
   float L = s.fusLen;
-  put(0, L, (float)m.gear, (float)m.engine, s.fusRad);
+  put(0, L, (float)(s.floats ? 5 : m.gear), (float)m.engine, s.fusRad);   // (a fitted airframe on floats draws them: gear 5)
   for (int i = 0; i < 8; i++) put(1 + i, m.st[i][0], m.st[i][1], m.st[i][2], m.st[i][3]);
   put(9, m.wing[0], m.wing[1], m.wing[2], m.wing[3]);
   put(10, m.wing[4], m.wing[5], tanf(m.wing[6] * DEG), m.wing[7]);

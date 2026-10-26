@@ -45,18 +45,23 @@ int main() {
           "Invalid aircraft selections fail closed");
   check(hangarSpecAt(-1) == 0 && hangarSpecAt(999) == kSomnus, "Catalog bounds must be safe");
 
-  // Performance cache rows use the career mapping rather than the stable-index prefix, which contains research.
+  // Performance cache rows use the career mapping rather than the stable-index prefix, which contains research; after
+  // them, a row for each career type that takes floats, on its floats (docs/HANGAR.md)
   const char* cache = "hangar_catalog_perf_test.bin";
+  int floatRows = 0;
+  for (int spec : kCareerAircraft) floatRows += floatKitFor(spec);
   auto writeCache = [&](int count) {
     FILE* f = std::fopen(cache, "wb"); check(f != nullptr, "Create cache fixture");
     char stamp[64] = {}; std::strcpy(stamp, "roster-cache-test");
     uint32_t n = count, size = sizeof(PerfModel);
     std::fwrite(stamp, 1, 64, f); std::fwrite(&n, 4, 1, f); std::fwrite(&size, 4, 1, f);
-    for (int row = 0; row < count; ++row) { PerfModel p; p.vs1 = float(1000 + careerSpecAt(row)); std::fwrite(&p, sizeof p, 1, f); }
+    for (int row = 0; row < count; ++row) { PerfModel p; p.vs1 = float(row < kNumAircraft ? 1000 + careerSpecAt(row) : 2000 + row); std::fwrite(&p, sizeof p, 1, f); }
     std::fclose(f);
   };
+  check(floatRows == 6, "Six career types take floats");
   writeCache(9); check(!Plane::perfLoad(cache, "roster-cache-test"), "Old nine-row cache must be relearned");
-  writeCache(kNumAircraft); check(Plane::perfLoad(cache, "roster-cache-test"), "Current career cache loads");
+  writeCache(kNumAircraft); check(!Plane::perfLoad(cache, "roster-cache-test"), "A cache without the float rows must be relearned");
+  writeCache(kNumAircraft + floatRows); check(Plane::perfLoad(cache, "roster-cache-test"), "Current career cache loads");
   for (int spec : kCareerAircraft) check(Plane::perf(&kAircraft[spec]).vs1 == 1000.f + spec, "Performance cache restores the correct aircraft identity");
   Plane::perfSave(cache, "roster-cache-test");
   FILE* f = std::fopen(cache, "rb"); check(f != nullptr, "Read written performance cache");

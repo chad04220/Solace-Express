@@ -205,6 +205,13 @@ private:
   // Its own selection and return screen keep the career's hangar and job card untouched.
   bool freeFlight = false;
   int freeCraft = 0, freeAirport = 0;
+  bool freeFloats = false;   // Free Flight on floats, where the type takes them (docs/HANGAR.md)
+  // what flies for a launch: your own aircraft as fitted at the hangar, Free Flight's choice of floats, else the type
+  const AircraftSpec& airframeFor(int spec, Career::Source src) const {
+    if (src == Career::SRC_OWNED) return career.specFor(spec, src);
+    if (src == Career::SRC_NONE) return fitted(spec, Fit{freeFloats, 0});
+    return kAircraft[std::clamp(spec, 0, kAircraftCount - 1)];
+  }
   bool freeStartsAirborne() const;
   bool atDock() const;   // afloat beside a seaplane base's dock (its berth within 15 m)
   int amphibianField() const;   // the field a float plane is coming down at (nearest within 4 km), or -1

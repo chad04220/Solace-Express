@@ -46,10 +46,11 @@ def fixture_source():
 #include <cstdio>
 struct Spec { const char* id; };
 """
+    source += f"constexpr int kAircraftCount = {count};\n"
     source += f"static const Spec kAircraft[] = {{{roster}}};\n"
     source += f"""
 class Renderer {{ public:
-  static constexpr int kAfModels = {count};
+  static constexpr int kAfModels = 2 * kAircraftCount;   // (each type, then each type on floats: docs/HANGAR.md)
   struct Own {{ aircraftAsset::Identity portableIdentity[2]; }};
   Own afOwn[kAfModels];
   aircraftAsset::Identity prebuiltAircraftIdentity(int model, int slot);
@@ -60,7 +61,7 @@ class Renderer {{ public:
     source += """
 int main() {
   Renderer renderer;
-  for (int model = 0; model < Renderer::kAfModels; ++model) for (int slot = 0; slot < 2; ++slot) {
+  for (int model = 0; model < kAircraftCount; ++model) for (int slot = 0; slot < 2; ++slot) {
     const auto first = renderer.prebuiltAircraftIdentity(model, slot);
     const auto cached = renderer.prebuiltAircraftIdentity(model, slot);
     if (first.geometry != cached.geometry || first.source != cached.source) return 1;
@@ -69,6 +70,8 @@ int main() {
     std::puts(name.c_str());
   }
   if (!aircraftAsset::filename(renderer.prebuiltAircraftIdentity(-1, 0)).empty()) return 3;
+  for (int model = kAircraftCount; model < Renderer::kAfModels; ++model)   // (a type on floats is baked on the player's PC, never packaged)
+    if (!aircraftAsset::filename(renderer.prebuiltAircraftIdentity(model, 0)).empty()) return 7;
   if (!aircraftAsset::filename(renderer.prebuiltAircraftIdentity(Renderer::kAfModels, 0)).empty()) return 4;
   if (!aircraftAsset::filename(renderer.prebuiltAircraftIdentity(0, -1)).empty()) return 5;
   if (!aircraftAsset::filename(renderer.prebuiltAircraftIdentity(0, 2)).empty()) return 6;

@@ -13,6 +13,18 @@ inline const char* licenseName(int l) { static const char* n[] = {"Student Permi
 
 class Scenery;
 
+// One airframe as it is fitted (docs/HANGAR.md): floats in place of its wheels, and the mechanic's kits, each a bit of
+// kits. A fitted airframe flies as a copy of its type's row with the changes made (fitted, below); a stock one is the
+// row itself, so everything keyed by the roster stays as it was.
+enum Kit { KIT_ENGINE = 0, KIT_PROP, KIT_AERO, KIT_LIGHT, KIT_TANKS, KIT_STOL, KIT_COUNT };
+struct Fit {
+  bool floats = false; uint32_t kits = 0;
+  bool stock() const { return !floats && !kits; }
+  bool has(int kit) const { return (kits >> kit) & 1u; }
+  bool operator==(const Fit& o) const { return floats == o.floats && kits == o.kits; }
+  bool operator!=(const Fit& o) const { return !(*this == o); }
+};
+
 struct AircraftSpec {
   const char* id; const char* name; const char* role;
   int engineType, engines, cylinders, blades;
@@ -50,6 +62,10 @@ struct AircraftSpec {
   // amphibious floats (docs/WINGS_OVER_WATER.md): it floats, takes off and lands on the water, and its wheels (retract)
   // fold up into the floats; floatStations sets them out, and its model row's gear type is 5 to match
   bool floats = false;
+  // a fitted airframe (Fit): the copy's type - its roster row (typeOf) - and its fit; the kits' effects the aerodynamics
+  // and the engines apply: the airframe's parasite drag, a propeller's efficiency
+  int fittedFrom = -1; Fit fit;
+  float dragFactor = 1.f, propFactor = 1.f;
   // the fuel the airframe was designed and learned at: its trim, its rigging, the weights its envelope and its runway
   // figures were measured at, a legacy type's weight limit. maxFuel is what its tanks hold - the real figure since
   // v4.1, when the islands' scaled-down tanks (these) gave way to real ones; the flight stays as it was designed
@@ -119,6 +135,16 @@ float cruiseBurnKgS(const AircraftSpec& s);
 inline float cruiseMinutes(const AircraftSpec& s, float fuelKg) { return std::max(0.f, fuelKg) / std::max(cruiseBurnKgS(s), 1e-6f) / 60.f; }
 float plannedFuelKg(const AircraftSpec& s, float tripKg);
 float fuelForKm(const AircraftSpec& s, float km);   // the fuel for so many kilometres of cruise (no reserve), never more than the tanks
+// The roster row a spec is (a fitted copy's: its type's), and a type as one airframe of it is fitted: the row itself for
+// a stock one, else a copy with the floats and the kits' changes made - one for each fit, made once and never moved
+// (airframe_fit.cpp). Which types take floats (a high wing, piston or turboprop, light enough: the Kittiwake has its own)
+// and which take each kit
+int typeOf(const AircraftSpec* s);   // (-1: none - a copy of no row)
+const AircraftSpec& fitted(int type, Fit fit);
+bool floatKitFor(int type);
+bool kitFor(int type, int kit);
+const char* kitName(int kit, const AircraftSpec& type);    // the shop's names and what each does, as the type has it
+const char* kitBlurb(int kit, const AircraftSpec& type);
 // XR-40 thruster pods (body coords, +z aft): front left, front right, rear left, rear right pivot points
 static const vec3 kSomnusPods[4] = {vec3(-2.35f, -0.08f, -3.3f), vec3(2.35f, -0.08f, -3.3f), vec3(-2.75f, 0.05f, 3.45f), vec3(2.75f, 0.05f, 3.45f)};
 
@@ -364,7 +390,8 @@ public:
   static const PerfModel& perf(const AircraftSpec* s);   // learned once per type (aircraft_perf.cpp)
   // a type learned while noting is on (the game's update, which names it as a part of the update): its index and ms
   static void perfNoting(bool on);
-  static bool perfLearned(const AircraftSpec* s);   // (learned already: perf() would return at once)
+  static bool perfLearned(const AircraftSpec* s);
+  static std::vector<const AircraftSpec*> perfAirframes();   // the airframes learned at the start: the career types, and each on floats where they fit   // (learned already: perf() would return at once)
   static std::vector<std::pair<int, double>> perfNoted();   // (the notes since the last call)
   // The trees and buildings over both of a field's finals, as apPlan samples them, profiled ahead on a worker
   // (g_sceneryProfiles) for the plans made later in flight: asked for as the field becomes a destination. A plan made

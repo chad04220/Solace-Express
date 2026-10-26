@@ -4,6 +4,7 @@
 #include "aero.h"
 #include "aircraft.h"
 #include "models.h"
+#include <map>
 #include <mutex>
 
 namespace {
@@ -34,7 +35,7 @@ AeroModel build(const AircraftSpec& s) {
   // tails: as they are drawn (models.cpp; the XR-20's canards and twin fins), else typical volume-coefficient sizes
   float sh = research ? 0.08f * S : 0.22f * S, sv = research ? 0.10f * S : 0.14f * S;
   {
-    const int idx = (int)(&s - kAircraft);
+    const int idx = typeOf(&s);
     if (idx >= 0 && idx < kAircraftCount && s.special == 0) {
       const ModelDef& m = kModels[idx];
       if (m.ht[0] > 0.f) sh = m.ht[0] * (m.ht[1] + m.ht[2]);
@@ -64,7 +65,7 @@ AeroModel build(const AircraftSpec& s) {
   // The established fleet retains its existing drag build-up.
   bool hasWingStruts = s.wingY > 1.f;
   if (s.fullCabinEnvelope) {
-    const int idx = (int)(&s - kAircraft);
+    const int idx = typeOf(&s);
     if (idx >= 0 && idx < kAircraftCount) hasWingStruts = kModels[idx].strut != 0;
   }
   if (!s.retract && !jet && hasWingStruts) a.extraDq += 0.06f;                                      // wing struts (faired)
@@ -122,6 +123,13 @@ const AeroModel& aeroModel(const AircraftSpec& s) {
   static AeroModel cache[kAircraftCount]; static bool built[kAircraftCount] = {};
   static std::mutex m;
   int idx = (int)(&s - kAircraft);
+  if (s.fittedFrom >= 0) {   // (a fitted airframe: its own, made once - fitted copies never move)
+    static std::map<const AircraftSpec*, AeroModel> fittedModels;
+    std::lock_guard<std::mutex> lk(m);
+    auto at = fittedModels.find(&s);
+    if (at == fittedModels.end()) at = fittedModels.emplace(&s, build(s)).first;
+    return at->second;
+  }
   if (idx < 0 || idx >= kAircraftCount) { static thread_local AeroModel tmp; tmp = build(s); return tmp; }
   std::lock_guard<std::mutex> lk(m);
   if (!built[idx]) { cache[idx] = build(s); built[idx] = true; }
@@ -145,7 +153,7 @@ float aeroCD0(const AeroModel& a, const AircraftSpec& s, float V, float rho, flo
       ffq *= powf(std::max(mach, 0.05f) / 0.2f, 0.18f);
     fric += cf * ffq * p.swet;
   }
-  return (fric * (1.f + a.misc) + a.extraDq) / s.wingArea;
+  return (fric * (1.f + a.misc) + a.extraDq) / s.wingArea * s.dragFactor;
 }
 
 void aeroDragAreas(const AeroModel& a, const AircraftSpec& s, float V, float rho, float mu, float mach, float out[4]) {
@@ -165,7 +173,7 @@ void aeroDragAreas(const AeroModel& a, const AircraftSpec& s, float V, float rho
     out[p.name[0] == 'w' ? 0 : p.name[0] == 'h' ? 1 : p.name[0] == 'v' ? 2 : 3] += dq;
   }
   out[3] += a.extraDq;
-  (void)s;
+  for (int i = 0; i < 4; i++) out[i] *= s.dragFactor;   // (a fitted airframe's speed kit: docs/HANGAR.md)
 }
 
 float aeroCLa(const AeroModel& a, float mach) {

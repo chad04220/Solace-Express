@@ -117,7 +117,7 @@ inline Pose mainPose(const AircraftSpec& s, const ModelDef& m, const GearStation
     const NacFold f = nacFold(m, gs, gh);
     return {f.hinge, quat::axisAngle(vec3(1, 0, 0), amount * f.angle)};
   }
-  const bool atlas = &s == &kAircraft[kGalleon];
+  const bool atlas = typeOf(&s) == kGalleon;
   if (atlas) {
     // Same swept two-axis trunnion as galleonGearFoldR. partRxz is a
     // negative-Y rotation; preserving that sign and multiplication order

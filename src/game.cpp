@@ -254,14 +254,17 @@ void Game::applyQuote(const Contract& c, Career::LaunchPlan& e, bool start) {
   if (c.longHaul()) return;   // (across the ocean, beyond this world: the quick estimate is the quote)
   // An ID alone is not a route: FREE, a continued job, or a changed forecast
   // can keep its ID while its estimated time and fuel change.
+  // (your own as fitted flies its own quote: its floats, its kits - fitted copies never move, so the worker can hold it)
+  const AircraftSpec* airframe = &career.specFor(e.spec, e.src);
   std::string key = menuPlan::quoteInputs(c, e.spec);
+  if (!airframe->fit.stock()) key += fmt("|fit %d %u", airframe->fit.floats ? 1 : 0, airframe->fit.kits);
   auto it = quoteFlown.find(key);
   if (it != quoteFlown.end()) { career.useFlownTime(e, c, it->second.first, it->second.second); return; }
   if (!start || quoteJob.valid() || c.forceAircraft >= 0) return;   // (lessons are flown by hand: the quick estimate stands)
-  Plane::perf(&kAircraft[e.spec]);   // (learned here first: the worker then only reads it)
+  Plane::perf(airframe);   // (learned here first: the worker then only reads it)
   quoteJobKey = key;
   Contract cc = c; int spec = e.spec;
-  quoteJob = std::async(std::launch::async, [cc, spec] { float fuel = -1; float m = simulateFlightMinutes(cc, spec, &fuel); return std::make_pair(m, fuel); });
+  quoteJob = std::async(std::launch::async, [cc, spec, airframe] { float fuel = -1; float m = simulateFlightMinutes(cc, spec, &fuel, false, airframe); return std::make_pair(m, fuel); });
 }
 
 std::string padGlyph(const std::string& name) {
@@ -565,7 +568,7 @@ bool Game::retryCommit() {
 // less than an owned aircraft already holds, never more than the tanks). A rental comes full, as far as the weight
 // limit lets it with the load on board.
 float Game::chosenFuel(const Contract& c, int spec, Career::Source src, const Career::LaunchPlan& p) const {
-  const AircraftSpec& s = kAircraft[spec];
+  const AircraftSpec& s = airframeFor(spec, src);
   if (c.rationKm > 0) return fuelForKm(s, c.rationKm);   // (a fuel challenge's ration: no choice of more)
   if (launchFuelKg > 0) return std::min(launchFuelKg, s.maxFuel);
   if (p.fuelLoadKg >= 0) return clampf(p.fuelLoadKg, 0.f, s.maxFuel);
@@ -1571,7 +1574,7 @@ bool Game::atDock() const {
 
 bool Game::freeStartsAirborne() const {
   return freeAirport >= 0 && freeAirport < (int)g_world.airports.size() && g_world.airports[freeAirport].water() &&
-         validAircraft(freeCraft) && !kAircraft[freeCraft].floats;
+         validAircraft(freeCraft) && !airframeFor(freeCraft, Career::SRC_NONE).floats;
 }
 
 Contract Game::freeFlightContract() const {
@@ -1600,7 +1603,7 @@ void Game::launchFreeFlight() {
     try { quoteJob.get(); } catch (...) {}
     quoteFlown.clear(); menuPlanCache = menuPlan::Cache{};
   }
-  const AircraftSpec& s = kAircraft[freeCraft];
+  const AircraftSpec& s = airframeFor(freeCraft, Career::SRC_NONE);
   // (the flight's setup and its first scene behind the loading card: Game::queueLaunch)
   if (queueLaunch(freeFlightContract(), freeCraft, LAUNCH_FREE, [this] { launchFreeFlight(); })) return;
   Contract c = freeFlightContract();
@@ -1685,11 +1688,12 @@ void Game::init(bool buildWorld, const std::function<void(float, const std::stri
     if (pf.empty() || !Plane::perfLoad(pf, buildStamp)) {
       std::vector<std::thread> th;
       std::atomic<int> completed{0};
-      for (int i : kCareerAircraft) th.emplace_back([i, &completed] { Plane::perf(&kAircraft[i]); completed.fetch_add(1); });
+      const std::vector<const AircraftSpec*> airframes = Plane::perfAirframes();   // (the career types, and each on floats where they fit)
+      for (const AircraftSpec* a : airframes) th.emplace_back([a, &completed] { Plane::perf(a); completed.fetch_add(1); });
       if (progress) {
-        while (completed.load() < kNumAircraft) {
-          const int n = completed.load();
-          report(1 + n, fmt("Flight performance: %d / %d airframes checked", n, kNumAircraft));
+        while (completed.load() < (int)airframes.size()) {
+          const int n = completed.load() * kNumAircraft / (int)airframes.size();
+          report(1 + n, fmt("Flight performance: %d / %d airframes checked", completed.load(), (int)airframes.size()));
           std::this_thread::sleep_for(std::chrono::milliseconds(30));
         }
       }
@@ -1742,7 +1746,7 @@ void Game::rollFailures(const Contract& c, int spec, Career::Source src) {
   uint32_t h = 2166136261u; for (char ch : c.id) h = (h ^ (uint8_t)ch) * 16777619u;
   Rng r(h ^ (career.attempt * 2654435761u) ^ (uint32_t)spec * 97u);
   if (r.uni() >= chance) return;
-  const AircraftSpec& s = kAircraft[spec];
+  const AircraftSpec& s = airframeFor(spec, src);
   // which: engines most often, the gear only on retractables, icing only in weather that can make it
   float w[FAIL_COUNT] = {0, 3.f, 2.f, 1.5f, 1.2f, s.retract ? 1.5f : 0.f, 1.f, (c.wx.precip == 2 || (c.wx.cloudCover > 0.6f && c.wx.cloudBase > 1800.f)) ? 1.5f : 0.f};
   float sum = 0; for (float x : w) sum += x;
@@ -2297,7 +2301,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
   wxStart = wx;
   wx.cloudDrift = cloudOff; wx.cloudDetail = cloudDet; wx.cloudBoil = cloudBoil;
   cloudWake.clear(); wakeGap = true; wakeOdo = 0; wispAccum = 0; rainNow = mistNow = 0;
-  const AircraftSpec& s = kAircraft[spec];
+  const AircraftSpec& s = airframeFor(spec, src);   // (your own as fitted at the hangar; Free Flight's on floats, if chosen)
   const Airport& a = g_world.airports[c.from];
   // runway into the wind (lessons with rings keep the published runway so the rings line up; the ringless ones, like
   // the cross-country and the checkride, take off into the wind like any other flight)
@@ -3232,7 +3236,7 @@ void Game::updateFlight(float dt) {
   if (!plane.onGround && plane.wxl.cloud > 0.03f) vapK = std::max(vapK, 0.35f * smoothstepf(0.03f, 0.3f, plane.wxl.cloud) * smoothstepf(20.f, 50.f, plane.airspeed));   // (in cloud the tips' vortices stir it at any g)
   if (vapK > 0.f || tipOn) {
     if (vapK > 0.f && !tipOn) tipSeg++;
-    vec3 tip = plane.spec->special == 2 ? kSomnusWingTip : plane.spec->special ? kJetWingTip : modelWingTip(kModels[plane.spec - kAircraft]);
+    vec3 tip = plane.spec->special == 2 ? kSomnusWingTip : plane.spec->special ? kJetWingTip : modelWingTip(kModels[typeOf(plane.spec)]);
     for (int sd = 0; sd < 2; sd++) {
       float sx = sd ? 1.f : -1.f;
       TipPt t{plane.pos + plane.q.rotate(vec3(sx * tip.x, tip.y, tip.z + 0.3f)), 0.f, vapK, tipSeg};
@@ -3560,7 +3564,7 @@ void Game::updateCamera(float dt) {
       float leadYaw = set.headLook && !plane.onGround ? clampf(-plane.bankDeg() / 60.f, -1.f, 1.f) * 0.30f : 0.f;
       float leadPitch = set.headLook && !plane.onGround ? clampf(plane.pitchDeg() / 30.f, -0.5f, 0.5f) * 0.10f : 0.f;
       lookYaw = approach(lookYaw, leadYaw, 2.f, dt); lookPitch = approach(lookPitch, rest + leadPitch, 2.f, dt); camYaw = lookYaw; camPitch = lookPitch + 0.12f; }
-    camPos = plane.pos + plane.q.rotate(kModels[plane.spec - kAircraft].eye);
+    camPos = plane.pos + plane.q.rotate(kModels[typeOf(plane.spec)].eye);
   } else if (camMode == 2) {
     float dist = (size * 1.4f + 8.f) * camZoom;
     quat orbit = quat::axisAngle(vec3(0, 1, 0), camYaw) * quat::axisAngle(vec3(1, 0, 0), -camPitch);
@@ -3572,7 +3576,7 @@ void Game::updateCamera(float dt) {
   if (camPos.y < gh) camPos.y = gh;
   // Use the same body-space viewing ray as rendering, never a projected/zoomed screen position.
   // Both mouse drag and controller look reach this path; no camera rotation or eye movement is added.
-  const int focusModel = int(plane.spec - kAircraft);
+  const int focusModel = typeOf(plane.spec);
   CockpitFocusTarget focusPanels[24];
   const int focusCount = camMode == 1 ? modelCockpitFocusTargets(focusModel, focusPanels, 24) : 0;
   const vec3 focusAim = quat::axisAngle(vec3(0, 1, 0), lookYaw).rotate(
@@ -3816,7 +3820,7 @@ void Game::jetEffects(float dt) {
   if (M < .94f) audioMachArmed = true;
   if (audioMachArmed && M >= 1.f && !plane.onGround) {
     audioMachArmed = false;
-    g_audio.triggerLocal(SFX_TRANSONIC, kModels[plane.spec-kAircraft].eye+vec3(0,0,-1), .45f);
+    g_audio.triggerLocal(SFX_TRANSONIC, kModels[std::max(0, typeOf(plane.spec))].eye+vec3(0,0,-1), .45f);
     toast("MACH 1 - SUPERSONIC", vec3(0.4f, 0.9f, 1));
     vec3 f = normalize(plane.vel), r = normalize(cross(f, vec3(0, 1, 0)) + vec3(1e-4f, 0, 0)), u = cross(r, f);
     // the boom: two shock rings racing out, and a collar of condensation flashing round the airframe at the shock -
@@ -3851,7 +3855,7 @@ void Game::buildLights(FrameParams& fp) {
   if (length(fp.flameLight) > 0.f) light(fp.flameLightPos, 4.f, fp.flameLight, -2.f, vec3(0, 1, 0), 0.f);   // plasma blast
   if ((screen != SCR_FLIGHT && screen != SCR_LOADING) || !plane.spec || crashed) return;
   const AircraftSpec& s = *plane.spec;
-  const ModelDef& md = kModels[plane.spec - kAircraft];
+  const ModelDef& md = kModels[typeOf(plane.spec)];
   float t = realTime, night = fp.night;
   float dark = s.special == 2 ? 1.f - somnus.stealth : 1.f;   // a cloaked XR-40 runs dark
   auto W = [&](vec3 b) { return plane.pos + plane.q.rotate(b); };
@@ -4464,7 +4468,7 @@ void Game::updateParticles(float dt) {
 // ------------------------------------------------------------------ frame assembly
 static void fillPlaneVisual(PlaneVisual& pv, const Plane& p, float propAngle, bool inside) {
   const AircraftSpec& s = *p.spec;
-  int idx = (int)(p.spec - kAircraft);
+  int idx = typeOf(p.spec);
   const ModelDef& md = kModels[idx];
   pv.on = true;
   pv.pos = p.pos;
@@ -4483,7 +4487,7 @@ static void fillPlaneVisual(PlaneVisual& pv, const Plane& p, float propAngle, bo
   pv.Ctl[3] = p.ctl.throttle;
   float blur = s.engineType == ENG_JET ? 1.f : smoothstepf(45.f, 650.f, p.rpm);
   float wr, nr; modelWheelRadii(idx, wr, nr);
-  pv.model = (int)(p.spec - kAircraft);
+  pv.model = typeOf(p.spec);
   pv.wheel[0] = p.wheelMotion[0].angle(wr); pv.wheel[1] = p.wheelMotion[1].angle(wr); pv.wheel[2] = p.wheelMotion[2].angle(nr);
   pv.Pr[0] = propAngle; pv.Pr[1] = blur; pv.Pr[2] = (float)std::max(s.blades, 2); pv.Pr[3] = p.flapLeft() - p.flaps;   // (a split flap: the left one's own)
   pv.I0[0] = p.ias * MS_TO_KT; pv.I0[1] = p.pos.y * M_TO_FT; pv.I0[2] = p.heading(); pv.I0[3] = p.vel.y * 196.85f;
@@ -4602,7 +4606,7 @@ FrameParams Game::buildFrame() {
   if ((screen == SCR_FLIGHT || screen == SCR_DEBRIEF || screen == SCR_LOADING) && plane.spec) {
     fillPlaneVisual(fp.plane, plane, propAngle, camMode == 1);
     if (camMode == 1 && wreck.empty()) {   // cockpit view: draw this frame's display / gauge atlas
-      fp.dispCk = kModels[plane.spec - kAircraft].cockpit;
+      fp.dispCk = kModels[typeOf(plane.spec)].cockpit;
       fp.dispMode = plane.spec->special ? 1 : fp.dispCk == 2 ? 3 : 2;   // glass cockpits: panel + the centre display page
     }
     {   // transonic vapour cone: strongest just below Mach 1 in humid low-level air
@@ -5294,7 +5298,7 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
     float ls = std::max(0.05f, dcam * 0.0012f);   // distant glints only: up close the modelled lens is the light
     float glint = 0.2f + 0.8f * smoothstepf(20.f, 110.f, dcam);
     float navI = (0.6f + 2.5f * night) * (1.f - somnus.stealth) * glint;   // a cloaked XR-40 runs dark
-    const ModelDef& md = kModels[plane.spec - kAircraft];
+    const ModelDef& md = kModels[typeOf(plane.spec)];
     bool jet = s.special != 0;   // the XR-30 is an SDF of its own: its lights don't follow the generic model layout
     vec3 tip = s.special == 2 ? kSomnusWingTip : jet ? kJetWingTip : modelWingTip(md);
     vec3 lt = plane.pos + plane.q.rotate(vec3(-tip.x, tip.y, tip.z)), rtp = plane.pos + plane.q.rotate(tip);
@@ -5889,7 +5893,7 @@ void Game::feedAudio() {
   ap.listener.position=dbgCam?dbgCamPos:camPos;
   if (plane.spec) {
     ap.aircraftPosition=plane.pos; ap.aircraftVelocity=plane.vel; ap.aircraftRotation=plane.q;
-    ap.cabinEye=kModels[plane.spec-kAircraft].eye; ap.soundSpeed=plane.soundSpeed;
+    ap.cabinEye=kModels[std::max(0, typeOf(plane.spec))].eye; ap.soundSpeed=plane.soundSpeed;
     ap.interior=camMode==1 && !dbgCam && !crashed;
     vec3 forward=ap.interior?plane.q.rotate(quat::axisAngle(vec3(0,1,0),lookYaw).rotate(quat::axisAngle(vec3(1,0,0),lookPitch).rotate(vec3(0,0,-1)))):
       normalize(plane.pos+vec3(0,plane.spec->fusRad*.3f,0)-ap.listener.position);
@@ -5938,7 +5942,7 @@ void Game::feedAudio() {
     ap.stallWarn = plane.onGround ? 0.f : plane.stallWarn; ap.stallIsShaker = s.engineType == ENG_JET || s.license == LIC_ATP;
     ap.gearMoving = plane.gear > 0.01f && plane.gear < 0.99f; ap.flapsMoving = fabsf(plane.flaps - plane.ctl.flaps) > 0.02f;
     ap.gearDown = plane.gear; ap.flaps = plane.flaps;
-    const int model = int(plane.spec-kAircraft);
+    const int model = std::max(0, typeOf(plane.spec));
     const auto& md=kModels[model];
     ap.engineRadius=clampf(sqrtf(std::max(s.power,1.f))*(s.engineType==ENG_PISTON?.025f:.13f),9.f,50.f);
     ap.gearPosition=vec3(0,-plane.gearHeight(),gearStations(s).mainZ);
@@ -6265,7 +6269,7 @@ void Game::render() {
       const int order[2] = {cm == 1 ? 1 : 0, cm == 1 ? 0 : 1};
       for (int view : {order[std::min(loadViewsStep, 1)]}) {
         camMode = view;
-        camPos = view == 1 ? plane.pos + plane.q.rotate(kModels[plane.spec - kAircraft].eye)
+        camPos = view == 1 ? plane.pos + plane.q.rotate(kModels[typeOf(plane.spec)].eye)
                            : cm != 1 ? cp : plane.pos + plane.q.rotate(vec3(0, size * 0.3f, size * 1.4f));
         FrameParams w = buildFrame();
         if (plane.spec->special == 2) {
@@ -6441,6 +6445,10 @@ void Game::debugScene(const std::string& name) {
   if (name == "menu") { screen = SCR_MENU; realTime = 20; return; }
   if (name.compare(0, 5, "menuT") == 0) { screen = SCR_MENU; realTime = (float)atof(name.c_str() + 5); return; }   // the menu tour at t seconds
   if (name == "hub") { screen = SCR_HUB; realTime = 20; return; }
+  if (name == "hangarfit") {   // the hangar's mechanic (docs/HANGAR.md): your own Ambler on floats with long-range tanks
+    std::string m; career.money = 60000; career.buy(1, &m); career.buyFloats(0, &m); career.buyKit(0, KIT_TANKS, &m);
+    screen = SCR_HUB; hubTab = TAB_HANGAR; selHangar = 1; realTime = 20; return;
+  }
   if (name.compare(0, 4, "jcam") == 0) {  // XR-30 close-up from an orbit angle: jcam<yaw deg>_<pitch deg>
     float yawD = 0, pitD = 10, thrP = -1, nozP = 0, zoom = 0.55f, tod = -1; sscanf(name.c_str() + 4, "%f_%f_%f_%f_%f_%f", &yawD, &pitD, &thrP, &nozP, &zoom, &tod);
     if (tod >= 0) resTime = tod;
@@ -7170,14 +7178,16 @@ void Game::debugScene(const std::string& name) {
     dbgCam = true; dbgFollow = false; dbgCamPos = cam; dbgCamLook = look;
     toasts.clear(); hint.clear(); uiHidden = true; return;
   }
-  if (name.compare(0, 5, "wtko_") == 0) {   // the Kittiwake's take-off run on Verde Bay's lane, t seconds in, from the chase camera: wtko_<s>[_<camYaw>]
-    float t = 8.f, yaw = 0.6f;
-    sscanf(name.c_str() + 5, "%f_%f", &t, &yaw);
+  if (name.compare(0, 5, "wtko_") == 0) {   // the Kittiwake's take-off run on Verde Bay's lane, t seconds in, from the chase camera: wtko_<s>[_<camYaw>[_<type>]]
+    // (another type: on its floats from the hangar's mechanic, docs/HANGAR.md)
+    float t = 8.f, yaw = 0.6f; int type = kKittiwake;
+    sscanf(name.c_str() + 5, "%f_%f_%d", &t, &yaw, &type);
+    if (!validAircraft(type) || (type != kKittiwake && !floatKitFor(type))) type = kKittiwake;
     const int ai = std::max(0, g_world.findAirport("VBY")); const Airport& a = g_world.airports[ai];
     Contract c; c.from = c.to = ai; c.title = "Water";
     c.wx = Weather(); c.wx.timeOfDay = 15.5f; c.wx.windSpeed = 4; c.wx.windFrom = a.heading; c.wx.cloudCover = 0.3f; c.wx.visibility = 60000;
-    realTime = 20; startFlight(c, kKittiwake, Career::SRC_OWNED);
-    const AircraftSpec& k = kAircraft[kKittiwake];
+    freeFloats = true; realTime = 20; startFlight(c, type, Career::SRC_NONE);
+    const AircraftSpec& k = fitted(type, Fit{true, 0});
     plane.reset(&k, a.threshold(false) + a.dir() * 60.f, a.heading, k.maxFuel * 0.6f, 500.f, false);
     plane.engineRunning = true; engineAutoStarted = true; parkingBrake = false; botControl = true;
     for (float s = 0; s < t; s += 1 / 30.f) {

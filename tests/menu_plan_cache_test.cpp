@@ -50,6 +50,7 @@ struct GameTest {
     c.from=g_world.findAirport("PVI");miss("continuation departure invalidates");
     c.wxEnd.cloudCover=.9f;c.wxShift=true;miss("forecast invalidates");
     g.career.fleet[0].fuel=75;miss("owned tank change invalidates raw economics");
+    g.career.fleet[0].fit.kits|=1u<<KIT_TANKS;miss("owned airframe's fitted kits invalidate");g.career.fleet[0].fit.kits=0;
     g.career.fleet[0].location=g_world.findAirport("MDB");miss("owned ferry location invalidates");
     g.career.location=c.to;miss("career location invalidates positioning");
     g.career.money=100;miss("courtesy positioning threshold invalidates");

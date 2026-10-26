@@ -62,7 +62,9 @@ geo::Position airportPlace(const std::string& region, const Airport& a);
 
 // (region: the one it is parked in, by id - the islands' "solace" or a generated region's; its location is that
 // region's airport)
-struct OwnedPlane { int spec; int location; float fuel; float condition; std::string region = "solace"; };
+// (fit: how it is fitted now - its floats on, the mechanic's kits in (docs/HANGAR.md); floatKit: it owns a set of floats,
+// on or in store)
+struct OwnedPlane { int spec; int location; float fuel; float condition; std::string region = "solace"; Fit fit = {}; bool floatKit = false; };
 
 // How a flight ended. Only a crash counts against the record and costs repairs; a safe diversion, an off-airport
 // landing, running dry on the ground or abandoning the job just fail the contract.
@@ -235,6 +237,19 @@ public:
   // they are worked out now)
 
   bool buy(int specIdx, std::string* msg);
+  // The hangar's mechanic (docs/HANGAR.md): your own aircraft as fitted (its floats, its kits), and the shop. A kit is
+  // bought once and stays in the airframe; floats are bought once and then put on or taken off for a fee, at a land
+  // field (the wheels come off where it stands on them). The aircraft must be here, at this airport, off any route and
+  // not in an open job.
+  const AircraftSpec& airframe(int fi) const { return fitted(fleet[fi].spec, fleet[fi].fit); }
+  const AircraftSpec& specFor(int specIdx, Source src) const;   // what flies: your own fitted aircraft when it is yours, else the type
+  int kitPrice(int specIdx, int kit) const;
+  int floatKitPrice(int specIdx) const { return kAircraft[specIdx].price * 22 / 100 / 10 * 10; }
+  int floatSwapFee(int specIdx) const { return std::max(150, kAircraft[specIdx].price * 3 / 200 / 10 * 10); }
+  bool workshopReady(int fi, std::string* why) const;   // here, on no route, in no job
+  bool buyKit(int fi, int kit, std::string* msg);
+  bool buyFloats(int fi, std::string* msg);              // buys and fits them
+  bool swapFloats(int fi, bool on, std::string* msg);    // floats owned: on or off
   int saleValue(int fi) const;   // what selling fleet[fi] pays before any loan is settled from it (the button shows this)
   bool sell(int fleetIdx, std::string* msg);
   int positioningCost(const Contract& c) const;
@@ -324,7 +339,8 @@ extern std::vector<Contract> g_story;
 // the load), a scripted takeoff, the checkpoints in turn, then the autopilot's approach and landing: the minutes it
 // takes, or a negative number if it didn't get there. About half a second of CPU: callers run it off the UI thread.
 // (climbOutOnly: just the scripted take-off - the minutes to 120 m above the ground, negative if it never got there)
-float simulateFlightMinutes(const Contract& c, int specIdx, float* fuelKgOut = nullptr, bool climbOutOnly = false);
+// (airframe: a fitted one of the type - your own on floats, with its kits - else the type's stock row)
+float simulateFlightMinutes(const Contract& c, int specIdx, float* fuelKgOut = nullptr, bool climbOutOnly = false, const AircraftSpec* airframe = nullptr);
 extern float kEstK[5];   // the flight-time estimate's fitted weights (Career::plan)
 void buildStory();
 bool replaceFile(const std::string& from, const std::string& to);   // moves `from` over `to` in one step (career saves, the settings file)

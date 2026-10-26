@@ -42,7 +42,7 @@ add_custom_target(aircraft_geometry_gen DEPENDS ${AIRCRAFT_GEOMETRY_GEN})
 # test compiled the shared sources itself: the islands' five 39 times over (the review of v3.44.0, ENG-1).
 set(ENVIRONMENT_SOURCES src/geo.cpp src/earth_data.cpp src/earth_charts.cpp src/earth_far.cpp src/earth_fetch.cpp src/earth_install.cpp src/world_earth.cpp src/region_travel.cpp src/procedural_regions.cpp src/distant_regions.cpp src/regional_surface.cpp src/world.cpp src/road_network.cpp src/bridges.cpp src/settlements.cpp src/road_furniture.cpp src/landmarks.cpp src/road_traffic.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp)
 set(CORE_ONLY_SOURCES
-  src/aircraft.cpp src/aircraft_perf.cpp src/aircraft_stunt.cpp src/aero.cpp src/aero_strips.cpp src/aero_wake.cpp src/breakup.cpp src/models.cpp src/career.cpp src/profile.cpp src/weather.cpp src/hive_combat.cpp src/hive_loadout.cpp src/hive_world_collision.cpp)
+  src/aircraft.cpp src/airframe_fit.cpp src/aircraft_perf.cpp src/aircraft_stunt.cpp src/aero.cpp src/aero_strips.cpp src/aero_wake.cpp src/breakup.cpp src/models.cpp src/career.cpp src/profile.cpp src/weather.cpp src/hive_combat.cpp src/hive_loadout.cpp src/hive_world_collision.cpp)
 set(CORE_SOURCES ${ENVIRONMENT_SOURCES} ${CORE_ONLY_SOURCES})
 set(GAME_ONLY_SOURCES
   src/aircraft_mesh_asset.cpp
@@ -952,6 +952,9 @@ add_test(NAME airport_slots COMMAND airport_slots_test)
 add_executable(water_test tests/water_test.cpp ${CORE_OBJS})
 add_dependencies(water_test test_world)
 add_test(NAME float_hydrodynamics COMMAND water_test)
+add_executable(hangar_test tests/hangar_test.cpp ${CORE_OBJS})
+add_dependencies(hangar_test test_world)
+add_test(NAME hangar COMMAND hangar_test)
 set_tests_properties(float_hydrodynamics PROPERTIES FIXTURES_REQUIRED world
   ENVIRONMENT "SOMNIUM_TEST_WORLD=${CMAKE_BINARY_DIR}/test_world.bin" COST 30)
 

@@ -27,45 +27,64 @@ vec3 seaPoint() {
 }
 }
 
-static PerfModel s_perf[kAircraftCount]; static int s_perfState[kAircraftCount] = {};   // 0 not learned, 1 learning (provisional numbers), 2 learned
-static std::recursive_mutex s_perfM[kAircraftCount];   // (one per type: different types can be learned on different threads at once)
+// One learned envelope for each type, and one for each type on floats (a fitted airframe's: docs/HANGAR.md) - the slot a
+// spec flies on: its type's, or its type's on floats; the mechanic's kits fly on it as it is (they only better it)
+static constexpr int kPerfSlots = 2 * kAircraftCount;
+static int perfSlot(const AircraftSpec* s) {
+  const int t = typeOf(s);
+  if (t < 0 || t >= kAircraftCount) return -1;
+  return s->fittedFrom >= 0 && s->fit.floats ? kAircraftCount + t : (s->fittedFrom >= 0 || s == &kAircraft[t] ? t : -1);
+}
+static const AircraftSpec& perfSpecOf(int slot) { return slot < kAircraftCount ? kAircraft[slot] : fitted(slot - kAircraftCount, Fit{true, 0}); }
+// (the career's: every career type, and each on floats where they fit - learned at the start, kept with the cache)
+static std::vector<int> perfRoster() {
+  std::vector<int> r;
+  for (int t : kCareerAircraft) r.push_back(t);
+  for (int t : kCareerAircraft) if (floatKitFor(t)) r.push_back(kAircraftCount + t);
+  return r;
+}
+static PerfModel s_perf[kPerfSlots]; static int s_perfState[kPerfSlots] = {};   // 0 not learned, 1 learning (provisional numbers), 2 learned
+static std::recursive_mutex s_perfM[kPerfSlots];   // (one per slot: different types can be learned on different threads at once)
 static std::atomic<bool> s_noting{false};
 static std::mutex s_notesM; static std::vector<std::pair<int, double>> s_notes;
 void Plane::perfNoting(bool on) { s_noting = on; }
 bool Plane::perfLearned(const AircraftSpec* s) {
-  const int idx = (int)(s - kAircraft);
-  if (idx < 0 || idx >= kAircraftCount) return false;
+  const int idx = perfSlot(s);
+  if (idx < 0) return false;
   std::lock_guard<std::recursive_mutex> lk(s_perfM[idx]); return s_perfState[idx] == 2;
 }
+std::vector<const AircraftSpec*> Plane::perfAirframes() { std::vector<const AircraftSpec*> v; for (int slot : perfRoster()) v.push_back(&perfSpecOf(slot)); return v; }
 std::vector<std::pair<int, double>> Plane::perfNoted() { std::lock_guard<std::mutex> lk(s_notesM); std::vector<std::pair<int, double>> n; n.swap(s_notes); return n; }
 // The learned models on disk, stamped with the build that learned them (another build learns them again)
 bool Plane::perfLoad(const std::string& path, const std::string& stamp) {
   FILE* f = fopen(path.c_str(), "rb"); if (!f) return false;
-  char st[64] = {}; uint32_t n = 0, sz = 0; PerfModel tmp[kAircraftCount];
+  const std::vector<int> roster = perfRoster();
+  char st[64] = {}; uint32_t n = 0, sz = 0; PerfModel tmp[kPerfSlots];
   bool ok = fread(st, 1, 64, f) == 64 && stamp == std::string(st, strnlen(st, 64)) && fread(&n, 4, 1, f) == 1 && fread(&sz, 4, 1, f) == 1
-            && n == (uint32_t)kNumAircraft && n <= kAircraftCount && sz == sizeof(PerfModel) && fread(tmp, sizeof(PerfModel), n, f) == n;
+            && n == (uint32_t)roster.size() && n <= kPerfSlots && sz == sizeof(PerfModel) && fread(tmp, sizeof(PerfModel), n, f) == n;
   fclose(f);
   if (!ok) return false;
-  for (uint32_t i = 0; i < n; i++) { std::lock_guard<std::recursive_mutex> lk(s_perfM[careerSpecAt(i)]); const int spec = careerSpecAt(i); if (!s_perfState[spec]) { s_perf[spec] = tmp[i]; s_perfState[spec] = 2; } }
+  for (uint32_t i = 0; i < n; i++) { const int slot = roster[i]; std::lock_guard<std::recursive_mutex> lk(s_perfM[slot]); if (!s_perfState[slot]) { s_perf[slot] = tmp[i]; s_perfState[slot] = 2; } }
   return true;
 }
 void Plane::perfSave(const std::string& path, const std::string& stamp) {
   FILE* f = fopen(path.c_str(), "wb"); if (!f) return;
+  const std::vector<int> roster = perfRoster();
   char st[64] = {}; strncpy(st, stamp.c_str(), 63);
-  uint32_t n = (uint32_t)kNumAircraft, sz = sizeof(PerfModel);
+  uint32_t n = (uint32_t)roster.size(), sz = sizeof(PerfModel);
   fwrite(st, 1, 64, f); fwrite(&n, 4, 1, f); fwrite(&sz, 4, 1, f);
-  for (uint32_t i = 0; i < n; i++) fwrite(&perf(&kAircraft[careerSpecAt(i)]), sizeof(PerfModel), 1, f);
+  for (int slot : roster) fwrite(&perf(&perfSpecOf(slot)), sizeof(PerfModel), 1, f);
   fclose(f);
 }
 const PerfModel& Plane::perf(const AircraftSpec* sp) {
   PerfModel* cache = s_perf; int* state = s_perfState; std::recursive_mutex* m = s_perfM;
-  int idx = (int)(sp - kAircraft);
-  if (idx < 0 || idx >= kAircraftCount) { static PerfModel none; return none; }
+  const int idx = perfSlot(sp);
+  if (idx < 0) { static PerfModel none; return none; }
   std::lock_guard<std::recursive_mutex> lk(m[idx]);
   if (state[idx]) return cache[idx];   // (while learning, the test sorties fly on the provisional numbers below)
   state[idx] = 1;
   const auto learnT0 = std::chrono::steady_clock::now();
-  const AircraftSpec& s = *sp;
+  const AircraftSpec& s = perfSpecOf(idx);   // (the slot's own airframe: a kit-fitted one flies on its type's numbers)
   PerfModel& P = cache[idx];
   Weather calm; calm.windSpeed = 0; calm.turbulence = 0; calm.gust = 0;
   // The appended production types count cabin occupants as well as hold cargo. In the older
@@ -219,7 +238,7 @@ const PerfModel& Plane::perf(const AircraftSpec* sp) {
     }
   }
   state[idx] = 2;
-  if (s_noting) { std::lock_guard<std::mutex> lk(s_notesM); s_notes.push_back({idx, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - learnT0).count()}); }
+  if (s_noting) { std::lock_guard<std::mutex> lk(s_notesM); s_notes.push_back({idx % kAircraftCount, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - learnT0).count()}); }
   return P;
 }
 

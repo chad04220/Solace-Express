@@ -124,8 +124,16 @@ static_assert(sizeof(kAircraft) / sizeof(kAircraft[0]) == kAircraftCount, "Aircr
 // figures now (a Dawnlark's 770 km, an Archipel's 1,500), and these the weights the airframes were trimmed, rigged and
 // measured at, so each flies as it did
 static const float kDesignFuel[kAircraftCount] = {70, 110, 120, 260, 420, 1500, 2200, 180, 220, 2200, 6000, 3200, 6000, 135, 20000, 400};
+int typeOf(const AircraftSpec* s) {
+  if (!s) return -1;
+  if (s->fittedFrom >= 0) return s->fittedFrom;
+  const uintptr_t p = (uintptr_t)s, a = (uintptr_t)kAircraft;
+  if (p >= a && p < a + sizeof(AircraftSpec) * kAircraftCount) return (int)((p - a) / sizeof(AircraftSpec));
+  for (int i = 0; i < kAircraftCount; i++) if (s->id && !strcmp(s->id, kAircraft[i].id)) return i;   // (a copy of a row: a test's variant)
+  return -1;
+}
 float AircraftSpec::designFuel() const {
-  const int t = (int)(this - kAircraft);
+  const int t = typeOf(this);
   return t >= 0 && t < kAircraftCount ? kDesignFuel[t] : maxFuel;
 }
 
@@ -159,12 +167,12 @@ float Plane::thrustAt(float spool, float V, float vf, float rho) const {
     return s.engines * s.power * spool * powf(sigmaRho, 0.75f) * (1.f - 0.3f * mach);
   }
   float P = s.engines * s.power * spool * (s.engineType == ENG_PISTON ? sigmaRho : powf(sigmaRho, 0.75f));
-  float thrust = P * 0.8f / sqrtf(vf * vf + s.v0 * s.v0);
+  float thrust = P * 0.8f * s.propFactor / sqrtf(vf * vf + s.v0 * s.v0);   // (propFactor: a fitted composite propeller's)
   // a propeller can't make more thrust than momentum theory allows for its disk: T = FM (2 rho A P^2)^(1/3) per
   // engine, figure of merit 0.75, diameter from the power it absorbs (1.75 m for a 110 kW trainer, 2.7 m for a
   // Longshore) - it's what limits the static thrust, at speed the power-over-speed term is the smaller
   float Pe = P / s.engines, D = 0.55f * powf(s.power / 1000.f, 0.25f), A = PI * D * D * 0.25f;
-  return std::min(thrust, s.engines * 0.75f * cbrtf(2.f * dens * A * Pe * Pe));
+  return std::min(thrust, s.engines * 0.75f * s.propFactor * cbrtf(2.f * dens * A * Pe * Pe));
 }
 
 // The thrust it can turn straight down to hold itself up (N): the XR-40's pods tilt to the vertical; nothing else can
@@ -184,10 +192,7 @@ float Plane::fuelFlowAt(float spool, float tas, float rho, float live) const {
     const float sigma = clampf((rho > 0.f ? rho : density) / 1.225f, .001f, 1.3f);
     return full * (dry + .668f * boost) * (.85f + .15f * sqrtf(sigma)) * live;
   }
-  if (s.engineType != ENG_JET || s.jetDryTsfc <= 0.f) {
-    const float rangeS = s.rangeKm * 1000.f / s.cruise;
-    return s.maxFuel / (rangeS * .8f) * (.2f + .8f * spool) * live;
-  }
+  if (s.engineType != ENG_JET || s.jetDryTsfc <= 0.f) return fuelFlowMax() * (.2f + .8f * spool) * live;
   const float dens = rho > 0.f ? rho : density;
   const float sigma = clampf(dens / 1.225f, .001f, 1.3f);
   const float m = std::max(0.f, tas) / std::max(soundSpeed, 1.f);
@@ -207,8 +212,12 @@ float Plane::fuelFlowAt(float spool, float tas, float rho, float live) const {
 }
 float Plane::fuelFlowMax() const {
   if (spec->engineType != ENG_JET || spec->jetDryTsfc <= 0.f) {
-    const float rangeS = spec->rangeKm * 1000.f / spec->cruise;
-    return spec->maxFuel / (rangeS * .8f);
+    // (the type's own engine, from its row: a fitted airframe's long-range tanks hold more and burn no faster, and its
+    // floats slow its cruise and shorten its range alike; a tuned engine burns as much more as it makes)
+    const int t = typeOf(spec);
+    const AircraftSpec& row = t >= 0 ? kAircraft[t] : *spec;
+    const float rangeS = row.rangeKm * 1000.f / row.cruise;
+    return row.maxFuel / (rangeS * .8f) * (spec->power / row.power);
   }
   Plane reference; reference.spec = spec; reference.soundSpeed = isa(0).a;
   return reference.fuelFlowAt(1.f, 0.f, 1.225f);
@@ -764,7 +773,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   if (s.fullCabinEnvelope && s.engineType == ENG_JET && s.engLayout == 1) {
     // Large underwing fans reach the runway before a swept, dihedral wing tip. Derive both
     // strike envelopes from the same model used to draw them, including the nacelle belly.
-    const int model = (int)(spec - kAircraft);
+    const int model = typeOf(spec);
     if (model >= 0 && model < kAircraftCount) {
       const ModelDef& md = kModels[model];
       const vec3 tip = modelWingTip(md);

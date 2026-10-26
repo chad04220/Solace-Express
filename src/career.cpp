@@ -441,6 +441,64 @@ int Career::ownedIndexFor(int specIdx) const {
   for (size_t i = 0; i < fleet.size(); i++) if (fleet[i].spec == specIdx) return (int)i;
   return -1;
 }
+const AircraftSpec& Career::specFor(int si, Source src) const {
+  if (src == SRC_OWNED) if (const int oi = ownedIndexFor(si); oi >= 0) return airframe(oi);
+  return kAircraft[std::clamp(si, 0, kAircraftCount - 1)];
+}
+
+// ------------------------------------------------------------------ the hangar's mechanic (docs/HANGAR.md)
+// (the kits' prices, shares of the aircraft's: the engine's work the dearest, the tanks the cheapest)
+static const int kKitPricePct[KIT_COUNT] = {12, 6, 7, 8, 5, 6};
+int Career::kitPrice(int si, int kit) const { return kit < 0 || kit >= KIT_COUNT ? 0 : kAircraft[si].price * kKitPricePct[kit] / 100 / 10 * 10; }
+bool Career::workshopReady(int fi, std::string* why) const {
+  auto no = [&](const std::string& w) { if (why) *why = w; return false; };
+  if (fi < 0 || fi >= (int)fleet.size()) return no("No such aircraft.");
+  const OwnedPlane& p = fleet[fi];
+  if (!here(p) || p.location != location) return no(fmt("Your %s is parked elsewhere: the work is done where it stands.", kAircraft[p.spec].name));
+  if (routeOf(fi) >= 0) return no("It's flying a route: recall it first.");
+  if (attemptOpen || (job && job->src == SRC_OWNED && job->spec == p.spec)) return no("It's on an open job: finish or release it first.");
+  return true;
+}
+bool Career::buyKit(int fi, int kit, std::string* msg) {
+  if (!workshopReady(fi, msg)) return false;
+  OwnedPlane& p = fleet[fi];
+  if (!kitFor(p.spec, kit)) { *msg = "That kit doesn't fit this aircraft."; return false; }
+  if (p.fit.has(kit)) { *msg = "It's fitted already."; return false; }
+  const int cost = kitPrice(p.spec, kit);
+  if (money < cost) { *msg = fmt("Not enough money ($%d)", cost); return false; }
+  money -= cost; p.fit.kits |= 1u << kit;
+  p.fuel = std::min(p.fuel, airframe(fi).maxFuel);
+  *msg = fmt("%s fitted to your %s for $%d.", kitName(kit, kAircraft[p.spec]), kAircraft[p.spec].name, cost);
+  return true;
+}
+// (the wheels come off where it stands on them: a land field's)
+static bool onLand(const std::string& region, int airport) { const Airport* a = procedural::airportOf(region, airport); return a && !a->water(); }
+bool Career::buyFloats(int fi, std::string* msg) {
+  if (!workshopReady(fi, msg)) return false;
+  OwnedPlane& p = fleet[fi];
+  if (!floatKitFor(p.spec)) { *msg = "Floats don't suit it."; return false; }
+  if (p.floatKit) { *msg = "It has its floats already."; return false; }
+  if (!onLand(region, location)) { *msg = "Floats are fitted at a land field."; return false; }
+  const int cost = floatKitPrice(p.spec);
+  if (money < cost) { *msg = fmt("Not enough money ($%d)", cost); return false; }
+  money -= cost; p.floatKit = true; p.fit.floats = true;
+  p.fuel = std::min(p.fuel, airframe(fi).maxFuel);
+  *msg = fmt("Amphibious floats fitted to your %s for $%d: it lands on water and, wheels down, on a runway.", kAircraft[p.spec].name, cost);
+  return true;
+}
+bool Career::swapFloats(int fi, bool on, std::string* msg) {
+  if (!workshopReady(fi, msg)) return false;
+  OwnedPlane& p = fleet[fi];
+  if (!p.floatKit) { *msg = "No floats in store: buy a set first."; return false; }
+  if (p.fit.floats == on) { *msg = on ? "Its floats are on." : "It stands on its wheels."; return false; }
+  if (!onLand(region, location)) { *msg = "The floats are changed at a land field."; return false; }
+  const int cost = floatSwapFee(p.spec);
+  if (money < cost) { *msg = fmt("Not enough money ($%d)", cost); return false; }
+  money -= cost; p.fit.floats = on;
+  p.fuel = std::min(p.fuel, airframe(fi).maxFuel);
+  *msg = fmt(on ? "Your %s is on its floats again ($%d)." : "Your %s is back on its wheels ($%d): the floats wait in the hangar.", kAircraft[p.spec].name, cost);
+  return true;
+}
 
 static float routeTopOf(const Contract& c);
 Career::Source Career::canFly(const Contract& c, int si, std::string* why) const {
@@ -461,7 +519,8 @@ Career::Source Career::canFly(const Contract& c, int si, std::string* why) const
     return SRC_MILITARY;
   }
   if (!isCareerAircraft(si)) return no("Not available in the career fleet");
-  const AircraftSpec& s = kAircraft[si];
+  const int oiHere = ownedIndexFor(si);   // (your own when it's in this region: as you've fitted it - floats, kits)
+  const AircraftSpec& s = oiHere >= 0 && here(fleet[oiHere]) ? airframe(oiHere) : kAircraft[si];
   if (c.forceAircraft >= 0) return si == c.forceAircraft ? SRC_LESSON : no("Lesson aircraft only");
   if (c.requireSpec >= 0 && si != c.requireSpec) return no(fmt("Client requires the %s", kAircraft[c.requireSpec].name));
   if (license < s.license) return no(std::string("Requires ") + licenseName(s.license));
@@ -527,7 +586,7 @@ static float routeTop(const std::vector<vec3>& r) {
 static float routeTopOf(const Contract& c) { return routeTop(routePoints(c)); }
 
 Career::LaunchPlan Career::plan(const Contract& c, int si, Source src) const {
-  const AircraftSpec& s = kAircraft[si];
+  const AircraftSpec& s = specFor(si, src);
   LaunchPlan e; e.spec = si; e.src = src; e.startAirport = c.from;
   if (isMilitaryContract(c.type)) {
     e.src = src == SRC_MILITARY ? canFly(c, si) : SRC_NONE;
@@ -636,7 +695,7 @@ static float quickFuelKg(const AircraftSpec& s, const Career::LaunchPlan& e) {
 }
 
 void Career::finishPlan(LaunchPlan& e, const Contract& c, float minutes, float fuelKg) const {
-  const AircraftSpec& s = kAircraft[e.spec];
+  const AircraftSpec& s = specFor(e.spec, e.src);
   const Airport& B = arrivalAirport(c);
   e.minutesEst = minutes;
   e.minutesSigma = 0.15f * e.minutesEst;
@@ -676,8 +735,8 @@ void Career::finishPlan(LaunchPlan& e, const Contract& c, float minutes, float f
   else e.challenge = "Straightforward";
 }
 
-float simulateFlightMinutes(const Contract& c, int si, float* fuelKgOut, bool climbOutOnly) {
-  const AircraftSpec& s = kAircraft[si];
+float simulateFlightMinutes(const Contract& c, int si, float* fuelKgOut, bool climbOutOnly, const AircraftSpec* airframe) {
+  const AircraftSpec& s = airframe ? *airframe : kAircraft[si];
   const Airport& a = g_world.airports[c.from];
   Weather wx = c.wx;
   float h0 = a.heading;
@@ -742,7 +801,7 @@ int Career::ferryCost(const Contract& c, int si) const {
 }
 
 int Career::netQuick(const Contract& c, int si, Source src) const {
-  const AircraftSpec& s = kAircraft[si];
+  const AircraftSpec& s = specFor(si, src);
   int fees = positioningCost(c) + (src == SRC_OWNED ? ferryCost(c, si) : 0) + (src == SRC_RENT ? s.rentFee : 0);
   int fuel = 0;
   if (src == SRC_OWNED) {   // the owned aircraft's fuel for the distance at its cruise power, the take-off, climb and approach on top (as the plan's quick estimate)
@@ -930,7 +989,7 @@ void Career::refreshBoard() {
   // drawn from a generator of its own, so the rest of the board (and the long hauls drawn after it) are as they were
   {
     int fl = -1;
-    for (int i : access) if (kAircraft[i].floats) fl = i;
+    for (int i : access) { const int oi = ownedIndexFor(i); if ((oi >= 0 && here(fleet[oi]) ? airframe(oi) : kAircraft[i]).floats) fl = i; }   // (yours on floats too)
     std::vector<int> bases;
     for (int i = 0; i < (int)g_world.airports.size(); i++) if (g_world.airports[i].water() && i != location) bases.push_back(i);
     Rng rw(boardSeed * 2246822519u + location * 3266489917u + 0x5EA9u);
@@ -939,7 +998,7 @@ void Career::refreshBoard() {
       bool dup = false;
       for (auto& b : board) dup |= b.to == to;
       if (dup) continue;
-      const AircraftSpec& s = kAircraft[fl];
+      const AircraftSpec& s = kAircraft[fl];   // (its load as the type's: floats come out of the useful load, canFly weighs it)
       const Airport& A = g_world.airports[location]; const Airport& B = g_world.airports[to];
       Contract c; c.from = location; c.to = to; c.id = fmt("W%u_%d", boardSeed, location);
       const bool pax = license >= LIC_CPL && s.pax >= 2 && (rw.next() & 1);
@@ -1103,7 +1162,7 @@ std::vector<PayoutLine> Career::closeLeg(const FlightResult& r, const LaunchPlan
     int oi = ownedIndexFor(J.spec);
     if (p.fuel == LaunchPlan::FUEL_PURCHASED) {
       if (p.fuelCostEst) { L.push_back({fmt("Fuel uplift at %s (%.0f kg)", g_world.airports[p.startAirport].code, p.fuelUpliftKg), -p.fuelCostEst}); J.fuelBilledKg += p.fuelUpliftKg; }
-      if (oi >= 0 && r.fuelLeftKg >= 0) fleet[oi].fuel = std::clamp(r.fuelLeftKg, 0.f, s.maxFuel);
+      if (oi >= 0 && r.fuelLeftKg >= 0) fleet[oi].fuel = std::clamp(r.fuelLeftKg, 0.f, airframe(oi).maxFuel);
     } else {
       int fuelCost = (int)(r.fuelUsedKg * s.fuelPriceBase());
       if (fuelCost) { L.push_back({"Fuel (this leg)", -fuelCost}); J.fuelBilledKg += r.fuelUsedKg; }
@@ -1157,7 +1216,7 @@ std::vector<PayoutLine> Career::settleJob(const FlightResult& r, const LaunchPla
 }
 void Career::releaseJob() { job.reset(); refreshBoard(); }
 void Career::planFuel(LaunchPlan& e, const Contract& c, float fuelKg) const {
-  const AircraftSpec& s = kAircraft[e.spec];
+  const AircraftSpec& s = specFor(e.spec, e.src);
   e.fuelLoadKg = clampf(fuelKg, 0.f, s.maxFuel);
   if (e.fuel != LaunchPlan::FUEL_PURCHASED) return;
   int oi = ownedIndexFor(e.spec);
@@ -1169,7 +1228,7 @@ void Career::planFuel(LaunchPlan& e, const Contract& c, float fuelKg) const {
 bool Career::refuel(int fi, std::string* msg) {
   if (fi < 0 || fi >= (int)fleet.size()) return false;
   OwnedPlane& p = fleet[fi];
-  const AircraftSpec& s = kAircraft[p.spec];
+  const AircraftSpec& s = airframe(fi);
   if (!here(p)) { *msg = fmt("Your %s is parked in another region.", s.name); return false; }
   if (p.location != location) { *msg = fmt("Your %s is at %s, not here.", s.name, g_world.airports[p.location].code); return false; }
   float need = std::max(0.f, s.maxFuel - p.fuel);
@@ -1213,7 +1272,7 @@ std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, co
     abandonMilitaryAttempt();
     return L;
   }
-  const AircraftSpec& s = kAircraft[si];
+  const AircraftSpec& s = specFor(si, src)   /* (your own as fitted: its tanks, its speeds) */;
   int pos = plan ? plan->positioning : positioningCost(c), ferry = plan ? plan->ferry : src == SRC_OWNED ? ferryCost(c, si) : 0;
   int hire = plan ? plan->hire : src == SRC_RENT ? s.rentFee : 0;
   if (pos) L.push_back({"Positioning ticket to " + std::string(g_world.airports[c.from].code), -pos});
@@ -1223,7 +1282,7 @@ std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, co
     int oi = ownedIndexFor(si);
     if (plan && plan->fuel == LaunchPlan::FUEL_PURCHASED) {   // bought at the departure, as quoted; the tanks keep what is left
       if (plan->fuelCostEst) L.push_back({c.longHaul() ? fmt("Fuel uplift at the departure (%.0f kg)", plan->fuelUpliftKg) : fmt("Fuel uplift at %s (%.0f kg)", g_world.airports[plan->startAirport].code, plan->fuelUpliftKg), -plan->fuelCostEst});
-      if (oi >= 0 && r.fuelLeftKg >= 0) fleet[oi].fuel = std::clamp(r.fuelLeftKg, 0.f, s.maxFuel);
+      if (oi >= 0 && r.fuelLeftKg >= 0) fleet[oi].fuel = std::clamp(r.fuelLeftKg, 0.f, airframe(oi).maxFuel);
     } else {
       int fuelCost = (int)(r.fuelUsedKg * s.fuelPriceBase());
       if (fuelCost) L.push_back({"Fuel", -fuelCost});
@@ -1394,7 +1453,7 @@ int Career::routeRevenue(const Route& r) const {
 }
 int Career::routeFuelCost(const Route& r) const {
   if (r.fleetIdx < 0 || r.fleetIdx >= (int)fleet.size()) return 0;
-  const AircraftSpec& s = kAircraft[fleet[r.fleetIdx].spec];
+  const AircraftSpec& s = airframe(r.fleetIdx);   // (as fitted: its floats, its kits)
   float km = solaceDistanceKm(r.from, r.to) + 8.f;
   float kg = s.engineType == ENG_JET ? jetMissionFuel(s, km * 1000.f / (s.cruise * .85f) / 60.f, 1.f, 3.f) : s.maxFuel / std::max(s.rangeKm, 1.f) * km * 1.1f;
   return (int)(kg * s.fuelPriceBase() * 1.1f);
@@ -1488,7 +1547,7 @@ bool Career::routeFlightQualifies(const FlightResult& r) {
 }
 float Career::routeLegMinutes(const Route& rt) const {
   if (rt.fleetIdx < 0 || rt.fleetIdx >= (int)fleet.size()) return 1e9f;
-  const AircraftSpec& s = kAircraft[fleet[rt.fleetIdx].spec];
+  const AircraftSpec& s = airframe(rt.fleetIdx);
   return solaceDistanceKm(rt.from, rt.to) * 1000.f / Plane::perf(&s).cruiseV / 60.f + 6.f;   // (6 min on the stand)
 }
 void Career::airlineTick(std::vector<PayoutLine>& L, float minutes) {
@@ -1607,7 +1666,10 @@ void Career::payLoan(std::vector<PayoutLine>& L) {
 }
 int Career::saleValue(int fi) const {
   if (fi < 0 || fi >= (int)fleet.size()) return 0;
-  return (int)(kAircraft[fleet[fi].spec].price * 7 / 10 * (0.6f + 0.4f * clampf(fleet[fi].condition, 0.f, 1.f)));
+  const OwnedPlane& p = fleet[fi];
+  int fittedValue = p.floatKit ? floatKitPrice(p.spec) : 0;   // (what was fitted: half of it back)
+  for (int k = 0; k < KIT_COUNT; k++) if (p.fit.has(k)) fittedValue += kitPrice(p.spec, k);
+  return (int)(kAircraft[p.spec].price * 7 / 10 * (0.6f + 0.4f * clampf(p.condition, 0.f, 1.f))) + fittedValue / 2;
 }
 bool Career::sell(int fi, std::string* msg) {
   if (fi < 0 || fi >= (int)fleet.size()) return false;
@@ -1640,9 +1702,11 @@ bool Career::save(const std::string& path) const {
   // (version 7 is a career with something beyond the islands - its own region, or an aircraft parked in one: a career
   // that never left them writes version 6 exactly, as every release before could read)
   // (version 8: a career on the real Earth - "earth 1"; one with the generated regions writes 7 or 6 as before)
-  bool away = !atHome();
-  for (auto& p : fleet) away = away || p.region != "solace";
-  bool ok = fprintf(f, "somnium_save %d\n", realEarth ? 8 : away ? 7 : 6) > 0;
+  // (version 9: a career with an aircraft fitted at the hangar - floats owned, the mechanic's kits - "plane_fit" lines;
+  // one without writes 8, 7 or 6 as before)
+  bool away = !atHome(), fits = false;
+  for (auto& p : fleet) { away = away || p.region != "solace"; fits = fits || p.floatKit || p.fit != Fit{}; }
+  bool ok = fprintf(f, "somnium_save %d\n", fits ? 9 : realEarth ? 8 : away ? 7 : 6) > 0;
   if (realEarth) ok = ok && fprintf(f, "earth 1\n") > 0;
   if (away) ok = ok && fprintf(f, "region %s\n", region.c_str()) > 0;
   ok = ok && fprintf(f, "money %d\nlicense %d\nrep %d\nlocation %d\nstory %d\nflights %d\nlandings %d\ncrashes %d\nhours %f\nbest %f\nseed %u\nfinished %d\nattempt %u\nattempt_open %d\n",
@@ -1654,6 +1718,8 @@ bool Career::save(const std::string& path) const {
   ok = ok && fprintf(f, "fleet %d\n", (int)fleet.size()) > 0;
   for (auto& p : fleet) ok = ok && fprintf(f, "plane %s %d %f %f\n", kAircraft[p.spec].id, p.location, p.fuel, p.condition) > 0;
   for (size_t i = 0; i < fleet.size(); i++) if (fleet[i].region != "solace") ok = ok && fprintf(f, "plane_region %d %s\n", (int)i, fleet[i].region.c_str()) > 0;
+  for (size_t i = 0; i < fleet.size(); i++)
+    if (fleet[i].floatKit || fleet[i].fit != Fit{}) ok = ok && fprintf(f, "plane_fit %d %u %d %d\n", (int)i, fleet[i].fit.kits, fleet[i].floatKit ? 1 : 0, fleet[i].fit.floats ? 1 : 0) > 0;
   if (loan.open()) ok = ok && fprintf(f, "loan %s %d %d %d %f\n", kAircraft[loan.spec].id, loan.balance, loan.payment, loan.missed, loan.rate) > 0;
   ok = ok && fprintf(f, "insured %d\n", insured ? 1 : 0) > 0;
   for (auto& p : airline.pilots) { std::string n = p.name; for (char& ch : n) if (ch == ' ') ch = '_'; ok = ok && fprintf(f, "pilot %s %d %d\n", n.c_str(), p.rating, p.wage) > 0; }
@@ -1702,7 +1768,7 @@ bool Career::load(const std::string& path, bool board) {
   FILE* f = fopen(path.c_str(), "r");
   if (!f) return false;
   Career c; char key[64]; int ver = 0;
-  if (fscanf(f, "%63s %d", key, &ver) != 2 || (strcmp(key, "somnium_save") && strcmp(key, "solace_save") && strcmp(key, "airxpress_save")) || ver < 1 || ver > 8) { fclose(f); return false; }
+  if (fscanf(f, "%63s %d", key, &ver) != 2 || (strcmp(key, "somnium_save") && strcmp(key, "solace_save") && strcmp(key, "airxpress_save")) || ver < 1 || ver > 9) { fclose(f); return false; }
   // the career's airports are its region's (the islands' until a "region" line, which comes first), wherever g_world is;
   // the airline's routes and the military are the islands'; an aircraft's are the region it is parked in (checked last)
   int nApt = solaceAirportCount();
@@ -1763,7 +1829,7 @@ bool Career::load(const std::string& path, bool board) {
       { long pos = ftell(f); float cv = 0; if (fscanf(f, "%f", &cv) == 1 && std::isfinite(cv)) cond = cv; else fseek(f, pos, SEEK_SET); }   // (version 3 adds the condition)
       for (int i : kCareerAircraft) if (ok && !strcmp(kAircraft[i].id, id)) spec = i;
       ok = ok && spec >= 0 && loc >= 0 && std::isfinite(fuel) && c.ownedIndexFor(spec) < 0;   // (one of each type; its airport checked once its region is known)
-      if (ok) c.fleet.push_back({spec, loc, std::clamp(fuel, 0.f, kAircraft[spec].maxFuel), std::clamp(cond, 0.f, 1.f)});
+      if (ok) c.fleet.push_back({spec, loc, std::clamp(fuel, 0.f, kAircraft[spec].maxFuel * 1.3f), std::clamp(cond, 0.f, 1.f)});   // (its own tanks, which may be long-range ones: checked once its fit is read)
     }
     else if (!strcmp(key, "plane_region")) {
       int i = -1; char id[64];
@@ -1771,6 +1837,13 @@ bool Career::load(const std::string& path, bool board) {
       if (ok && earthCharts::isEarthId(id) && procedural::airportCount(id) == 0) { c.fleet[i].location = procedural::mainAirport("solace"); continue; }   // (its pack gone: home)
       ok = ok && procedural::airportCount(id) > 0;
       if (ok) c.fleet[i].region = id;
+    }
+    else if (!strcmp(key, "plane_fit")) {   // (version 9) an aircraft fitted at the hangar: its kits, its floats owned and on
+      int i = -1, owned = 0, on = 0; unsigned kits = 0;
+      ok = ver >= 9 && fscanf(f, "%d %u %d %d", &i, &kits, &owned, &on) == 4 && i >= 0 && i < (int)c.fleet.size() && (owned == 0 || owned == 1) && (on == 0 || on == 1)
+           && !(on && !owned) && (!owned || floatKitFor(c.fleet[i].spec)) && kits < (1u << KIT_COUNT);
+      for (int k = 0; ok && k < KIT_COUNT; k++) ok = !((kits >> k) & 1u) || kitFor(c.fleet[i].spec, k);
+      if (ok) { c.fleet[i].fit.kits = kits; c.fleet[i].floatKit = owned != 0; c.fleet[i].fit.floats = on != 0; }
     }
     else if (!strcmp(key, "insured")) { int v = 0; ok = fscanf(f, "%d", &v) == 1 && (v == 0 || v == 1); c.insured = v == 1; }
     else if (!strcmp(key, "pilot")) { char n[64]; Pilot p; ok = fscanf(f, "%63s %d %d", n, &p.rating, &p.wage) == 3 && p.rating >= 1 && p.rating <= 3 && p.wage >= 0 && c.airline.pilots.size() < 6; if (ok) { p.name = n; for (char& ch : p.name) if (ch == '_') ch = ' '; c.airline.pilots.push_back(p); } }
@@ -1864,6 +1937,7 @@ bool Career::load(const std::string& path, bool board) {
     else ok = false;   // unknown key: not a file this version wrote
   }
   fclose(f);
+  for (auto& p : c.fleet) p.fuel = std::min(p.fuel, fitted(p.spec, p.fit).maxFuel);   // (what its tanks, as fitted, hold)
   if (ver >= 2) ok = ok && have == 4095 && ended && fleetN == (int)c.fleet.size();   // a truncated save is rejected
   if (earthGone) { c.region = "solace"; c.location = procedural::mainAirport("solace"); c.job.reset(); c.attemptOpen = false; }
   for (auto& r : c.airline.routes) if (r.fleetIdx >= (int)c.fleet.size() || r.pilot >= (int)c.airline.pilots.size() || c.fleet[r.fleetIdx].region != "solace") ok = false;   // (a route needs its aircraft, in the islands, and its pilot)

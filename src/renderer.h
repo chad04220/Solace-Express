@@ -747,7 +747,15 @@ private:
   // the bakes build each body with its own pair. Made the first time the type is drawn or baked (from the binary cache
   // after the first launch), each falling back to the shared build (sharedMeshProgram, sharedBakePrograms) if it fails.
   // AF_ALL (debug) draws and bakes everything with the shared builds.
-  static constexpr int kAfModels = kAircraftCount;   // (the whole roster, kAircraft: the career types and the research craft)
+  // (the whole roster, kAircraft: the career types and the research craft; past it, each type on floats from the hangar's
+  // mechanic - docs/HANGAR.md - its own build made the first time it flies, its bodies baked on this PC and cached)
+  static constexpr int kAfModels = 2 * kAircraftCount;
+public:
+  static int afTypeOf(int m) { return m >= kAircraftCount ? m - kAircraftCount : m; }
+  static bool afExists(int m);
+  static void afPack(int m, float M[96]);
+  static std::string afName(int m);
+private:
   // (the bake: a builder pair for each of its bodies - [0] the outside's, without the cabin's code (AF_OUTSIDE), [1] the
   // cockpit's - each with its own stamp, so a cockpit's edit builds that cockpit's body alone)
   struct AfOwn { GLuint mesh = 0, probe = 0, bake[2][2] = {}, pass[3] = {}; bool meshTried = false, bakeTried[2] = {}, passTried[3] = {}; bool bakeFullQuality[2] = {}; std::string stamp[2]; aircraftAsset::Identity portableIdentity[2]; };

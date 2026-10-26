@@ -98,17 +98,25 @@ GLuint Renderer::sharedMeshProgram() {
   }
   return progPlaneMesh;
 }
+bool Renderer::afExists(int m) { return m >= 0 && m < kAfModels && (m < kAircraftCount || floatKitFor(m - kAircraftCount)); }
+void Renderer::afPack(int m, float M[96]) {
+  if (m < kAircraftCount) { packModelOf(m, M); return; }
+  const int type = m - kAircraftCount;
+  const AircraftSpec& s = fitted(type, Fit{true, 0});   // (its floats as the physics hang them)
+  Plane p; p.spec = &s; packModel(s, type, p.gearHeight(), M);
+}
+std::string Renderer::afName(int m) { return std::string(kAircraft[afTypeOf(m)].name) + (m >= kAircraftCount ? " on floats" : ""); }
 int Renderer::afModelOf(const float* M, int model) {
-  static_assert(kAfModels == kAircraftCount, "one own build for each type in the roster");
+  static_assert(kAfModels == 2 * kAircraftCount, "one own build for each type in the roster, and one for each on floats");
   static const bool all = getenv("AF_ALL") != nullptr;   // (debug: every aircraft drawn and baked with the shared builds)
   if (all) return -1;
   if (!afKeysSet) {
-    for (int m = 0; m < kAfModels; m++) { float P[96]; packModelOf(m, P); afKeys[m] = trafficModelKey(P); }
+    for (int m = 0; m < kAfModels; m++) { float P[96]; if (afExists(m)) { afPack(m, P); afKeys[m] = trafficModelKey(P); } else afKeys[m] = 0; }
     afKeysSet = true;
   }
   // (by its packed model, the constants its own build is made with; and the type it claims, if any, must be that one)
   const uint64_t k = trafficModelKey(M);
-  for (int m = 0; m < kAfModels; m++) if (afKeys[m] == k) return model < 0 || model == m ? m : -1;
+  for (int m = 0; m < kAfModels; m++) if (afKeys[m] == k && afExists(m)) return model < 0 || model == afTypeOf(m) ? m : -1;
   return -1;
 }
 // the mesh pass's program for an aircraft: its type's own build, else every aircraft's (each made the first time it is
@@ -122,26 +130,26 @@ GLuint Renderer::afMeshProgram(int model) {
   AfOwn& a = afOwn[model];
   if (!a.meshTried) {
     a.meshTried = true;
-    float M[96]; packModelOf(model, M);
-    const std::string stage = std::string("aircraft mesh (the ") + kAircraft[model].name + "'s own)";
+    float M[96]; afPack(model, M);
+    const std::string stage = "aircraft mesh (the " + afName(model) + "'s own)";
     setCompileStage(stage.c_str());
     std::string e;
-    a.mesh = linkProgramCached(planeMeshVSAssembly(""), planeMeshFSAssembly(aircraftDefines(model, M)), e);
+    a.mesh = linkProgramCached(planeMeshVSAssembly(""), planeMeshFSAssembly(aircraftDefines(afTypeOf(model), M)), e);
     setCompileStage("");
-    if (!a.mesh) shaderNote(std::string("Aircraft mesh shader (the ") + kAircraft[model].name + "'s own build) failed: drawn with every aircraft's\n" + e);
+    if (!a.mesh) shaderNote("Aircraft mesh shader (the " + afName(model) + "'s own build) failed: drawn with every aircraft's\n" + e);
   }
   return a.mesh;
 }
 // an aircraft's own builder for one of its bodies: the outside's has no cabin code (AF_OUTSIDE)
 static std::string bakeDefines(int model, int slot) {
-  float M[96]; packModelOf(model, M);
-  return aircraftDefines(model, M) + (slot == 0 ? "#define AF_OUTSIDE\n" : "") + (getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "");
+  float M[96]; Renderer::afPack(model, M);
+  return aircraftDefines(Renderer::afTypeOf(model), M) + (slot == 0 ? "#define AF_OUTSIDE\n" : "") + (getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "");
 }
 bool Renderer::afBakePrograms(int model, int slot, GLuint out[2]) {
   AfOwn& a = afOwn[model];
   if (!a.bakeTried[slot]) {
     a.bakeTried[slot] = true;
-    const std::string who = std::string("the ") + kAircraft[model].name + (slot ? "'s cockpit" : "'s outside");
+    const std::string who = "the " + afName(model) + (slot ? "'s cockpit" : "'s outside");
     const std::string stage = "aircraft bake (" + who + ")";
     setCompileStage(stage.c_str());
     std::string e;
@@ -170,7 +178,7 @@ std::string Renderer::meshStamp(int model, int slot) {
 // all families while actual construction remains each aircraft's own unchanged builder. Only canonical runtime
 // model inputs may use this identity (the exact local pack is checked below); custom geometry always falls back.
 aircraftAsset::Identity Renderer::prebuiltAircraftIdentity(int model, int slot) {
-  if (model < 0 || model >= kAfModels || slot < 0 || slot > 1) return {};
+  if (model < 0 || model >= kAircraftCount || slot < 0 || slot > 1) return {};   // (a type on floats is baked on this PC: never packaged)
   aircraftAsset::Identity& id = afOwn[model].portableIdentity[slot];
   if (id.geometry != aircraftAsset::Digest{}) return id;
   id.model = (uint32_t)model; id.slot = (uint32_t)slot;
@@ -237,7 +245,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
   // A packaged full-quality body takes priority even when this driver's old cache contains reduced fallback
   // geometry. Missing/stale/corrupt assets never modify GPU state or the read-only package directory.
   const int own = afModelOf(M, pv.model);
-  float canonicalM[96]; if (own >= 0) packModelOf(own, canonicalM);
+  float canonicalM[96]; if (own >= 0) afPack(own, canonicalM);
   const bool canonical = own >= 0 && pv.model == own && std::memcmp(M, canonicalM, sizeof canonicalM) == 0;
   if (!aircraftExportCapture && !prebuiltAircraftDir.empty() && canonical && !getenv("AF_ALL") && !getenv("CLIPDBG")) {
     aircraftAsset::MeshData data; std::string assetError;
@@ -1042,7 +1050,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
       const double all = std::chrono::duration<double>(std::chrono::steady_clock::now() - tBake).count();
       const int own = afModelOf(M, pv.model);
       char line[320]; snprintf(line, sizeof line, "baked %s's %s body in %.1f s: its builder's programs %.1f s, the field %.1f s (%.1f M points), the frames shown %.1f s, the meshing %.1f s",
-                               own >= 0 ? kAircraft[own].name : "an aircraft", inside ? "cockpit" : "outside", all, progS, bakeEvalS, bakeEvalPts * 1e-6, bakeYieldS, all - progS - bakeEvalS - bakeYieldS);
+                               own >= 0 ? afName(own).c_str() : "an aircraft", inside ? "cockpit" : "outside", all, progS, bakeEvalS, bakeEvalPts * 1e-6, bakeYieldS, all - progS - bakeEvalS - bakeYieldS);
       bakeLog(line);
       if (getenv("HULLDBG")) printf("%s\n", line);
     }
@@ -1314,9 +1322,9 @@ void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const f
   if ((dbgOff & kProbeMeshShade) && trafK < 0) {
     GLuint& probe = own >= 0 && prog != progPlaneMesh ? afOwn[own].probe : progPlaneMeshProbe;
     if (!probe) {
-      float M[96]; if (own >= 0 && prog != progPlaneMesh) packModelOf(own, M);
+      float M[96]; if (own >= 0 && prog != progPlaneMesh) afPack(own, M);
       setCompileStage("the analysis's airframe shading probe");
-      std::string pe; probe = linkProgramCached(planeMeshVSAssembly(""), planeMeshFSAssembly((own >= 0 && prog != progPlaneMesh ? aircraftDefines(own, M) : std::string()) + "#define PROBE_MESH_SHADE\n"), pe);
+      std::string pe; probe = linkProgramCached(planeMeshVSAssembly(""), planeMeshFSAssembly((own >= 0 && prog != progPlaneMesh ? aircraftDefines(afTypeOf(own), M) : std::string()) + "#define PROBE_MESH_SHADE\n"), pe);
       setCompileStage("");
     }
     if (probe) prog = probe;
@@ -1347,7 +1355,7 @@ void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const f
 void Renderer::checkMeshCache() {
   meshCached = false;
   if (!prebuiltAircraftDir.empty() && !getenv("AF_ALL") && !getenv("CLIPDBG")) {
-    for (int model = 0; model < kAfModels; model++) for (int slot = 0; slot < 2; slot++) {
+    for (int model = 0; model < kAircraftCount; model++) for (int slot = 0; slot < 2; slot++) {
       std::error_code ec;
       if (std::filesystem::is_regular_file(std::filesystem::path(prebuiltAircraftDir) / prebuiltAircraftFilename(model, slot), ec)) {
         meshCached = true; return; // pacing hint only; the actual load fully validates before trusting it
@@ -1356,7 +1364,7 @@ void Renderer::checkMeshCache() {
   }
   if (g_shaderCacheDir.empty()) return;
   std::vector<std::string> tails;
-  for (int m = -1; m < kAfModels; m++) for (int slot = 0; slot < 2; slot++) tails.push_back("_" + meshStamp(m, slot) + ".bin");
+  for (int m = -1; m < kAfModels; m++) if (m < 0 || afExists(m)) for (int slot = 0; slot < 2; slot++) tails.push_back("_" + meshStamp(m, slot) + ".bin");
   std::error_code ec;
   for (const auto& e : std::filesystem::directory_iterator(g_shaderCacheDir, ec)) {
     const std::string n = e.path().filename().string();

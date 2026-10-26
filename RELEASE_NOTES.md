@@ -1,3 +1,47 @@
+## Unreleased: Real fuel, floats for your aircraft, and the mechanic
+
+### Real fuel
+- **Every aircraft carries real fuel.** The tanks were sized to the islands: a trainer flew 45 km on fifteen minutes
+  of fuel and an airliner 170 km. Now the career types hold three to seven hours each: the Dawnlark 770 km, the
+  Ambler 1,150, the Longshore 1,700 on a tonne of fuel, the Archipel 1,600. The flight model's handling is unchanged.
+- **The XR-40 flies for hours.** Its pods emptied six tonnes in eighty seconds of boost. Now they burn like a
+  strategic bomber's engines: two hours at full boost, seven at full dry power, seventeen at cruise (15,500 km). The
+  XR-10, XR-20 and XR-30 are fighter-realistic: about eight minutes on full reheat, three to four hours at cruise.
+- **Fuel by the rules.** A job card plans the trip with a tenth to spare and a 30-minute reserve (45 for a jet). A
+  rental comes as full as the weight limit allows. The LOW FUEL warning and the debrief's reserve lines count minutes
+  of cruise, and the HUD's fuel tile shows hours and minutes.
+- **Missions about fuel ration it.** The Nordholm Crossing leaves with fuel for 90 km, and the XR-40's Mach 4 card
+  with 300 kg. The job card shows a rationed load, and it can't be changed.
+- **Around the world.** On the real Earth the board lists six intercontinental hubs, 3,000 to 9,000 km away, and can
+  offer a long haul across an ocean.
+
+### Floats for your own aircraft
+- **Six types take amphibious floats:** the Dawnlark, Ambler, Scrubrunner, Skerry, Longshore and Thistledown. A set
+  costs 22% of the aircraft's price, fitted at a land field. The wheels fold up into the floats, so it lands on the
+  water wheels up and on a runway wheels down.
+- **Swap them on and off** for a mechanic's fee (1.5% of the price); the floats wait in the hangar. Your own aircraft
+  on floats takes seaplane bases' jobs and the board's seaplane charters. A rental of the type comes on its wheels.
+- **Floats with weight and drag:** a sixth more empty weight out of the useful load, about 8% off the cruise, and
+  4.0's hydrodynamics. Each type floats at its draft with its propeller clear of the water, and comes off the water in
+  100 to 630 m.
+- **Drawn on the aircraft:** each type's own model with the floats and struts under it.
+- **In Free Flight** the six types have an "On floats / On wheels" button.
+
+### The mechanic
+- **Six kits for an aircraft you own,** in the hangar's MECHANIC section: an engine overhaul (8% more power, a
+  jet's 6% more thrust), a composite propeller, a speed kit (6% less drag), a lightweight interior (5% off the empty
+  weight), long-range tanks (30% more fuel at the same burn) and a STOL kit (10% more lift). They stack, they change
+  how it flies in the flight model, and the quotes, fuel and dispatch follow. An Ambler with every kit cruises 6.5%
+  faster.
+- Kits cost 5% to 12% of the aircraft's price each, and add half of what they cost to its sale value.
+
+### Saves
+- A career with floats or kits saves as version 9; one with nothing fitted saves as before.
+
+### Fixes
+- A piston's fuel burn is now metered to a fraction of a gram each physics step. At real flows a step's tenth of a
+  gram was lost to rounding.
+
 ## What's new in v4.0.0: Wings over Water
 
 Until now the sea between the islands was only something to fall into: touch it anywhere off a runway and the flight

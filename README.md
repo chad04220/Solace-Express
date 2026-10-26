@@ -76,6 +76,9 @@ generated regions, each with its own airports, towns and sights, and the career 
   ferry flights and positioning tickets, and buy fuel at the departure. The job board quotes each job for the
   aircraft you pick: it flies the job on the autopilot in the background, then shows the time, the fuel, the costs
   and your net. Owned aircraft wear, need servicing and can fail in flight; the hangar sells insurance.
+- **A mechanic in the hangar.** Six kits for an aircraft you own: an engine overhaul, a composite propeller, a speed
+  kit, a lightweight interior, long-range tanks and a STOL kit. Each changes how it flies in the flight model, and
+  they stack.
 - **Jobs survive a diversion.** Land short and the leg closes; the job waits where the load is until you fly it on.
 - **Your airline.** Hired pilots fly your aircraft on routes and pay into your account, and their flights pass you
   as traffic in your livery.
@@ -108,8 +111,8 @@ generated regions, each with its own airports, towns and sights, and the career 
   heads, straits), named for that region and marked on the maps. Your passport keeps a page for every region:
   the airports you've landed at and the sights you've found.
 - **The career goes too.** Fly to another region by airline ticket and work its own job board. Your aircraft stay
-  where you park them. With a jet that has the range, take a **long haul** and fly a load there yourself, across
-  the open ocean.
+  where you park them. With an aircraft that has the range, take a **long haul** and fly a load there yourself,
+  across the open ocean. On the real Earth the board lists intercontinental hubs 3,000 to 9,000 km away.
 
 <table>
   <tr>
@@ -136,6 +139,9 @@ New in 4.0: the sea is somewhere to fly from and to, not only something to fall 
   water lane with the wheels up and taxis you in to the dock. An amphibian's gear advisory calls out what the gear is
   set for against the field ahead. Spray, a foam wake, and the floats' hiss make the water show what the floats are
   doing.
+- **Floats for your own aircraft.** Six types (the Dawnlark, Ambler, Scrubrunner, Skerry, Longshore and
+  Thistledown) take a set of amphibious floats in place of their wheels: bought once in the hangar, swapped on and
+  off at a land field, and flown with the floats' weight, drag and hydrodynamics.
 
 <table>
   <tr>
@@ -152,21 +158,21 @@ with your inputs.
 
 | Aircraft | Type | Seats / Cargo | Range | Cruise | Runway | Licence |
 |---|---|---|---|---|---|---|
-| Dawnlark T2 | Two-seat aerobatic trainer | 1 / 120 kg | 45 km | 118 kt | 410 m paved | Student |
-| Ambler 180 | Four-seat tourer | 3 / 320 kg | 70 km | 130 kt | 442 m paved | PPL |
-| Cutwater S6 | Retractable low-wing tourer | 3 / 420 kg | 140 km | 173 kt | 451 m paved | PPL |
-| Thistledown L4 | Shoulder-wing tourer | 3 / 130 kg | 115 km | 133 kt | 600 m paved | PPL |
-| Scrubrunner STOL | Backcountry taildragger | 4 / 480 kg | 72 km | 133 kt | 251 m, gravel / snow | CPL |
-| Skerry Twin | Nine-seat utility twin | 9 / 900 kg | 90 km | 130 kt | 469 m, gravel / snow | CPL |
-| Wavecrest C6 | Coastal charter twin | 5 / 270 kg | 110 km | 160 kt | 447 m paved | CPL |
-| Longshore Hauler | Single turboprop hauler | 12 / 1,400 kg | 130 km | 150 kt | 525 m, gravel / snow | CPL |
-| Archipel 400 | Regional turboprop airliner | 40 / 4,500 kg | 170 km | 265 kt | 780 m paved | ATP |
+| Dawnlark T2 | Two-seat aerobatic trainer | 1 / 120 kg | 770 km | 118 kt | 410 m paved | Student |
+| Ambler 180 | Four-seat tourer | 3 / 320 kg | 1,150 km | 130 kt | 442 m paved | PPL |
+| Cutwater S6 | Retractable low-wing tourer | 3 / 420 kg | 1,500 km | 173 kt | 451 m paved | PPL |
+| Thistledown L4 | Shoulder-wing tourer | 3 / 130 kg | 1,600 km | 133 kt | 600 m paved | PPL |
+| Scrubrunner STOL | Backcountry taildragger | 4 / 480 kg | 1,100 km | 133 kt | 251 m, gravel / snow | CPL |
+| Skerry Twin | Nine-seat utility twin | 9 / 900 kg | 1,400 km | 130 kt | 469 m, gravel / snow | CPL |
+| Wavecrest C6 | Coastal charter twin | 5 / 270 kg | 1,800 km | 160 kt | 447 m paved | CPL |
+| Longshore Hauler | Single turboprop hauler | 12 / 1,400 kg | 1,700 km | 150 kt | 525 m, gravel / snow | CPL |
+| Archipel 400 | Regional turboprop airliner | 40 / 4,500 kg | 1,600 km | 265 kt | 780 m paved | ATP |
 | Emissary 500 | Light business jet | 7 / 700 kg | 4,350 km | 466 kt | 607 m paved | ATP |
 | Galleon 180 | 180-seat twin-engine transport | 180 / 6,500 kg | 5,800 km | 513 kt | 1,900 m paved | ATP |
-| Kittiwake A9 | Single-turboprop amphibian | 9 / 900 kg | 120 km | 165 kt | 600 m paved, or a water lane | CPL |
+| Kittiwake A9 | Single-turboprop amphibian | 9 / 900 kg | 1,450 km | 165 kt | 600 m paved, or a water lane | CPL |
 
 The numbers are what each aircraft actually does in the flight model, measured by flying it (`flight_test --table`).
-Ranges are scaled to the islands; only the jets reach the other regions. Four research craft sit beyond the career:
+The tanks are real: three to seven hours of fuel for each career type (docs/FUEL.md). Four research craft sit beyond the career:
 the XR-10 Vigil, the XR-20 Reverie, the XR-30 Nocturne (Mach 2.85, thrust vectoring) and the XR-40 Somnus (Mach 4.4,
 four tilting thruster pods, a cloak, lasers and plasma bombs).
 
@@ -385,7 +391,9 @@ docs/                               design notes (below) and the README's pictur
 | [docs/RENDERER_REBUILD.md](docs/RENDERER_REBUILD.md) | The deferred renderer and its passes |
 | [docs/AIRCRAFT_AUTHORING.md](docs/AIRCRAFT_AUTHORING.md) | Adding an aircraft, from its numbers to its cockpit and tests |
 | [docs/COCKPIT_INTERIORS.md](docs/COCKPIT_INTERIORS.md) | Cockpit layouts and crew-station fit |
+| [docs/FUEL.md](docs/FUEL.md) | Real fuel: every type's tanks, burn and endurance; reserves; rationed missions; long hauls |
 | [docs/JET_FUEL.md](docs/JET_FUEL.md) | Jet fuel burn and endurance calibration |
+| [docs/HANGAR.md](docs/HANGAR.md) | Floats for six types, the mechanic's kits, one airframe as it is fitted |
 | [docs/HIVE_COMBAT_DESIGN.md](docs/HIVE_COMBAT_DESIGN.md) | The military enemies' combat simulation |
 | [docs/AUDIO_PASS.md](docs/AUDIO_PASS.md) | The spatial audio mix and its tests |
 | [steam/README.md](steam/README.md) | Steamworks settings, achievements, the demo and the upload |

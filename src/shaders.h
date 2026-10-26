@@ -16,6 +16,7 @@
 // (plane_common.glsl HAS_*, shader_prune.h): the program holds this aircraft and nothing else.
 inline std::string aircraftDefines(int model, const float packed[96]) {
   std::string d = "#define AF_MODEL " + std::to_string(model) + "\n" + aircraftBuild::shaderDefine(aircraftBuild::familyOf(packed));
+  if ((int)(packed[1] + 0.5f) == 5 && model != 15) d += "#define AF_FLOATS\n";   // (a type on floats from the hangar: the Kittiwake's own carries them already)
   d += "#define AF_PACKED_MODEL vec4[24](";
   for (int i = 0; i < 96; i++) {
     char b[32]; snprintf(b, sizeof b, "%.9g", packed[i]);   // (9 digits: the float itself, exactly)

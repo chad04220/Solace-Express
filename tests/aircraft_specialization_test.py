@@ -41,7 +41,7 @@ for gate in ('FLEET_ON && mid == 1', 'FLEET_ON && mid == 2', 'FLEET_ON && mid ==
 mesh = read('src/aircraft_mesh.cpp')
 hull = read('src/aircraft_hull.cpp')
 assert 'afModelOf(trafK >= 0 ? fp.traffic[trafK].t : fp.plane.M, trafK >= 0 ? -1 : fp.plane.model)' in mesh, 'Lost per-aircraft mesh dispatch'
-assert 'afMeshProgram(own)' in mesh and 'planeMeshFSAssembly(aircraftDefines(model, M))' in mesh, 'Lost the aircraft\'s own mesh build'
+assert 'afMeshProgram(own)' in mesh and 'planeMeshFSAssembly(aircraftDefines(afTypeOf(model), M))' in mesh, 'Lost the aircraft\'s own mesh build (a float variant builds as its type)'
 assert 'afBakePrograms(own, slot, hullBakeProg)' in hull and 'hullBakeFSAssembly(bakeDefines(model, slot))' in mesh, 'Lost the aircraft\'s own bake'
 assert '"#define AF_OUTSIDE\\n"' in mesh, 'The outside body\'s builder must leave the cabin out'
 assert 'meshStamp(afModelOf(M, pv.model), inside ? 1 : 0)' in mesh, 'The bodies\' cache must be stamped per aircraft and body'

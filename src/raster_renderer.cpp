@@ -93,8 +93,8 @@ GLuint Renderer::afPassProgram(int pass, int model, bool research) {
     AfOwn& a = afOwn[model];
     if (!a.passTried[pass]) {
       a.passTried[pass] = true;
-      float M[96]; packModelOf(model, M);
-      a.pass[pass] = linkAfPass(pass, aircraftDefines(model, M), std::string("the ") + kAircraft[model].name + "'s own");
+      float M[96]; afPack(model, M);
+      a.pass[pass] = linkAfPass(pass, aircraftDefines(afTypeOf(model), M), "the " + afName(model) + "'s own");
     }
     if (a.pass[pass]) return a.pass[pass];
   }
@@ -103,10 +103,11 @@ GLuint Renderer::afPassProgram(int pass, int model, bool research) {
   if (!afSharedTried[pass][v]) { afSharedTried[pass][v] = true; afShared[pass][v] = linkAfPass(pass, v ? "#define AF_LIGHT\n" : "", v ? "light aircraft build" : "every aircraft"); }
   return afShared[pass][v];
 }
-// the items: three for each type (item / 3 its type, item % 3 the kind), then the XR-40's effects
-int Renderer::afItemCount() { return kAfModels * 3 + 1; }
+// the items: three for each type (item / 3 its type, item % 3 the kind), then the XR-40's effects (a type on floats is
+// built the first time it flies, never here: after an update, the launch compiles the roster's alone)
+int Renderer::afItemCount() { return kAircraftCount * 3 + 1; }
 void Renderer::afItemOf(int item, int& model, int& kind) {
-  if (item >= kAfModels * 3) { model = kSomnus; kind = 3; return; }
+  if (item >= kAircraftCount * 3) { model = kSomnus; kind = 3; return; }
   model = item / 3; kind = item % 3;
 }
 // what each takes to compile, roughly (seconds on v3.50.1's diagnostics' RTX 3070 laptop: only their ratios matter)
@@ -130,7 +131,7 @@ std::vector<std::vector<int>> Renderer::afShareItems(int helpers) {
 void Renderer::buildAfItem(int item) {
   int model, kind; afItemOf(item, model, kind);
   if (kind == 0) { afMeshProgram(model); return; }
-  float M[96]; packModelOf(model, M);
+  float M[96]; afPack(model, M);
   afPassProgram(kind - 1, model, M[2] > 4.5f);   // (research as afCover has it: for the shared build, should its own fail)
 }
 // one more aircraft a pass covers: model collects its type (-2 none yet, -1 several, or one without an own build) and

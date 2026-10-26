@@ -1,5 +1,10 @@
 # Jet fuel calibration
 
+> **Superseded in part by [FUEL.md](FUEL.md).** The engine model below (thrust times TSFC, idle, reheat, 240 Hz
+> metering) stands. The research jets' TSFC and endurance, the XR-40's burn (now by its power setting: hours, not
+> minutes), and the note that propeller types keep their old calibration are replaced there, with every type's real
+> tank and burn.
+
 ## Scope and units
 
 All six jet aircraft use **usable fuel mass in kilograms**, fuel flow in **kg/s**, thrust in N and true airspeed in m/s. The model is independent of map size. Piston and turboprop consumption retains its previous gameplay calibration; this is deliberately a jet-only change.

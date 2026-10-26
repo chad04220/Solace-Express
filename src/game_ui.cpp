@@ -438,7 +438,7 @@ void Game::drawLoading() {
   const Airport& ap = g_world.airports[air && !flight.longHaul() ? flight.to : flight.from];
   // a picture rendered by render_loading.bat - the airport, or the aircraft in flight - when there is one on disk
   std::string key = g_world.procedural ? g_world.regionId + "/" + ap.code :
-    (military || air) ? fmt("air_%d", pendingService ? flight.forceAircraft : queued ? queued->spec : (int)(plane.spec - kAircraft)) : std::string(ap.code);
+    (military || air) ? fmt("air_%d", pendingService ? flight.forceAircraft : queued ? queued->spec : typeOf(plane.spec)) : std::string(ap.code);
   auto li = loadImg.find(key);
   if (li == loadImg.end() && !pending) {
     unsigned tex = 0; int w = 0, h = 0; std::vector<uint8_t> px;
@@ -976,7 +976,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
       row("Est. time", fmt("about %.0f min (+- %.0f)%s", e.minutesEst, e.minutesSigma, e.flown || c.forceAircraft >= 0 ? "" : e.flownFailed ? "  - estimated" : "  - flying it on the autopilot..."), e.mayBeLate(c.timeLimitMin) ? C_BAD : C_TEXT);
       {   // fuel and weight: the tanks at take-off (arrows: 5% of the tanks a step), the take-off weight against the
           // limit, the roll it needs here, and the uplift's price for an owned aircraft
-        const AircraftSpec& sp = kAircraft[selAircraft];
+        const AircraftSpec& sp = career.specFor(selAircraft, esrc);   // (your own as fitted: its tanks, its floats)
         if (!sp.special) {
           float fuel = chosenFuel(c, selAircraft, esrc, e);
           float payload = (float)c.cargoKg + c.pax * 85.f + 85.f, mass = sp.emptyMass + fuel + payload;
@@ -1145,7 +1145,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   bool otherWhileJob = openJob && !cd.job && !cd.free;   // (another job waits until this one is delivered or released)
   bool overweight = false;
   if (selAircraft >= 0) {
-    const AircraftSpec& sp = kAircraft[selAircraft]; auto esrc = career.canFly(c, selAircraft);
+    auto esrc = career.canFly(c, selAircraft); const AircraftSpec& sp = career.specFor(selAircraft, esrc);
     if (esrc != Career::SRC_NONE) { Career::LaunchPlan e0 = menuLaunchPlan(c, selAircraft, esrc, cd.job, false); float fuel = e0.fuelLoadKg; overweight = sp.emptyMass + fuel + c.cargoKg + c.pax * 85.f + 85.f > sp.maxMass() + 0.5f; }
   }
   bool can = selAircraft >= 0 && !commitBlocked() && !otherWhileJob && !overweight;
@@ -1435,9 +1435,11 @@ void Game::drawHubHangar(float x, float y, float w, float h) {
     g_ren.text(mx + 10 * s, py + 9 * s, 10 * s, label, C_DIM, 1, 0, false);
     g_ren.text(mx + 10 * s, py + 29 * s, 17 * s, ellipsize(value, half - 20 * s, 17 * s), C_TEXT, 1);
   };
-  metric(px, "CRUISE", fmtSpeed(a.cruise)); metric(px + half + 14 * s, "RANGE", fmt("%.0f km", a.rangeKm)); py += 72 * s;
-  header(px, py, iw, "ACQUISITION"); py += 28 * s;
+  // (your own as you've fitted it at the mechanic's: its floats, its kits)
   int oi = career.ownedIndexFor(selHangar);
+  const AircraftSpec& af = oi >= 0 ? career.airframe(oi) : a;
+  metric(px, "CRUISE", fmtSpeed(af.cruise)); metric(px + half + 14 * s, "RANGE", fmt("%.0f km", af.rangeKm)); py += 72 * s;
+  header(px, py, iw, "ACQUISITION"); py += 28 * s;
   auto result = [&](const std::string& m, bool cash) { if (cash) g_audio.trigger(SFX_CASH); hubMsg = m; hubMsgTime = 5; };
   if (oi < 0) {
     const bool lic = career.license >= a.license && !commitBlocked();
@@ -1458,20 +1460,57 @@ void Game::drawHubHangar(float x, float y, float w, float h) {
     if (button(px, py, iw, 38 * s, "Sell / " + fmtMoney(saleVal), !commitBlocked())) { std::string m; bool ok = false; commit([&](Career& k) { ok = k.sell(oi, &m); }); result(m, ok); }
     py += 52 * s;
   }
+  // the mechanic (docs/HANGAR.md): floats where the type takes them, and the kits - each bought once, worked where
+  // the aircraft stands (here, off any route, out of any job)
+  if (oi >= 0) {
+    const OwnedPlane f = career.fleet[oi];
+    header(px, py, iw, "MECHANIC"); py += 28 * s;
+    std::string why; const bool ready = !commitBlocked() && career.workshopReady(oi, &why);
+    std::string kits;
+    for (int k = 0; k < KIT_COUNT; k++) if (f.fit.has(k)) kits += (kits.empty() ? "" : ", ") + std::string(kitName(k, a));
+    note(std::string(f.fit.floats ? "On amphibious floats" : "On its wheels") + (kits.empty() ? ", as it left the factory." : ". Fitted: " + kits + "."), C_GOOD);
+    if (!ready) note(commitBlocked() ? "Last result not saved yet. Retrying." : why, C_WARN);
+    if (floatKitFor(f.spec)) {
+      if (!f.floatKit) {
+        const int cost = career.floatKitPrice(f.spec);
+        if (button(px, py, iw, 36 * s, "Amphibious floats / " + fmtMoney(cost), ready && career.money >= cost)) { std::string m; bool ok = false; commit([&](Career& k) { ok = k.buyFloats(oi, &m); }); result(m, ok); }
+        py += 46 * s;
+        note("Floats with wheels that fold up into them: seaplane bases, water jobs, and a runway still. A sixth more empty weight, a little slower; swap back to wheels for a fee.");
+      } else {
+        const int fee = career.floatSwapFee(f.spec);
+        if (button(px, py, iw, 36 * s, std::string(f.fit.floats ? "Back on wheels / " : "Put on floats / ") + fmtMoney(fee), ready && career.money >= fee)) {
+          std::string m; bool ok = false; const bool on = !f.fit.floats; commit([&](Career& k) { ok = k.swapFloats(oi, on, &m); }); result(m, ok);
+        }
+        py += 46 * s;
+        note(f.fit.floats ? "The floats come off at a land field and wait here for you." : "Your floats are in store: on again at any land field.");
+      }
+    }
+    for (int k = 0; k < KIT_COUNT; k++) {
+      if (!kitFor(f.spec, k)) continue;
+      if (f.fit.has(k)) { g_ren.text(px, py, 13 * s, ellipsize(std::string(kitName(k, a)) + "  -  fitted", iw, 13 * s), C_GOOD, 1); py += 22 * s; continue; }
+      const int cost = career.kitPrice(f.spec, k);
+      if (button(px, py, iw, 34 * s, std::string(kitName(k, a)) + " / " + fmtMoney(cost), ready && career.money >= cost)) { std::string m; bool ok = false; commit([&](Career& kc) { ok = kc.buyKit(oi, k, &m); }); result(m, ok); }
+      py += 42 * s;
+      note(kitBlurb(k, a));
+    }
+    py += 6 * s;
+  }
   header(px, py, iw, "TECHNICAL DATA"); py += 28 * s;
   row("CAPACITY", fmt("%d passenger%s / %.0f kg cargo", a.pax, a.pax == 1 ? "" : "s", a.cargoKg));
   const char* et[] = {"Piston", "Turboprop", "Turbofan"};
   row("POWERPLANT", fmt("%d x %s%s", a.engines, et[a.engineType], a.engineType == ENG_PISTON ? fmt(" (%d-cyl)", a.cylinders).c_str() : ""));
-  row("RUNWAY AT SEA LEVEL", fmt("%.0f m / %s", a.runwayM, a.roughOK ? "gravel / snow" : a.runwayM < 900 ? "grass" : "paved"));
-  row("LANDING GEAR", a.taildragger ? "Taildragger" : a.retract ? "Retractable tricycle" : "Fixed tricycle");
+  row("FUEL", fmt("%.0f kg: %.1f h at cruise", af.maxFuel, cruiseMinutes(af, af.maxFuel) / 60.f));
+  row("RUNWAY AT SEA LEVEL", fmt("%.0f m / %s", af.runwayM, af.roughOK ? "gravel / snow" : af.runwayM < 900 ? "grass" : "paved"));
+  row("LANDING GEAR", af.floats ? "Amphibious floats (retractable wheels)" : af.taildragger ? "Taildragger" : af.retract ? "Retractable tricycle" : "Fixed tricycle");
+  if (!af.floats && floatKitFor(selHangar)) row("ON THE WATER", "Amphibious floats at the mechanic's, once it's yours");
   row("LICENCE", licenseName(a.license));
   row("RENTAL / FLIGHT", a.rentFee ? fmtMoney(a.rentFee) : "Not available");
   header(px, py, iw, "FLEET SERVICES"); py += 28 * s;
   if (career.loan.open()) note(fmt("Loan: %s remaining, %s per flight%s", fmtMoney(career.loan.balance).c_str(), fmtMoney(career.loan.payment).c_str(), career.loan.missed ? fmt(" / %d missed", career.loan.missed).c_str() : ""), C_WARN);
   if (career.fleet.empty()) note("No owned aircraft yet. Rentals are available at every airport.");
   for (size_t fi = 0; fi < career.fleet.size(); ++fi) {
-    const OwnedPlane f = career.fleet[fi]; const AircraftSpec& fs = kAircraft[f.spec];
-    g_ren.text(px, py, 16 * s, ellipsize(fs.name, iw, 16 * s), C_TEXT, 1); py += 25 * s;
+    const OwnedPlane f = career.fleet[fi]; const AircraftSpec& fs = career.airframe((int)fi);
+    g_ren.text(px, py, 16 * s, ellipsize(std::string(fs.name) + (f.fit.floats ? "  (floats)" : ""), iw, 16 * s), C_TEXT, 1); py += 25 * s;
     note(fmt("%s / %.0f%% fuel / %.0f%% condition%s", parkedAt(f, false).c_str(), 100 * f.fuel / std::max(fs.maxFuel, 1.f), 100 * f.condition, career.routeOf((int)fi) >= 0 ? " / on route" : ""));
     const bool atHand = career.here(f) && f.location == career.location;
     if (atHand && f.fuel < fs.maxFuel - 1) {
@@ -1775,12 +1814,15 @@ void Game::drawFreeFlightSetup(const FrameParams& fp) {
     g_ren.text(x + 23 * s, cy + 35 * s, 11 * s, ellipsize(locked ? std::string("In the full game") : std::string(kAircraft[spec].role), lw - 46 * s, 11 * s), locked ? C_ACCENT : C_DIM, 1);
   }
   g_ren.text(x + 18 * s, y + h - 22 * s, 11 * s, ellipsize(fmt("%02d - %02d / %02d   SCROLL", craftFirst + 1, std::min(kNumAircraft, craftFirst + craftVisible), kNumAircraft), lw - 36 * s, 11 * s), C_DIM, 0.85f, 0, false);
-  const AircraftSpec& spec = kAircraft[freeCraft];
+  if (!floatKitFor(freeCraft)) freeFloats = false;
+  const AircraftSpec& spec = airframeFor(freeCraft, Career::SRC_NONE);   // (on floats, if chosen)
   hangarView.select(freeCraft, true);
   const float vx = L.previewX, vw = L.previewWidth;
   g_ren.rectGrad(vx, y, vw, 82 * s, C_PANEL, C_PANEL2, 0.86f, 4 * s);
   g_ren.text(vx + 18 * s, y + 13 * s, 11 * s, "READY FOR FREE FLIGHT", C_ACCENT, 1, 0, false);
-  fitText(vx + 18 * s, y + 33 * s, vw - 36 * s, 28 * s, 16 * s, spec.name, C_TEXT);
+  // (the types that take floats: on wheels or on amphibious floats - seaplane bases, and a runway still)
+  if (floatKitFor(freeCraft) && button(vx + vw - 178 * s, y + 8 * s, 164 * s, 26 * s, freeFloats ? "On floats" : "On wheels", true, freeFloats)) { freeFloats = !freeFloats; g_audio.trigger(SFX_CLICK); }
+  fitText(vx + 18 * s, y + 33 * s, vw - 36 * s, 28 * s, 16 * s, std::string(spec.name) + (spec.floats && !kAircraft[freeCraft].floats ? " on floats" : ""), C_TEXT);
   g_ren.text(vx + 18 * s, y + 66 * s, 10 * s, ellipsize(fmt("CRUISE / RANGE   %s / %.0f km", fmtSpeed(spec.cruise).c_str(), spec.rangeKm), vw - 36 * s, 10 * s), C_DIM, 1, 0, false);
   drawHangarPreviewControls(vx, y + h - 56 * s, vw);
   const float px = rx + 18 * s, iw = rw - 36 * s;

@@ -8,6 +8,7 @@
 #include "aircraft.h"
 #include "models.h"
 #include <cstring>
+#include <map>
 #include <mutex>
 
 namespace {
@@ -439,6 +440,17 @@ const AeroGeom& aeroGeom(const AircraftSpec& s) {
   static std::recursive_mutex mtx;
   std::lock_guard<std::recursive_mutex> lk(mtx);
   int idx = (int)(&s - kAircraft);
+  if (s.fittedFrom >= 0) {   // (a fitted airframe - floats, the mechanic's kits: its type's drawn airframe with its own numbers, made once)
+    static std::map<const AircraftSpec*, AeroGeom> fittedGeoms;
+    auto at = fittedGeoms.find(&s);
+    if (at == fittedGeoms.end()) {
+      AeroGeom g = build(s, s.fittedFrom); calibrate(g, s, s.fittedFrom);
+      at = fittedGeoms.emplace(&s, g).first;   // (in before its gear stations, which ask for its centre of gravity)
+      const GearStations gst = gearStations(s);
+      at->second.gearAt = vec3(0, -s.fusRad - 0.35f, 0.7f * gst.mainZ + 0.3f * (s.taildragger ? gst.tailZ : gst.noseZ));
+    }
+    return at->second;
+  }
   if (idx < 0 || idx >= kAircraftCount) {
     // a copy of a type's spec (a variant under test): its type's drawn airframe, with the copy's own numbers (engines,
     // power, weights), built afresh while the copy changes

@@ -39,7 +39,7 @@ int breakOwner(const BreakPiece* p, int n, vec3 b) {
 }
 
 int breakPieces(const AircraftSpec& s, float gearDown, float gearHeight, BreakPiece out[kMaxBreakPieces]) {
-  const ModelDef& m = kModels[&s - kAircraft];
+  const ModelDef& m = kModels[std::max(0, typeOf(&s))];
   int n = 0;
   auto push = [&](const BreakPiece& p) { if (n < kMaxBreakPieces - 3 && p.H.x > 0.f && p.H.y > 0.f && p.H.z > 0.f) out[n++] = p; };
   // the wing's chordwise extent at the root (its most forward point: a forward-swept wing's tips reach ahead of its root)
@@ -58,7 +58,7 @@ int breakPieces(const AircraftSpec& s, float gearDown, float gearHeight, BreakPi
     const bool fixed = !s.special && m.gear <= 2;
     if (!fixed && gearDown <= .2f) return;
     const GearStations gs = gearStations(s);
-    const bool galleon = &s == &kAircraft[kGalleon];
+    const bool galleon = typeOf(&s) == kGalleon;
     const float wr = s.special ? .38f : m.wheelR;
     const auto main = gearBreakup::mainPose(s,m,gs,gearHeight,gearDown);
     const vec3 wheel(gs.track,wr-gearHeight,gs.mainZ);
@@ -159,7 +159,7 @@ int breakPieces(const AircraftSpec& s, float gearDown, float gearHeight, BreakPi
   // engine nacelles that stand clear of the fuselage: on the wings, or podded on the tail cone
   const bool podded = m.engine >= 2 && m.nacR > 0.05f && m.nacX - m.nacR * 0.5f > hwAt(m, m.nacZ0 + 0.5f * m.nacLen);
   if (podded) for (int sd = -1; sd <= 1; sd += 2)
-    push({vec3(sd * m.nacX, m.nacY, m.nacZ0 + 0.5f * m.nacLen), vec3(m.nacR + 0.1f, m.nacR + 0.14f, 0.5f * m.nacLen + (&s == &kAircraft[kGalleon] ? .50f : .12f)), BK_NACELLE, sd});
+    push({vec3(sd * m.nacX, m.nacY, m.nacZ0 + 0.5f * m.nacLen), vec3(m.nacR + 0.1f, m.nacR + 0.14f, 0.5f * m.nacLen + (typeOf(&s) == kGalleon ? .50f : .12f)), BK_NACELLE, sd});
   gearPieces();
   // wing struts: from the lower fuselage out to the wing, below its skin
   if (m.strut) {
@@ -367,7 +367,7 @@ static void finish(DebrisBody& b, const std::vector<Elem>& els) {
 }
 
 void breakBodies(const AircraftSpec& s, const BreakPiece* p, int n, float mass, float payload, DebrisBody out[kMaxBreakPieces]) {
-  const ModelDef& m = kModels[&s - kAircraft];
+  const ModelDef& m = kModels[std::max(0, typeOf(&s))];
   const AeroGeom& g = aeroGeom(s);
   const float empty = std::max(mass - payload, 1.f);
   std::vector<Elem> els[kMaxBreakPieces];

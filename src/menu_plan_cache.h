@@ -50,7 +50,7 @@ inline std::string inputs(const Career& career, const Contract& c, int spec, Car
   Key k; k.bytes.reserve(2048); k.add(spec); k.add(src); k.contract(c); k.world();
   k.add(career.location); k.add(career.money < 1500); k.add(career.boardSeed);
   k.add(career.fleet.size());
-  for (const auto& p : career.fleet) { k.add(p.spec); k.add(p.location); k.add(p.fuel); k.add(p.condition); }
+  for (const auto& p : career.fleet) { k.add(p.spec); k.add(p.location); k.add(p.fuel); k.add(p.condition); k.add(p.fit.floats); k.add(p.fit.kits); k.add(p.floatKit); }
   for (float v : kEstK) k.add(v);
   return std::move(k.bytes);
 }
