@@ -1553,6 +1553,14 @@ bool Game::gearWarning() const {
   return plane.gear < 0.99f && length(plane.pos - g_world.airports[contract.to].pos()) < 4000.f;
 }
 
+// The research craft's launch sites step through the land fields alone: a seaplane base has nowhere to stand one
+int Game::stepResearchSite(int from, int step) const {
+  const int n = (int)g_world.airports.size();
+  int at = from;
+  for (int k = 0; k < n; k++) { at = ((at + step) % n + n) % n; if (!g_world.airports[at].water()) return at; }
+  return from;
+}
+
 bool Game::atDock() const {
   if (!plane.onWater) return false;
   for (const Airport& a : g_world.airports)
@@ -3600,11 +3608,10 @@ void Game::gamepadMenus(float dt) {
   if (ry != 0 && !menuPreviewTarget()) { static float acc = 0; acc += ry * dt * 8.f; while (fabsf(acc) >= 1.f) { in.wheel += acc > 0 ? 1.f : -1.f; acc -= acc > 0 ? 1.f : -1.f; } }
   // research menu: D-pad also steps through launch sites, Start launches
   if (screen == SCR_RESEARCH) {
-    int n = (int)g_world.airports.size();
     // Every research airframe has focusable preview controls. Start remains a
     // distinct launch action, never an extra activation of the focused control.
-    if (in.buttonsPressed & PAD_RB) resAirport = (resAirport + 1) % n;
-    if (in.buttonsPressed & PAD_LB) resAirport = (resAirport + n - 1) % n;
+    if (in.buttonsPressed & PAD_RB) resAirport = stepResearchSite(resAirport, 1);
+    if (in.buttonsPressed & PAD_LB) resAirport = stepResearchSite(resAirport, -1);
   }
 }
 
@@ -6465,7 +6472,7 @@ void Game::debugScene(const std::string& name) {
     printf("pad: combo -> research menu: %s\n", screen == SCR_RESEARCH ? "ok" : "FAIL");
     for (int i = 0; i < 50; i++) frame(0);           // let the access sequence finish
     int site = resAirport; frame(PAD_RB); frame(0);
-    printf("pad: RB steps launch site: %s\n", resAirport == (site + 1) % (int)g_world.airports.size() ? "ok" : "FAIL");
+    printf("pad: RB steps launch site: %s\n", resAirport == stepResearchSite(site, 1) ? "ok" : "FAIL");
     frame(PAD_B); frame(0);
     printf("pad: B backs out to main menu: %s\n", screen == SCR_MENU ? "ok" : "FAIL");
     screen = SCR_HUB; hubTab = 0; frame(0);
@@ -7428,8 +7435,8 @@ void Game::setupMilitaryEncounter() {
     m.kind=hive::MissionKind::Recon; m.scanRange=mission->scanRange; m.scanSeconds=mission->scanSeconds;
     const bool local=mission->id==military::LocalSurvey || mission->id==military::HoverScan;
     const int wanted=mission->id==military::HoverScan?1:(mission->id==military::LocalSurvey || mission->id==military::HighAltitudeIntel)?2:3;
-    m.objectiveCount=local?wanted:std::min(wanted,(int)g_world.airports.size());
-    std::vector<int> airports; for(int i=0;i<(int)g_world.airports.size();++i) airports.push_back(i);
+    std::vector<int> airports; for(int i=0;i<(int)g_world.airports.size();++i) if(!g_world.airports[i].water()) airports.push_back(i);   // (the land fields: a seaplane base has no tower or hangars)
+    m.objectiveCount=local?wanted:std::min(wanted,(int)airports.size());
     std::stable_sort(airports.begin(),airports.end(),[&](int a,int b) { return length(hiveCombat.displacement(origin,g_world.airports[a].pos()))<length(hiveCombat.displacement(origin,g_world.airports[b].pos())); });
     const int preferred[]={EK_CTRL_TOWER,EK_HANGAR,EK_FUEL_TANK};
     for(int i=0;i<m.objectiveCount;++i) {

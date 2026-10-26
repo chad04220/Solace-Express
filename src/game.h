@@ -931,6 +931,7 @@ private:
   std::future<std::pair<float, float>> quoteJob; std::string quoteJobKey;
   void applyQuote(const Contract& c, Career::LaunchPlan& e, bool start);
   int resAirport = 0, resWx = 0, resCraft = kResearchJet; bool resAirborne = true; float resTime = 12.f, resOpened = 0;
+  int stepResearchSite(int from, int step) const;   // the next launch site that way: the land fields alone (no seaplane base)
   // research test cards: each asks a craft for its limits or exercises one of its systems, step by step. The table is
   // in game_research_ui.cpp; the flight tracks the current step here and a finished card is remembered in settings.cfg.
   enum ResStepKind { RS_MACH = 0, RS_ALT, RS_G, RS_NEGG, RS_ROLL, RS_SLOW, RS_STALL, RS_CLIMB, RS_HOVER, RS_VLAND, RS_CLOAK, RS_LASER, RS_BOMB, RS_LAND };

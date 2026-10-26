@@ -737,7 +737,6 @@ void Game::drawResearch(const FrameParams& fp) {
       g_ren.text(x + w * 0.5f, y + hh * 0.5f - 6.5f * s, 11.5f * hs, t, on ? R_TEXT : R_DIM, e, 1, false);
       return click(x, y, w, hh, id);
     };
-    int na = (int)g_world.airports.size();
     if (chip(cx, cy + 16 * s, 96 * hs, 34 * s, "<  ABORT", false, 0x7E5E0001u) || in.pressed[K_ESC]) { screen = SCR_MENU; return; }
     cx += 112 * hs;
     // site
@@ -746,12 +745,12 @@ void Game::drawResearch(const FrameParams& fp) {
     float sw = 290 * hs;
     {   // the site itself in the D-pad's walk: left / right step it (the arrows are the mouse's; LB / RB step it too)
       int step = 0; focusAdjust(0x7E5E0002u, cx + 30 * hs, cy + 12 * s, sw - 34 * hs, 40 * s, &step);
-      if (step) resAirport = (resAirport + na + step) % na;
+      if (step) resAirport = stepResearchSite(resAirport, step);
     }
-    if (chip(cx, cy + 16 * s, 26 * hs, 34 * s, "<", false) || in.pressed[K_LEFT]) resAirport = (resAirport + na - 1) % na;
+    if (chip(cx, cy + 16 * s, 26 * hs, 34 * s, "<", false) || in.pressed[K_LEFT]) resAirport = stepResearchSite(resAirport, -1);
     g_ren.text(cx + 36 * hs, cy + 16 * s, 16 * hs, ellipsize(std::string(a.code) + "  " + a.name, sw - 44 * hs, 16 * hs), R_TEXT, e, 0, false);
     g_ren.text(cx + 36 * hs, cy + 36 * s, 10 * hs, ellipsize(fmt("RWY %02d/%02d  //  %.0f M %s  //  ELEV %.0f M", a.rwyNumber(false), a.rwyNumber(true), a.length, surfaceName(a.surface), a.elev), sw - 44 * hs, 10 * hs), R_DIM, e, 0, false);
-    if (chip(cx + sw, cy + 16 * s, 26 * hs, 34 * s, ">", false) || in.pressed[K_RIGHT]) resAirport = (resAirport + 1) % na;
+    if (chip(cx + sw, cy + 16 * s, 26 * hs, 34 * s, ">", false) || in.pressed[K_RIGHT]) resAirport = stepResearchSite(resAirport, 1);
     float c2 = cx + sw + 40 * hs;
     g_ren.text(c2, cy, 10 * hs, "INSERTION", R_DIM, e, 0, false);
     if (chip(c2, cy + 16 * s, 86 * hs, 34 * s, "AIRBORNE", resAirborne, 0x7E5E0003u)) resAirborne = true;
