@@ -143,6 +143,17 @@ struct GameTest {
       const bool beat = g.pbNew && fabsf(g.pbOld - 55.f) < 0.01f;
       FILE* f = fopen("profile.cfg", "r"); const bool wrote = f != nullptr; if (f) fclose(f);
       check(stamped && butter && best && beat && !wrote, "A touchdown at Far Isle: its stamp, Butter and Greaser, the type's softest, then a new best; no profile written by a test");
+      {   // on the water (docs/WINGS_OVER_WATER.md): a float plane alights at each seaplane base - Splashdown at the first,
+          // Harbour Master at the last; the islands' land airports (Every Field) are counted apart
+        g.plane.spec = &kAircraft[kKittiwake]; g.plane.onWater = true;
+        int bases = 0; bool first = false;
+        for (int i = 0; i < (int)g_world.airports.size(); i++)
+          if (g_world.airports[i].water()) { g.profileTouchdown(200.f, i); if (++bases == 1) first = g.profile.has("splashdown") && !g.profile.has("harbours_all"); }
+        const bool master = g.profile.has("harbours_all") && bases == islandFields(true) && g.profile.islandStamps(true) == bases;
+        const bool apart = g.profile.islandStamps(false) == 1 && islandFields(false) + bases == solaceAirportCount() && !g.profile.has("airports_all");
+        g.plane.spec = &s; g.plane.onWater = false;
+        check(first && master && apart && bases == 7, fmt("On the water: Splashdown at the first seaplane base, Harbour Master at the %dth; the land airports' stamps counted apart", bases));
+      }
       // over a landmark, low
       const auto& sites = profileSites();
       if (!sites.empty()) {

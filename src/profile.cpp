@@ -24,6 +24,7 @@ const Achievement kAchievements[] = {
   {"go_around", "Better Safe", "Go around, then land", false},
   {"long_haul", "Long Haul", "Fly a single flight of 150 km or more", false},
   {"warp", "Warp Drive", "Cover 500 km in Time Warp", false},
+  {"splashdown", "Splashdown", "Land on the water in a float plane", false},
   // career
   {"lic_ppl", "Private Pilot", "Earn the private pilot licence", false},
   {"lic_cpl", "Commercial Pilot", "Earn the commercial pilot licence", false},
@@ -38,6 +39,7 @@ const Achievement kAchievements[] = {
   // exploring
   {"airports10", "Island Hopper", "Land at 10 different airports", false},
   {"airports_all", "Every Field", "Land at every airport in the islands", false},
+  {"harbours_all", "Harbour Master", "Alight at every seaplane base in the islands", false},
   {"sites5", "Sightseer", "Find 5 landmarks", false},
   {"sites_all", "Grand Tour", "Find every landmark in the islands", false},
   {"photo", "Shutterbug", "Complete a photo flight", false},
@@ -114,6 +116,14 @@ static bool inRegion(const std::string& key, const std::string& region, char mar
   return key.size() > region.size() && key[region.size()] == mark && key.compare(0, region.size(), region) == 0;
 }
 int Profile::islandAirports() const { int n = 0; for (auto& a : airports) n += !beyond(a, ':'); return n; }
+// the islands' stamps of one kind - its land airports, or its seaplane bases (docs/WINGS_OVER_WATER.md) - and how many
+// there are to collect
+int Profile::islandStamps(bool water) const {
+  int n = 0;
+  for (int i = 0; i < solaceAirportCount(); i++) { const Airport& a = solaceAirport(i); n += a.water() == water && airports.count(a.code); }
+  return n;
+}
+int islandFields(bool water) { int n = 0; for (int i = 0; i < solaceAirportCount(); i++) n += solaceAirport(i).water() == water; return n; }
 int Profile::islandSites() const { int n = 0; for (auto& s : sites) n += !beyond(s, '/'); return n; }
 int Profile::sitesBeyond() const { return (int)sites.size() - islandSites(); }
 std::vector<std::string> Profile::regionsLanded() const {

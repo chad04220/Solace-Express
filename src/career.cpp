@@ -890,6 +890,41 @@ void Career::refreshBoard() {
     for (auto& b : board) if ((b.to == c.to && b.type == c.type) || (c.type == CT_TOUR && b.type == CT_TOUR)) dup = true;   // (one photo flight a board)
     if (!dup) board.push_back(c);
   }
+  // a seaplane charter (docs/WINGS_OVER_WATER.md): when a float plane is to hand, one job more, to a seaplane base -
+  // drawn from a generator of its own, so the rest of the board (and the long hauls drawn after it) are as they were
+  {
+    int fl = -1;
+    for (int i : access) if (kAircraft[i].floats) fl = i;
+    std::vector<int> bases;
+    for (int i = 0; i < (int)g_world.airports.size(); i++) if (g_world.airports[i].water() && i != location) bases.push_back(i);
+    Rng rw(boardSeed * 2246822519u + location * 3266489917u + 0x5EA9u);
+    for (int k = 0; fl >= 0 && !bases.empty() && k < 8; k++) {
+      const int to = bases[rw.next() % bases.size()];
+      bool dup = false;
+      for (auto& b : board) dup |= b.to == to;
+      if (dup) continue;
+      const AircraftSpec& s = kAircraft[fl];
+      const Airport& A = g_world.airports[location]; const Airport& B = g_world.airports[to];
+      Contract c; c.from = location; c.to = to; c.id = fmt("W%u_%d", boardSeed, location);
+      const bool pax = license >= LIC_CPL && s.pax >= 2 && (rw.next() & 1);
+      c.type = pax ? CT_PAX : CT_CARGO;
+      if (pax) { c.pax = std::max(1, (int)(s.pax * rw.range(0.4f, 1.0f))); c.cargoKg = c.pax * 15; }
+      else c.cargoKg = std::max(20, (int)(s.cargoKg * rw.range(0.35f, 0.95f)) / 10 * 10);
+      c.minLicense = pax ? LIC_CPL : LIC_PPL;
+      if (canFly(c, fl) == SRC_NONE) continue;
+      c.payout = (int)((250 + contractKm(c) * (30 + c.cargoKg * 0.13f + c.pax * 16)) * rw.range(1.0f, 1.2f)) / 10 * 10;   // (a little over the going rate: few can fly it)
+      { int chapter = nextStory() ? nextStory()->chapter : 5; c.payout = (int)(c.payout * (1.f + 0.35f * chapter)) / 10 * 10; }
+      if (!atHome()) c.payout = c.payout * 115 / 100 / 10 * 10;
+      c.repBonusPct = repBonusPct();
+      c.payout = c.payout * (100 + c.repBonusPct) / 100 / 10 * 10;
+      c.title = pax ? fmt("Seaplane charter: %s to %s", paxNames[rw.next() % 8], B.name) : fmt("Seaplane charter: %s to %s", cargoNames[rw.next() % 10], B.name);
+      c.brief = fmt("%s from %s to the seaplane base at %s, where no runway goes: a float plane's work. Alight on the lane between the buoys and moor at the dock.",
+                    pax ? "Passengers" : "A load", A.name, B.name);
+      c.wx = W(rw.range(0, 360), rw.range(0, 12), 0, rw.range(0.05f, 0.3f), rw.range(0, 0.7f), rw.range(2500, 7000), rw.range(15, 50), 0, false, rw.range(8.f, 18.f));
+      board.push_back(c);
+      break;
+    }
+  }
   // cross-country work (the real Earth, docs/REAL_EARTH_PLAN.md E7): a load for a small field beyond this chart, 30 to
   // 180 km on - a strip, or a field no airline serves, which the long hauls never take - flown there yourself as a long
   // haul is, the charts on the way made ready as you fly. Two at most, the fields drawn afresh with each board

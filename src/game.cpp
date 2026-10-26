@@ -7083,11 +7083,12 @@ void Game::debugScene(const std::string& name) {
     vec3 cam = ctr + r * (len * 0.3f + 200.f) - d * (len * 0.4f + 120.f);
     cam.y = std::max(a.elev, g_world.height(cam.x, cam.z)) + 90.f + len * 0.03f;
     vec3 look = ctr + d * (len * 0.05f) + vec3(0, 5.f, 0);
-    if (a.water() && a.dockLen > 0.f) {   // a seaplane base: over the shore behind its dock, out across the dock to the lane
-      const vec3 o(a.dockDirX, 0.f, a.dockDirZ), side = normalize(cross(o, vec3(0, 1, 0))), head = a.dockHead();
-      cam = vec3(a.dockX, 0.f, a.dockZ) - o * 110.f + side * 70.f;
-      cam.y = std::max(g_world.height(cam.x, cam.z), 0.f) + 45.f;
-      look = head + (ctr - head) * 0.25f;
+    if (a.water() && a.dockLen > 0.f) {   // a seaplane base: from the shore beside its dock, on the berth's side, the aircraft
+      // moored there with the water beyond
+      const vec3 o(a.dockDirX, 0.f, a.dockDirZ), side = normalize(cross(o, vec3(0, 1, 0)));
+      cam = vec3(a.dockX, 0.f, a.dockZ) - o * 10.f + side * 32.f;
+      cam.y = std::max(g_world.height(cam.x, cam.z), 0.f) + 9.f;
+      look = a.berth(4.6f) + o * 4.f + vec3(0, 1.2f, 0);
     }
     dbgCam = true; dbgFollow = false; dbgCamPos = cam; dbgCamLook = look;
     toasts.clear(); hint.clear(); uiHidden = true; return;

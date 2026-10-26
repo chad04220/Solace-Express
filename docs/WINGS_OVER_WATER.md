@@ -133,6 +133,16 @@ accident. Sinking through 150 m within 4 km of a field, the aircraft says once w
 the field is ("Gear is up for a water landing", or, wrong, "Gear is DOWN - a water landing: raise it", with a chime).
 The HUD's GEAR warning follows the same rule for an amphibian: wheels down near a water lane, or up near a runway.
 
+### The career on the water
+
+There is no seaplane lesson in the story: the story is one chain whose place every save keeps, so a new step would move
+every one after it. The water comes to the career through the job board instead. With a float plane to hand (owned or
+for hire under the pilot's licence), every board carries a seaplane charter to one of the bases, a little over the going
+rate. It is drawn from a random stream of its own, so the rest of the board and its long hauls are exactly what they
+were. At a seaplane base every job on the board is a float plane's (the dispatch rule allows nothing else there). The pilot's profile collects the bases apart from the land airports:
+"Splashdown" for the first landing on the water, "Harbour Master" for alighting at all seven, while "Every Field" still
+counts the land airports alone.
+
 ## Phases
 
 Each phase is built, tested and committed on its own.

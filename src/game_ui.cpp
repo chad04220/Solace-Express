@@ -2033,7 +2033,8 @@ void Game::drawHubLogbook(float x, float y, float w, float h) {
       auto progress = [&](const std::string& id) -> std::string {
         if (id == "butter25") return fmt("%d / 25", (int)profile.count("butters"));
         if (id == "airports10") return fmt("%d / 10", std::min(nAp, 10));
-        if (id == "airports_all") return fmt("%d / %d", profile.islandAirports(), solaceAirportCount());
+        if (id == "airports_all") return fmt("%d / %d", profile.islandStamps(false), islandFields(false));
+        if (id == "harbours_all") return fmt("%d / %d", profile.islandStamps(true), islandFields(true));
         if (id == "sites5") return fmt("%d / 5", std::min(nSites, 5));
         if (id == "sites_all") return solaceSiteCount() > 0 ? fmt("%d / %d", islandSites, solaceSiteCount()) : fmt("%d found", islandSites);
         if (id == "regions5") return fmt("%d / 5", std::min((int)profile.regionsLanded().size(), 5));

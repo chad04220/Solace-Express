@@ -13,6 +13,7 @@ ACH_BY_THE_BOOK,By the Book,"Taxi clear, shut down and set the parking brake at 
 ACH_GO_AROUND,Better Safe,"Go around, then land",0,flying,achievements/ACH_GO_AROUND.png,achievements/ACH_GO_AROUND_locked.png
 ACH_LONG_HAUL,Long Haul,Fly a single flight of 150 km or more,0,flying,achievements/ACH_LONG_HAUL.png,achievements/ACH_LONG_HAUL_locked.png
 ACH_WARP,Warp Drive,Cover 500 km in Time Warp,0,flying,achievements/ACH_WARP.png,achievements/ACH_WARP_locked.png
+ACH_SPLASHDOWN,Splashdown,Land on the water in a float plane,0,flying,achievements/ACH_SPLASHDOWN.png,achievements/ACH_SPLASHDOWN_locked.png
 ACH_LIC_PPL,Private Pilot,Earn the private pilot licence,0,career,achievements/ACH_LIC_PPL.png,achievements/ACH_LIC_PPL_locked.png
 ACH_LIC_CPL,Commercial Pilot,Earn the commercial pilot licence,0,career,achievements/ACH_LIC_CPL.png,achievements/ACH_LIC_CPL_locked.png
 ACH_LIC_ATP,Airline Transport Pilot,Earn the airline transport pilot licence,0,career,achievements/ACH_LIC_ATP.png,achievements/ACH_LIC_ATP_locked.png
@@ -25,6 +26,7 @@ ACH_CAMPAIGN,Captain,Complete the campaign,0,career,achievements/ACH_CAMPAIGN.pn
 ACH_LEGEND,Living Legend,Complete every legendary contract,0,career,achievements/ACH_LEGEND.png,achievements/ACH_LEGEND_locked.png
 ACH_AIRPORTS10,Island Hopper,Land at 10 different airports,0,exploring,achievements/ACH_AIRPORTS10.png,achievements/ACH_AIRPORTS10_locked.png
 ACH_AIRPORTS_ALL,Every Field,Land at every airport in the islands,0,exploring,achievements/ACH_AIRPORTS_ALL.png,achievements/ACH_AIRPORTS_ALL_locked.png
+ACH_HARBOURS_ALL,Harbour Master,Alight at every seaplane base in the islands,0,exploring,achievements/ACH_HARBOURS_ALL.png,achievements/ACH_HARBOURS_ALL_locked.png
 ACH_SITES5,Sightseer,Find 5 landmarks,0,exploring,achievements/ACH_SITES5.png,achievements/ACH_SITES5_locked.png
 ACH_SITES_ALL,Grand Tour,Find every landmark in the islands,0,exploring,achievements/ACH_SITES_ALL.png,achievements/ACH_SITES_ALL_locked.png
 ACH_PHOTO,Shutterbug,Complete a photo flight,0,exploring,achievements/ACH_PHOTO.png,achievements/ACH_PHOTO_locked.png

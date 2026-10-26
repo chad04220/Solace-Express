@@ -31,7 +31,9 @@ void Game::award(const std::string& id) {
 }
 
 void Game::profileTouchdown(float fpm, int ap) {
-  if (botControl || researchFlight || militaryFlight || !plane.spec || ap < 0 || ap >= (int)g_world.airports.size()) return;
+  if (botControl || researchFlight || militaryFlight || !plane.spec) return;
+  if (plane.onWater) award("splashdown");   // (anywhere on the water: a base's lane or the open sea)
+  if (ap < 0 || ap >= (int)g_world.airports.size()) return;
   fpm = fabsf(fpm);
   const Airport& A = g_world.airports[ap];
   if (profile.airports.insert(airportStamp(A)).second) {   // (a region's stamps are its own: Profile::airports)
@@ -42,10 +44,10 @@ void Game::profileTouchdown(float fpm, int ap) {
       award("region_first");
       if (profile.regionsLanded().size() >= 5) award("regions5");
       if (n >= N) award("region_all");
-    } else {
-      const int n = profile.islandAirports();
-      toast(fmt("Airport stamp: %s %s (%d of %d)", A.code, A.name, n, N), vec3(1.f, 0.85f, 0.45f), false);
-      if (n >= N) award("airports_all");
+    } else {   // (the islands' land airports and their seaplane bases are collected apart)
+      const int n = profile.islandStamps(A.water()), of = islandFields(A.water());
+      toast(fmt(A.water() ? "Seaplane base stamp: %s %s (%d of %d)" : "Airport stamp: %s %s (%d of %d)", A.code, A.name, n, of), vec3(1.f, 0.85f, 0.45f), false);
+      if (n >= of) award(A.water() ? "harbours_all" : "airports_all");
     }
     if (profile.airports.size() >= 10) award("airports10");
   }

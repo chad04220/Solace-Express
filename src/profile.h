@@ -36,6 +36,7 @@ struct Profile {
   // The islands' stamps are their airports' codes and their landmarks' ids; a region's begin with its id
   // ("pr1-0-0-17:UMA", "pr1-0-0-17/crater0"), so a code or a name may repeat from one region to the next
   int islandAirports() const;
+  int islandStamps(bool water) const;   // the islands' land airports (false) or seaplane bases (true) stamped
   int islandSites() const;
   int sitesBeyond() const;                          // landmarks found in the regions beyond the islands
   std::vector<std::string> regionsLanded() const;   // the regions with an airport stamp, by id
@@ -48,6 +49,7 @@ struct Airport;
 std::string airportStamp(const Airport& a);   // its key in Profile::airports, in g_world
 // A region's airports, wherever g_world is (its recipe made the first time, and its count kept; 0 for an unknown id)
 int regionAirportCount(const std::string& region);
+int islandFields(bool water);   // the islands' land airports (false) or seaplane bases (true): how many
 
 // The landmarks a pilot can find in g_world: each one's name and a point at its middle. In the islands, from the
 // world as it was built (the wind farm, the stone circle, the wreck, the platform, the observatory, the star fort,

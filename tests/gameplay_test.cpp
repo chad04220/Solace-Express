@@ -1643,6 +1643,28 @@ struct GameTest {
                moored, waits, delivered, ok ? "ok" : "FAIL");
         fails += !ok;
       }
+      {   // the board on the water: at a seaplane base every job is a float plane's (none flies for a landplane there);
+          // from a land airport, with a float plane to hand, every board carries a seaplane charter to a base
+        Career k; k.license = LIC_CPL; k.money = 100000; k.region = g_world.regionId;
+        k.location = g_world.findAirport("PBL");
+        int jobs = 0, floatsOnly = 0;
+        for (unsigned seed = 1; seed <= 4; seed++) {
+          k.boardSeed = seed; k.refreshBoard();
+          for (const Contract& c : k.board) { jobs++; floatsOnly += k.canFly(c, kKittiwake) != Career::SRC_NONE && k.canFly(c, 1) == Career::SRC_NONE; }
+        }
+        k.location = g_world.findAirport("CAP");
+        int charters = 0;
+        for (unsigned seed = 1; seed <= 12; seed++) {
+          k.boardSeed = seed; k.refreshBoard();
+          int n = 0;
+          for (const Contract& c : k.board) n += g_world.airports[c.to].water() && c.title.rfind("Seaplane charter", 0) == 0 && k.canFly(c, kKittiwake) != Career::SRC_NONE;
+          charters += n == 1;
+        }
+        const bool ok = jobs >= 12 && floatsOnly == jobs && charters == 12;
+        printf("Board on the water: %d jobs at Palm Bay Lagoon in 4 draws, %d of them floats only; a seaplane charter on %d of 12 boards at the capital: %s\n",
+               jobs, floatsOnly, charters, ok ? "ok" : "FAIL");
+        fails += !ok;
+      }
       {   // a checkpoint job's leg ends safely at a field (the review of v3.44.0, CAR-5): stopped on a runway with checkpoints
           // left it waits to take off again, and the parking brake ends the leg there with the checkpoint flown carried; a
           // hold instruction ignored on that leg is still charged at the delivery, through a save and reload (CAR-6)
