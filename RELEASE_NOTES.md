@@ -1,3 +1,58 @@
+## What's new in v4.0.0: Wings over Water
+
+Until now the sea between the islands was only something to fall into: touch it anywhere off a runway and the flight
+ended. In 4.0 the water is somewhere to fly from and to.
+
+### The Kittiwake A9 amphibian
+- **A new aircraft for Commercial pilots:** a nine-seat single turboprop on amphibious floats, rented anywhere or
+  bought from the hangar. Its main wheels swing forward into wells in the floats and its two nose wheels fold back
+  into the bows. Wheels down, it uses a runway like any other aircraft (600 m paved). Wheels up, it uses the water.
+- **Floats with real physics.** They float at their draft and push a bow wave as you add power. Through the hump the
+  acceleration sags, then the floats climb onto the step and plane, and the aircraft leaves the water when the wing
+  can carry it. A take-off on the water takes about twice the runway's roll. Water rudders, down at taxi speeds,
+  steer with the rudder pedals, and left alone the aircraft weathervanes into the wind. The open coast in a fresh wind
+  is rough; a sheltered lagoon is glass.
+- **The classic mistakes, simulated.** Land on the water with the wheels down and the nose wheels dig in and it goes
+  over. Land on a runway with them up and it slides to a stop on its keels, damaged. Arrive too hard and the floats
+  break. Run onto a beach at a walking pace and it grounds gently; at speed it is aground.
+- **A gear advisory.** Coming down within 4 km of a field, the amphibian says once what its gear is set for against
+  what the field is ("Gear is up for a water landing"), and warns, with a chime, when it is wrong. The HUD's GEAR
+  warning follows the same rule.
+
+### Seaplane bases
+- **Seven in the islands:** Verde Bay below Port Verde, Fjordhaven Water in the fjord, Ice Harbor and Saltmarsh
+  (villages no runway reaches), Palm Bay Lagoon behind the reef, Westvale on the west coast, and Turtle Bay at the Far
+  Isle resort. Each has a 1,000 m water lane marked by buoys and a dock: a pier, a gangway down to a pontoon with a
+  fuel pump, a small office and a windsock. The maps draw the lanes in blue. The bases have no tower.
+- **One or two in most generated regions,** found on each region's own coast beside its towns, each with its dock.
+- **Moored at the dock.** A float plane's flight from a base starts moored alongside the pontoon, facing out. On the
+  water the parking-brake control moors you (once you're all but stopped) and casts you off. Moored, you ride the chop
+  on your lines. The dock's fenders take a gentle bump; hit it fast and it's a collision.
+- **Arriving on the water.** Alight on the lane, taxi to the dock and moor to finish. The shutdown bonus is paid moored
+  at the dock, the way it's paid ashore clear of the runway.
+- A landplane picked at a seaplane base in Free Flight starts in the air over the lane. Fuel at the bases costs half
+  as much again as at the islands' main fields.
+
+### Work on the water
+- **Seaplane charters.** With a float plane to hand (owned, or for hire on your licence), every job board carries a
+  charter to a seaplane base, paying a little over the going rate. At a base, every job is a float plane's. The rest
+  of the board is drawn exactly as before.
+- **The autopilot on the water.** Pick a seaplane base on the GPS and the autoland flies its lane with the wheels up,
+  touches down on the floats and then taxis you in to the dock, where you're moored.
+- **Two new achievements:** Splashdown (land on the water in a float plane) and Harbour Master (alight at all seven of
+  the islands' seaplane bases). Every Field still counts the land airports only.
+- Every seaplane base has its own loading picture: the Kittiwake moored at its dock.
+
+### Spray, wakes and the sound of the water
+- **Spray** flies from the floats where the bow wave breaks: heaviest through the hump, a thin sheet from the steps once
+  you're planing. The propeller's blast raises mist from the water at high power, and a touchdown throws spray from
+  both floats with a splash, without tyre smoke.
+- **A wake** of foam spreads behind the floats, with rings at its edge.
+- **On the water** you hear the floats hissing through it and the chop slapping them instead of tyres rolling.
+
+### Fixes
+- The research terminal's launch sites and the military reconnaissance targets keep to the land airfields.
+
 ## What's new in v3.54.2
 
 ### Smoother career on the real Earth

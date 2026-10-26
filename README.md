@@ -7,7 +7,8 @@
 <p align="center">
   <b>A pilot-career flight game for Windows.</b><br>
   Start with a student permit in a two-seat trainer and work up to an airline transport licence, a fleet of your own
-  and an airline, over a hand-built archipelago and thousands of generated island regions on a full-size Earth.
+  and an airline, over a hand-built archipelago and thousands of generated island regions on a full-size Earth,
+  from runways and, in an amphibian, from the water.
 </p>
 
 <p align="center">
@@ -93,7 +94,7 @@ generated regions, each with its own airports, towns and sights, and the career 
 
 ### The Solace Islands, and the world beyond
 
-- **A hand-built archipelago.** 16 airports on 5 islands: a flight-school field, grass farm strips, a rock in the
+- **A hand-built archipelago.** 16 airports and 7 seaplane bases on 5 islands: a flight-school field, grass farm strips, a rock in the
   sea, international hubs at Port Verde and Solace Capital, a gravel strip high on a mountain pass, a volcano research strip, a glacier snow
   runway, a fjord town and a resort isle. There are 26 settlements, from three cities to small villages, joined by a
   graded road network with bridges, traffic and ferries. Add farms, a container port, a stadium, a racetrack, a dam,
@@ -117,9 +118,35 @@ generated regions, each with its own airports, towns and sights, and the career 
   </tr>
 </table>
 
+### Wings over Water
+
+New in 4.0: the sea is somewhere to fly from and to, not only something to fall into.
+
+- **The Kittiwake A9 amphibian.** A nine-seat single turboprop on amphibious floats, its wheels folding up into them.
+  Wheels down, it lands on a runway; wheels up, on the water.
+- **Floats that behave like floats.** They float at their draft, push a bow wave through the hump, climb onto the
+  step and plane, and leave the water when the wing can carry the aircraft. Water rudders steer it at taxi speeds and
+  the wind weathervanes it when it stops. The classic mistakes are simulated: land on the water with the wheels down
+  and it goes over on its nose, or on a runway with them up and it slides on its keels.
+- **Seaplane bases.** Seven in the islands (a sheltered bay below Port Verde, the fjord above Fjordhaven, a lagoon
+  behind Palm Bay's reef, villages no runway reaches) and one or two in most generated regions. Each has a buoyed water
+  lane and a dock with a pontoon, fuel pump, office and windsock. Flights from a base start moored at the dock; on the
+  water the parking-brake control moors you and casts you off.
+- **Work on the water.** With a float plane to hand, every job board has a seaplane charter. The autopilot lands on a
+  water lane with the wheels up and taxis you in to the dock. An amphibian's gear advisory calls out what the gear is
+  set for against the field ahead. Spray, a foam wake, and the floats' hiss make the water show what the floats are
+  doing.
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/media/water_takeoff.jpg" alt="The Kittiwake planing on Verde Bay's lane, its wake behind it, Port Verde's cranes beyond"></td>
+    <td width="50%"><img src="docs/media/seaplane_base.jpg" alt="The Kittiwake moored at Palm Bay Lagoon's dock, sailboats at anchor in the lagoon"></td>
+  </tr>
+</table>
+
 ### Aircraft
 
-Eleven career aircraft, each hand-built down to the rivets, door handles, static wicks and antennas, with moving
+Twelve career aircraft, each hand-built down to the rivets, door handles, static wicks and antennas, with moving
 control surfaces, gear and props. Each has a 3D cockpit with live gauges or glass displays and controls that move
 with your inputs.
 
@@ -136,6 +163,7 @@ with your inputs.
 | Archipel 400 | Regional turboprop airliner | 40 / 4,500 kg | 170 km | 265 kt | 780 m paved | ATP |
 | Emissary 500 | Light business jet | 7 / 700 kg | 4,350 km | 466 kt | 607 m paved | ATP |
 | Galleon 180 | 180-seat twin-engine transport | 180 / 6,500 kg | 5,800 km | 513 kt | 1,900 m paved | ATP |
+| Kittiwake A9 | Single-turboprop amphibian | 9 / 900 kg | 120 km | 165 kt | 600 m paved, or a water lane | CPL |
 
 The numbers are what each aircraft actually does in the flight model, measured by flying it (`flight_test --table`).
 Ranges are scaled to the islands; only the jets reach the other regions. Four research craft sit beyond the career:
@@ -183,7 +211,7 @@ four tilting thruster pods, a cloak, lasers and plasma bombs).
 
 - **Photo mode** (F2): freeze the flight, take a free camera up to 600 m out, grade the shot and save it without the
   HUD.
-- **A pilot profile** across careers: 41 achievements, a stamp for every airport you land at, the landmarks you've
+- **A pilot profile** across careers: 43 achievements, a stamp for every airport you land at, the landmarks you've
   found, and your softest touchdown in each aircraft.
 - **Steam ready.** With Valve's `steam_api64.dll` beside the exe it adds achievements, trial leaderboards, rich
   presence, screenshots, the overlay pause and Steam Deck support (with a Deck graphics preset). Without the DLL
@@ -227,7 +255,7 @@ roll, yaw, throttle, toe brakes) with reversal, dead zones and response curves.
 | Shift / Ctrl, PgUp / PgDn, 1–9, 0 | Throttle | RT / LT |
 | F / V | Flaps down / up | B / X |
 | G | Landing gear | Y or D-pad → |
-| B | Parking brake | D-pad ← |
+| B | Parking brake; on the water, moor or cast off | D-pad ← |
 | Space | Wheel brakes | A |
 | [ / ] | Elevator trim | D-pad ↑ / ↓ |
 | Z | Autopilot hold, or autoland at the airport picked on the GPS | Right-stick click |
@@ -350,6 +378,7 @@ docs/                               design notes (below) and the README's pictur
 | Document | What it covers |
 |---|---|
 | [RELEASE_NOTES.md](RELEASE_NOTES.md) | What changed in each version |
+| [docs/WINGS_OVER_WATER.md](docs/WINGS_OVER_WATER.md) | 4.0: the amphibian, float hydrodynamics, seaplane bases, mooring, the autopilot and the career on the water |
 | [docs/PROCEDURAL_EARTH.md](docs/PROCEDURAL_EARTH.md) | The generated regions: recipes, sizes, sights, the career's travel and long hauls |
 | [docs/LIVING_ISLANDS_PLAN.md](docs/LIVING_ISLANDS_PLAN.md) | The islands' towns, roads, bridges, landmarks and traffic |
 | [docs/PILOT.md](docs/PILOT.md) | The autopilot: how it learns an aircraft and flies it |
