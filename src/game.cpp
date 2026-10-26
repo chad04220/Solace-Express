@@ -888,7 +888,7 @@ void Game::finishRegionLoad() {
   }
   crashed = completed = landed = false;
   dbgCam = dbgFollow = false;
-  wreck.clear(); debris.clear(); pops.clear(); particles.clear(); pits.clear();
+  wreck.clear(); debris.clear(); pops.clear(); particles.clear(); wakeRings.clear(); pits.clear();
   bursts.clear(); trail.clear(); cloudWake.clear(); tipTrail[0].clear(); tipTrail[1].clear();
   for (auto& smoke : pieceTrail) smoke.clear();
   g_ren.entBudgetMs = 2.5f;
@@ -1168,7 +1168,7 @@ void Game::updateEarthFlight() {
   earthRetireJob = std::async(std::launch::async, [old = std::move(retired), gpu = std::move(retiredGpu)]() mutable { old.reset(); gpu = Renderer::WorldUploadData{}; });
   atc.cancel(); commsPending.clear(); traffic.reset(); hiveCombat.reset(1, combatWrap());
   gpsMapValid = loadMap = loadBackdrop = false;
-  wreck.clear(); debris.clear(); pops.clear(); particles.clear(); pits.clear();
+  wreck.clear(); debris.clear(); pops.clear(); particles.clear(); wakeRings.clear(); pits.clear();
   bursts.clear(); trail.clear(); cloudWake.clear(); tipTrail[0].clear(); tipTrail[1].clear();
   for (auto& smoke : pieceTrail) smoke.clear();
   continueEarthFlight();
@@ -1391,7 +1391,7 @@ void Game::slideEarthChart(const regionTravel::Chart& chart) {
   atc.cancel(); commsPending.clear(); hiveCombat.reset(1, combatWrap());
   traffic.carry(*regionPoseChange, [&](int old, float* lift) { return carriedAirport(old, lift); });   // (where they were)
   gpsMapValid = loadMap = loadBackdrop = false;
-  wreck.clear(); debris.clear(); pops.clear(); particles.clear(); pits.clear();
+  wreck.clear(); debris.clear(); pops.clear(); particles.clear(); wakeRings.clear(); pits.clear();
   bursts.clear(); trail.clear(); cloudWake.clear(); tipTrail[0].clear(); tipTrail[1].clear();
   for (auto& smoke : pieceTrail) smoke.clear();
   continueEarthFlight();
@@ -1647,7 +1647,7 @@ void Game::returnToMilitary() {
   crashed = completed = landed = false; dbgCam = dbgFollow = false;
   hiveCombat.reset(1, combatWrap()); combatLoadout.reset(); militaryHull = 100;
   combatCollisionWarm = false; combatCollisionWarmMs = 0; combatPrefetchCursor = 0;
-  somnus = SomnusState(); wreck.clear(); debris.clear(); pops.clear(); particles.clear(); pits.clear();
+  somnus = SomnusState(); wreck.clear(); debris.clear(); pops.clear(); particles.clear(); wakeRings.clear(); pits.clear();
   bursts.clear(); trail.clear(); cloudWake.clear(); tipTrail[0].clear(); tipTrail[1].clear();
   for (auto& smoke : pieceTrail) smoke.clear();
   tipOn = airBreak = false; trailT = 0; wakeGap = true; wakeOdo = 0;
@@ -1863,6 +1863,7 @@ void Game::followSeam(vec3 d) {
   g_audio.shiftWorld(d); audioCameraPrevious += d;
   camPos += d; dbgCamPos += d; dbgCamLook += d;
   for (auto& p : particles) p.p += d;
+  for (auto& w : wakeRings) w.p += d;
   for (auto& w : wreck) w.c += d;
   for (auto& b : debris) b.p += d;
   for (auto& p : pops) p.p += d;
@@ -2344,7 +2345,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
   engineAutoStarted = false; startDelay = 1.2f;
   parkingBrake = !c.startAirborne;   // a start on the ground is parked: the brake is released to roll
   if (!plane.onGround) settleAirborneStart();
-  particles.clear(); bursts.clear(); pops.clear(); boomT = -1; for (auto& tt : pieceTrail) tt.clear(); trail.clear(); tipTrail[0].clear(); tipTrail[1].clear(); tipOn = false; trailT = 0; wreck.clear(); debris.clear(); craterR = 0; pits.clear();
+  particles.clear(); wakeRings.clear(); bursts.clear(); pops.clear(); boomT = -1; for (auto& tt : pieceTrail) tt.clear(); trail.clear(); tipTrail[0].clear(); tipTrail[1].clear(); tipOn = false; trailT = 0; wreck.clear(); debris.clear(); craterR = 0; pits.clear();
   lightning = 0; nextLightning = 6; strikes.clear(); lightningGlow = 0.f;
   landingLight = true;
   approachMinAgl = 1e9f; thrPrevAlong = -1e9f; appLow = false; appHigh = false; coaching.clear();
@@ -2825,6 +2826,50 @@ void Game::flightControls(float dt) {
   }
 }
 
+// On the water (docs/WINGS_OVER_WATER.md): spray off the floats - heaviest where the bow wave breaks through the hump,
+// a thin sheet thrown from the steps once on the plane - mist where the propeller's blast meets the water at high power
+// and low speed, and the wake: a patch of foam dropped at each float's stern every sixteenth of a second, spreading and
+// fading where it was left, and every half second a ring at its edge (drawn flat on the water: buildSprites)
+void Game::updateWaterEffects(float dt, float gs) {
+  for (WakeRing& w : wakeRings) w.age += dt;
+  wakeRings.erase(std::remove_if(wakeRings.begin(), wakeRings.end(), [](const WakeRing& w) { return w.age >= w.life; }), wakeRings.end());
+  if (!plane.spec || !plane.spec->floats || !plane.onWater || crashed) { waterSprayAccum = propMistAccum = 0.f; return; }
+  const FloatStations fs = floatStations(*plane.spec);
+  const float hump = smoothstepf(1.5f, 6.f, gs) * (1.f - 0.7f * smoothstepf(11.f, 20.f, gs)), plane_ = smoothstepf(12.f, 26.f, gs);
+  waterSprayAccum += dt * (hump * 55.f + plane_ * 30.f) * (0.5f + plane.floatWet);
+  const float zBreak = fs.bowZ + (fs.stepZ - fs.bowZ) * (0.3f + 0.7f * smoothstepf(8.f, 20.f, gs));   // (the bow wave's break, aft to the step on the plane)
+  while (waterSprayAccum > 1.f) {
+    waterSprayAccum -= 1.f;
+    for (int side = -1; side <= 1; side += 2) {
+      const vec3 wp = plane.pos + plane.q.rotate(vec3(side * (fs.x + fs.beam * 0.5f), fs.keelY, zBreak));
+      const float u = (rand() % 100) * 0.01f, h = (rand() % 100) * 0.01f;
+      spawn(vec3(wp.x, 0.08f, wp.z), plane.vel * (0.35f + 0.3f * plane_) + plane.right() * (side * (1.2f + gs * 0.1f) * (0.6f + 0.6f * u)) + vec3(0, (0.9f + gs * 0.07f) * (0.6f + 0.7f * h), 0),
+            0.8f + 0.7f * u, 0.35f, 2.4f + plane_, vec3(0.92f, 0.94f, 0.97f), 0.36f + 0.14f * hump, SPR_SMOKE, 1.3f, -7.f);
+    }
+  }
+  if (plane.engineRunning && plane.engineSpool > 0.55f && gs < 12.f) {   // the propeller's blast on the water
+    propMistAccum += dt * 14.f * (plane.engineSpool - 0.5f) * (1.f - gs / 12.f);
+    while (propMistAccum > 1.f) {
+      propMistAccum -= 1.f;
+      const vec3 nose = plane.pos + plane.forward() * (plane.spec->fusLen * 0.4f);
+      spawn(vec3(nose.x, 0.3f, nose.z) + plane.right() * ((rand() % 100 - 50) * 0.04f), plane.q.rotate(vec3(0, 0, 6.f)) + vec3(0, 0.8f, 0),
+            1.8f, 0.6f, 2.4f, vec3(0.86f, 0.89f, 0.92f), 0.14f, SPR_SMOKE, 1.f, 0.1f);
+    }
+  } else propMistAccum = 0.f;
+  wakeAccum += dt;
+  if (gs > 0.6f && wakeAccum > 0.0625f) {
+    wakeAccum = 0.f;
+    const bool ring = (wakeTick++ % 8) == 0;
+    for (int side = -1; side <= 1; side += 2) {
+      const vec3 st = plane.pos + plane.q.rotate(vec3(side * fs.x, fs.keelY, fs.sternZ));
+      const float a = clampf(gs / 5.f, 0.2f, 1.f) * (0.6f + 0.4f * hump + 0.3f * plane_);
+      wakeRings.push_back({vec3(st.x, 0.04f, st.z), 0.f, 5.f + gs * 0.25f, 0.8f + gs * 0.09f, a, false});
+      if (ring) wakeRings.push_back({vec3(st.x, 0.05f, st.z), 0.f, 3.f + gs * 0.1f, 1.5f + gs * 0.2f, a, true});
+    }
+    if (wakeRings.size() > 1200) wakeRings.erase(wakeRings.begin(), wakeRings.begin() + (wakeRings.size() - 1200));
+  }
+}
+
 void Game::spawn(vec3 p, vec3 v, float life, float size, float grow, vec3 col, float alpha, int kind, float drag, float buoy) {
   if (particles.size() > 9000) return;
   particles.push_back({p, v, life, life, size, grow, col, alpha, kind, drag, buoy, false, true});
@@ -3095,7 +3140,17 @@ void Game::updateFlight(float dt) {
     const GearStations audioGear = gearStations(*plane.spec);
     const AudioSurface contactSurface=tdRunway>=0?AudioSurface(g_world.airports[tdRunway].surface):AudioSurface::Grass;
     // A belly arrival has no tyres to spin up; its metal contact is emitted above. Floats meet the water with a splash
-    if (plane.onWater) g_audio.triggerAt(SFX_SPLASH, plane.pos, clampf(fpm / 500.f, .25f, .9f));
+    if (plane.onWater) {
+      g_audio.triggerAt(SFX_SPLASH, plane.pos, clampf(fpm / 500.f, .25f, .9f));
+      const FloatStations fs = floatStations(*plane.spec);   // (a sheet of spray off each float where its keel met the water)
+      const float k = clampf(fpm / 300.f, 0.5f, 2.f);
+      for (int side = -1; side <= 1; side += 2)
+        for (int i = 0; i < (int)(18 * k); i++) {
+          const vec3 wp = plane.pos + plane.q.rotate(vec3(side * (fs.x + fs.beam * 0.5f), fs.keelY, fs.stepZ + (rand() % 100) * 0.02f - 1.f));
+          spawn(vec3(wp.x, 0.05f, wp.z), plane.vel * 0.45f + plane.right() * (side * (1.f + (rand() % 100) * 0.03f) * k) + vec3(0, (1.5f + (rand() % 100) * 0.02f) * k, 0),
+                0.9f + (rand() % 100) * 0.006f, 0.3f, 2.2f, vec3(0.9f, 0.92f, 0.95f), 0.4f, SPR_SMOKE, 1.4f, -7.f);
+        }
+    }
     else if(!result.bellyLanding) for (float side : {-1.f,1.f}) g_audio.touchdown(
       plane.pos+plane.q.rotate(vec3(side*audioGear.track,-plane.gearHeight(),audioGear.mainZ)),
       clampf(fpm/600.f,.15f,.8f),length(vec3(plane.vel.x,0,plane.vel.z)),contactSurface);
@@ -3145,6 +3200,7 @@ void Game::updateFlight(float dt) {
             0.9f + (rand() % 100) * 0.008f, 0.4f, 2.6f, vec3(0.86f, 0.88f, 0.92f), 0.32f, SPR_SMOKE, 2.6f, -0.4f);
     }
   } else sprayAccum = 0.f;
+  updateWaterEffects(simDt, gs);
   // prop wash dust on rough ground
   if (plane.onGround && plane.groundRough > 0.3f && plane.engineSpool > 0.5f && gs < 15.f && (rand() % 3 == 0)) {
     vec3 bp = plane.pos + plane.q.rotate(vec3((rand() % 100 - 50) * 0.04f, -plane.gearHeight(), 3.f));
@@ -5386,6 +5442,17 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
     }
     if (S.ground && t >= lead) bill(add, S.foot + vec3(0, 6.f, 0), 70.f, vec3(0.8f, 0.85f, 1.f) * 3.f, all, SPR_GLOW, 8.f);
   }
+  // the wake on the water (updateWaterEffects): each ring flat on the surface, spreading and fading as it ages - drawn
+  // under the particles, the spray over it
+  for (const WakeRing& w : wakeRings) {
+    const float ph = w.age / w.life;
+    if (length(w.p - fp.camPos) > 1500.f) continue;
+    if (w.ring) { const float r = w.size * (0.4f + 1.4f * ph); quadAx(alpha, w.p, vec3(r, 0, 0), vec3(0, 0, r), vec3(0.92f, 0.94f, 0.96f), 0.4f * w.a * (1.f - ph), SPR_SPLASH + std::min(ph, 0.99f) * 0.399f, 0.05f); }
+    else {   // (a soft patch of foam, its pattern its own: a seed from where it was left)
+      const float r = w.size * (1.f + 1.6f * sqrtf(ph)), seed = 0.399f * (0.5f + 0.5f * sinf(w.p.x * 1.7f + w.p.z * 2.3f));
+      quadAx(alpha, w.p, vec3(r, 0, 0), vec3(0, 0, r), vec3(0.93f, 0.95f, 0.97f), 0.42f * w.a * (1.f - ph) * (1.f - ph), SPR_SMOKE + seed, 0.05f);
+    }
+  }
   // particles
   vec3 camVel = screen == SCR_FLIGHT && plane.spec ? plane.vel : vec3();
   std::vector<std::pair<float, const Particle*>> order;
@@ -7091,6 +7158,24 @@ void Game::debugScene(const std::string& name) {
       look = a.berth(4.6f) + o * 4.f + vec3(0, 1.2f, 0);
     }
     dbgCam = true; dbgFollow = false; dbgCamPos = cam; dbgCamLook = look;
+    toasts.clear(); hint.clear(); uiHidden = true; return;
+  }
+  if (name.compare(0, 5, "wtko_") == 0) {   // the Kittiwake's take-off run on Verde Bay's lane, t seconds in, from the chase camera: wtko_<s>[_<camYaw>]
+    float t = 8.f, yaw = 0.6f;
+    sscanf(name.c_str() + 5, "%f_%f", &t, &yaw);
+    const int ai = std::max(0, g_world.findAirport("VBY")); const Airport& a = g_world.airports[ai];
+    Contract c; c.from = c.to = ai; c.title = "Water";
+    c.wx = Weather(); c.wx.timeOfDay = 15.5f; c.wx.windSpeed = 4; c.wx.windFrom = a.heading; c.wx.cloudCover = 0.3f; c.wx.visibility = 60000;
+    realTime = 20; startFlight(c, kKittiwake, Career::SRC_OWNED);
+    const AircraftSpec& k = kAircraft[kKittiwake];
+    plane.reset(&k, a.threshold(false) + a.dir() * 60.f, a.heading, k.maxFuel * 0.6f, 500.f, false);
+    plane.engineRunning = true; engineAutoStarted = true; parkingBrake = false; botControl = true;
+    for (float s = 0; s < t; s += 1 / 30.f) {
+      plane.ctl.throttle = 1; plane.ctl.flaps = k.takeoffFlap; plane.ctl.gearDown = false; plane.ctl.yaw = 0;
+      plane.ctl.pitch = clampf((6.f - plane.pitchDeg()) * 0.08f - plane.w.x * 0.5f, -1.f, 1.f); plane.ctl.roll = clampf(-plane.bankDeg() * 0.05f, -1.f, 1.f);
+      realTime += 1 / 30.f; update(1 / 30.f);
+    }
+    camMode = 2; camYaw = yaw; camPitch = 0.16f; camZoom = 0.55f;
     toasts.clear(); hint.clear(); uiHidden = true; return;
   }
   if (name.compare(0, 3, "apt") == 0 && name.size() >= 6) {   // on the runway of an airport: apt<CODE>, e.g. aptHFS

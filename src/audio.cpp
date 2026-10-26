@@ -615,7 +615,9 @@ void AudioEngine::render(float* out, int frames) {
         I.windLP[c].set(LP,1600+std::min(air,400.f)*12,.7f,sr);
         I.buffLP[c].set(BP,46+c*7,.65f,sr);
         const bool gravel=P.groundSurface==AudioSurface::Gravel;
-        float band=P.groundSurface==AudioSurface::Snow?220.f:P.groundSurface==AudioSurface::Grass?500.f:gravel?2400.f:850.f;
+        // (on the water the floats' hiss through it, a broad wash round 650 Hz, over the chop's slap in the rumble)
+        float band=P.groundSurface==AudioSurface::Snow?220.f:P.groundSurface==AudioSurface::Grass?500.f:gravel?2400.f:
+          P.groundSurface==AudioSurface::Water?650.f:850.f;
         I.rollLP[c].set(LP,120+gs*4,.75f,sr);I.rollGrit[c].set(BP,band,.65f,sr);
         I.rainLP[c].set(BP,inter?1800.f:3800.f,.55f,sr);
       }
@@ -670,7 +672,7 @@ void AudioEngine::render(float* out, int frames) {
         I.wind[c].mix((wind+buffet)*slip*world*(P.inFlight?1:0),L,R);
         float grain=I.nz[c].w();
         float texture=P.groundSurface==AudioSurface::Paved?.012f:P.groundSurface==AudioSurface::Gravel?.20f:
-          P.groundSurface==AudioSurface::Snow?.07f:.10f;
+          P.groundSurface==AudioSurface::Snow?.07f:P.groundSurface==AudioSurface::Water?.45f:.10f;
         float roll=(I.rollLP[c].p(grain)*(.4f+.9f*P.rough)+I.rollGrit[c].p(grain)*texture)*clampf(gs/30,0,1.3f);
         I.roll[c].mix(roll*world*(P.onGround && P.inFlight?1:0),L,R);
         float drops=I.rainLP[c].p(I.nz[c].w())*.18f*rain;

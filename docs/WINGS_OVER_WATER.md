@@ -161,6 +161,23 @@ top), and the water test checks the Kittiwake's real run (382 m against a 195 m 
 A float bumping the dock at a walking pace (under 2 m/s) meets its fenders: the motion toward the dock is stopped
 and the aircraft is eased off. Faster than that it is a collision.
 
+### Spray, wakes and the sound of the water
+
+`Game::updateWaterEffects` makes the water show what the floats are doing. Spray is thrown out and up from each float
+where the bow wave breaks, a third of the way back from the bow at low speed and aft to the step on the plane. It is
+heaviest through the hump and thins to a sheet from the steps once on the plane, more of it the more of the float is
+wet. Where the propeller's blast meets the water at high power and low speed it raises a mist. A touchdown on the water
+throws a sheet of spray off each float, as hard as the arrival was, and a splash (`SFX_SPLASH`) in place of the tyres'
+chirp and smoke.
+
+The wake is drawn flat on the water (`buildSprites`): a soft patch of foam left at each float's stern sixteen times a
+second, spreading and fading where it was left, and every half second a ring at its edge. Together they make a band of
+white behind a planing float and a fan of rings behind a slow one. They are carried across the map's seam with the
+smoke and cleared with it.
+
+On the water the rolling sound is the floats' hiss through it: the `Water` audio surface gives the roll channel a
+broad wash round 650 Hz over the chop's slap, growing with the speed.
+
 ## Phases
 
 Each phase is built, tested and committed on its own.

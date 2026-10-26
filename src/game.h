@@ -723,6 +723,12 @@ private:
   bool ringGeom(int i, vec3& c, vec3& ax, vec3& ay) const;
   std::vector<vec3> rainDrops;
   float dustAccum = 0, sprayAccum = 0;   // (dust off rough ground; spray off a wet runway: puffs owed)
+  // on the water (updateWaterEffects): the floats' spray and the propeller's mist owed, and the wake - rings dropped at
+  // the floats' sterns, spreading and fading where they were left
+  struct WakeRing { vec3 p; float age, life, size, a; bool ring; };   // (ring: a spreading ring at the wake's edge; else a patch of foam)
+  std::vector<WakeRing> wakeRings;
+  float waterSprayAccum = 0, propMistAccum = 0, wakeAccum = 0; unsigned wakeTick = 0;
+  void updateWaterEffects(float dt, float gs);
 
   // debrief
   std::vector<PayoutLine> payout; int stars = 0; bool lastSuccess = false; std::string debriefTitle;
