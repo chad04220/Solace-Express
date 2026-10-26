@@ -68,11 +68,11 @@ struct GameTest {
     // Make a completed flight quote disagree deliberately with the quick estimate.
     g.quoteFlown[menuPlan::quoteInputs(c,spec)]={22.f,12.f};
     auto quoted=parity("display and gate use the same completed flown quote");
-    check(quoted.flown && quoted.fuelKgEst==12.f && quoted.fuelLoadKg==15.f,"owned default tank follows flown fuel with reserve");
+    check(quoted.flown && quoted.fuelKgEst==12.f && fabsf(quoted.fuelLoadKg-plannedFuelKg(kAircraft[spec],12.f))<.01f,"owned default tank follows flown fuel with reserve");
     builds=g.menuPlanCache.builds;
     g.quoteFlown[menuPlan::quoteInputs(c,spec)]={26.f,20.f};
     quoted=parity("new completed quote replaces old displayed estimate immediately");
-    check(quoted.fuelLoadKg==25 && g.menuPlanCache.builds==builds,"new quote updates tank without full replan");
+    check(fabsf(quoted.fuelLoadKg-plannedFuelKg(kAircraft[spec],20.f))<.01f && g.menuPlanCache.builds==builds,"new quote updates tank without full replan");
     // Full eligible payload: a full tank exceeds design mass, while this short
     // route's quick default can fit. A newly flown quote must disable the gate.
     {

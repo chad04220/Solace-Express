@@ -96,7 +96,7 @@ void cruiseFlights(int seconds, int only=-1, bool rangeRun=false) {
     check(std::fabs(actual-modelKg)<std::max(.05,modelKg*.004),"free-running simulation burn agrees with estimator");
     check(std::fabs(p.pos.y-s.fuelCruiseAlt)<150 && std::fabs(v-s.fuelCruiseTas)<s.fuelCruiseTas*.12f,"jet holds efficient cruise altitude and TAS");
     if(i==kGalleon)check(maxSlip<3.f&&maxBank<3.f,"long transport cruise does not develop drag-inducing Dutch roll");
-    check(range>1000 && range<11000,"measured jet range is plausible and finite");
+    check(range>1000 && range<(i==kSomnus?16000:11000),"measured jet range is plausible and finite (the XR-40's a stealth flying wing's, a B-2's and more)");
     check(std::fabs(p.rangeLeftKm()-p.fuel/p.fuelFlowKgS()*p.airspeed/1000)<.01f,"HUD actual range uses current fuel flow and TAS");
   }
 }
@@ -110,7 +110,8 @@ void hoverAndLoadout() {
     const float before=p.fuelFlowKgS();p.step(1.f/60,wx,k/60.f);used+=(before+p.fuelFlowKgS())*.5/60;
   }
   printf("HOVER %s used %.1f kg in 120 s model %.1f flow %.0f kg/h vs %.3f altitude %.1f\n",s.id,s.maxFuel-p.fuel,used,p.fuelFlowKgS()*3600,p.vel.y,p.pos.y);
-  check(!p.ev.crashed&&std::fabs(p.vel.y)<1.f&&s.maxFuel-p.fuel>300,"VTOL hover remains stable and consumes substantial fuel");
+  // (the pods' fictional power plant: hours of hover, as of boost - it once emptied the tanks in four minutes of it)
+  check(!p.ev.crashed&&std::fabs(p.vel.y)<1.f&&s.maxFuel-p.fuel>10&&s.maxFuel-p.fuel<60,"VTOL hover remains stable and burns its tanks over hours, not minutes");
   check(std::fabs(s.maxFuel-p.fuel-used)<std::max(1.0,used*.005),"vectored-pod hover bills the same actual thrust flow");
   check(p.rangeLeftKm()<30,"hover does not claim cruise distance while burning fuel");
 }
@@ -145,9 +146,28 @@ void saveAndCost() {
   for(const char* suffix:{"",".bak",".tmp"})std::remove((path+suffix).c_str());
 }
 }
+// Real tanks (v4.1): every type's endurance and range are an airframe of its class's, the planned load carries the rules'
+// reserve, the XR-40 lasts hours at full boost, and a mission built on the fuel gauge rations its own
+void realism() {
+  for (int i=0;i<kAircraftCount;++i) {
+    const auto& s=kAircraft[i]; Plane p; p.spec=&s; p.soundSpeed=isa(0).a;
+    const float hours=cruiseMinutes(s,s.maxFuel)/60.f, km=fuelForKm(s,1e9f)>=s.maxFuel?s.maxFuel/std::max(cruiseBurnKgS(s),1e-6f)*(s.fuelCruiseTas>0?s.fuelCruiseTas:s.cruise)/1000.f:0.f;
+    printf("REAL %s tanks %.0f kg: %.1f h, %.0f km at cruise; full power %.1f min\n",s.id,s.maxFuel,hours,km,s.maxFuel/std::max(p.fuelFlowAt(1.f,s.cruise,1.225f),1e-6f)/60.f);
+    if(s.special==2) check(s.maxFuel/p.fuelFlowAt(1.f,250.f,1.225f)>1.5f*3600.f && hours>10.f,"the XR-40 lasts hours at full boost and a long day at cruise");
+    else if(isResearchAircraft(i)) {
+      const float reheat=s.maxFuel/p.fuelFlowAt(1.f,s.cruise,1.225f)/60.f;
+      check(reheat>5.f && reheat<20.f && hours>2.f,"a reheat research jet: minutes on full reheat, hours at cruise");
+    } else check(hours>3.f && hours<9.f && km>700.f && km<6500.f,"a civil type's tanks: hours of cruise and its class's range");
+    check(fabsf(plannedFuelKg(s,0.f)-std::min(s.maxFuel,cruiseBurnKgS(s)*60.f*(s.engineType==ENG_JET?45.f:30.f)))<.01f,"the planned load carries the reserve: 30 minutes of cruise, 45 for a jet");
+    check(plannedFuelKg(s,1e9f)==s.maxFuel,"never more than the tanks");
+  }
+  buildStory();
+  const Contract* o3=nullptr; for(auto& c:g_story) if(c.id=="O3") o3=&c;
+  check(o3 && o3->rationKm>g_world.distanceKm(o3->from,o3->to) && fuelForKm(kAircraft[2],o3->rationKm)<kAircraft[2].maxFuel*.3f,"the Nordholm Crossing rations its fuel: enough for the crossing, a fraction of the tanks");
+}
 int main(int argc,char**argv) {
   int seconds=120,only=-1;bool meter=true,rangeRun=false;
   for(int i=1;i<argc;++i){if(!strcmp(argv[i],"--long"))seconds=3600;if(!strcmp(argv[i],"--cruise-only"))meter=false;if(!strcmp(argv[i],"--only")&&i+1<argc)only=atoi(argv[++i]);if(!strcmp(argv[i],"--range")){seconds=12*3600;rangeRun=true;}}
-  buildTestWorld();curves();if(meter){metering();hoverAndLoadout();missionQuotes();saveAndCost();}cruiseFlights(seconds,only,rangeRun);
+  buildTestWorld();curves();realism();if(meter){metering();hoverAndLoadout();missionQuotes();saveAndCost();}cruiseFlights(seconds,only,rangeRun);
   printf("Jet fuel: %d failures\n",failures);return failures?1:0;
 }

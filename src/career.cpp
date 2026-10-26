@@ -48,6 +48,7 @@ struct S {  // compact story entry builder
   S& type(const char* spec) { for (int i : kCareerAircraft) if (!strcmp(kAircraft[i].id, spec)) c.requireSpec = i; return *this; }
   S& fragile() { c.fragile = true; return *this; }
   S& limit(float m) { c.timeLimitMin = m; return *this; }
+  S& ration(float km) { c.rationKm = km; return *this; }
   S& grant(int l) { c.grantLicense = l; return *this; }
   S& wx(Weather w) { c.wx = w; return *this; }
   S& brief(const char* b) { c.brief = b; return *this; }
@@ -165,8 +166,9 @@ void buildStory() {
     s.load(120, 3).pay(13000).lic(LIC_CPL).owned().wx(W(10, 12, 6, 0.4f, 0.6f, 6500, 15, 2, false, 15.0f))
      .brief("The national ski team is heading home to Northpoint. Light snow over the Spine."); add(s); }
   { S s("O3", 3, CT_PAX, "NPT", "FJH", "Nordholm Crossing");
-    s.load(150, 4).pay(24000).lic(LIC_CPL).owned().wx(W(350, 15, 6, 0.35f, 0.65f, 3500, 15, 2, false, 11.0f))
-     .brief("Cross 40 km of cold open sea to Fjordhaven. Check your fuel before you go."); add(s); }
+    s.load(150, 4).pay(24000).lic(LIC_CPL).owned().ration(90).wx(W(350, 15, 6, 0.35f, 0.65f, 3500, 15, 2, false, 11.0f))
+     .brief("Cross 40 km of cold open sea to Fjordhaven. Fuel is rationed at Northpoint this week: you leave with enough for 90 km "
+            "and not a drop more, into a northerly. Fly it direct, and don't waste it climbing higher than you need."); add(s); }
   { S s("O4", 3, CT_CARGO, "FJH", "GLS", "Glacier Station Resupply");
     s.load(450, 0).pay(20000).lic(LIC_CPL).owned().wx(W(40, 14, 8, 0.45f, 0.75f, 7000, 8, 2, false, 12.5f))
      .brief("The science camp on the Nordholm ice plateau is running low on food. Packed-snow runway at 4,750 ft, snow falling."); add(s); }
@@ -312,6 +314,38 @@ std::vector<Career::Destination> Career::destinations() const {
         t.name = a.name + (a.municipality.empty() ? "" : ", " + a.municipality);
         t.fare = (int)(120. + 0.45 * t.km) / 10 * 10;
         t.minLicense = t.km <= 450. ? LIC_PPL : t.km <= 900. ? LIC_CPL : LIC_ATP;
+        out.push_back(t);
+      }
+      // and across the oceans: since v4.1 the tanks hold real fuel, and a Galleon crosses 5,800 km - the six nearest of
+      // the world's large scheduled airports between 3,000 and 9,000 km, one to a country (read from the pack once)
+      static std::vector<earth::AirportRecord> hubs;
+      static const earth::Pack* hubsOf = nullptr;
+      if (hubsOf != pack.get()) {
+        hubsOf = pack.get(); hubs.clear();
+        for (auto& a : pack->airports(earth::Box{-90, -180, 90, 180})) if (a.type == 2 && a.scheduled && !a.runways.empty()) hubs.push_back(std::move(a));
+      }
+      std::vector<std::pair<double, const earth::AirportRecord*>> beyond;   // (not "far": windows.h makes that a macro too)
+      for (const auto& a : hubs) {
+        const double km = geo::surfaceDistance(from, {a.lat, a.lon, 0}) / 1000.;
+        if (km > reach && km <= 9000.) beyond.push_back({km, &a});
+      }
+      std::sort(beyond.begin(), beyond.end(), [](const auto& a, const auto& b) { return a.first != b.first ? a.first < b.first : a.second->ident < b.second->ident; });
+      std::vector<std::string> countries;
+      for (const auto& [km, ap] : beyond) {
+        if (countries.size() >= 6) break;
+        const earth::AirportRecord& a = *ap;
+        if (std::find(countries.begin(), countries.end(), a.country) != countries.end()) continue;
+        const auto chart = earthCharts::chartForAirport(a);
+        if (chart.id == region) continue;
+        int index = -1;
+        for (int i = 0, n = procedural::airportCount(chart.id); i < n && index < 0; i++)
+          if (const Airport* p = procedural::airportOf(chart.id, i); p && a.ident == p->code) index = i;
+        if (index < 0) continue;
+        countries.push_back(a.country);
+        Destination t; t.id = chart.id; t.airport = index; t.km = km;
+        t.name = a.name + (a.municipality.empty() ? "" : ", " + a.municipality);
+        t.fare = (int)(120. + 0.45 * t.km) / 10 * 10;
+        t.minLicense = LIC_ATP;
         out.push_back(t);
       }
     }
@@ -608,10 +642,10 @@ void Career::finishPlan(LaunchPlan& e, const Contract& c, float minutes, float f
   e.minutesSigma = 0.15f * e.minutesEst;
   // (flown in the background: what the autopilot burned; else the quick estimate's, above)
   e.fuelKgEst = fuelKg >= 0 ? fuelKg : quickFuelKg(s, e);
-  if (e.fuel == LaunchPlan::FUEL_PURCHASED) {   // bought at the departure: the estimate's fuel with a quarter to spare, less what the tanks hold
+  if (e.fuel == LaunchPlan::FUEL_PURCHASED) {   // bought at the departure: the trip's fuel and its reserve (plannedFuelKg), less what the tanks hold
     int oi = ownedIndexFor(e.spec);
     float have = oi >= 0 ? fleet[oi].fuel : 0.f;
-    e.fuelUpliftKg = std::max(0.f, std::min(e.fuelKgEst * 1.25f, s.maxFuel) - have);
+    e.fuelUpliftKg = std::max(0.f, plannedFuelKg(s, e.fuelKgEst) - have);
     e.fuelCostEst = (int)(e.fuelUpliftKg * fuelPrice(c.from, e.spec));
   } else e.fuelCostEst = e.fuel == LaunchPlan::FUEL_BILL_CONSUMED ? (int)(e.fuelKgEst * s.fuelPriceBase()) : 0;
   e.net = c.payout - e.fees() - e.fuelCostEst;
@@ -654,7 +688,9 @@ float simulateFlightMinutes(const Contract& c, int si, float* fuelKgOut, bool cl
   }
   vec3 start = a.threshold(reverse) + (reverse ? -a.dir() : a.dir()) * 30.f;
   const float payload = (float)c.cargoKg + c.pax * 85.f + 85.f;
-  const float initialFuel = s.engineType == ENG_JET ? s.maxFuelForPayload(payload) : s.maxFuel;
+  // (a non-jet with the load its estimates were fitted at - the design tanks - not real tanks brimmed: a flight leaves
+  // with its trip and a reserve, and a Longshore with a tonne aboard flew its quote 6% heavier than it is flown)
+  const float initialFuel = s.engineType == ENG_JET ? s.maxFuelForPayload(payload) : std::min(s.maxFuel, s.designFuel());
   Plane p; p.reset(&s, start, reverse ? h0 + 180.f : h0, initialFuel, payload, c.startAirborne, s.cruise);
   // (the trees on the finals from scenery of its own: the quote is flown on a worker thread, and the game's scenery
   // is the game thread's)
@@ -993,8 +1029,11 @@ void Career::refreshBoard() {
     const geo::Position here = airportPlace(region, g_world.airports[location]);
     static const char* bearings[] = {"north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"};
     int added = 0;
+    int oceans = 0;   // (and one across an ocean, when a type you can fly has the range: the real Earth's far hubs)
     for (const Destination& d : destinations()) {
-      if (added >= 2) break;
+      if (added >= 3) break;
+      const bool across = d.km > 3000.;
+      if (across ? oceans >= 1 : added - oceans >= 2) continue;
       if (!d.home && license < std::max(d.minLicense, (int)LIC_PPL)) continue;
       const int main = d.airport >= 0 ? d.airport : procedural::mainAirport(d.id);
       const Airport* B = procedural::airportOf(d.id, main);
@@ -1031,7 +1070,7 @@ void Career::refreshBoard() {
                     pax ? fmt("%d passengers", c.pax).c_str() : fmt("%d kg of freight", c.cargoKg).c_str(), B->name, where.c_str(), c.haulKm, way,
                     B->code, g_world.airports[location].code);
       c.wx = W(r.range(0, 360), r.range(0, 10), 0, r.range(0.05f, 0.25f), r.range(0, 0.5f), r.range(3000, 7000), r.range(25, 50), 0, false, r.range(8.f, 14.f));
-      board.push_back(c); added++;
+      board.push_back(c); added++; oceans += across;
     }
   }
   if (!earningPath()) { Contract rc = recoveryContract(); if (rc.payout > 0) board.insert(board.begin(), rc); }
@@ -1236,8 +1275,11 @@ std::vector<PayoutLine> Career::settle(const Contract& c, int si, Source src, co
       if (r.shutDownAtStand) L.push_back({"Taxied clear and shut down", c.payout * 2 / 100});
     }
     if (c.payout > 0 && !s.special) {
-      if (r.fuelLeftFrac >= 0.15f) L.push_back({"Fuel reserve kept", c.payout * 2 / 100});
-      else if (r.fuelLeftFrac < 0.05f) { L.push_back({"Landed on fumes", -c.payout / 10}); reputation = std::max(0, reputation - 1); }
+      // (the reserve in minutes of cruise - the rules' 30 of day flying - kept, or under ten: on fumes)
+      const bool kept = r.fuelLeftMin >= 0.f ? r.fuelLeftMin >= 30.f : r.fuelLeftFrac >= 0.15f;
+      const bool fumes = r.fuelLeftMin >= 0.f ? r.fuelLeftMin < 10.f : r.fuelLeftFrac < 0.05f;
+      if (kept) L.push_back({"Fuel reserve kept", c.payout * 2 / 100});
+      else if (fumes) { L.push_back({"Landed on fumes", -c.payout / 10}); reputation = std::max(0, reputation - 1); }
     }
     if (c.payout > 0 && r.holdViolated) { L.push_back({"Took off against a hold instruction", -c.payout / 10}); reputation = std::max(0, reputation - 1); st--; }
     if (c.payout > 0 && r.landedAgainstGoAround) { L.push_back({"Landed against a go-around instruction", -c.payout / 2}); reputation = std::max(0, reputation - 1); st--; }

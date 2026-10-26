@@ -72,7 +72,7 @@ AeroModel build(const AircraftSpec& s) {
   else if (s.engineType == ENG_TURBOPROP) a.extraDq += 0.03e-6f * s.power * s.engines;                 // intakes, oil cooler
   // landing gear (when down): grows with the weight it carries; fixed gear is faired, retractable gear isn't
   // (rough-field types run big unfaired tyres; the research craft's gear is small for its weight)
-  float mtow = s.emptyMass + s.maxFuel + s.cargoKg;
+  float mtow = s.emptyMass + s.designFuel() + s.cargoKg;
   a.gearDq = (s.retract ? 0.0018f : s.roughOK ? 0.0019f : 0.00128f) * powf(mtow, 2.f / 3.f) * (s.taildragger ? 0.85f : 1.f) * (research ? 0.6f : 1.f);
   a.misc = research ? 0.10f : jet ? 0.04f : s.engineType == ENG_TURBOPROP ? 0.08f : 0.15f;   // antennas, rivets, steps, leaks
   a.fuseFactor = 1.07f * (1.f + d / b) * (1.f + d / b);

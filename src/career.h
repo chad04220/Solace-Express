@@ -48,6 +48,10 @@ struct Contract {
   // is called off and the career is back where it set out. Board contracts only: never saved
   std::string toRegion; float haulKm = 0;
   bool longHaul() const { return !toRegion.empty(); }
+  // A fuel challenge: the flight leaves with fuel for this many kilometres of cruise and no more (0: the plan's, the
+  // trip and its reserve). Since v4.1 the tanks hold real fuel - hours of it - so a mission built on the fuel gauge
+  // rations its own; whatever more an owned aircraft's tanks held goes back into the field's store
+  float rationKm = 0;
   // a cross-country job (the real Earth): flown as a long haul is, to a small field beyond the chart, within 200 km
   bool crossCountry() const { return longHaul() && toRegion.rfind("earth:", 0) == 0 && haulKm <= 200.f; }
 };
@@ -82,6 +86,7 @@ struct FlightResult {
   // the rest of the record the settlement scores (C9 / C10): fuel left at the end (fraction of the tanks), a
   // shutdown off the runway with the brake set, and the tower's instructions ignored
   float fuelLeftFrac = 1.f;
+  float fuelLeftMin = -1.f;   // the minutes of cruise the fuel left would last (-1: not recorded; the settlement then reads the fraction)
   bool shutDownAtStand = false;     // stopped clear of the runway, engine off, parking brake set
   bool holdViolated = false;        // moved off (or took off) while told to hold
   bool landedAgainstGoAround = false;   // touched down after the tower said go around

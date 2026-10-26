@@ -74,7 +74,7 @@ const PerfModel& Plane::perf(const AircraftSpec* sp) {
   // types at their real reference / design maximum masses.
   const bool fullCabinEnvelope = s.fullCabinEnvelope;
   const float cabinPayload = s.cargoKg + s.pax * 85.f + 85.f;
-  const float fuel = s.maxFuel * 0.6f, payload = performanceReferencePayload(s);
+  const float fuel = s.designFuel() * 0.6f, payload = performanceReferencePayload(s);
   const vec3 sea = seaPoint() + vec3(0, 1200.f, 0);
   const float W = (s.emptyMass + fuel + payload) * G0, rho = isaDensity(1200.f);
   P.vs1 = sqrtf(2.f * W / (rho * s.wingArea * aeroCLmaxFlown(s, 0)));   // (the wing's, unless its controls run out first)
@@ -160,7 +160,7 @@ const PerfModel& Plane::perf(const AircraftSpec* sp) {
   P.sinkIdle = std::max(0.5f, -excessPower(std::max(P.vs0 * 1.25f, s.vref * 0.95f), true, 0.f, 16.f));
   // 4. cruise: level at 1500 m on the altitude hold, 75% power, mid weight; the true airspeed it settles at
   {
-    Plane p; p.reset(&s, seaPoint() + vec3(0, 1500.f, 0), 90.f, s.maxFuel * 0.5f, fullCabinEnvelope ? cabinPayload * 0.5f : s.cargoKg * 0.5f, true, s.cruise);
+    Plane p; p.reset(&s, seaPoint() + vec3(0, 1500.f, 0), 90.f, s.designFuel() * 0.5f, fullCabinEnvelope ? cabinPayload * 0.5f : s.cargoKg * 0.5f, true, s.cruise);
     p.ctl.gearDown = !s.retract; p.gear = p.ctl.gearDown ? 1.f : 0.f; p.engineRunning = true; p.engineSpool = 0.75f;
     p.apEngage(Plane::AP_HOLD, -1, calm); p.apSpeed = 0; p.apAlt = p.pos.y; p.apHeading = p.heading();
     float sum = 0; int n = 0;
@@ -170,7 +170,7 @@ const PerfModel& Plane::perf(const AircraftSpec* sp) {
   // 5. the take-off and landing rolls at full weight on a paved runway (Solace Capital), brought to sea level
   if (!s.special) {
     const Airport& a = g_world.airports[std::max(g_world.findAirport("CAP"), 0)];
-    const float mtowFuel = s.maxFuel * (fullCabinEnvelope ? 0.75f : 1.f);
+    const float mtowFuel = s.designFuel() * (fullCabinEnvelope ? 0.75f : 1.f);
     const float mtowLoad = fullCabinEnvelope ? s.maxMass() - s.emptyMass - mtowFuel : s.cargoKg;
     const float elevK = 1.f + a.elev / 3000.f;
     {

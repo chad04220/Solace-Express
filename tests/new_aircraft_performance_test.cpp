@@ -282,7 +282,7 @@ int main(int argc,char**argv){
     const PerfModel&p=Plane::perf(&s);
     printf("LEARNED %s cruise%.1f climb%.2f vy%.1f takeoff%.1f landing15m%.1f requiredSL%.1f CAP%d PVI%d KLO%d FAR%d\n",s.id,p.cruiseV,p.roc,p.vy,p.toRoll,p.ldgRoll,s.runwayNeeded(0),runwayOK(s,g_world.airports[g_world.findAirport("CAP")]),runwayOK(s,g_world.airports[g_world.findAirport("PVI")]),runwayOK(s,g_world.airports[g_world.findAirport("KLO")]),runwayOK(s,g_world.airports[g_world.findAirport("FAR")]));
     Plane envelope;envelope.reset(&s,vec3(-39000,1500,35000),0,s.maxFuel*.75f,s.maxMass()-s.emptyMass-s.maxFuel*.75f,true,s.cruise);envelope.apSense();
-    const float reference=s.emptyMass+s.maxFuel*.6f+performanceReferencePayload(s);
+    const float reference=s.emptyMass+s.designFuel()*.6f+performanceReferencePayload(s);
     check(fabsf(envelope.apEnv.wRatio-s.maxMass()/reference)<.001f,s.name,"autopilot uses learner reference mass");
     check(fabsf(envelope.apEnv.ldgDist-p.ldgRoll)<.01f,s.name,"loaded landing envelope uses true design maximum");
     check(runwayOK(s,g_world.airports[g_world.findAirport("CAP")])&&runwayOK(s,g_world.airports[g_world.findAirport("PVI")]),s.name,"usable capital/port career route");

@@ -561,17 +561,18 @@ bool Game::retryCommit() {
 }
 // A career flight: the save marks the attempt open first (a crash to desktop mid-flight then shows on the next start
 // that a flight was interrupted), then the flight starts
-// The fuel at take-off: what was chosen on the card, else the plan's estimate with a quarter to spare (never less
-// than an owned aircraft already holds, never more than the tanks)
+// The fuel at take-off: what was chosen on the card, else the plan's - the trip and its reserve (plannedFuelKg; never
+// less than an owned aircraft already holds, never more than the tanks). A rental comes full, as far as the weight
+// limit lets it with the load on board.
 float Game::chosenFuel(const Contract& c, int spec, Career::Source src, const Career::LaunchPlan& p) const {
   const AircraftSpec& s = kAircraft[spec];
+  if (c.rationKm > 0) return fuelForKm(s, c.rationKm);   // (a fuel challenge's ration: no choice of more)
   if (launchFuelKg > 0) return std::min(launchFuelKg, s.maxFuel);
   if (p.fuelLoadKg >= 0) return clampf(p.fuelLoadKg, 0.f, s.maxFuel);
   float have = 0.f;
   if (src == Career::SRC_OWNED) { int oi = career.ownedIndexFor(spec); if (oi >= 0) have = career.fleet[oi].fuel; }
-  if (src != Career::SRC_OWNED) return s.maxFuel;   // a rental comes full (the weight limit may still ask for less)
-  (void)c;
-  return std::min(std::max(p.fuelKgEst * 1.25f, have), s.maxFuel);
+  if (src != Career::SRC_OWNED) return std::max(s.maxFuelForPayload(c.cargoKg + c.pax * 85.f + 85.f), std::min(plannedFuelKg(s, p.fuelKgEst), s.maxFuel));
+  return std::min(std::max(plannedFuelKg(s, p.fuelKgEst), have), s.maxFuel);
 }
 // A launch's save is its precondition: when it fails, nothing flies and the launch is not left pending to be saved
 // later (a retried save would then record an open flight that never started); the card's button tries again
@@ -2418,6 +2419,7 @@ void Game::endFlight(bool success, const std::string& reason, FlightOutcome outc
   result.fuelUsedKg = std::max(0.f, fuelStart - plane.fuel);
   result.fuelLeftKg = std::max(0.f, plane.fuel);
   result.fuelLeftFrac = plane.spec->maxFuel > 0 ? clampf(plane.fuel / plane.spec->maxFuel, 0.f, 1.f) : 1.f;
+  result.fuelLeftMin = cruiseMinutes(*plane.spec, plane.fuel);
   result.shutDownAtStand = success && plane.onGround && !plane.engineRunning && parkingBrake && (plane.onWater ? atDock() : g_world.onRunway(plane.pos.x, plane.pos.z, 6.f) < 0);
   result.touchdownFpm = touchdownFpm;
   result.late = contract.timeLimitMin > 0 && (jobClockBase + flightClock) / 60.f > contract.timeLimitMin;
@@ -2574,7 +2576,7 @@ std::string Game::warpBlocker() const {
   if (plane.stallWarn > 0.6f) return "stall warning";
   if (gTunnel > 0.05f) return "high g";
   if (ufo.on) return "something is alongside";
-  if (plane.spec && plane.fuel < plane.spec->maxFuel * 0.1f && !plane.spec->special) return "low fuel";
+  if (plane.spec && cruiseMinutes(*plane.spec, plane.fuel) < 15.f && !plane.spec->special) return "low fuel";
   return "";
 }
 
@@ -3313,7 +3315,8 @@ void Game::updateFlight(float dt) {
   // fuel warnings
   static bool lowFuelWarned = false;
   if (flightClock < 0.1f) lowFuelWarned = false;
-  if (!lowFuelWarned && plane.fuel < plane.spec->maxFuel * 0.15f) { lowFuelWarned = true; g_audio.trigger(SFX_BEEP); toast("LOW FUEL", vec3(1, 0.5f, 0.2f)); }
+  // (twenty minutes left at cruise: tanks sized for real flying hold hours, and a short hop leaves with a part load)
+  if (!lowFuelWarned && cruiseMinutes(*plane.spec, plane.fuel) < 20.f) { lowFuelWarned = true; g_audio.trigger(SFX_BEEP); toast("LOW FUEL", vec3(1, 0.5f, 0.2f)); }
   // completion
   if (plane.onGround && takeoffAnnounced && gs < 2.5f && !researchFlight && !militaryFlight) {
     stillTimer += dt;
@@ -3716,7 +3719,7 @@ void Game::launchResearch() {
   launchFuelKg = -1;
   Career::LaunchPlan researchPlan;
   researchPlan.spec = resCraft; researchPlan.src = Career::SRC_OWNED;
-  researchPlan.startAirport = resAirport; researchPlan.fuelLoadKg = rs.maxFuel;
+  researchPlan.startAirport = resAirport; researchPlan.fuelLoadKg = resCard >= 0 && kResCards[resCard].fuelKg > 0 ? kResCards[resCard].fuelKg : rs.maxFuel;
   startFlight(c, resCraft, Career::SRC_OWNED, &researchPlan);
   launchFuelKg = careerFuelChoice;
   researchFlight = true;

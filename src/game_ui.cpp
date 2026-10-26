@@ -985,10 +985,13 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
           float sigma = isaDensity(g_world.airports[c.from].elev) / 1.225f;
           float roll = P.toRoll > 0 ? P.toRoll * (mass / sp.maxMass()) * (mass / sp.maxMass()) / sigma : 0.f;
           Career::LaunchPlan ef = e; career.planFuel(ef, c, fuel);
-          std::string v = fmt("%.0f kg (%.0f%%)  -  take-off %.0f of %.0f kg%s", fuel, 100.f * fuel / sp.maxFuel, mass, sp.maxMass(), heavy ? "  OVERWEIGHT" : "");
+          // (with the hours and minutes it lasts at cruise: the tanks hold real fuel, and a short hop leaves with a part load)
+          const int endur = (int)cruiseMinutes(sp, fuel);
+          std::string v = fmt("%.0f kg (%.0f%%, %d h %02d at cruise)  -  take-off %.0f of %.0f kg%s", fuel, 100.f * fuel / sp.maxFuel, endur / 60, endur % 60, mass, sp.maxMass(), heavy ? "  OVERWEIGHT" : "");
+          if (c.rationKm > 0) v = fmt("Rationed: %.0f kg, for %.0f km  -  take-off %.0f of %.0f kg", fuel, c.rationKm, mass, sp.maxMass());
           if (roll > 0) v += fmt(", roll ~%.0f m", roll);
           if (ef.fuel == Career::LaunchPlan::FUEL_PURCHASED) v += ef.fuelUpliftKg > 0.5f ? fmt(", uplift %.0f kg for %s", ef.fuelUpliftKg, fmtMoney(ef.fuelCostEst).c_str()) : " (tanks hold it)";
-          {   // the fuel row: with the D-pad's focus on it, left / right take 5% off or put it on (the arrows are the mouse's)
+          if (c.rationKm <= 0) {   // the fuel row: with the D-pad's focus on it, left / right take 5% off or put it on (the arrows are the mouse's)
             int step = 0; focusAdjust(uid(0, (float)selAircraft, "job-fuel"), px, py - 4 * s, textW, 24 * s, &step);
             if (step) launchFuelKg = std::clamp(fuel + step * sp.maxFuel * 0.05f, sp.maxFuel * 0.1f, sp.maxFuel);
             const size_t arrows = focusList.size();
@@ -2971,7 +2974,7 @@ void Game::drawHud(const FrameParams& fp) {
       float unit = set.metric ? 3.6f : MS_TO_KT; float v = plane.ias * unit, span = set.metric ? 120.f : 60.f, ppu = railH / (2.f * span);
       hudStrip(x, railTop, rail, railH, 0.9f);
       const PerfModel& P = Plane::perf(&spc);
-      float vs = (plane.flaps > 0.5f ? P.vs0 : P.vs1) * unit * sqrtf(plane.mass() / std::max(spc.emptyMass + spc.maxFuel * 0.6f + 150.f, 1.f));
+      float vs = (plane.flaps > 0.5f ? P.vs0 : P.vs1) * unit * sqrtf(plane.mass() / std::max(spc.emptyMass + spc.designFuel() * 0.6f + 150.f, 1.f));
       auto Y = [&](float val) { return mid - (val - v) * ppu; };
       // the low-speed band: red below the stall, amber to 1.15 Vs (never for the research craft's fly-by-wire)
       if (!spc.special && vs > 0) {
@@ -3078,9 +3081,13 @@ void Game::drawHud(const FrameParams& fp) {
     tiles.push_back({"THR", fmt("%.0f%%", plane.ctl.throttle * 100), plane.ctl.throttle > 0.85f ? C_WARN : C_TEXT, plane.ctl.throttle});
     if (sp.engineType == ENG_PISTON) tiles.push_back({"RPM", plane.engineRunning ? fmt("%.0f", plane.rpm) : (plane.starterTime > 0 ? "CRANK" : "OFF"), plane.engineRunning ? C_TEXT : C_BAD, plane.engineRunning ? clampf(plane.rpm / sp.maxRpm, 0.f, 1.f) : 0.f});
     else tiles.push_back({"N1", plane.engineRunning ? fmt("%.1f%%", plane.n1) : (plane.starterTime > 0 ? fmt("ST %.0f", plane.n1) : "OFF"), plane.engineRunning ? C_TEXT : C_BAD, clampf(plane.n1 / 100.f, 0.f, 1.f)});
+    // (the fuel as the hours and minutes of cruise it lasts - the tanks hold real fuel, and a short hop leaves with a part
+    // load - red under twenty minutes; the bar its share of the tanks)
     float fuelFrac = plane.fuel / std::max(sp.maxFuel, 1.f);
-    if (sp.special) { tiles.push_back({"FUEL", fmt("%.0f%%", fuelFrac * 100), fuelFrac < 0.15f ? C_BAD : C_TEXT, fuelFrac}); tiles.push_back({"MACH", fmt("%.2f", plane.mach), plane.mach > sp.designMach * 0.95f ? C_WARN : C_TEXT, -1.f}); }
-    else { tiles.push_back({"FUEL", fmt("%.0f%%", fuelFrac * 100), fuelFrac < 0.15f ? C_BAD : C_TEXT, fuelFrac}); tiles.push_back({"RANGE", fmt("%.0f km", plane.rangeLeftKm()), fuelFrac < 0.15f ? C_BAD : C_TEXT, -1.f}); }
+    const int endur = (int)cruiseMinutes(sp, plane.fuel); const bool fuelLow = endur < 20;
+    const std::string fuelS = fmt("%d:%02d", endur / 60, endur % 60);
+    if (sp.special) { tiles.push_back({"FUEL", fuelS, fuelLow ? C_BAD : C_TEXT, fuelFrac}); tiles.push_back({"MACH", fmt("%.2f", plane.mach), plane.mach > sp.designMach * 0.95f ? C_WARN : C_TEXT, -1.f}); }
+    else { tiles.push_back({"FUEL", fuelS, fuelLow ? C_BAD : C_TEXT, fuelFrac}); tiles.push_back({"RANGE", fmt("%.0f km", plane.rangeLeftKm()), fuelLow ? C_BAD : C_TEXT, -1.f}); }
     if (sp.special == 2) {
       const vec3 VIO(0.8f, 0.5f, 1.f);
       tiles.push_back({"PODS", fmt("%.0f deg%s", plane.nozzle * 90, plane.nozzle > 0.99f ? " VTOL" : ""), C_TEXT, plane.nozzle});

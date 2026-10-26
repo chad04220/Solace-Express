@@ -855,11 +855,11 @@ struct GameTest {
         int from = g_world.findAirport("ORC"), to = g_world.findAirport("MDB");
         Contract c; c.id = "FUELTEST"; c.title = "Fuel test"; c.type = CT_CARGO; c.from = from; c.to = to; c.cargoKg = 40; c.payout = 1000; c.minLicense = LIC_PPL; c.wx = Weather();
         q.pendingCareer.reset(); q.career.newGame(); q.career.money = 50000; q.career.license = LIC_PPL; q.career.location = from; q.saveDir.clear();
-        q.career.fleet.push_back({1, from, 20.f, 0.f});   // an owned Ambler with 20 kg in the tanks
+        q.career.fleet.push_back({1, from, 5.f, 0.f});   // an owned Ambler with 5 kg in the tanks (less than the hop and its 30-minute reserve)
         q.launchFuelKg = -1;
         q.beginCareerFlight(c, 1, Career::SRC_OWNED);
         float fuel0 = q.plane.fuel, uplift = q.launchPlan.fuelUpliftKg; int cost = q.launchPlan.fuelCostEst;
-        bool planned = fuel0 > 20.f && fabsf(uplift - (fuel0 - 20.f)) < 1.f && cost > 0 && fabsf(cost - uplift * q.career.fuelPrice(from, 1)) < 2.f;
+        bool planned = fuel0 > 5.f && fabsf(uplift - (fuel0 - 5.f)) < 1.f && cost > 0 && fabsf(cost - uplift * q.career.fuelPrice(from, 1)) < 2.f;
         q.plane.fuel = fuel0 * 0.6f;   // (the flight burns 40%)
         q.plane.pos = g_world.airports[to].pos() + vec3(0, 0.1f, 0); q.plane.onGround = true; q.touchedDown = true; q.takeoffAnnounced = true;
         int m0 = q.career.money;

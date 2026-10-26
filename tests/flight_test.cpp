@@ -38,7 +38,7 @@ int main(int argc, char** argv) {
     const Airport& a = g_world.airports[apIdx];
     Plane p; vec3 start = a.threshold(false) + a.dir() * 30.f;
     float gh = 3.0f; start.y = a.elev + gh;
-    p.reset(&s, start, a.heading, s.maxFuel, s.cargoKg * 0.8f, false);
+    p.reset(&s, start, a.heading, s.designFuel(), s.cargoKg * 0.8f, false);   // (the load the published runway figure is for: real tanks brimmed with the cargo aboard pass a Longshore's weight limit)
     p.starterTime = 0.01f;
     float t = 0, dt = 1.f / 60.f; float liftoffDist = -1, vLift = 0;
     // settle + start engine

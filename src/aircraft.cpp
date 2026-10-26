@@ -13,27 +13,27 @@ const AircraftSpec kAircraft[] = {
   // power, v0, vr, vref, cruise, range, runway, rough, tail, retract, Ixx, Iyy, Izz, elev, ail, rud, lic, price, rent,
   // fusLen, fusRad, wingY, wingZ, engLayout, tail, colBase, colStripe
   {"dawnlark", "Dawnlark T2", "Two-seat trainer", ENG_PISTON, 1, 4, 2, 750, 2600, 530, 70, 120, 1, 14.9f, 10.1f, 1.5f,
-   0.30f, 4.8f, 1.45f, 0.55f, 0.030f, 0.004f, 0.045f, 0.75f, 110000, 22, 25, 30, 50, 45, 400, false, false, false,
+   0.30f, 4.8f, 1.45f, 0.55f, 0.030f, 0.004f, 0.045f, 0.75f, 110000, 22, 25, 30, 50, 770, 400, false, false, false,
    900, 1300, 1900, 0.40f, 0.060f, 0.060f, LIC_STUDENT, 18000, 120,
    7.3f, 0.62f, 1.19f, -0.92f, 0, 0, vec3(0.92f, 0.92f, 0.95f), vec3(0.85f, 0.12f, 0.10f), 0, 0, 6.0f, -3.0f},
-  {"ambler", "Ambler 180", "Four-seat tourer", ENG_PISTON, 1, 6, 2, 700, 2700, 820, 110, 320, 3, 16.2f, 11.0f, 1.5f,
-   0.30f, 4.9f, 1.50f, 0.65f, 0.028f, 0.004f, 0.050f, 0.76f, 180000, 23, 28, 33, 60, 70, 450, false, false, false,
+  {"ambler", "Ambler 180", "Four-seat tourer", ENG_PISTON, 1, 6, 2, 700, 2700, 820, 150, 320, 3, 16.2f, 11.0f, 1.5f,
+   0.30f, 4.9f, 1.50f, 0.65f, 0.028f, 0.004f, 0.050f, 0.76f, 180000, 23, 28, 33, 60, 1150, 450, false, false, false,
    1500, 2000, 3000, 0.40f, 0.058f, 0.060f, LIC_PPL, 30000, 250,
    8.3f, 0.68f, 1.18f, -1.07f, 0, 0, vec3(0.95f, 0.95f, 0.92f), vec3(0.10f, 0.30f, 0.70f), 0, 0, 3.8f, -1.52f},
-  {"scrubrunner", "Scrubrunner STOL", "Backcountry taildragger", ENG_PISTON, 1, 6, 3, 700, 2700, 760, 120, 480, 4, 21.5f, 12.4f, 1.75f,
-   0.35f, 5.0f, 1.85f, 0.95f, 0.034f, 0.006f, 0.070f, 0.74f, 220000, 18, 18, 24, 55, 72, 220, true, true, false,
+  {"scrubrunner", "Scrubrunner STOL", "Backcountry taildragger", ENG_PISTON, 1, 6, 3, 700, 2700, 760, 200, 480, 4, 21.5f, 12.4f, 1.75f,
+   0.35f, 5.0f, 1.85f, 0.95f, 0.034f, 0.006f, 0.070f, 0.74f, 220000, 18, 18, 24, 55, 1100, 220, true, true, false,
    1500, 2100, 3200, 0.42f, 0.065f, 0.070f, LIC_CPL, 40000, 450,
    8.0f, 0.70f, 1.17f, -1.05f, 0, 0, vec3(0.95f, 0.75f, 0.10f), vec3(0.12f, 0.12f, 0.12f), 0, 0, 4.4f, -1.76f},
-  {"skerry", "Skerry Twin", "Nine-seat utility twin", ENG_PISTON, 2, 6, 2, 700, 2700, 1750, 260, 900, 9, 30.2f, 14.9f, 2.05f,
-   0.32f, 4.9f, 1.55f, 0.70f, 0.036f, 0.006f, 0.060f, 0.76f, 195000, 22, 26, 31, 65, 90, 420, true, false, false,
+  {"skerry", "Skerry Twin", "Nine-seat utility twin", ENG_PISTON, 2, 6, 2, 700, 2700, 1750, 370, 900, 9, 30.2f, 14.9f, 2.05f,
+   0.32f, 4.9f, 1.55f, 0.70f, 0.036f, 0.006f, 0.060f, 0.76f, 195000, 22, 26, 31, 65, 1400, 420, true, false, false,
    9000, 9500, 17000, 0.40f, 0.055f, 0.060f, LIC_CPL, 85000, 900,
    10.9f, 0.85f, 1.12f, -1.38f, 1, 0, vec3(0.96f, 0.96f, 0.96f), vec3(0.05f, 0.55f, 0.45f), 0, 0, 3.8f, -1.52f},
-  {"longshore", "Longshore Hauler", "Single turboprop hauler", ENG_TURBOPROP, 1, 0, 3, 1100, 1900, 2150, 420, 1400, 12, 25.9f, 15.9f, 1.95f,
-   0.32f, 5.0f, 1.60f, 0.90f, 0.030f, 0.005f, 0.060f, 0.78f, 540000, 30, 31, 38, 85, 130, 550, true, false, false,
+  {"longshore", "Longshore Hauler", "Single turboprop hauler", ENG_TURBOPROP, 1, 0, 3, 1100, 1900, 2150, 1000, 1400, 12, 25.9f, 15.9f, 1.95f,
+   0.32f, 5.0f, 1.60f, 0.90f, 0.030f, 0.005f, 0.060f, 0.78f, 540000, 30, 31, 38, 85, 1700, 550, true, false, false,
    12000, 14000, 24000, 0.40f, 0.052f, 0.060f, LIC_CPL, 120000, 1600,
    11.5f, 0.92f, 1.09f, -1.83f, 0, 0, vec3(0.95f, 0.95f, 0.95f), vec3(0.85f, 0.45f, 0.05f), 0, 0, 3.8f, -1.52f},
-  {"archipel", "Archipel 400", "Regional turboprop airliner", ENG_TURBOPROP, 2, 0, 4, 900, 1300, 12000, 1500, 4500, 40, 54.0f, 27.4f, 2.1f,
-   0.30f, 5.2f, 1.50f, 0.80f, 0.026f, 0.010f, 0.060f, 0.80f, 1800000, 40, 52, 60, 140, 170, 1100, false, false, true,
+  {"archipel", "Archipel 400", "Regional turboprop airliner", ENG_TURBOPROP, 2, 0, 4, 900, 1300, 12000, 4500, 4500, 40, 54.0f, 27.4f, 2.1f,
+   0.30f, 5.2f, 1.50f, 0.80f, 0.026f, 0.010f, 0.060f, 0.80f, 1800000, 40, 52, 60, 140, 1600, 1100, false, false, true,
    180000, 300000, 450000, 0.40f, 0.048f, 0.055f, LIC_ATP, 600000, 8000,
    26.0f, 1.35f, 0.93f, -0.38f, 1, 1, vec3(0.96f, 0.96f, 0.98f), vec3(0.08f, 0.18f, 0.45f), 0, 0, 2.5f, -1.0f},
   {"emissary", "Emissary 500", "Light business jet", ENG_JET, 2, 0, 0, 0, 0, 4600, 2200, 700, 7, 30.0f, 15.9f, 2.0f,
@@ -43,15 +43,15 @@ const AircraftSpec kAircraft[] = {
   // ---- Codex's aircraft: Cutwater S6, Wavecrest C6, XR-10 Vigil
   // Cutwater S6: four-seat retractable touring piston
   {"cutwater_s6", "Cutwater S6", "Retractable low-wing tourer", ENG_PISTON, 1, 6, 3, 700.0f, 2700.0f,
-  980.0f, 180.0f, 420.0f, 3, 17.10f, 11.40f, 1.552f,
+  980.0f, 200.0f, 420.0f, 3, 17.10f, 11.40f, 1.552f,
   0.28f, 4.9f, 1.65f, 0.78f, 0.025f, 0.010f, 0.052f, 0.80f,
-  260000.0f, 23.0f, 31.0f, 36.0f, 76.0f, 140.0f, 600.0f, false, false, true,
+  260000.0f, 23.0f, 31.0f, 36.0f, 76.0f, 1500.0f, 600.0f, false, false, true,
   7600.0f, 6500.0f, 14100.0f, 0.42f, 0.065f, 0.068f, LIC_PPL, 68000, 600,
   8.60f, 0.66f, -1.121212f, -0.155f, 0, 0,
   vec3(0.91f, 0.88f, 0.80f), vec3(0.13f, 0.26f, 0.32f), 0, 0, 4.4f, -1.76f},
   // Wavecrest C6: six-seat coastal charter piston twin (its cabin trim: plane_sdf.glsl mapWavecrestCabinTrim, by kWavecrest)
-  {"wavecrest_c6", "Wavecrest C6", "Six-seat coastal charter twin", ENG_PISTON, 2, 6, 3, 700.0f, 2700.0f, 1420.0f, 220.0f, 270.0f, 5, 22.5f, 12.4f, 1.82f,
-  0.30f, 4.9f, 1.65f, 0.80f, 0.028f, 0.006f, 0.060f, 0.78f, 180000.0f, 24.0f, 30.2f, 35.0f, 74.0f, 110.0f, 550.0f, false, false, true,
+  {"wavecrest_c6", "Wavecrest C6", "Six-seat coastal charter twin", ENG_PISTON, 2, 6, 3, 700.0f, 2700.0f, 1420.0f, 390.0f, 270.0f, 5, 22.5f, 12.4f, 1.82f,
+  0.30f, 4.9f, 1.65f, 0.80f, 0.028f, 0.006f, 0.060f, 0.78f, 180000.0f, 24.0f, 30.2f, 35.0f, 74.0f, 1800.0f, 550.0f, false, false, true,
   9000.0f, 10800.0f, 19800.0f, 0.41f, 0.056f, 0.062f, LIC_CPL, 68000, 650,
   9.8f, 0.90f, -0.68f, -0.80f, 1, 0, vec3(0.91f, 0.88f, 0.79f), vec3(0.82f, 0.24f, 0.06f), 0, 0, 3.8f, -1.52f},
   // ---- the research craft (stable roster indices 9 through 12; excluded by kCareerAircraft)
@@ -59,38 +59,38 @@ const AircraftSpec kAircraft[] = {
   {"xr10_vigil", "XR-10 Vigil", "Tapered-wing research demonstrator", ENG_JET, 2, 0, 0, 0.0f, 0.0f,
   5700.0f, 2200.0f, 100.0f, 0, 38.18f, 16.60f, 2.508f,
   0.15f, 4.6f, 1.55f, 0.55f, 0.020f, 0.010f, 0.045f, 0.80f,
-  30000.0f, 0.0f, 43.0f, 50.0f, 260.0f, 2150.0f, 1250.0f, false, false, true,
+  30000.0f, 0.0f, 43.0f, 50.0f, 260.0f, 2500.0f, 1250.0f, false, false, true,
   52000.0f, 80000.0f, 130000.0f, 0.33f, 0.085f, 0.065f, LIC_ATP, 340000, 0,
   16.30f, 0.80f, -0.9375f, -1.145f, 2, 0,
-  vec3(0.14f, 0.18f, 0.20f), vec3(0.20f, 0.78f, 0.70f), 0, 1.30f, 45.f, -28.f, false, 0, .2f, 0, 2.2e-5f, 5.4e-5f, 10000, 240, .288f, 8800},
+  vec3(0.14f, 0.18f, 0.20f), vec3(0.20f, 0.78f, 0.70f), 0, 1.30f, 45.f, -28.f, false, 0, .2f, 0, 1.9e-5f, 2.6e-5f, 10000, 240, .288f, 8800},
   // Supersonic research model with finite fuel and pitch thrust vectoring (see Plane::substep special path).
   // It lands fast and long on its small unflapped wing: 1,400 m of hard runway (250 m and rough fields once said here,
   // and the autoland took it to fields it overran or broke its gear on - the review of v3.33.0, A1)
   {"xr30_nocturne", "XR-30 Nocturne", "Confidential research model", ENG_JET, 2, 0, 0, 0, 0, 9000, 6000, 0, 0, 46.0f, 11.2f, 4.6f,
-   0.05f, 3.6f, 1.70f, 0.0f, 0.013f, 0.010f, 0.0f, 0.75f, 132000, 0, 60, 70, 420, 1930, 1400, false, false, true,
+   0.05f, 3.6f, 1.70f, 0.0f, 0.013f, 0.010f, 0.0f, 0.75f, 132000, 0, 60, 70, 420, 4100, 1400, false, false, true,
    25000, 90000, 110000, 0.40f, 0.060f, 0.060f, LIC_STUDENT, 0, 0,
-   17.2f, 1.0f, -0.2f, 1.6f, 2, 1, vec3(0.11f, 0.12f, 0.14f), vec3(0.2f, 0.85f, 1.0f), 1, 2.7f, 180.f, -180.f, false, 0, .2f, 0, 2.3e-5f, 5.8e-5f, 10000, 250, .216f, 15800},
+   17.2f, 1.0f, -0.2f, 1.6f, 2, 1, vec3(0.11f, 0.12f, 0.14f), vec3(0.2f, 0.85f, 1.0f), 1, 2.7f, 180.f, -180.f, false, 0, .2f, 0, 1.2e-5f, 1.7e-5f, 10000, 250, .216f, 15800},
   // XR-20 Reverie: forward-swept single-jet systems demonstrator (special 0: conventional flight model and controls).
   // One centerline 88 kN-rated engine preserves the prior pair's combined thrust (176 kN static at full reheat).
   // Its foreplanes are the model's horizontal tail placed forward; the two fins remain independently ruddered.
   {"xr20_reverie", "XR-20 Reverie", "Forward-swept systems demonstrator", ENG_JET, 1, 0, 0, 0.0f, 0.0f,
    6100.0f, 3200.0f, 0.0f, 0, 30.0f, 13.2f, 2.27f,
    0.25f, 5.0f, 1.55f, 0.60f, 0.026f, 0.012f, 0.070f, 0.78f,
-   88000.0f, 0.0f, 55.0f, 62.0f, 330.0f, 2800.0f, 1350.0f, false, false, true,
+   88000.0f, 0.0f, 55.0f, 62.0f, 330.0f, 3700.0f, 1350.0f, false, false, true,
    30000.0f, 70000.0f, 100000.0f, 0.45f, 0.070f, 0.070f, LIC_ATP, 480000, 0,
-   16.0f, 1.05f, -0.62f, 0.65f, 2, 0, vec3(0.105f, 0.125f, 0.15f), vec3(0.92f, 0.43f, 0.08f), 0, 1.9f, 34.f, -34.f, false, 0, .2f, 0, 2.3e-5f, 5.8e-5f, 10000, 240, .208f, 10300},
+   16.0f, 1.05f, -0.62f, 0.65f, 2, 0, vec3(0.105f, 0.125f, 0.15f), vec3(0.92f, 0.43f, 0.08f), 0, 1.9f, 34.f, -34.f, false, 0, .2f, 0, 1.7e-5f, 2.4e-5f, 10000, 240, .208f, 10300},
   // Stealth aerobatic research model: four tilting pods (power = one pod's rated thrust).
   // Finite fuel; a fictional +300 / -300 g structure, past all it can pull either way (see Plane::somnusThrust).
   {"xr40_somnus", "XR-40 Somnus", "Stealth aerobatic research model", ENG_JET, 4, 0, 0, 0, 0, 10500, 6000, 0, 0, 52.0f, 12.4f, 5.2f,
-   0.03f, 3.4f, 1.60f, 0.0f, 0.012f, 0.010f, 0.0f, 0.72f, 72000, 0, 60, 70, 480, 3400, 200, true, false, true,
+   0.03f, 3.4f, 1.60f, 0.0f, 0.012f, 0.010f, 0.0f, 0.72f, 72000, 0, 60, 70, 480, 15000, 200, true, false, true,
    30000, 80000, 100000, 0.90f, 0.090f, 0.070f, LIC_STUDENT, 0, 0,
    16.5f, 1.0f, -0.15f, 0.8f, 2, 1, vec3(0.075f, 0.08f, 0.09f), vec3(0.72f, 0.3f, 1.0f), 2, 4.3f, 300.f, -300.f, false, 0, .2f, 0, 2.5e-5f, 6.2e-5f, 10000, 250, .070f, 18000},
   // Thistledown L4: a four-seat cantilever shoulder-wing touring single. Full payload includes passengers
   // in maxMass(); cargo is baggage, not an additional four-seat cabin. Range is intentionally game-scaled.
   {"thistledown_l4", "Thistledown L4", "Four-seat shoulder-wing tourer", ENG_PISTON, 1, 6, 3, 700, 2700,
-   930, 135, 130, 3, 18.40f, 11.60f, 1.5862f,
+   930, 235, 130, 3, 18.40f, 11.60f, 1.5862f,
    0.30f, 4.9f, 1.58f, 0.78f, 0.026f, 0.005f, 0.055f, 0.80f,
-   190000, 24, 29.5f, 29.5f, 69, 115, 600, false, false, false,
+   190000, 24, 29.5f, 29.5f, 69, 1600, 600, false, false, false,
    2100, 3300, 4900, 0.40f, 0.058f, 0.062f, LIC_PPL, 46000, 360,
    8.80f, 0.72f, 1.305556f, -1.90f, 0, 0,
    vec3(0.88f, 0.92f, 0.86f), vec3(0.18f, 0.34f, 0.22f), 0, 0, 3.8f, -1.52f, true, 0, .2f, 0},
@@ -109,15 +109,25 @@ const AircraftSpec kAircraft[] = {
   // for their side area ahead of the centre of gravity. Its floats hang below on struts: the wheels 2.75 m below the
   // origin, the floats' centre lines 1.45 m either side. Full cabin envelope, 3.9 t maximum; range game-scaled.
   {"kittiwake_a9", "Kittiwake A9", "Single-turboprop amphibian", ENG_TURBOPROP, 1, 0, 3, 1100, 1900,
-   2450, 400, 900, 9, 26.0f, 15.9f, 1.70f,
+   2450, 1000, 900, 9, 26.0f, 15.9f, 1.70f,
    0.32f, 5.0f, 1.60f, 0.90f, 0.040f, 0.005f, 0.060f, 0.76f,
-   600000, 30, 32, 37, 76, 120, 600, false, false, true,
+   600000, 30, 32, 37, 76, 1450, 600, false, false, true,
    13000, 16000, 27000, 0.42f, 0.052f, 0.070f, LIC_CPL, 165000, 1900,
    11.6f, 0.90f, 1.08f, -1.80f, 0, 0,
    vec3(0.94f, 0.94f, 0.91f), vec3(0.05f, 0.36f, 0.52f), 0, 0, 3.8f, -1.52f, true, 2.75f, .2f, 1.45f, 0, 0, 0, 0, 0, 3900, true},
 };
 // clang-format on
 static_assert(sizeof(kAircraft) / sizeof(kAircraft[0]) == kAircraftCount, "Aircraft table must match roster count");
+
+// The tanks each type was designed at (AircraftSpec::designFuel): until v4.1 the islands' small distances had their
+// tanks and ranges scaled down to suit them - a trainer that flew 45 km, an airliner 170. The table holds the real
+// figures now (a Dawnlark's 770 km, an Archipel's 1,500), and these the weights the airframes were trimmed, rigged and
+// measured at, so each flies as it did
+static const float kDesignFuel[kAircraftCount] = {70, 110, 120, 260, 420, 1500, 2200, 180, 220, 2200, 6000, 3200, 6000, 135, 20000, 400};
+float AircraftSpec::designFuel() const {
+  const int t = (int)(this - kAircraft);
+  return t >= 0 && t < kAircraftCount ? kDesignFuel[t] : maxFuel;
+}
 
 // How fast the engines follow the throttle (spool fraction per second): a piston at once, a turbine slowly, the research
 // jets' fast-spooling cores in between
@@ -164,6 +174,16 @@ float Plane::fuelFlowAt(float spool, float tas, float rho, float live) const {
   const AircraftSpec& s = *spec;
   spool = clampf(spool, 0.f, 1.f); live = clampf(live, 0.f, 1.f);
   if (live <= 0.f) return 0.f;
+  if (s.special == 2) {
+    // The XR-40's pods are a fictional power plant, and their burn follows their power setting, not a turbofan's thrust:
+    // at full boost they make sixty times the thrust that holds its cruise, and at any real fuel per newton its tanks
+    // lasted 80 seconds of boost (to v4.0). A stealth flying wing's endurance instead: about two hours at full boost, seven
+    // at full dry power, sixteen at cruise - a B-2's hours at full throttle. Thinner air costs a little less.
+    const float full = 6000.f / (2.f * 3600.f), boost = smoothstepf(.85f, 1.f, spool);   // (kg/s at full boost: its tanks in two hours)
+    const float dry = .12f + .212f * powf(std::min(spool, .85f), 1.5f);
+    const float sigma = clampf((rho > 0.f ? rho : density) / 1.225f, .001f, 1.3f);
+    return full * (dry + .668f * boost) * (.85f + .15f * sqrtf(sigma)) * live;
+  }
   if (s.engineType != ENG_JET || s.jetDryTsfc <= 0.f) {
     const float rangeS = s.rangeKm * 1000.f / s.cruise;
     return s.maxFuel / (rangeS * .8f) * (.2f + .8f * spool) * live;
@@ -203,6 +223,15 @@ float Plane::nominalFuelFlowKgS() const {
   Plane reference; reference.spec = spec; const Atmosphere at = isa(spec->fuelCruiseAlt);
   reference.soundSpeed = at.a;
   return reference.fuelFlowAt(spec->fuelCruiseSpool, spec->fuelCruiseTas, at.rho);
+}
+float cruiseBurnKgS(const AircraftSpec& s) { Plane p; p.spec = &s; return p.nominalFuelFlowKgS(); }
+float plannedFuelKg(const AircraftSpec& s, float tripKg) {
+  const float reserve = cruiseBurnKgS(s) * 60.f * (s.engineType == ENG_JET ? 45.f : 30.f);
+  return std::min(s.maxFuel, std::max(0.f, tripKg) * 1.1f + reserve);
+}
+float fuelForKm(const AircraftSpec& s, float km) {
+  const float tas = s.fuelCruiseTas > 0.f ? s.fuelCruiseTas : s.cruise;
+  return std::min(s.maxFuel, cruiseBurnKgS(s) * std::max(0.f, km) * 1000.f / std::max(tas, 1.f));
 }
 float Plane::nominalRangeKm() const {
   const float tas = spec->fuelCruiseTas > 0.f ? spec->fuelCruiseTas : spec->cruise;
@@ -572,11 +601,17 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     thrust = thrustAt(engineSpool, V, std::max(0.f, -va.z));
     // (the engines still running burn it: a twin on one engine burns half - the review of v3.44.0, FLT-7)
     const float live = s.engines > 0 ? float(s.engines - fail.enginesOut(s.engines)) / (float)s.engines : 1.f;
+    // (each step's burn to the gram's fraction, the rounding carried: real tanks hold hundreds of kilograms and a piston's
+    // step at 240 Hz burns a tenth of a gram, below a float's resolution there - it lost a fifth of what it burned)
     if (s.engineType == ENG_JET) {
       const double burn = double(fuelFlowAt(engineSpool, V, density, live)) * dt + fuelBurnRemainder;
       if (burn >= fuel) { thrust *= burn > 0 ? float(fuel / burn) : 0.f; fuel = 0; fuelBurnRemainder = 0; engineRunning = false; }
       else { const double exact = double(fuel) - burn; fuel = float(exact); fuelBurnRemainder = double(fuel) - exact; }
-    } else fuel = std::max(0.f, fuel - fuelFlowMax() * (0.2f + 0.8f * ctl.throttle) * live * dt);
+    } else {
+      const double burn = double(fuelFlowMax()) * (0.2 + 0.8 * ctl.throttle) * live * dt + fuelBurnRemainder;
+      if (burn >= fuel) { fuel = 0; fuelBurnRemainder = 0; }
+      else { const double exact = double(fuel) - burn; fuel = float(exact); fuelBurnRemainder = double(fuel) - exact; }
+    }
   }
 
   // ---------------- configuration
@@ -673,7 +708,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     float p = -w.z, qq = w.x, r = -w.y;
     float ph = (p - gustRot.x) * s.span / (2 * Vh), qh = (qq - gustRot.y) * s.chord / (2 * Vh), rh = (r - gustRot.z) * s.span / (2 * Vh);   // (relative to the air's own rotation)
     // trim reference so the aircraft flies hands-off near cruise
-    float clCruise = (s.emptyMass + s.maxFuel * 0.6f + s.cargoKg * 0.5f) * G0 / (0.5f * 1.225f * s.cruise * s.cruise * s.wingArea);
+    float clCruise = (s.emptyMass + s.designFuel() * 0.6f + s.cargoKg * 0.5f) * G0 / (0.5f * 1.225f * s.cruise * s.cruise * s.wingArea);
     float aCruise = (clCruise - s.CL0) / aeroCLa(aero, s.cruise / 340.f);
     float Cma = -1.1f, Cmq = -16.f;
     float ctlEff = 1.f - 0.4f * sig;
@@ -1225,7 +1260,7 @@ void Plane::apSense() {
   const AircraftSpec& s = *spec;
   const PerfModel& P = perf(spec);
   ApEnvelope& E = apEnv;
-  const float mTest = s.emptyMass + s.maxFuel * 0.6f + performanceReferencePayload(s), rhoTest = isaDensity(1200.f);
+  const float mTest = s.emptyMass + s.designFuel() * 0.6f + performanceReferencePayload(s), rhoTest = isaDensity(1200.f);
   E.mass = mass(); E.wRatio = E.mass / mTest;
   E.sigma = density / 1.225f;
   // the stall: with the square root of the weight; ice takes up to 30% of the wing's lift
@@ -1268,7 +1303,7 @@ void Plane::apSense() {
   E.glideMax = clampf(std::min(0.6f * glide, E.spool >= 2.f ? 3.5f : 6.5f), 3.f, 6.5f);
   if (P.ldgRoll > 0.f && P.ldgRoll < 260.f) E.glideMax = 6.5f;
   E.gUse = P.gUse;
-  E.ldgDist = P.ldgRoll * E.mass / (s.fullCabinEnvelope ? s.maxMass() : s.emptyMass + s.maxFuel + s.cargoKg) * (E.vApp / vAppFull) * (E.vApp / vAppFull);   // (the learned distance is at full weight and flap)
+  E.ldgDist = P.ldgRoll * E.mass / (s.fullCabinEnvelope ? s.maxMass() : s.emptyMass + s.designFuel() + s.cargoKg) * (E.vApp / vAppFull) * (E.vApp / vAppFull);   // (the learned distance is at full weight and flap)
   E.hover = liftThrustMax() > 1.1f * E.mass * G0;
   E.agile = P.gUse >= 30.f;
   E.rateCmd = s.special != 0;

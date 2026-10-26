@@ -42,7 +42,7 @@ static Career fixedCareer() {
   c.military.rank = 1; c.military.credits = 300; c.military.sorties = 5; c.military.successes = 4; c.military.failures = 1;
   c.military.intelligence = 3; c.military.hours = 3.5f; c.military.lastSettledAttempt = 11;
   c.military.completedMissions = 0x03u;
-  auto half = [](int spec) { return std::floor(kAircraft[spec].maxFuel * .5f); };   // (whole kilograms, within the tanks)
+  auto half = [](int spec) { return std::floor(kAircraft[spec].designFuel() * .5f); };   // (whole kilograms, within the tanks: the frozen bytes hold the design tanks' halves)
   c.fleet = {{1, 2, half(1), 0.92f}, {6, 3, half(6), 1.f}, {kGalleon, 2, half(kGalleon), 0.75f}};
   c.loan = {kGalleon, 50000, 2500, 1, .08f};
   c.insured = true;

@@ -936,7 +936,8 @@ private:
   // in game_research_ui.cpp; the flight tracks the current step here and a finished card is remembered in settings.cfg.
   enum ResStepKind { RS_MACH = 0, RS_ALT, RS_G, RS_NEGG, RS_ROLL, RS_SLOW, RS_STALL, RS_CLIMB, RS_HOVER, RS_VLAND, RS_CLOAK, RS_LASER, RS_BOMB, RS_LAND };
   struct ResStep { int kind; float v, hold; const char* label; };
-  struct ResCard { int craft; const char* id; const char* title; const char* brief; ResStep steps[5]; int n; };
+  // (fuelKg: a card built on the fuel gauge launches with that much, the tanks otherwise full: since v4.1 they hold hours)
+  struct ResCard { int craft; const char* id; const char* title; const char* brief; ResStep steps[5]; int n; float fuelKg = 0; };
   static const ResCard kResCards[]; static const int kNumResCards;
   int resCard = -1, resStep = 0; float resHold = 0, resBest = 0; bool resCardDone = false;
   std::set<std::string> resDone;   // finished card ids

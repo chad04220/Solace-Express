@@ -272,7 +272,7 @@ void calibrate(AeroGeom& g, const AircraftSpec& s, int idx) {
   // the centre of gravity a static margin ahead of the neutral point, the tail set so it flies hands-off at cruise
   // (1500 m, the reference weight, the elevator neutral and the thrust that holds the speed along the engines' lines),
   // and the rigging that flies it straight there
-  const float W = (s.emptyMass + s.maxFuel * 0.6f + (s.fullCabinEnvelope ? performanceReferencePayload(s) : s.cargoKg * 0.5f)) * G0;
+  const float W = (s.emptyMass + s.designFuel() * 0.6f + (s.fullCabinEnvelope ? performanceReferencePayload(s) : s.cargoKg * 0.5f)) * G0;
   float thr[4] = {};
   auto placeCG = [&](float sm) {
     // (subsonic, at most Mach 0.6: a supersonic type trims its cruise with the elevator - set for Mach 1, the XR-20's

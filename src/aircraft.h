@@ -50,6 +50,10 @@ struct AircraftSpec {
   // amphibious floats (docs/WINGS_OVER_WATER.md): it floats, takes off and lands on the water, and its wheels (retract)
   // fold up into the floats; floatStations sets them out, and its model row's gear type is 5 to match
   bool floats = false;
+  // the fuel the airframe was designed and learned at: its trim, its rigging, the weights its envelope and its runway
+  // figures were measured at, a legacy type's weight limit. maxFuel is what its tanks hold - the real figure since
+  // v4.1, when the islands' scaled-down tanks (these) gave way to real ones; the flight stays as it was designed
+  float designFuel() const;
   float maxFuelForPayload(float payloadKg) const { return std::max(0.f, std::min(maxFuel, maxMass() - emptyMass - std::max(0.f, payloadKg))); }
   // (0: a light aircraft's normal category, +3.8 / -1.52 flaps up; every type in the table sets its own)
   float gLimitPos() const { return gPos > 0 ? gPos : 3.8f; }
@@ -60,7 +64,7 @@ struct AircraftSpec {
   float waterRunNeeded(float elev) const;   // (a seaplane base's water lane: aircraft_perf.cpp)
   // Maximum take-off mass: jets have an explicit envelope. Legacy non-jets keep the
   // original three-quarter-tank/full-load convention. Full tanks can require less payload.
-  float maxMass() const { return maxTakeoffMass > 0 ? maxTakeoffMass : emptyMass + maxFuel * 0.75f + cargoKg + pax * 85.f + 85.f; }
+  float maxMass() const { return maxTakeoffMass > 0 ? maxTakeoffMass : emptyMass + designFuel() * 0.75f + cargoKg + pax * 85.f + 85.f; }
   float fuelPriceBase() const { return engineType == ENG_PISTON ? 2.2f : 1.4f; }   // $ per kg at a hub
 };
 
@@ -108,6 +112,13 @@ inline constexpr int validCareerSelection(int spec) { return isCareerAircraft(sp
 inline float performanceReferencePayload(const AircraftSpec& s) {
   return s.fullCabinEnvelope ? 0.5f * (s.cargoKg + s.pax * 85.f + 85.f) : 150.f;
 }
+// What a type burns in cruise (kg/s: Plane::nominalFuelFlowKgS), the minutes a quantity of fuel lasts at it, and the fuel
+// a flight is planned with: the trip with a tenth to spare and the reserve the rules ask - 30 minutes of cruise, 45 for a
+// jet - never more than the tanks hold
+float cruiseBurnKgS(const AircraftSpec& s);
+inline float cruiseMinutes(const AircraftSpec& s, float fuelKg) { return std::max(0.f, fuelKg) / std::max(cruiseBurnKgS(s), 1e-6f) / 60.f; }
+float plannedFuelKg(const AircraftSpec& s, float tripKg);
+float fuelForKm(const AircraftSpec& s, float km);   // the fuel for so many kilometres of cruise (no reserve), never more than the tanks
 // XR-40 thruster pods (body coords, +z aft): front left, front right, rear left, rear right pivot points
 static const vec3 kSomnusPods[4] = {vec3(-2.35f, -0.08f, -3.3f), vec3(2.35f, -0.08f, -3.3f), vec3(-2.75f, 0.05f, 3.45f), vec3(2.75f, 0.05f, 3.45f)};
 

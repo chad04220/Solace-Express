@@ -42,6 +42,7 @@ static Career populated() {
   Career::LaunchPlan p; p.startAirport = c.location; p.spec = 0; p.src = Career::SRC_OWNED;
   c.accept(j, 0, Career::SRC_OWNED, p); c.job->state = Career::JobState::RECOVERY;
   c.job->jobClockMin = 17.5f; c.job->patient = 0.8f; c.job->comfort = 0.7f;
+  c.refreshBoard();   // (the board as a loaded career has it, with its job open: no long hauls, which real tanks now offer)
   return c;
 }
 static FlightResult success() {
