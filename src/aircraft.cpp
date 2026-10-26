@@ -341,6 +341,12 @@ float floatHalfBeam(const FloatStations& f, float z) {
 }
 
 float Plane::gearHeight() const { return gearHeightOf(*spec); }
+// what meets the field, its height under the model's origin: the wheels, or on a water lane an amphibian's float keels
+// (its wheels up in them, the keels wheelDrop above where the wheels would touch: docs/WINGS_OVER_WATER.md)
+float Plane::touchHeight(const Airport& a) const { return gearHeight() - (spec->floats && a.water() ? floatStations(*spec).wheelDrop : 0.f); }
+// where the autopilot's taxi to a seaplane base's dock stops (Plane::apDockTaxi): beside the pontoon, a metre and a half
+// wider than the moored berth
+static vec3 dockTaxiStop(const Airport& a, const AircraftSpec& s) { const FloatStations fs = floatStations(s); return a.berth(2.6f + fs.x + fs.beam * 0.5f + 1.5f); }
 
 float Plane::heading() const { vec3 f = forward(); return wrapDeg360(atan2f(f.x, -f.z) / DEG); }
 float Plane::pitchDeg() const { return asinf(clampf(forward().y, -1, 1)) / DEG; }
@@ -915,8 +921,24 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   }
   // trees, rock formations and buildings (separate entities standing on the terrain)
   if (altAgl < 200.f && sceneryHits) {
-    int hk = g_scenery.collide(pos, s.span * 0.12f);
-    for (size_t i = 0; !hk && i < cs.size(); i++) hk = g_scenery.collide(pos + q.rotate(cs[i].p), 0.3f);
+    Ent he{}; vec3 hp = pos;
+    int hk = g_scenery.collide(pos, s.span * 0.12f, &he);
+    for (size_t i = 0; !hk && i < cs.size(); i++) { hp = pos + q.rotate(cs[i].p); hk = g_scenery.collide(hp, 0.3f, &he); }
+    // alongside a seaplane dock at a walking pace its fenders take the aircraft: what carried it in toward the dock (from
+    // the nearest point of the dock's centre line) is stopped, and it is eased off; faster, it is a collision
+    if (hk == EK_SEADOCK + 1 && length(vec3(vel.x, 0.f, vel.z)) < 2.f) {
+      const vec3 ax(sinf(he.yaw), 0.f, cosf(he.yaw));   // (the dock's length, its local z)
+      const float along = clampf((hp.x - he.x) * ax.x + (hp.z - he.z) * ax.z, -20.25f, 20.25f);
+      vec3 n = vec3(hp.x - he.x - ax.x * along, 0.f, hp.z - he.z - ax.z * along);
+      const float nl = length(n);
+      if (nl > 1e-3f) {
+        n = n / nl;
+        const float vn = vel.x * n.x + vel.z * n.z;
+        if (vn < 0.f) { vel.x -= n.x * vn; vel.z -= n.z * vn; }
+        pos += n * 0.01f;
+      }
+      hk = 0;
+    }
     if (hk) {
       int k = hk - 1, cl = entClass(k);
       ev.crashed = true;
@@ -1117,7 +1139,7 @@ void Plane::apHover(float dt) {
 bool Plane::apTowerGoAround() {
   if (!apOn || apAirport < 0 || onGround || apMode == AP_STUNT) return false;
   if (apStage == APS_GOAROUND) return true;
-  if (apStage == APS_ROLLOUT || !apEnv.canGoAround) return false;
+  if (apStage == APS_ROLLOUT || apStage == APS_DOCK || !apEnv.canGoAround) return false;
   if (getenv("APDBG")) printf("  go-around: the tower's (runway occupied)\n");
   apStage = APS_GOAROUND; apStageT = 0;
   return true;
@@ -1307,7 +1329,10 @@ float Plane::apStopNeed(const Airport& a, bool rev, const Weather& wx, float* tw
   if (tw) *tw = t;
   const float sigma = isaDensity(a.elev) / 1.225f;
   const float vtd = E.vApp / sqrtf(sigma) + t;
-  return E.hover ? 0.f : len2(td - a.threshold(rev)) + (spec->taildragger ? 0.27f : 0.2f) * vtd * vtd * (surfaceRough(a.surface) ? 1.1f : 1.f);   // (what holds itself up on its thrust comes down vertically)
+  // (on the water there are no brakes: the floats' drag stops it, half as fast as wheel brakes would - the water test's
+  // landings run 150-450 m)
+  const float k = a.water() ? 0.4f : (spec->taildragger ? 0.27f : 0.2f) * (surfaceRough(a.surface) ? 1.1f : 1.f);
+  return E.hover ? 0.f : len2(td - a.threshold(rev)) + k * vtd * vtd;   // (what holds itself up on its thrust comes down vertically)
 }
 // an orbit's cost (apPlan): how high it holds above the gate's height, and how far out of the way it is from where the
 // aircraft is now (every km flown is fuel). Out of line: the bound the search prunes by and the cost it compares are
@@ -1388,7 +1413,7 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   }
   float blocked = F < 2000.f ? 3000.f : 0.f;
   F = std::max(F, 2000.f);
-  float gh = gearHeight();
+  float gh = touchHeight(a);   // (the wheels, or on a water lane the float keels)
   float iafAlt = a.elev + gh + F * gs + 20.f;
   // orbit radius: a comfortable turn at holding speed
   const float vh = apHoldSpeed(E.vApp, s.cruise, apPro || transportPathControl(s));
@@ -1448,7 +1473,7 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   // distance (the review of v3.31.0, F2: the Emissary took Gull Rock's 480 m and overran it; of v3.33.0, A1: Harlan
   // Farm's grass and Palm Bay's sand, which the career never sends it to, and it overran them)
   const bool surfBad = !E.hover && !surfaceOK(s, a.surface);
-  const float rwyNeed = s.runwayNeeded(a.elev), fieldShort = E.hover ? 0.f : rwyNeed - a.length;
+  const float rwyNeed = a.water() ? s.waterRunNeeded(a.elev) : s.runwayNeeded(a.elev), fieldShort = E.hover ? 0.f : rwyNeed - a.length;
   const float stopShort = fieldShort > 0.f ? 1000.f + fieldShort : ldgNeed - a.length;
   // ...and whether it can get down to the glidepath from the hold: it leaves the orbit at its height and descends from
   // there, may not go below the intercept altitude until the gate, and goes around if still 80 m high 2 km out.
@@ -1529,7 +1554,7 @@ void Plane::apGuidance(float dt) {
   vec3 rr(-ld.z, 0, ld.x), rel = pos - td;
   float along = rel.x * ld.x + rel.z * ld.z, cross = rel.x * rr.x + rel.z * rr.z, dist = -along;
   float rwyHdg = atan2f(ld.x, -ld.z) / DEG;
-  float gh = gearHeight(), hab = pos.y - gh - a.elev;
+  float gh = touchHeight(a), hab = pos.y - gh - a.elev;
   const float gs = apGs;
   float F = apFinalLen;
   const float vref = E.vApp;   // (this weight's, this ice's)
@@ -1725,7 +1750,7 @@ void Plane::apGuidance(float dt) {
         fl = shortField ? 1.f : clampf(fl, 0.34f, 1.f);
         ctl.flaps = approach(ctl.flaps, fl, 0.3f, dt);
       }
-      if (dist < F + 1500.f || high) ctl.gearDown = true;
+      if (dist < F + 1500.f || high) ctl.gearDown = !(s.floats && a.water());   // (an amphibian's wheels stay up for the water)
       // (and slowed on a planned profile: at the final approach speed by the point where the glidepath is 30 m above the
       // height it is to be stable by - a professional is at it from there - and from there back up the glidepath no faster than this airframe
       // slows on it at idle with its drag out, half of that to spare: the speed a slick jet needs to shed takes it
@@ -1857,12 +1882,24 @@ void Plane::apGuidance(float dt) {
       if (length(vel) < 2.5f) {   // stopped: complete only on the runway; past its end the autoland is over but not a success
         float fromThr = along + clampf(a.length * 0.12f, 80.f, 300.f);   // (td sits past the threshold)
         bool onRwy = fromThr >= -5.f && fromThr <= a.length + 5.f && fabsf(cross) <= std::max(a.width * 0.5f, 12.f) + 8.f;
+        // (on a seaplane base's lane, afloat, it goes on to the dock: there is nowhere to park on the water)
+        if (onRwy && onWater && a.water() && a.dockLen > 0.f) { apStage = APS_DOCK; apStageT = 0; apLeg = 0; break; }
         apDisengage(); apDone = true; apOverrun = !onRwy; ctl.brake = 1; apStatus = onRwy ? "AUTOLAND COMPLETE" : "AUTOLAND  STOPPED PAST THE RUNWAY";
       }
       break;
+    case APS_DOCK: {   // taxiing to the dock (flown in apDockTaxi): done beside the pontoon at a walking pace (the lines take
+      // it there), or after five minutes
+      const vec3 st = dockTaxiStop(a, s), o(a.dockDirX, 0.f, a.dockDirZ);
+      const float d = len2(st - pos), along = (pos.x - st.x) * o.x + (pos.z - st.z) * o.z;
+      apStatus = fmt("TAXI TO THE DOCK  %s  %.0f m", a.code, d);
+      if ((apLeg == 1 && along < 2.5f && length(vec3(vel.x, 0.f, vel.z)) < 1.4f) || apStageT > 300.f || !onWater) {
+        apDisengage(); apDone = true; ctl.throttle = 0; apStatus = d < 15.f ? "AUTOLAND COMPLETE  AT THE DOCK" : "AUTOLAND COMPLETE";
+      }
+      break;
+    }
     case APS_BLEED: {   // the belly-up (flown in apControl): rear up, then nose back down onto the glidepath
       apHeading = rwyHdg - apDrift; apSpeed = 0;
-      ctl.gearDown = true;
+      ctl.gearDown = !(s.floats && a.water());
       // (over at 68 deg, or slow enough - or climbing hard: a conventional airframe, its pull held to the g limit, turns
       // the speed into height instead of drag - the XR-10 zoomed 200 m and had to go round; the fly-by-wire jets snap up
       // fast enough to stall the wing and go flat against the air)
@@ -2077,6 +2114,26 @@ void Plane::apBellyUp(float dt) {
   if (apEnv.flaps) ctl.flaps = 0.f;
 }
 
+// Taxiing to a seaplane base's dock after an autoland on its lane (docs/WINGS_OVER_WATER.md): out to a gate 45 m off
+// the pontoon's head on the berth's line (a metre and a half wider than the moored berth), then in along that line,
+// steering for a point on it 15 m ahead, to stop beside the pontoon. The water rudders steer, down at these speeds;
+// there are no brakes on the water and little drag at a walking pace, so the speed comes down with the distance left
+// along the dock and the engine is cut 4 m short (apGuidance APS_DOCK ends it there and the lines are made fast)
+void Plane::apDockTaxi(float dt) {
+  (void)dt;
+  const Airport& a = g_world.airports[apAirport];
+  const vec3 o(a.dockDirX, 0.f, a.dockDirZ), stop = dockTaxiStop(a, *spec), gate = stop + o * 45.f;
+  const float along = (pos.x - stop.x) * o.x + (pos.z - stop.z) * o.z, gs = length(vec3(vel.x, 0.f, vel.z));
+  if (apLeg == 0 && len2(gate - pos) < 12.f) apLeg = 1;
+  const vec3 tgt = apLeg == 0 ? gate : stop + o * std::max(along - 15.f, -5.f);
+  const float he = hdgErrDeg(atan2f(tgt.x - pos.x, -(tgt.z - pos.z)) / DEG, heading());
+  float vT = apLeg == 0 ? 3.f : clampf(along * 0.05f, 0.5f, 2.5f);
+  if (fabsf(he) > 45.f) vT = std::min(vT, 1.5f);   // (round a turn slowly)
+  ctl.throttle = apLeg == 1 && along < 4.f ? 0.f : clampf((vT - gs) * 0.25f + 0.03f, 0.f, 0.45f);
+  ctl.yaw = clampf(he * 0.06f + w.y / DEG * 0.12f, -1.f, 1.f);
+  ctl.pitch = 0.f; ctl.roll = clampf(-bankDeg() * 0.18f + w.z * 0.6f, -1.f, 1.f); ctl.brake = 0.f; ctl.flaps = 0.f;
+}
+
 void Plane::apControl(float dt) {
   const AircraftSpec& s = *spec;
   const ApEnvelope& E = apEnv;
@@ -2126,6 +2183,7 @@ void Plane::apControl(float dt) {
     return;
   }
   if (apMode == AP_APPR && apStage == APS_HOVER) { apHover(dt); return; }
+  if (apMode == AP_APPR && apStage == APS_DOCK) { apDockTaxi(dt); return; }
   if (onGround) return;
   if (apMode == AP_STUNT && apStuntFly(dt)) return;
   if (apMode == AP_APPR && apStage == APS_BLEED) { apBellyUp(dt); return; }

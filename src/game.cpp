@@ -2729,7 +2729,7 @@ void Game::flightControls(float dt) {
   if (plane.apDone) {
     plane.apDone = false; parking = true;
     if (plane.apOverrun) toast("Autoland: stopped past the end of the runway - parking brake set", vec3(1, 0.45f, 0.35f));
-    else toast("Autoland complete - parking brake set", vec3(0.5f, 1, 0.6f));
+    else toast(plane.onWater ? (atDock() ? "Autoland complete - moored at the dock" : "Autoland complete - moored") : "Autoland complete - parking brake set", vec3(0.5f, 1, 0.6f));
     plane.apOverrun = false; g_audio.trigger(SFX_AP_DISC, 0.7f);
   }
   // a figure flown (or given up) and level again: aerobatics ends, and the aircraft goes back to what was flying it

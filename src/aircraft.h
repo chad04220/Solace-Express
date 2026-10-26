@@ -269,7 +269,7 @@ public:
   // aerobatic figures the autopilot flies (aircraft_stunt.cpp), each sized to this airframe's envelope
   enum Stunt { STUNT_LOOP = 0, STUNT_ROLL, STUNT_BARREL, STUNT_IMMELMANN, STUNT_SPLIT_S, STUNT_CUBAN, STUNT_WINGOVER, STUNT_COUNT };
   static const char* stuntName(int figure);
-  enum ApStage { APS_NAV = 0, APS_FINAL, APS_FLARE, APS_ROLLOUT, APS_GOAROUND, APS_HOVER, APS_BLEED };
+  enum ApStage { APS_NAV = 0, APS_FINAL, APS_FLARE, APS_ROLLOUT, APS_GOAROUND, APS_HOVER, APS_BLEED, APS_DOCK };   // (APS_DOCK: taxiing to a seaplane base's dock)
   // (APS_BLEED: the research craft come down the final fast and, a few km out, rear up belly-first into the airflow -
   // throttle closed, nose 70 deg up - to shed the speed, then drop the nose back onto the glidepath)
   int apBleedPhase = 0; bool apBled = false; float apBleedT = 1e9f;   // (pitching up / nose back down; done this approach; s since)
@@ -291,6 +291,7 @@ public:
   int apWindEvent = 0;      // the wind turned behind it on the final: 1 going around, 2 then planned afresh (the game says so and clears it)
   std::string apDecline;   // set by apEngage when neither end is safe: the autoland is declined (the autopilot holds instead), and why
   void apEngage(int mode, int airport, const Weather& wx);
+  void apDockTaxi(float dt);   // after an autoland on a water lane: out round the pontoon's head and in alongside it
   // The tower's go-around (the runway occupied on short final) while it flies an approach: abandoned for a climb-out and
   // a fresh approach. False when it can't climb away (it lands from what it has) or isn't flying one (review FLT-3)
   bool apTowerGoAround();
@@ -331,6 +332,7 @@ public:
   vec3 up() const { return q.rotate(vec3(0, 1, 0)); }
   vec3 right() const { return q.rotate(vec3(1, 0, 0)); }
   float heading() const;   // degrees
+  float touchHeight(const Airport& a) const;   // what meets that field under the origin: the wheels, or a float plane's keels on a water lane
   float pitchDeg() const;
   float bankDeg() const;   // positive right wing down
   float agl() const;

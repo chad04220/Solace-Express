@@ -224,6 +224,22 @@ int main() {
     for (const float t0 = t; t < t0 + 30 && !p.ev.crashed; t += 1 / 60.f) { p.ctl.throttle = 0; p.step(1 / 60.f, wind(), t); }
     check(!p.ev.crashed && p.moored && dist2d(p.pos, at) < 4.f, "moored where it stopped, it stays there");
   }
+  {   // the autopilot on the water: engaged for Verde Bay from 6 km out, it lands the Kittiwake on the lane with its
+      // wheels up, then taxis it to the dock
+    const int vby = g_world.findAirport("VBY"); const Airport& a = g_world.airports[vby];
+    Plane p; p.reset(&K, a.pos() - a.dir() * 6000.f + vec3(0, 600.f, 0), a.heading, fuel(), kLoad, true, K.cruise * 0.8f);
+    const Weather w = wind(4, a.heading);
+    p.apEngage(Plane::AP_NAV, vby, w);
+    float t = 0; bool wheelsSeen = false;
+    for (; t < 1200 && !p.ev.crashed && !p.apDone; t += 1 / 60.f) { p.step(1 / 60.f, w, t); wheelsSeen |= p.gear > 0.01f; }
+    const int lane = g_world.onRunway(p.pos.x, p.pos.z, 10.f);
+    const vec3 head = a.dockHead();
+    const float atDock = dist2d(p.pos, head);
+    std::printf("  autoland on Verde Bay's lane: %s after %.0f s, afloat %d, wheels lowered on the way %d, %.1f m from the dock's head (%s)\n",
+                p.ev.crashed ? p.ev.crashReason.c_str() : p.apDone ? "done" : "not done", t, (int)p.onWater, (int)wheelsSeen, atDock, p.apStatus.c_str());
+    check(!p.ev.crashed && p.apDone && !p.apOverrun && p.onWater && lane != vby && atDock < 15.f && !wheelsSeen,
+          "the autopilot lands it on a water lane, wheels up, and taxis it in to stop beside the dock");
+  }
   {   // a landplane on the water ditches, as before
     Plane p; p.reset(&kAircraft[1], sea + vec3(0, 4, 0), 90, 60, 100, true, kAircraft[1].vref);
     p.ctl.throttle = 0; p.ctl.flaps = p.flaps = 1;

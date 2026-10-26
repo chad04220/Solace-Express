@@ -143,6 +143,24 @@ were. At a seaplane base every job on the board is a float plane's (the dispatch
 "Splashdown" for the first landing on the water, "Harbour Master" for alighting at all seven, while "Every Field" still
 counts the land airports alone.
 
+### The autopilot on the water
+
+The autoland flies a water lane as it flies a runway, with four differences. The amphibian's wheels stay up all the
+way down (`ctl.gearDown` is the field's: down for a runway, up for the water). Its height above the lane is measured
+to the float keels, 30 cm above where the wheels would touch (`Plane::touchHeight`). The run it needs is the water
+run (`waterRunNeeded`), and its stopping distance has no brakes in it: the floats' drag stops it at about half the
+deceleration wheel brakes would (`apStopNeed`). Stopped on the lane, it taxis to the dock (`APS_DOCK`,
+`Plane::apDockTaxi`): out to a gate 45 m off the pontoon's head on the berth's line, then in along it, slowing with
+the distance left and cutting the engine 4 m short, the water rudders steering; beside the pontoon at a walking pace
+it hands over, the mooring lines are made fast, and the leg ends at the dock (`water_test`: from 6 km out to moored at
+Verde Bay in under seven minutes).
+
+The water run itself is not learned: the dispatch rule estimates it from the learned land roll (twice it, with 15% on
+top), and the water test checks the Kittiwake's real run (382 m against a 195 m land roll) inside that estimate.
+
+A float bumping the dock at a walking pace (under 2 m/s) meets its fenders: the motion toward the dock is stopped
+and the aircraft is eased off. Faster than that it is a collision.
+
 ## Phases
 
 Each phase is built, tested and committed on its own.
