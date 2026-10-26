@@ -1,4 +1,8 @@
-## Unreleased: Real fuel, floats for your aircraft, and the mechanic
+## What's new in v4.1.0: Real fuel, floats for your aircraft, the mechanic, and the hangar at the airport
+
+Every aircraft now carries real fuel, so a long haul across the real Earth is a matter of tanks. Six of the aircraft
+you own can trade their wheels for amphibious floats, a mechanic sells upgrades that change how they fly, and the
+hangar shows them parked at the airport, beside the buildings that give them their size.
 
 ### Real fuel
 - **Every aircraft carries real fuel.** The tanks were sized to the islands: a trainer flew 45 km on fifteen minutes
@@ -45,7 +49,7 @@
   rides with it.
 
 ### Saves
-- A career with floats or kits saves as version 9; one with nothing fitted saves as before.
+- A career with floats or kits saves as version 9, which needs v4.1 to load. One with nothing fitted saves as before.
 
 ### Fixes
 - A piston's fuel burn is now metered to a fraction of a gram each physics step. At real flows a step's tenth of a
