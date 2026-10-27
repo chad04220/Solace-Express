@@ -114,7 +114,7 @@ void Renderer::afItemOf(int item, int& model, int& kind) {
 static float afItemCost(int item) {
   int model, kind; Renderer::afItemOf(item, model, kind);
   static const float light[3] = {2.4f, 5.8f, 1.0f}, xr30[3] = {5.1f, 10.3f, 4.3f}, xr40[3] = {9.5f, 12.6f, 7.3f};
-  return kind == 3 ? 3.7f : model == kSomnus ? xr40[kind] : model == kResearchJet ? xr30[kind] : light[kind];
+  return kind == 3 ? 3.7f : model == kSomnus ? xr40[kind] : model == kResearchJet || model == kMorpheus ? xr30[kind] : light[kind];   // (the XR-50: the jet family's other)
 }
 std::vector<std::vector<int>> Renderer::afShareItems(int helpers) {
   std::vector<int> order(afItemCount());
