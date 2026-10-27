@@ -1,4 +1,4 @@
-## What's new in the next release: the XR-50 Morpheus
+## What's new in v4.2.0: the XR-50 Morpheus
 
 The fifth research craft, and the one the others lead to. It takes off vertically, swings its wings back past the
 speed of sound, crosses Mach 7 on its scramjets in the narrow corridor between too thick and too thin, and lights a
