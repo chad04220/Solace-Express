@@ -1398,6 +1398,37 @@ research.nyx.58211501e3ad	nyx/research.nyx.58211501e3ad.wav	TEST CARD XR40-4 COM
 research.nyx.ad1521dba439	nyx/research.nyx.ad1521dba439.wav	STEP 1 of 4: Pull 80 g	nyx	40	line		
 research.nyx.4abcac3d963e	nyx/research.nyx.4abcac3d963e.wav	STEP 2 of 4: Push to -40 g	nyx	40	line		
 research.nyx.f0d16f91fcd8	nyx/research.nyx.f0d16f91fcd8.wav	STEP 3 of 4: Roll at 380 deg/s	nyx	40	line		
+research.nyx.c52579ad7d48	nyx/research.nyx.c52579ad7d48.wav	XR-50 MORPHEUS // RESEARCH FLIGHT	nyx	40	line		
+research.nyx.572d8bb795df	nyx/research.nyx.572d8bb795df.wav	XR-50 MORPHEUS // TEST CARD VERTICAL FLIGHT	nyx	40	line		
+research.nyx.57054edf582e	nyx/research.nyx.57054edf582e.wav	XR-50 MORPHEUS // TEST CARD SCRAMJET CORRIDOR	nyx	40	line		
+research.nyx.ba9bbedfd004	nyx/research.nyx.ba9bbedfd004.wav	XR-50 MORPHEUS // TEST CARD EDGE OF SPACE	nyx	40	line		
+research.nyx.796a960d43b8	nyx/research.nyx.796a960d43b8.wav	XR-50 MORPHEUS // TEST CARD POST-STALL	nyx	40	line		
+research.nyx.93b2ae0d181c	nyx/research.nyx.93b2ae0d181c.wav	TEST CARD XR50-1 COMPLETE - VERTICAL FLIGHT SIGNED OFF	nyx	40	line		
+research.nyx.556905d91847	nyx/research.nyx.556905d91847.wav	TEST CARD XR50-2 COMPLETE - SCRAMJET CORRIDOR SIGNED OFF	nyx	40	line		
+research.nyx.7afbc2193c7b	nyx/research.nyx.7afbc2193c7b.wav	TEST CARD XR50-3 COMPLETE - EDGE OF SPACE SIGNED OFF	nyx	40	line		
+research.nyx.ef0965da71cb	nyx/research.nyx.ef0965da71cb.wav	TEST CARD XR50-4 COMPLETE - POST-STALL SIGNED OFF	nyx	40	line		
+research.nyx.fc92193c80c9	nyx/research.nyx.fc92193c80c9.wav	STEP 1 of 3: Hover for 10 s	nyx	40	line		
+research.nyx.9007cb8f48f6	nyx/research.nyx.9007cb8f48f6.wav	STEP 2 of 3: Wingborne past 250 kt, nozzles aft	nyx	40	line		
+research.nyx.859a732a4daf	nyx/research.nyx.859a732a4daf.wav	STEP 3 of 3: Land vertically	nyx	40	line		
+research.nyx.d35b1658e696	nyx/research.nyx.d35b1658e696.wav	STEP 1 of 3: Climb through 24,000 m	nyx	40	line		
+research.nyx.02a4dfc12e56	nyx/research.nyx.02a4dfc12e56.wav	STEP 2 of 3: Mach 6.5 on the scramjets	nyx	40	line		
+research.nyx.80bba326718e	nyx/research.nyx.80bba326718e.wav	STEP 1 of 3: Rocket lit for 5 s	nyx	40	line		
+research.nyx.7ba1cb53629e	nyx/research.nyx.7ba1cb53629e.wav	STEP 2 of 3: Climb through 80,000 m	nyx	40	line		
+research.nyx.6eecd9b45e2b	nyx/research.nyx.6eecd9b45e2b.wav	STEP 1 of 4: 70 deg angle of attack	nyx	40	line		
+research.nyx.179baa21f24a	nyx/research.nyx.179baa21f24a.wav	STEP 2 of 4: Roll at 230 deg/s	nyx	40	line		
+research.nyx.4c3080a6338b	nyx/research.nyx.4c3080a6338b.wav	STEP 3 of 4: Pull 11 g	nyx	40	line		
+research.nyx.204c17e10039	nyx/research.nyx.204c17e10039.wav	ROCKET SHUT DOWN	nyx	40	line		
+research.nyx.3215a27b3352	nyx/research.nyx.3215a27b3352.wav	ROCKET: its oxidizer is spent	nyx	40	line		
+research.nyx.d81f61a02d20	nyx/research.nyx.d81f61a02d20.wav	ROCKET: no fuel	nyx	40	line		
+research.nyx.760fadaf73a7	nyx/research.nyx.760fadaf73a7.wav	ROCKET OUT - oxidizer spent	nyx	40	line		
+research.nyx.4b528d2b1c46	nyx/research.nyx.4b528d2b1c46.wav	SCRAMJETS - supersonic combustion	nyx	40	line		
+research.nyx.dd53ec7d7d23	nyx/research.nyx.dd53ec7d7d23.wav	RAMJETS - the turbofans shut down	nyx	40	line		
+research.nyx.0086214ede3a	nyx/research.nyx.0086214ede3a.wav	TURBOFANS	nyx	40	line		
+research.nyx.704e2949ac29	nyx/research.nyx.704e2949ac29.wav	Nozzles 95 deg, lift fan in - VTOL	nyx	40	line		
+research.nyx.224b60992807	nyx/research.nyx.224b60992807.wav	Nozzles aft - lift fan out	nyx	40	line		
+research.nyx.xr50_rocket_lit	nyx/research.nyx.xr50_rocket_lit.wav	Rocket lit.	nyx	40	cue_regex	ROCKET LIT - .*
+research.nyx.xr50_edges_hot	nyx/research.nyx.xr50_edges_hot.wav	Leading edges overheating. Slow down or climb.	nyx	40	cue_regex	LEADING EDGES -?[0-9]+ C - slow down or climb
+research.nyx.xr50_nozzles_stovl	nyx/research.nyx.xr50_nozzles_stovl.wav	Nozzles down. Lift fan in.	nyx	40	cue_regex	Nozzles [0-9]+ deg, lift fan in - STOVL
 toast.aster.9f248aded886	aster/toast.aster.9f248aded886.wav	Below minimums and not lined up - GO AROUND	aster	95	line		
 toast.aster.22693bd3b444	aster/toast.aster.22693bd3b444.wav	Runway in sight	aster	40	line		
 toast.aster.d0792f1878ef	aster/toast.aster.d0792f1878ef.wav	Snow has set in	aster	35	line		
@@ -1522,6 +1553,7 @@ fragment.nyx.craft_xr40_somnus	nyx/fragment.nyx.craft_xr40_somnus.wav	XR-40 Somn
 fragment.nyx.craft_thistledown_l4	nyx/fragment.nyx.craft_thistledown_l4.wav	Thistledown L4	nyx	40	fragment		
 fragment.nyx.craft_galleon_180	nyx/fragment.nyx.craft_galleon_180.wav	Galleon 180	nyx	40	fragment		
 fragment.nyx.craft_kittiwake_a9	nyx/fragment.nyx.craft_kittiwake_a9.wav	Kittiwake A9	nyx	40	fragment		
+fragment.nyx.craft_xr50_morpheus	nyx/fragment.nyx.craft_xr50_morpheus.wav	XR-50 Morpheus	nyx	40	fragment		
 @atom.nyx.craft_dawnlark	fragment.nyx.craft_dawnlark
 @craft.Dawnlark T2	dawnlark
 @atom.nyx.craft_ambler	fragment.nyx.craft_ambler
@@ -1554,3 +1586,5 @@ fragment.nyx.craft_kittiwake_a9	nyx/fragment.nyx.craft_kittiwake_a9.wav	Kittiwak
 @craft.Galleon 180	galleon_180
 @atom.nyx.craft_kittiwake_a9	fragment.nyx.craft_kittiwake_a9
 @craft.Kittiwake A9	kittiwake_a9
+@atom.nyx.craft_xr50_morpheus	fragment.nyx.craft_xr50_morpheus
+@craft.XR-50 Morpheus	xr50_morpheus

@@ -2796,7 +2796,7 @@ void Game::drawHud(const FrameParams& fp) {
   // the bottom rows' layout (the systems tiles over the bottom strip), which the target marker keeps clear of too
   const float stripH = cockpit ? 0.f : 46 * s, pfd = 148 * s;
   const float tileW = 80 * s, tileH = 38 * s, tileGap = 5 * s; const int tileCols = 4;
-  int tileRows = spc.special == 2 ? 3 : 2;
+  int tileRows = spc.special >= 2 ? 3 : 2;
   const float tilesTop = H - stripH - 10 * s - tileRows * tileH - (tileRows - 1) * tileGap;
   // ================================================================ the target in the world (first: under the rest of
   // the HUD, and behind the aircraft - its diamond a point in the world, hidden where the airframe or the cockpit is in
@@ -3136,6 +3136,19 @@ void Game::drawHud(const FrameParams& fp) {
       tiles.push_back({"CLOAK", somnus.stealth > 0.99f ? "ACTIVE" : somnus.stealth > 0.01f ? fmt("%.0f%%", somnus.stealth * 100) : "OFF", somnus.stealth > 0.01f ? VIO : C_DIM, somnus.stealth});
       tiles.push_back({"WEAPONS", somnus.lasers > 0.97f ? "HOT" : somnus.lasers > 0.01f ? "DEPLOY" : "SAFE", somnus.lasers > 0.97f ? C_BAD : C_DIM, -1.f});
       tiles.push_back({"PLASMA", somnus.bay > 0.05f ? "BAY OPEN" : somnus.bombLoaded >= 1.f ? "READY" : "CHARGING", somnus.bombLoaded >= 1.f ? VIO : C_WARN, somnus.bombLoaded});
+    } else if (sp.special == 3) {   // the XR-50: its engines' mode, its rocket, its leading edges, its wing and its nozzles
+      const vec3 AMB(1.f, 0.72f, 0.3f);
+      const float tb = plane.tbcc[0] + plane.tbcc[1] + plane.tbcc[2];
+      const char* mode = !plane.engineRunning ? "OFF" : plane.tbcc[2] > 0.5f * tb && tb > 1.f ? "SCRAMJET" : plane.tbcc[1] > 0.5f * tb && tb > 1.f ? "RAMJET"
+                       : plane.engineSpool > 0.86f && plane.nzSwivel < 5.f * DEG ? "REHEAT" : "TURBOFAN";
+      tiles.push_back({"ENGINES", mode, plane.tbcc[2] > 0.5f * tb && tb > 1.f ? AMB : C_TEXT, -1.f});
+      const float ox = plane.oxidizer / kMorpheusOxidizer;
+      tiles.push_back({"ROCKET", plane.rocketN > 1.f ? fmt("LIT %.0f s", morpheusRocketSeconds(plane.oxidizer, plane.ctl.throttle)) : ox > 0.001f ? fmt("%.0f kg LOX", plane.oxidizer) : "SPENT",
+                       plane.rocketN > 1.f ? AMB : ox > 0.001f ? C_DIM : C_BAD, ox});
+      const float skinC = plane.skinT - 273.15f, skinK = (plane.skinT - 288.f) / (kMorpheusSkinLimit - 288.f);
+      tiles.push_back({"LEAD EDGE", fmt("%.0f C", skinC), plane.skinT > kMorpheusSkinWarn ? C_BAD : plane.skinT > kMorpheusSkinWarn - 250.f ? C_WARN : C_TEXT, clampf(skinK, 0.f, 1.f)});
+      tiles.push_back({"WING", fmt("%.0f deg%s", plane.sweep / DEG, plane.hiLift > 0.5f ? " FLAP" : ""), C_TEXT, (plane.sweep - kMorpheusSweepMin) / (kMorpheusSweepMax - kMorpheusSweepMin)});
+      tiles.push_back({"NOZZLES", plane.fanClutch > 0.05f ? fmt("%.0f deg FAN", plane.nzSwivel / DEG) : fmt("%.0f deg", plane.nzSwivel / DEG), plane.fanClutch > 0.05f ? AMB : C_TEXT, plane.nozzle});
     } else if (sp.special) tiles.push_back({"TVC", fmt("%+.0f deg", -clampf(plane.ctl.pitch + plane.ctl.trim * 0.3f, -1, 1) * 0.5f / DEG), C_TEXT, -1.f});
     else tiles.push_back({"FLAPS", fmt("%.0f%%", plane.flaps * 100), plane.flaps > 0.01f ? C_ACCENT : C_TEXT, plane.flaps});
     std::string gearS = !sp.retract ? "FIXED" : plane.gear > 0.99f ? "DOWN" : plane.gear < 0.01f ? "UP" : "TRANSIT";
@@ -3144,7 +3157,7 @@ void Game::drawHud(const FrameParams& fp) {
     int rows = ((int)tiles.size() + tileCols - 1) / tileCols;
     float bx = W - tileCols * tileW - (tileCols - 1) * tileGap - 14 * s, by = H - stripH - 10 * s - rows * tileH - (rows - 1) * tileGap;
     hudStrip(bx - 8 * s, by - 20 * s, tileCols * tileW + (tileCols - 1) * tileGap + 16 * s, rows * tileH + (rows - 1) * tileGap + 28 * s, 0.9f);
-    g_ren.text(bx, by - 15 * s, 9.5f * s, sp.special == 2 ? "XR-40 SYSTEMS" : sp.special ? "XR-30 SYSTEMS" : "SYSTEMS", C_ACCENT, 0.9f, 0, false);
+    g_ren.text(bx, by - 15 * s, 9.5f * s, sp.special == 3 ? "XR-50 SYSTEMS" : sp.special == 2 ? "XR-40 SYSTEMS" : sp.special ? "XR-30 SYSTEMS" : "SYSTEMS", C_ACCENT, 0.9f, 0, false);
     for (size_t i = 0; i < tiles.size(); i++) {
       float x = bx + (i % tileCols) * (tileW + tileGap), y = by + (i / tileCols) * (tileH + tileGap);
       g_ren.rect(x, y, tileW, tileH, vec3(0.0f, 0.02f, 0.04f), 0.55f, 3 * s);

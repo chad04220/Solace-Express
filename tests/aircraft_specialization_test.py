@@ -90,7 +90,8 @@ if a.shader_dir:
         'galleonFixedWingFootprint': (14,), 'galleonRootFairing': (14,), 'galleonFairingOwns': (14,),
         'thistledownStickShaft': (13,), 'thistledownStickGrip': (13,), 'thistledownStickPivot': (13,),
         'galleonNavFrame': (14,), 'galleonOverheadFrame': (14,), 'mapNewFleetFurnishings': (13, 14),
-        'mapJet': (10,), 'mapJetCockpit': (10,), 'nocturnePanoramaBezel': (10,), 'jetScreen': (10,), 'jtNozzleShape': (10,),
+        'mapJet': (10,), 'mapJetCockpit': (10, 16), 'nocturnePanoramaBezel': (10, 16), 'jetScreen': (10, 16), 'jtNozzleShape': (10,),   # (the XR-50 flies the XR-30's sealed pod)
+        'mapMorpheus': (16,),
         'mapSomnus': (12,), 'mapSomnusCockpit': (12,), 'somnusScreen': (12,), 'shadeSomnusCockpit': (12,),
     }
     shading = ('shadeFleetCabin', 'fuselagePaint', 'wavecrestCabinAlbedo', 'jetScreen', 'somnusScreen', 'shadeSomnusCockpit')

@@ -236,8 +236,8 @@ int main() {
   // Family identities change only for intentional geometry edits, or a rename in the shaders' sources (the craft
   // renames changed both). The XR-30 mounting relief changes AF_JET; the conventional AF_LIGHT family must retain its
   // original bake. (4.0's Kittiwake, the amphibian, changed both: its floats and its HAS_KITTIWAKE / HAS_FLOATS switches
-  // are in every build's source.)
-  for (const auto& family : {std::pair<const char*,uint64_t>{"AF_LIGHT",0x81ca563dfe370b5eull}, {"AF_JET",0xdd5ef755aed9cafaull}}) {
+  // are in every build's source. The XR-50's HAS_NOCTURNE / HAS_MORPHEUS switches did the same; its shape is AF_JET's.)
+  for (const auto& family : {std::pair<const char*,uint64_t>{"AF_LIGHT",0x2ff112aaaa3b72feull}, {"AF_JET",0xf88c747be0f8844cull}}) {
     uint64_t h=1469598103934665603ull;
     for(const char* n:{"","#define HULL_BAKE_NORMALS\n"})
       for(unsigned char c:shaderPrune::prune(hullBakeFSAssembly(std::string("#define ")+family.first+"\n"+n)))h=(h^c)*1099511628211ull;

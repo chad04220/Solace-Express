@@ -651,6 +651,9 @@ vec2 jtGear(vec3 p, vec3 ap, vec2 res, float mainDepth, float mainBelow){
   float fd = res.x;
   res.x = smin(res.x, fair, 0.1);
   if (fair < fd) res.y = wr ? 80.0 : 31.0;
+#if HAS_MORPHEUS
+  if (fair < fd && int(gM[0].z + 0.5) == 7) res.y = 150.0;   // (the XR-50's: its skin's own)
+#endif
   res = gearWell(ap, res, g.mc, g.mh, g.md, 0.03);
   res = gearWellP(p, res, g.nc, g.nh, g.nd, g.nb, g.np);
   if (gPartMode != -1) return res;
@@ -673,14 +676,17 @@ vec2 jtGear(vec3 p, vec3 ap, vec2 res, float mainDepth, float mainBelow){
 // canard in its pivot's frame, the nozzle in its own frame, the gear extended (body space), a door in its hinge's frame
 vec2 jtPartField(int k, vec3 l){
   vec4 G0 = gM[18]; float gh = gM[19].x;
-#if HAS_JET
-  if (k == PT_JT_NOZZLE) return jtNozzleShape(l);
+#if HAS_NOCTURNE
+  if (k == PT_JT_NOZZLE) return jtNozzleShape(l);   // (the XR-30's: the XR-50 builds its own)
 #endif
   if (k == PT_JT_LEGM) return jtMainLeg(l, jtGearOf().H, vec3(G0.x, 0.38 - gh, G0.z));
   if (k == PT_JT_WHEELM) return jtMainWheel(l - vec3(G0.x, 0.38 - gh, G0.z));
   if (k == PT_JT_LEGN) return jtStrut(l, jtGearOf().P, vec3(0.0, 0.43 - gh, G0.w), 0.06);
   if (k == PT_JT_WHEELN) return jtNoseWheels(l - vec3(0.0, 0.33 - gh, G0.w));
   bool wrd = int(gM[0].z + 0.5) == 6;   // (the doors in the skin's paint: the XR-40's, the XR-30's wing and body)
+#if HAS_MORPHEUS
+  if (int(gM[0].z + 0.5) == 7 && (k == PT_JT_DOORM || k == PT_JT_DOORN)) return vec2(gearDoorV(l, k == PT_JT_DOORM ? jtGearOf().mh : jtGearOf().nh), 150.0);   // (the XR-50's)
+#endif
   if (k == PT_JT_DOORM) return vec2(gearDoorV(l, jtGearOf().mh), wrd ? 80.0 : 31.0);
   if (k == PT_JT_DOORN) return vec2(gearDoorV(l, jtGearOf().nh), wrd ? 80.0 : 30.0);
 #if HAS_JET   // (the XR-30's own surfaces; the gear above is the XR-40's too)
@@ -749,6 +755,9 @@ vec2 mapJet(vec3 p){
 }
 vec2 mapSomnus(vec3 p);
 vec2 mapSomnusCockpit(vec3 p);
+#if HAS_MORPHEUS
+vec2 mapMorpheus(vec3 p);   // (morpheus_sdf.glsl)
+#endif
 vec2 mapPlaneBody(vec3 p);
 // light fixtures: a faired housing set into the airframe with a domed lens facing out along the light's axis
 vec2 mapPlane(vec3 p){
@@ -762,6 +771,10 @@ vec2 mapPlane(vec3 p){
   vec3 tail = wr ? vec3(0.0, -0.1, 7.86) : jet ? vec3(0.0, 0.45, 7.6) : isReverie() ? reverieTailLight() : vec3(0.0, gM[8].w, gM[8].x + 0.03);
   float lx = gM[9].x*0.3;
   vec3 land = wr ? vec3(-0.2, -0.38, -6.6) : jet ? vec3(-1.8, -0.26, 0.15) : vec3(-lx, gM[10].x + lx*gM[10].z, gM[10].y + gM[9].w*0.3 - 0.02);
+#if HAS_MORPHEUS
+  // the XR-50's (aircraft.h kMorpheus*): its wingtips' lenses are its swing wings' own (morpheus_sdf.glsl mrWingField)
+  if (engine == 7) { tip = vec3(1e3); fin = vec3(0.0, 0.93, -1.4); tail = vec3(0.0, 0.46, 9.25); land = vec3(-2.20, -0.10, -3.62); }
+#endif
   // IDs 95..100 always mean port nav, starboard nav, tail, beacon, port/starboard landing.
   // Neither menu/flight order, current owner, flashing phase nor lamp state can change this shape.
   for (int i = 0; i < 6; i++) {
@@ -920,15 +933,27 @@ vec2 mapPlaneBody(vec3 p){
       // carries one copy of it (written into each airframe it was two, and the march's every pixel paid for the size)
     int engJ = int(gM[0].z + 0.5);
 #if HAS_FLEET
-    if (engJ == 5 || engJ == 6)
+    if (engJ == 5 || engJ == 6
+#if HAS_MORPHEUS
+        || engJ == 7
+#endif
+       )
 #endif
     {   // (a research jet's own build: nothing else follows - the light aircraft's body below is not in it)
+#if HAS_MORPHEUS
+      if (engJ == 7) {   // the XR-50: its own airframe (morpheus_sdf.glsl) on the research gear
+        vec2 rm = mapMorpheus(p);
+        return gPS.w > 0.5 || !GEAR_FIELD ? rm : jtGear(p, vec3(abs(p.x), p.y, p.z), rm, 0.8, 0.06);
+      }
+#endif
 #if HAS_JET && HAS_SOMNUS
       vec2 r = engJ == 5 ? mapJet(p) : mapSomnus(p);
-#elif HAS_JET
+#elif HAS_NOCTURNE
       vec2 r = mapJet(p);
-#else
+#elif HAS_SOMNUS
       vec2 r = mapSomnus(p);
+#else
+      vec2 r = vec2(1e9, 0.0);   // (the XR-50's own build: its airframe is above)
 #endif
       return gPS.w > 0.5 || !GEAR_FIELD ? r : jtGear(p, vec3(abs(p.x), p.y, p.z), r, engJ == 6 ? 0.7 : 0.8, engJ == 6 ? 0.03 : 0.06);
     }

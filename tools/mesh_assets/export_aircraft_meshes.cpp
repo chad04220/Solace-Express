@@ -194,7 +194,7 @@ int main(int argc, char** argv) {
   }
   fs::path staging;
   try {
-    static_assert(kAircraftCount == 16, "Update export/bundle contract for a roster change");
+    static_assert(kAircraftCount == 17, "Update export/bundle contract for a roster change");
     rejectDebugOverrides();
     if (argc == 5) { bakeOne(integer(argv[2]), integer(argv[3]), fs::absolute(argv[4])); return 0; }
     const fs::path output = fs::absolute(argv[1]).lexically_normal();

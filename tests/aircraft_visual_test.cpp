@@ -168,14 +168,18 @@ int main(int argc,char**argv) {
   std::string defines;
   if(std::string(kSceneUniforms).find("vec4 gCab0")!=std::string::npos)defines+="#define FIT_PATCH\n";
   if(std::string(kSomnusCockpitSDF).find("abs(cq.z - 0.265)")!=std::string::npos)defines+="#define TOUCH_PATCH\n";
-  std::string fs=sdfAssembly(defines)+inspection;
-  GLuint prog=program(fs),vao; glGenVertexArrays(1,&vao); glBindVertexArray(vao); glUseProgram(prog); glViewport(0,0,W,H);
+  // AVT_OWN=1: each aircraft through its own build (shaders.h aircraftDefines, as the game draws it) - the program with
+  // every aircraft in it is too large for some software renderers to compile
+  const bool own=getenv("AVT_OWN")!=nullptr;
+  GLuint prog=own?0:program(sdfAssembly(defines)+inspection),vao; glGenVertexArrays(1,&vao); glBindVertexArray(vao); glViewport(0,0,W,H);
   auto loc=[&](const char* n){ return glGetUniformLocation(prog,n); };
   auto v3=[&](const char* n,vec3 v){ glUniform3f(loc(n),v.x,v.y,v.z); };
-  glUniform2f(loc("uRes"),(float)W,(float)H); glUniform1i(loc("vIds"),getenv("AVT_IDS")?1:0); glUniform1f(loc("uAspect"),(float)W/H);
+  auto use=[&](){ glUseProgram(prog); glUniform2f(loc("uRes"),(float)W,(float)H); glUniform1i(loc("vIds"),getenv("AVT_IDS")?1:0); glUniform1f(loc("uAspect"),(float)W/H); };
+  if(!own) use();
   int frames=0;
   for(int a=first;a<=last;a++) {
     const ModelDef& m=kModels[a]; const AircraftSpec& s=kAircraft[a]; Plane plane; plane.spec=&s; float M[96]; packModel(s,a,plane.gearHeight(),M);
+    if(own) { if(prog) glDeleteProgram(prog); prog=program(sdfAssembly(defines+aircraftDefines(a,M))+inspection); use(); }
     glUniform4fv(loc("uM"),24,M); v3("uColBase",s.colBase); v3("uColStripe",s.colStripe);
     const char* only=getenv("AVT_VIEWS");   // comma-separated subset of views (quick iteration)
     for(const char* view:{"front","side","rear","top","belly","controls","controls-negative","cockpit","down","left","right","aft","overhead","transition","retracted","hover","profile","quarter","gearbelly","gearside","gearfront","pedals"}) {
@@ -189,6 +193,12 @@ int main(int argc,char**argv) {
       glUniform4f(loc("uPS"),retracted?0.f:trans?0.5f:1.f,defl?1.f:trans?0.5f:0.f,ctl*0.5f,inside?1.f:0.f);
       glUniform4f(loc("uCtl"),ctl,ctl,ctl,0.7f);
       float wr[28]={}; for(int i=0;i<4;i++) { wr[i]=tilt; wr[8+i]=0.7f; } wr[17]=defl?1.f:0.f; wr[18]=defl?1.f:0.f; wr[20]=wr[21]=wr[22]=ctl; wr[24]=1.f;
+      if(a==kMorpheus) {   // the XR-50's state (game.cpp fillPlaneVisual): its wing's sweep (AVT_SWEEP, deg), flaps, the fan's doors; its nozzles
+        for(float& v:wr) v=0.f;
+        float sweep=getenv("AVT_SWEEP")?(float)atof(getenv("AVT_SWEEP"))*DEG:trans?42.f*DEG:16.f*DEG;
+        wr[0]=sweep; wr[1]=hover||defl?1.f:0.f; wr[2]=hover?1.f:trans?0.5f:0.f; wr[3]=0.3f;
+        wr[4]=hover?95.f*DEG:trans?45.f*DEG:0.f; wr[5]=wr[6]=defl?ctl*0.3f:0.f; wr[7]=defl?ctl*0.2f:0.f;
+      }
       glUniform4fv(loc("uWr"),7,wr); glUniform4f(loc("uFlame"),.7f,0.f,tilt,0.f);
       vec3 eye,target;
       if(inside) {
@@ -226,6 +236,7 @@ int main(int argc,char**argv) {
     }
   }
   printf("Rendered %d production geometry views.\n",frames);
+  if(own) return 0;   // (the numerical checks below run on the program with every aircraft in it)
   // Numerical checks use the actual GLSL geometry, rather than a CPU copy of its formulas.
   GLuint tex,fbo;glGenTextures(1,&tex);glBindTexture(GL_TEXTURE_2D,tex);
   glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA32F,64,16,0,GL_RGBA,GL_FLOAT,nullptr);

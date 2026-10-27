@@ -43,7 +43,7 @@ MAX_PART_TYPE = _validator_constant("kMaxPartType")
 PROFILE = 1
 HEADER_BYTES = 192
 MAX_FILE_BYTES = 512 * 1024 * 1024
-MODEL_COUNT = 16
+MODEL_COUNT = 17
 MANIFEST_NAME = "manifest.json"
 REPORT_NAME = "bake-report.json"
 IMPLEMENTATION = "production-strict-fresh-v1"
@@ -231,7 +231,7 @@ def inspect_directory(directory, source, roster):
             "Exporter binary/source digest mismatch; rebuild and rebake")
     require(report.get("format_version") == FORMAT_VERSION and report.get("algorithm_version") == ALGORITHM_VERSION,
             "Bake report format/algorithm mismatch")
-    require(report.get("asset_count") == MODEL_COUNT * 2, "Bake report does not contain all 32 aircraft bodies")
+    require(report.get("asset_count") == MODEL_COUNT * 2, f"Bake report does not contain all {MODEL_COUNT * 2} aircraft bodies")
     gl = report.get("gl", {})
     require(isinstance(gl, dict) and all(isinstance(gl.get(key), str) and gl[key] for key in ("vendor", "renderer", "version")),
             "Missing canonical producer GL provenance")
@@ -334,7 +334,7 @@ def extract(archive_path, output, source, roster):
     try:
         with zipfile.ZipFile(archive_path) as archive:
             entries = archive.infolist()
-            require(len(entries) == MODEL_COUNT * 2 + 2, "Bundle must contain exactly 32 meshes, manifest and bake report")
+            require(len(entries) == MODEL_COUNT * 2 + 2, f"Bundle must contain exactly {MODEL_COUNT * 2} meshes, manifest and bake report")
             seen = set()
             total = 0
             for info in entries:

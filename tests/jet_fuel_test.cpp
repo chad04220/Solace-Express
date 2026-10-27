@@ -154,7 +154,10 @@ void realism() {
     const float hours=cruiseMinutes(s,s.maxFuel)/60.f, km=fuelForKm(s,1e9f)>=s.maxFuel?s.maxFuel/std::max(cruiseBurnKgS(s),1e-6f)*(s.fuelCruiseTas>0?s.fuelCruiseTas:s.cruise)/1000.f:0.f;
     printf("REAL %s tanks %.0f kg: %.1f h, %.0f km at cruise; full power %.1f min\n",s.id,s.maxFuel,hours,km,s.maxFuel/std::max(p.fuelFlowAt(1.f,s.cruise,1.225f),1e-6f)/60.f);
     if(s.special==2) check(s.maxFuel/p.fuelFlowAt(1.f,250.f,1.225f)>1.5f*3600.f && hours>10.f,"the XR-40 lasts hours at full boost and a long day at cruise");
-    else if(isResearchAircraft(i)) {
+    else if(s.special==3) {   // (the XR-50's cruise is supersonic at sea level, where the inlets' ram rise feeds its reheat: 4 minutes. Standing, 8)
+      const float reheat=s.maxFuel/p.fuelFlowAt(1.f,0.f,1.225f)/60.f;
+      check(reheat>5.f && reheat<20.f && hours>2.f,"the XR-50: minutes on full reheat, hours at cruise");
+    } else if(isResearchAircraft(i)) {
       const float reheat=s.maxFuel/p.fuelFlowAt(1.f,s.cruise,1.225f)/60.f;
       check(reheat>5.f && reheat<20.f && hours>2.f,"a reheat research jet: minutes on full reheat, hours at cruise");
     } else check(hours>3.f && hours<9.f && km>700.f && km<6500.f,"a civil type's tanks: hours of cruise and its class's range");

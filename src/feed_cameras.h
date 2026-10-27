@@ -33,7 +33,9 @@ struct FeedMount {
   vec3 screen; float screenR = 0.f;   // its display: centre and radius
 };
 
-inline int feedRigOf(const AircraftSpec* s) { if (!s) return 0; int sp = s->special; return sp == 1 ? 1 : sp == 2 ? 2 : 0; }   // 1 XR-30, 2 XR-40
+// 1 XR-30, 2 XR-40, 3 XR-50 (the XR-30's sealed pod and displays, its cameras mounted on its own airframe: a rig of its
+// own, so its lenses are measured on its own skin - camera_feeds.cpp g_feedMounts)
+inline int feedRigOf(const AircraftSpec* s) { if (!s) return 0; int sp = s->special; return sp == 1 ? 1 : sp == 2 ? 2 : sp == 3 ? 3 : 0; }
 
 // A flat panel: centre c, normal n (facing the pilot), "up" hint u, half size s; mirrored to the left side when
 // left. The camera looks out through it (along -n, with the panel's own axes) and the display shows it as a window
@@ -66,7 +68,7 @@ inline FeedMount feedPanel(vec3 c, vec3 n, vec3 u, vec2 s, bool left, float foca
 // the rig of a research jet (empty for anything else); focal: the main view's focal length in pixels (sets the
 // pictures' resolution: the displays are as sharp as the screen they're seen on)
 inline int feedRig(int rig, float focal, FeedMount out[kMaxFeeds]) {
-  if (rig == 1) {
+  if (rig == 1 || rig == 3) {
     // XR-30: a panoramic display on a cylinder around the eye (r 0.64 m, +-1.25 rad, y 0.02 +- 0.30), shown by one
     // panoramic camera at the nose whose picture is that same cylinder (slots 1 and 2 are unused); a side display bay
     // either side

@@ -9,7 +9,7 @@
 namespace {
 const vec3 R_ICE = svui::code, R_DIM = svui::codeDim, R_TEXT(.90f,.95f,1.f), R_RED(1.f,.43f,.30f);
 const vec3 R_AMBER(1.f, 0.72f, 0.26f), R_READY(.58f,.82f,1.f), R_VIOLET(.62f,.65f,1.f), R_INK = svui::codeInk;
-const vec3 R_SKY(.40f,.77f,1.f), R_COBALT(.44f,.57f,1.f);
+const vec3 R_SKY(.40f,.77f,1.f), R_COBALT(.44f,.57f,1.f), R_GOLD(1.f,.66f,.24f);
 const char* kGlyphs = "0123456789ABCDEF#%&@$*+=<>/\\|";
 const float kPreviewControlsHeight = 56.f;
 
@@ -66,6 +66,14 @@ const ResCraftInfo kResCraft[] = {
    100.f, -50.f, 50.f, 90.f, -45.f, 4.4f, 0.32f,
    {"F / V tilt the pods: 0 forward, 90 hover", "X or double-tap brake: cloak", "Y weapons hot: lasers LMB/Enter, bomb Bksp",
     "Slow on low power the pods do the flying", "6,000 kg: 2 h of full boost, 16 h of cruise"}, "XR40"},
+  {kMorpheus, "NG-XR50-M  //  BLK 1", "XR-50", "MORPHEUS", R_GOLD, {0.98f, 0.78f, 0.40f}, "VARIABLE-SWEEP HYPERSONIC VTOL RESEARCH MODEL",
+   {{"CONFIGURATION", "Waverider body, swing wing 16-68 deg, V-tail", -1}, {"PROPULSION", "2 x turbofan / ramjet / scramjet + rocket", 0.95f},
+    {"THRUST / WEIGHT", "1.3 in reheat, 2.4 with the rocket", 0.62f}, {"TOP SPEED", "Mach 7.1 at 27 km, scramjet", 1.f},
+    {"VTOL", "Lift fan, nozzles swivel to 95 deg", 0.9f}, {"CEILING", "84 km on the rocket", 1.f},
+    {"AIRFRAME", "+13 / -6 g; edges to 1,650 C", 0.14f}, {"ENDURANCE", "8,200 kg: 20 min scramjet, 5 h cruise", 0.6f}},
+   16.f, -8.f, 4.f, 13.f, -6.f, 7.1f, 0.17f,
+   {"F / V: nozzles 0-95 deg; the lift fan comes in", "X or double-tap brake: the rocket (~55 s of LOX)", "The wing sweeps itself: 16 deg slow, 68 past Mach 1.45",
+    "Mach 7 needs 27 km: watch LEAD EDGE (1,650 C)", "Full aft stick past its stop: post-stall to 80 deg"}, "XR50"},
 };
 const int kNumResCraft = sizeof(kResCraft) / sizeof(kResCraft[0]);
 int resCraftSlot(int idx) { for (int k = 0; k < kNumResCraft; k++) if (kResCraft[k].idx == idx) return k; return 1; }
@@ -146,6 +154,14 @@ void silhouette(int craft, float cx, float cy, float sc, vec3 c, float a, float 
     mirror(body, 11);
     g_ren.line(cx - 0.08f * sc, cy + 0.92f * sc, cx - 0.08f * sc, cy + 0.98f * sc, th, c, a);
     g_ren.line(cx + 0.08f * sc, cy + 0.92f * sc, cx + 0.08f * sc, cy + 0.98f * sc, th, c, a);
+  } else if (craft == kMorpheus) {   // the waverider and its glove, the swing wings forward, the V-tail, the nozzles and the rocket
+    static const float body[] = {0.f, -1.f, 0.042f, -0.678f, 0.095f, -0.473f, 0.289f, -0.052f, 0.289f, 0.517f, 0.209f, 0.592f, 0.114f, 0.972f, 0.f, 0.99f};
+    mirror(body, 8);
+    static const float wing[] = {0.22f, -0.11f, 0.749f, 0.159f, 0.722f, 0.25f, 0.289f, 0.21f};
+    mirror(wing, 4);
+    static const float tail[] = {0.10f, 0.69f, 0.30f, 0.86f, 0.30f, 0.94f, 0.11f, 0.94f};
+    mirror(tail, 4);
+    g_ren.rectOutline(cx - 0.06f * sc, cy - 0.43f * sc, 0.12f * sc, 0.12f * sc, c, a, 0.06f * sc, th);   // (the lift fan)
   } else {   // a conventional twin jet (the XR-10): tapered wing, tailplane, two aft engines
     static const float body[] = {0.f, -1.f, 0.11f, -0.72f, 0.13f, -0.18f, 0.95f, 0.34f, 0.93f, 0.46f, 0.15f, 0.42f, 0.14f, 0.72f, 0.44f, 0.86f, 0.42f, 0.94f, 0.1f, 0.92f, 0.f, 0.96f};
     mirror(body, 11);
@@ -199,6 +215,14 @@ const Game::ResCard Game::kResCards[] = {
    {{RS_CLOAK, 0, 10.f, "Cloak for 10 s"}, {RS_LASER, 6.f, 0.f, "Fire 6 laser bolts"}, {RS_BOMB, 1.f, 0.f, "Release a plasma bomb"}, {RS_LAND, 0, 0, "Land back at the range"}}, 4},
   {kSomnus, "XR40-4", "EXTREMES", "No limiter, no mercy: 80 g, -40 g, a 380 deg/s roll. Good for +90 / -45 with a short overstress.",
    {{RS_G, 80.f, 0.f, "Pull 80 g"}, {RS_NEGG, -40.f, 0.f, "Push to -40 g"}, {RS_ROLL, 380.f, 0.f, "Roll at 380 deg/s"}, {RS_LAND, 0, 0, "Land back at the range"}}, 4},
+  {kMorpheus, "XR50-1", "VERTICAL FLIGHT", "The lever down (F): the nozzles swivel and the lift fan comes in. Hover for 10 s, then convert: nozzles aft (V), the wing carrying it past 250 kt. Back to the range and down vertically.",
+   {{RS_HOVER, 0, 10.f, "Hover for 10 s"}, {RS_CONVERT, 129.f, 0.f, "Wingborne past 250 kt, nozzles aft"}, {RS_VLAND, 0, 0, "Land vertically"}}, 3},
+  {kMorpheus, "XR50-2", "SCRAMJET CORRIDOR", "Turbofans, ramjets, scramjets: climb as you accelerate and hold Mach 6.5 on the scramjets for 30 s. Below 27 km Mach 7 burns the leading edges away - watch LEAD EDGE.",
+   {{RS_ALT, 24000.f, 0.f, "Climb through 24,000 m"}, {RS_SCRAM, 6.5f, 30.f, "Mach 6.5 on the scramjets"}, {RS_LAND, 0, 0, "Land back at the range"}}, 3},
+  {kMorpheus, "XR50-3", "EDGE OF SPACE", "From the corridor pull up and light the rocket (X). Climb through 80 km - up there the reaction jets steer - then bring it back without burning up.",
+   {{RS_ROCKET, 0, 5.f, "Rocket lit for 5 s"}, {RS_ALT, 80000.f, 0.f, "Climb through 80,000 m"}, {RS_LAND, 0, 0, "Land back at the range"}}, 3},
+  {kMorpheus, "XR50-4", "POST-STALL", "Slow, high: the stick hard against its stop takes it through the gate - 70 deg of angle of attack on the nozzles. Then a 230 deg/s roll and 11 g.",
+   {{RS_ALPHA, 70.f, 0.f, "70 deg angle of attack"}, {RS_ROLL, 230.f, 0.f, "Roll at 230 deg/s"}, {RS_G, 11.f, 0.f, "Pull 11 g"}, {RS_LAND, 0, 0, "Land back at the range"}}, 4},
 };
 const int Game::kNumResCards = sizeof(Game::kResCards) / sizeof(Game::kResCards[0]);
 
@@ -213,12 +237,19 @@ std::string Game::resStepText(const ResStep& st) const {
     case RS_SLOW: return fmt("%s / %s%s", fmtSpeed(plane.ias).c_str(), fmtSpeed(st.v).c_str(), h.c_str());
     case RS_STALL: return fmt("STALL WARN %.0f%%", plane.stallWarn * 100.f);
     case RS_CLIMB: return fmt("V/S %+.0f / %.0f m/s%s", plane.vel.y, st.v, h.c_str());
-    case RS_HOVER: return fmt("PODS %.0f deg  %.0f kt%s", plane.nozzle * 90.f, length(plane.vel) * MS_TO_KT, h.c_str());
-    case RS_VLAND: return "PODS DOWN, SETTLE";
+    case RS_HOVER: return plane.spec->special == 3 ? fmt("NOZZLES %.0f deg  FAN %.0f%%  %.0f kt%s", plane.nzSwivel / DEG, plane.fanClutch * 100.f, length(plane.vel) * MS_TO_KT, h.c_str())
+                                                   : fmt("PODS %.0f deg  %.0f kt%s", plane.nozzle * 90.f, length(plane.vel) * MS_TO_KT, h.c_str());
+    case RS_VLAND: return plane.spec->special == 3 ? "NOZZLES DOWN, SETTLE" : "PODS DOWN, SETTLE";
     case RS_CLOAK: return fmt("CLOAK %.0f%%%s", somnus.stealth * 100.f, h.c_str());
     case RS_LASER: return fmt("BOLTS %d / %.0f", somnus.shots, st.v);
     case RS_BOMB: return fmt("BOMBS %d / %.0f", somnus.dropped, st.v);
-    default: return std::string("LAND ") + g_world.airports[resAirport].code;
+    case RS_ALPHA: return fmt("ALPHA %.0f / %.0f deg", plane.alpha / DEG, st.v);
+    case RS_SCRAM: { const float tb = plane.tbcc[0] + plane.tbcc[1] + plane.tbcc[2];
+      return fmt("MACH %.2f / %.2f  %s%s", plane.mach, st.v, tb > 1.f && plane.tbcc[2] > 0.5f * tb ? "SCRAM" : "NOT SCRAM", h.c_str()); }
+    case RS_ROCKET: return fmt("ROCKET %s  %.0f kg LOX%s", plane.rocketN > 1.f ? "LIT" : "OFF", plane.oxidizer, h.c_str());
+    case RS_CONVERT: return fmt("NOZZLES %.0f deg  %s / %s", plane.nzSwivel / DEG, fmtSpeed(plane.ias).c_str(), fmtSpeed(st.v).c_str());
+    case RS_LAND: return std::string("LAND ") + g_world.airports[resAirport].code;
+    default: return "";
   }
 }
 
@@ -593,6 +624,8 @@ void Game::drawResearch(const FrameParams& fp) {
     float fl = kAircraft[RC.idx].fusLen * 0.5f;
     if (wr) calls = {{vec3(0, 0, -fl), "SENSOR NOSE  //  PASSIVE", -1}, {kSomnusPods[1], "POD 2  //  130 kN  0-90 DEG", 1},
                      {kSomnusPods[2], "POD 3  //  VECTORING VANES", -1}, {vec3(6.2f, -0.24f, 2.0f), "FACETED SKIN  //  CLOAK MESH", 1}};
+    else if (RC.idx == kMorpheus) calls = {{vec3(0, 0.1f, -fl), "WAVERIDER  //  C-C EDGES 1,650 C", -1}, {morpheusWingTip(kMorpheusSweepMin), "SWING WING  //  16-68 DEG", 1},
+                  {vec3(0, 0.84f, -5.f), "LIFT FAN  //  160 kN", -1}, {vec3(0.78f, -0.02f, 8.3f), "3D NOZZLE  //  95 DEG SWIVEL", 1}};
     else if (RC.idx == kResearchJet) calls = {{vec3(0, 0, -fl), "SYNTHETIC-VISION POD", -1}, {vec3(2.1f, 0.1f, -4.4f), "CANARD  //  ALL-MOVING", 1},
                   {vec3(5.62f, -0.38f, 4.4f), "CRANKED DELTA  //  NO FLAPS", 1}, {vec3(-0.82f, -0.12f, 7.75f), "2D NOZZLE  //  +-29 DEG", -1}};
     else {   // a conventional airframe: its parts from the parametric model

@@ -42,11 +42,11 @@ add_custom_target(aircraft_geometry_gen DEPENDS ${AIRCRAFT_GEOMETRY_GEN})
 # test compiled the shared sources itself: the islands' five 39 times over (the review of v3.44.0, ENG-1).
 set(ENVIRONMENT_SOURCES src/geo.cpp src/earth_data.cpp src/earth_charts.cpp src/earth_far.cpp src/earth_fetch.cpp src/earth_install.cpp src/world_earth.cpp src/region_travel.cpp src/procedural_regions.cpp src/distant_regions.cpp src/regional_surface.cpp src/world.cpp src/road_network.cpp src/bridges.cpp src/settlements.cpp src/road_furniture.cpp src/landmarks.cpp src/road_traffic.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp)
 set(CORE_ONLY_SOURCES
-  src/aircraft.cpp src/airframe_fit.cpp src/aircraft_perf.cpp src/aircraft_stunt.cpp src/aero.cpp src/aero_strips.cpp src/aero_wake.cpp src/breakup.cpp src/models.cpp src/career.cpp src/profile.cpp src/weather.cpp src/hive_combat.cpp src/hive_loadout.cpp src/hive_world_collision.cpp)
+  src/aircraft.cpp src/airframe_fit.cpp src/aircraft_perf.cpp src/aircraft_stunt.cpp src/aircraft_morpheus.cpp src/aero.cpp src/aero_strips.cpp src/aero_wake.cpp src/breakup.cpp src/models.cpp src/career.cpp src/profile.cpp src/weather.cpp src/hive_combat.cpp src/hive_loadout.cpp src/hive_world_collision.cpp)
 set(CORE_SOURCES ${ENVIRONMENT_SOURCES} ${CORE_ONLY_SOURCES})
 set(GAME_ONLY_SOURCES
   src/aircraft_mesh_asset.cpp
-  src/joystick.cpp src/traffic.cpp src/game.cpp src/game_ui.cpp src/game_profile.cpp src/game_photo.cpp src/music.cpp src/steam.cpp src/game_research_ui.cpp src/game_military_ui.cpp src/game_somnus.cpp src/renderer.cpp src/png_write.cpp src/materials.cpp src/texture_compress.cpp src/raster_renderer.cpp src/prop_disc.cpp src/terrain_mesh.cpp src/aircraft_mesh.cpp src/entity_render.cpp src/aircraft_hull.cpp src/camera_feeds.cpp src/atc.cpp src/gl.cpp src/audio.cpp src/sky.cpp src/enemy_fleet.cpp src/enemy_mesh.cpp)
+  src/joystick.cpp src/traffic.cpp src/game.cpp src/game_ui.cpp src/game_profile.cpp src/game_photo.cpp src/music.cpp src/steam.cpp src/game_research_ui.cpp src/game_military_ui.cpp src/game_somnus.cpp src/game_morpheus.cpp src/renderer.cpp src/png_write.cpp src/materials.cpp src/texture_compress.cpp src/raster_renderer.cpp src/prop_disc.cpp src/terrain_mesh.cpp src/aircraft_mesh.cpp src/entity_render.cpp src/aircraft_hull.cpp src/camera_feeds.cpp src/atc.cpp src/gl.cpp src/audio.cpp src/sky.cpp src/enemy_fleet.cpp src/enemy_mesh.cpp)
 set(GAME_SOURCES ${CORE_SOURCES} src/entity_mesh.cpp src/bridge_mesh.cpp ${GAME_ONLY_SOURCES})
 add_library(env_objs OBJECT ${ENVIRONMENT_SOURCES})
 add_library(core_objs OBJECT ${CORE_ONLY_SOURCES})
@@ -148,6 +148,7 @@ else()
   target_compile_options(earth_data_fastmath_test PRIVATE -ffast-math)
 endif()
 add_executable(new_aircraft_performance_test tests/new_aircraft_performance_test.cpp ${CORE_OBJS})
+add_executable(xr50_flight_test tests/xr50_flight_test.cpp ${CORE_OBJS})
 add_executable(new_aircraft_autoland_test tests/new_aircraft_autoland_test.cpp ${CORE_OBJS})
 target_include_directories(new_aircraft_autoland_test PRIVATE src)
 add_executable(new_aircraft_exterior_test tests/new_aircraft_exterior_test.cpp ${CORE_OBJS})
@@ -397,6 +398,7 @@ add_test(NAME nocturne_toggle_detail COMMAND nocturne_toggle_detail_test)
 add_test(NAME mesh_planar COMMAND mesh_planar_test)
 add_test(NAME mesh_orientation COMMAND mesh_orientation_test)
 add_test(NAME new_aircraft_performance COMMAND new_aircraft_performance_test)
+add_test(NAME xr50_flight COMMAND xr50_flight_test)
 # (the native autolands one aircraft a test, by its index - kThistledown 13, kGalleon 14: aircraft.h never renumbers - so
 # CI's runners take them side by side)
 add_test(NAME new_aircraft_autoland_thistledown COMMAND new_aircraft_autoland_test 13)
@@ -764,6 +766,7 @@ set_tests_properties(new_aircraft_autoland_thistledown PROPERTIES COST 175)
 set_tests_properties(new_aircraft_autoland_galleon PROPERTIES COST 245)
 set_tests_properties(new_aircraft_go_around PROPERTIES COST 230)
 set_tests_properties(new_aircraft_performance PROPERTIES COST 25)
+set_tests_properties(xr50_flight PROPERTIES COST 25)
 set_tests_properties(wreck_pose PROPERTIES COST 10)
 set_tests_properties(galleon_gear_geometry PROPERTIES COST 8)
 if(Python3_Interpreter_FOUND)
@@ -810,7 +813,7 @@ set_tests_properties(test_world PROPERTIES FIXTURES_SETUP world COST 1000)
 foreach(t airport_environment airport_layouts cockpit_camera community_layout ufo_encounter entity_raycast terrain_envelope
           environment_scale_audit earth_rebase_flight flight_model_1 flight_model_2 flight_model_3 gameplay_loop_1 gameplay_loop_2 gameplay_loop_3
           gameplay_loop_4 assist_and_warp pilot_profile campaign_progression_1 campaign_progression_2 campaign_progression_3 career_saves save_format soak military_career military_career_fastmath military_gameplay hangar_preview_controls hive_world_collision hive_world_collision_fastmath terrain_shadow_bake
-          volcano_effects new_aircraft_performance new_aircraft_autoland_thistledown new_aircraft_autoland_galleon new_aircraft_go_around
+          volcano_effects new_aircraft_performance xr50_flight new_aircraft_autoland_thistledown new_aircraft_autoland_galleon new_aircraft_go_around
           vtol_throttle wreck_pose bridges roads landmarks road_traffic road_grade_gpu menu_plan_cache)
   if(TEST ${t})
     set_property(TEST ${t} APPEND PROPERTY FIXTURES_REQUIRED world)
@@ -820,7 +823,7 @@ endforeach()
 foreach(t airport_environment_test airport_layout_test cockpit_camera_test community_layout_test encounter_timing_test
           entity_raycast_test envelope_test environment_scale_audit geo_flight_test flight_test gameplay_test assist_test profile_test progression_test save_test save_format_test soak_test
           military_career_test military_career_fastmath_test military_gameplay_test hangar_preview_controls_test hive_world_collision_test hive_world_collision_fastmath_test
-          terrain_shadow_test volcano_effects_test new_aircraft_performance_test new_aircraft_autoland_test vtol_throttle_test
+          terrain_shadow_test volcano_effects_test new_aircraft_performance_test xr50_flight_test new_aircraft_autoland_test vtol_throttle_test
           bridges_test roads_test landmarks_test road_traffic_test road_grade_gpu_test menu_plan_cache_test)
   if(TARGET ${t})
     add_dependencies(${t} test_world)

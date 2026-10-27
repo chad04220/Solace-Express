@@ -22,10 +22,10 @@ static void valid(const ExhaustVisual& e) {
   }
 }
 int main() {
-  int expected[4] = {2, 2, 1, 4};
+  auto expected = [](int m) { return m == kReverie ? 1 : m == kSomnus ? 4 : 2; };   // (the XR-50's rocket only while it burns)
   for (int m = 0; m < kAircraftCount; ++m) {
     Plane p = running(m); ExhaustVisual e = build(p); valid(e);
-    check(e.count == (isCareerAircraft(m) ? 0 : expected[m - kVigil]), "fleet capability and exact 2/2/1/4 nozzle counts");
+    check(e.count == (isCareerAircraft(m) ? 0 : expected(m)), "fleet capability and exact 2/2/1/4/2 nozzle counts");
     if (isCareerAircraft(m)) continue;
     for (float spool : {0.f, .019f, .02f, .3f, .7f, .85f, .9f, .925f, 1.f}) {
       p.engineSpool = spool; e = build(p); valid(e);

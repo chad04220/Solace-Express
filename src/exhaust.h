@@ -63,6 +63,13 @@ inline ExhaustVisual buildExhaustVisual(const Plane& p, const ModelDef& m) {
       rx = ry = .28f + .1f*clampf(thrust, 0.f, 1.f);
       // Differential thrust modulates emission without falsely enabling boost below actual reheat spool.
       intensity = clampf(thrust*1.3f, 0.f, 1.6f);
+    } else if (s.special == 3) {
+      // the XR-50: each nozzle where it has swivelled (its 1.15 m from the swivel to the exit), along its vectored jet. Its
+      // flame: reheat's (none with the nozzles swivelled down), or the ram and scram combustion's through the same exits
+      const float sd = i == 0 ? -1.f : 1.f, a = p.nzSwivel + p.nzPitch[i & 1], y = p.nzYaw[i & 1];
+      pos = vec3(sd * kMorpheusNozzle.x, kMorpheusNozzle.y, kMorpheusNozzle.z) + vec3(0, -sinf(p.nzSwivel), cosf(p.nzSwivel)) * 1.15f;
+      dir = vec3(-sinf(y), -sinf(a) * cosf(y), cosf(a) * cosf(y));
+      rx = ry = .40f;
     } else if (s.special == 1) {
       // jtNozzleShape's aft lip is 1.06 m behind its moving front-edge pivot; its bore is 0.36 x 0.23 m.
       const float a = exhaustNozzleAngle(p);
@@ -81,6 +88,18 @@ inline ExhaustVisual buildExhaustVisual(const Plane& p, const ModelDef& m) {
     out.exit[j][3] = clampf(rx, .05f, 2.f); out.axis[j][3] = clampf(ry, .05f, 2.f);
     out.power[j][0] = spool; out.power[j][1] = reheat; out.power[j][2] = intensity;
     out.power[j][3] = exhaustFinite(p.mach, 0.f, 5.f); out.engine[j] = i;
+    if (s.special == 3) {   // (the XR-50's flame: reheat only aft, or its ram and scram combustion's)
+      const float tb = p.tbcc[0] + p.tbcc[1] + p.tbcc[2], ram = tb > 1.f ? p.tbcc[1] / tb : 0.f, scram = tb > 1.f ? p.tbcc[2] / tb : 0.f;
+      out.power[j][1] = std::max(reheat * (1.f - smoothstepf(5.f * DEG, 20.f * DEG, p.nzSwivel)), std::max(0.85f * ram, 0.55f * scram) * clampf(spool / .85f, 0.f, 1.f));
+    }
+  }
+  // the XR-50's rocket, between the nozzles while it burns: its flame at full reheat's, as strong as it is lit
+  if (s.special == 3 && p.rocketN > 1.f && out.count < 4) {
+    const int j = out.count++;
+    out.exit[j][0] = kMorpheusRocket.x; out.exit[j][1] = kMorpheusRocket.y; out.exit[j][2] = kMorpheusRocket.z; out.exit[j][3] = .34f;
+    out.axis[j][0] = 0.f; out.axis[j][1] = 0.f; out.axis[j][2] = 1.f; out.axis[j][3] = .34f;
+    out.power[j][0] = 1.f; out.power[j][1] = 1.f; out.power[j][2] = clampf(p.rocketN / 270000.f, 0.f, 1.f) * 1.5f;
+    out.power[j][3] = exhaustFinite(p.mach, 0.f, 5.f); out.engine[j] = 2;
   }
   return out;
 }

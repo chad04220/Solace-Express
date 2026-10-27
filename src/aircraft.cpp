@@ -115,6 +115,19 @@ const AircraftSpec kAircraft[] = {
    13000, 16000, 27000, 0.42f, 0.052f, 0.070f, LIC_CPL, 165000, 1900,
    11.6f, 0.90f, 1.08f, -1.80f, 0, 0,
    vec3(0.94f, 0.94f, 0.91f), vec3(0.05f, 0.36f, 0.52f), 0, 0, 3.8f, -1.52f, true, 2.75f, .2f, 1.45f, 0, 0, 0, 0, 0, 3900, true},
+  // XR-50 Morpheus (docs/XR50.md): a variable-sweep hypersonic research craft that takes off and lands vertically. Two
+  // combined-cycle engines (power: one's rated dry thrust; turbofans with reheat to Mach 3, then ramjets, then
+  // scramjets to Mach 7.5), a rocket with its own oxidizer, a lift fan, 3D vectoring nozzles, reaction jets: its own path
+  // through the flight model (special 3, aircraft_morpheus.cpp). The span and the lift slope are the wing's swept
+  // forward; its slats and flaps are its own (flapCL 0: the lever is the nozzles', as the XR-40's is its pods').
+  // A hot structure good for +13 / -6 g; its fly-by-wire holds it to 12
+  {"xr50_morpheus", "XR-50 Morpheus", "Variable-sweep hypersonic research craft", ENG_JET, 2, 0, 0, 0, 0,
+   12800, 8200, 0, 0, 48.0f, 15.5f, 3.4f,
+   0.05f, 4.2f, 1.75f, 0.0f, 0.011f, 0.010f, 0.0f, 0.80f,
+   100000, 0, 64, 72, 460, 5200, 900, true, false, true,
+   90000, 330000, 410000, 0.45f, 0.080f, 0.060f, LIC_STUDENT, 0, 0,
+   21.0f, 0.85f, -0.07f, -0.4f, 2, 1, vec3(0.80f, 0.81f, 0.82f), vec3(1.0f, 0.60f, 0.16f), 3, 7.6f, 13.f, -6.f, false, 1.95f, .2f, 1.55f,
+   2.1e-5f, 5.2e-5f, 12000, 265, .13f, 24500},
 };
 // clang-format on
 static_assert(sizeof(kAircraft) / sizeof(kAircraft[0]) == kAircraftCount, "Aircraft table must match roster count");
@@ -123,7 +136,7 @@ static_assert(sizeof(kAircraft) / sizeof(kAircraft[0]) == kAircraftCount, "Aircr
 // tanks and ranges scaled down to suit them - a trainer that flew 45 km, an airliner 170. The table holds the real
 // figures now (a Dawnlark's 770 km, an Archipel's 1,500), and these the weights the airframes were trimmed, rigged and
 // measured at, so each flies as it did
-static const float kDesignFuel[kAircraftCount] = {70, 110, 120, 260, 420, 1500, 2200, 180, 220, 2200, 6000, 3200, 6000, 135, 20000, 400};
+static const float kDesignFuel[kAircraftCount] = {70, 110, 120, 260, 420, 1500, 2200, 180, 220, 2200, 6000, 3200, 6000, 135, 20000, 400, 8200};
 int typeOf(const AircraftSpec* s) {
   if (!s) return -1;
   if (s->fittedFrom >= 0) return s->fittedFrom;
@@ -149,7 +162,10 @@ float Plane::spoolRate() const {
 float Plane::thrustAt(float spool, float V, float vf, float rho) const {
   const AircraftSpec& s = *spec;
   const float dens = rho > 0.f ? rho : density, sigmaRho = dens / 1.225f;   // (rho: another air's density, for comparisons)
-  if (s.special == 2) {
+  if (s.special == 3) {   // the XR-50's combined-cycle engines, all modes (aircraft_morpheus.cpp; the rocket is the pilot's)
+    const MorpheusThrust t = morpheusEngines(s, spool, V, dens, soundSpeed);
+    return t.tf + t.ram + t.scram;
+  } else if (s.special == 2) {
     // four thruster pods: dry up to 85% throttle, boost above; ram compression adds thrust with Mach
     float ab = smoothstepf(0.85f, 1.0f, spool);
     return s.engines * s.power * powf(sigmaRho, 0.5f) * (0.85f * spool + 1.25f * ab) * (1.f + 0.3f * std::min(V / 330.f, 4.f));
@@ -175,13 +191,22 @@ float Plane::thrustAt(float spool, float V, float vf, float rho) const {
   return std::min(thrust, s.engines * 0.75f * s.propFactor * cbrtf(2.f * dens * A * Pe * Pe));
 }
 
-// The thrust it can turn straight down to hold itself up (N): the XR-40's pods tilt to the vertical; nothing else can
-float Plane::liftThrustMax() const { return spec->special == 2 ? thrustAt(1.f, 0.f, 0.f) : 0.f; }
+// The thrust it can turn straight down to hold itself up (N): the XR-40's pods tilt to the vertical, the XR-50's nozzles
+// swivel down beside its lift fan; nothing else can
+float Plane::liftThrustMax() const {
+  return spec->special == 2 ? thrustAt(1.f, 0.f, 0.f) : spec->special == 3 ? morpheusHoverMax(*spec, density) : 0.f;
+}
 
 float Plane::fuelFlowAt(float spool, float tas, float rho, float live) const {
   const AircraftSpec& s = *spec;
   spool = clampf(spool, 0.f, 1.f); live = clampf(live, 0.f, 1.f);
   if (live <= 0.f) return 0.f;
+  if (s.special == 3) {   // the XR-50: each mode's thrust at its own consumption (its rocket burns apart: aircraft_morpheus.cpp)
+    const float dens = rho > 0.f ? rho : density;
+    MorpheusThrust t = morpheusEngines(s, spool, tas, dens, soundSpeed);
+    t.tf = t.tfDry + (t.tf - t.tfDry) * (1.f - smoothstepf(5.f * DEG, 20.f * DEG, nzSwivel));   // (no reheat with the nozzles swivelled down)
+    return morpheusFuelFlow(s, t, tas / std::max(soundSpeed, 1.f), dens) * live;
+  }
   if (s.special == 2) {
     // The XR-40's pods are a fictional power plant, and their burn follows their power setting, not a turbofan's thrust:
     // at full boost they make sixty times the thrust that holds its cruise, and at any real fuel per newton its tanks
@@ -292,6 +317,13 @@ void Plane::reset(const AircraftSpec* s, vec3 position, float headingDeg, float 
   // drag comes from the airframe's shape (aero.cpp), evaluated every step at the speed and air density of the moment
   cd0 = aeroCD0(aeroModel(*s), *s, std::max(speed, 30.f), 1.225f, speed / 340.f);
   nozzle = 0; mach = 0;
+  // the XR-50's: its oxidizer full, the rocket out, the skin at the air's temperature, the wing where the schedule has it
+  oxidizer = s->special == 3 ? kMorpheusOxidizer : 0.f; rocketLit = false; rocketThr = rocketN = 0.f;
+  for (float& t : tbcc) t = 0.f;
+  skinT = isa(position.y).T; heatOver = 0.f; fanClutch = fanN = 0.f; postN[0] = postN[1] = 0.f; hiLift = 0.f;
+  nzSwivel = 0.f; nzPitch[0] = nzPitch[1] = nzYaw[0] = nzYaw[1] = 0.f; rcs = vec3();
+  airspeed = speed; mach = speed / isa(position.y).a; gear = airborne && s->retract ? 0.f : 1.f;
+  sweep = s->special == 3 ? sweepTarget() : 0.f; mach = 0;
   onWater = false; floatWet = 0.f; seaFetchT = -1.f; floatGround = floatGroundRunway = false; floatGroundSpeed = 0.f;
   moorWanted = moored = false;
   if (airborne) {
@@ -626,7 +658,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   // ---------------- configuration
   // (a stopped left flap stays where it was, and the right one keeps following the lever: flapLeft)
   flaps = approach(flaps, ctl.flaps * (s.special ? 1.f : aeroGeom(s).flapMax), s.special ? 0.5f : 0.6f, dt);   // (as far as they trim: aero_strips.cpp)
-  nozzle = s.special == 2 ? flaps : 0.f;   // the XR-40's F/V keys tilt its thruster pods instead of flaps
+  nozzle = s.special >= 2 ? flaps : 0.f;   // the XR-40's F/V keys tilt its thruster pods instead of flaps, the XR-50's swivel its nozzles down
   if (s.retract && fail.gearStuck == 0) gear = clampf(gear + (ctl.gearDown ? 1.f : -1.f) * dt / 5.f, 0, 1);
   else if (!s.retract) gear = 1;
 
@@ -678,6 +710,9 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     aeroWakeBuild(ag, in, ao, wake);
     F += ao.F; T += ao.M;
     stallWarn = ao.stall;
+  } else if (s.special == 3) {   // the XR-50: its swing wing, its heat (aircraft_morpheus.cpp)
+    if (!morpheusAero(atmo, va, V, altAgl, dt, F, Taero, surfMax)) return;
+    T += Taero;
   } else if (V > 0.5f) {
     // the research craft on fly-by-wire (the XR-30, XR-40): their coefficients, and the flight control system below
     float qbar = 0.5f * density * V * V;
@@ -730,7 +765,8 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     }
     stallWarn = smoothstepf(aStall - 5 * DEG, aStall - 1.5f * DEG, alpha);
   }
-  if (s.special) {
+  if (s.special == 3) morpheusThrust(F, T, Taero, surfMax, V, dt);   // the XR-50's propulsion and its fly-by-wire
+  else if (s.special) {
     if (s.special == 1) F += vec3(0, 0, -thrust);   // XR-30: the nozzles vector in pitch only (no vertical flight)
     // fly-by-wire rate command through vectored thrust and reaction jets: authority independent of airspeed
     float Vt = std::max(V, 1.f);

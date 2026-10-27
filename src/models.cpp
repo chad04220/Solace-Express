@@ -177,6 +177,18 @@ const ModelDef kModels[] = {
     5, .24f, 0,
     4, -2.0f,2.0f,.30f,.21f,.18f,
     vec3(-.38f,.66f,-2.45f), 1, -4.05f,-2.95f,.40f,-2.10f },
+  // ---------------------------------------------------------------- XR-50 Morpheus (hypersonic VTOL research craft; its own SDF in the shader, engine code 7)
+  // A waverider forebody and chined lifting body: the stations are its core (the belly the nose gear folds into, the
+  // sealed cockpit's place). The swing wing, the V-tail, the nozzles and the lift fan are plane_sdf.glsl mapMorpheus's;
+  // the wing row is the panel swept forward (the lights, the gear's bounds), the fin row one canted half of the V-tail
+  { {{-11.80f,.03f,.03f,-.22f},{-10.30f,.40f,.24f,-.16f},{-8.20f,.78f,.50f,-.04f},{-6.00f,1.00f,.78f,.08f},{-2.00f,1.10f,.82f,.06f},{2.50f,1.25f,.78f,.02f},{6.40f,1.18f,.62f,.02f},{9.20f,.98f,.50f,.04f}}, .35f,
+    {7.75f,2.40f,1.00f,1.60f,-.06f,-1.40f,0.0f,.045f}, 0,0,0,.82f, 0,0,
+    {0,0,0,0,0,0,0}, 0,
+    {2.90f,2.70f,.90f,1.90f,.45f,6.00f},
+    7, .78f,-.02f,.48f,1.0f,7.4f, 0,0,
+    4, .38f, 0,
+    0, 0,0,0,0,0,
+    vec3(0,.70f,-7.10f), 3, -8.3f,-7.2f,.55f,-6.3f },
 };
 // clang-format on
 static_assert(sizeof(kModels)/sizeof(kModels[0]) == kAircraftCount, "one authored model per aircraft roster entry");

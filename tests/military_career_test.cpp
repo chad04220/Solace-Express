@@ -94,7 +94,7 @@ int main() {
         !military::sensorEnvelope(hover, 1121, 5, 1000) && !military::sensorEnvelope(hover, 1060, 13, 1000), "Somnus hover sensor enforces roof-relative altitude and low speed");
   Career base = populated(); const std::string civil = civilianState(base);
   { // New careers reveal exactly one mission at a time in display order, not MissionId order.
-    const int expectedOrder[] = {3, 4, 5, 6, 7, 1, 8, 9, 2};
+    const int expectedOrder[] = {3, 4, 5, 6, 7, 1, 8, 9, 2, 10};
     Career c = base;
     check(!c.militaryMissionCompleted(-1) && !c.militaryMissionUnlocked(-1) &&
           !c.militaryMissionCompleted(military::kMissionCount) && !c.militaryMissionUnlocked(military::kMissionCount),
@@ -143,7 +143,7 @@ int main() {
         check(!c.militaryMissionUnlocked(military::kBoardMissionIds[index + 2]), "extra wins and rank do not unlock later identities");
     }
     check(c.military.completedMissions == (military::kKnownMissionMask & ~military::completionBit(military::LegacyRecon)),
-          "finished board records all nine and does not fabricate legacy trainer completion");
+          "finished board records all ten and does not fabricate legacy trainer completion");
     c.newGame();
     check(!c.military.completedMissions && c.militaryMissionUnlocked(military::LocalSurvey) &&
           !c.militaryMissionUnlocked(military::RouteRecon), "new game clears all mission progress");

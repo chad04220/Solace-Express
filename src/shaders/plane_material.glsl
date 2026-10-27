@@ -422,6 +422,67 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
     else if (mid == 58) { m.alb = vec3(0.7, 0.66, 0.6); m.rough = 0.3; m.emit = vec3(1.0, 0.8, 0.58)*0.55; }   // ceiling light diffusers
   }
 #endif
+#if HAS_MORPHEUS
+  else if (mid >= 150 && mid < 160) {   // the XR-50 Morpheus (morpheus_sdf.glsl)
+    gPixM = t*uTanHalf*2.0/uRes.y; gPixG = gPixM/max(abs(dot(ln, transpose(uPlaneRot)*rd)), 0.2);
+    vec3 nT; vec4 tx;
+    // the leading edges' temperature (gWr[2].y: 0 at 900 C, 1 at their 1,650 C limit): a glow from dull red to yellow-white
+    float hk = clamp(gWr[2].y, 0.0, 1.25), TK = 1173.0 + hk*750.0;
+    vec3 glow = mix(vec3(1.0, 0.10, 0.01), vec3(1.0, 0.78, 0.50), smoothstep(1250.0, 2000.0, TK))*pow(TK/1923.0, 4.0)*3.0*step(0.001, hk);
+    if (mid == 150) {   // the skin: a pearl thermal coating above, black high-emissivity tiles beneath the chine line
+      bool under = ln.y < -0.30;
+      if (under) {
+        tx = triSample(lp, ln, M_PAINT, 0.35, nT);
+        vec2 tq = lp.xz/vec2(0.152, 0.152);   // (15 cm tiles, staggered rows: the Shuttle's)
+        tq.x += 0.5*floor(tq.y);
+        float seam = max(aaLines(tq.x, 0.04, gPixG/0.152), aaLines(tq.y, 0.04, gPixG/0.152));
+        float var = fract(sin(dot(floor(tq), vec2(12.9898, 78.233)))*43758.5453);
+        m.alb = vec3(0.022, 0.022, 0.024)*(0.8 + 0.4*var)*(0.8 + 0.4*tx.r); m.rough = 0.78; m.metal = 0.0; m.nrm = mix(vec3(0.0, 0.0, 1.0), nT, 0.4);
+        m.alb = mix(m.alb, vec3(0.006), seam);
+        // (the tiles nearest the nose and the chines run hot too: a dull glow toward the leading edges)
+        m.emit = glow*0.25*smoothstep(-7.0, -11.0, lp.z);
+      } else {
+        tx = triSample(lp, ln, M_PAINT, 0.7, nT);
+        m.alb = gColBase*tx.rgb*1.25; m.rough = 0.32; m.metal = 0.12; m.nrm = nT;
+        m.alb *= 1.0 - 0.35*max(aaLines(lp.x/1.05, 0.006, gPixG/1.05), aaLines(lp.z/1.6, 0.004, gPixG/1.6));   // panel seams
+        if (abs(lp.x) < 0.11 && lp.z > -4.0 && lp.z < 8.5 && ln.y > 0.6 && abs(abs(lp.x) - 0.075) < 0.018) m.alb = gColStripe*0.85;   // (the amber spine stripes)
+        if (lp.z > -9.6 && lp.z < -9.3 && ln.y > 0.4) m.alb = vec3(0.04);   // (the anti-glare band ahead of the sensor canopy)
+      }
+      if (abs(lp.z + 10.35) < 0.05 && abs(ln.x) > 0.6 && abs(lp.y + 0.08) < 0.05) { m.alb = vec3(0.015); m.rough = 0.6; }   // the reaction jets' ports
+    }
+    else if (mid == 151) {   // carbon-carbon: dark, matte, glowing with the heat
+      tx = triSample(lp, ln, M_METAL, 0.5, nT);
+      m.alb = vec3(0.055, 0.055, 0.06)*(0.8 + 0.4*tx.r); m.rough = 0.55; m.metal = 0.1; m.nrm = mix(vec3(0.0, 0.0, 1.0), nT, 0.5);
+      m.emit = glow;
+    }
+    else if (mid == 152) { m.alb = vec3(0.34, 0.23, 0.06); m.metal = 0.95; m.rough = 0.07; }   // the sensor canopy's gold film
+    else if (mid == 153) {   // the nozzles' titanium, heat-tinted toward its exit (blue, violet, straw) with the engines' power
+      tx = triSample(lp, ln, M_METAL, 0.8, nT); m.alb = tx.rgb*vec3(0.24, 0.23, 0.24); m.metal = 0.75; m.rough = 0.42; m.nrm = nT;
+      vec4 ep = exhaustEnginePower(lp.x < 0.0 ? 0 : 1);
+      float aft = smoothstep(7.6, 8.6, lp.z)*(0.4 + 0.6*ep.x);
+      m.alb = mix(m.alb, mix(vec3(0.16, 0.12, 0.22), vec3(0.32, 0.26, 0.14), aft), 0.55*aft);
+    }
+    else if (mid == 154) { m.alb = vec3(0.05); m.rough = 0.2; m.emit = gColStripe*(1.0 + 2.0*uNight)*(0.8 + 0.2*sin(uTime*2.2)); }   // the amber strips
+    else if (mid == 155) { m.alb = vec3(0.018, 0.018, 0.02); m.rough = 0.8; m.metal = 0.2; }   // the inlets' and the duct's insides
+    else if (mid == 156) {   // the rocket's niobium bell: a dull grey, white-hot inside its throat while it burns
+      tx = triSample(lp, ln, M_METAL, 0.6, nT); m.alb = tx.rgb*vec3(0.3, 0.29, 0.31); m.metal = 0.85; m.rough = 0.35; m.nrm = nT;
+      float lit = clamp(gWr[2].x, 0.0, 1.0), throat = smoothstep(8.6, 8.1, lp.z);
+      m.emit = (vec3(1.0, 0.42, 0.12)*0.6*lit + vec3(1.0, 0.85, 0.6)*6.0*lit*throat)*step(length(lp.xy - vec2(0.0, 0.28)), 0.31);
+    }
+    else if (mid == 157) {   // the engines' hot insides, the roll posts: soot-black, red-hot with their thrust
+      vec4 ep = exhaustEnginePower(lp.x < 0.0 ? 0 : 1);
+      m.alb = vec3(0.012, 0.011, 0.012); m.metal = 0.3; m.rough = 0.8;
+      m.emit = (vec3(1.0, 0.32, 0.08)*(0.15*ep.x*ep.x) + mix(vec3(1.0, 0.45, 0.12), vec3(1.0, 0.8, 0.55), ep.y)*ep.y*3.0)*ep.z;
+      if (abs(lp.x) > 2.2) m.emit = vec3(1.0, 0.35, 0.1)*0.6*gWr[0].z*gCtl.w;   // (a roll post's: its jet with the lift fan in)
+    }
+    else if (mid == 158) { tx = triSample(lp, ln, M_METAL, 0.3, nT); m.alb = tx.rgb*vec3(0.55, 0.56, 0.6); m.metal = 0.9; m.rough = 0.25; m.nrm = nT; }   // the fan's blades
+    else {   // 159: a wingtip's lens - red to port, green to starboard (its swing wing carries it: plane_sdf.glsl's lamps leave it out)
+      int li = lp.x < 0.0 ? 0 : 1;
+      m.alb = li == 0 ? vec3(0.25, 0.02, 0.02) : vec3(0.02, 0.22, 0.06); m.metal = 0.0; m.rough = 0.04; m.nrm = vec3(0.0, 0.0, 1.0);
+      if (gOwn) m.emit = li < uLensN ? uLensC[li].rgb : vec3(0.0);
+    }
+  }
+#endif
 #if HAS_FLEET
   else if (FLEET_ON && mid >= 60) {  // light-aircraft / airliner cockpit parts (PBR texture sets)
     vec3 nT; vec4 tx;

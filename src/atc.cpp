@@ -129,7 +129,7 @@ bool AtcVoice::resolveRecorded(const std::string& msg, const std::string& missio
   auto line = [&](const std::string& id) {
     const Clip& c = clips.at(id);
     out.ids = {id};
-    if (c.kind == "line" && (msg.rfind("Gear ", 0) == 0 || msg.rfind("Flaps ", 0) == 0 || msg.rfind("Pods ", 0) == 0 || msg.rfind("Thrust vector ", 0) == 0)) out.group = "lever";   // settings: the newest replaces a waiting one
+    if (c.kind == "line" && (msg.rfind("Gear ", 0) == 0 || msg.rfind("Flaps ", 0) == 0 || msg.rfind("Pods ", 0) == 0 || msg.rfind("Nozzles ", 0) == 0 || msg.rfind("Thrust vector ", 0) == 0)) out.group = "lever";   // settings: the newest replaces a waiting one
     return finish(c.speaker, c.prio);
   };
   // the HUD's compact annunciators are spoken as their fuller recorded lines

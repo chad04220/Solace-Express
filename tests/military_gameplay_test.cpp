@@ -645,30 +645,32 @@ struct GameTest {
           near(m.config.scanSeconds,definition.scanSeconds),"noncombat XR mission has authored sensors and no compulsory pursuers "+std::to_string(missionId));
         for(int i=0;i<m.config.objectiveCount;++i) {
           const vec3 site=m.config.objectives[i].position;
-          const float high=missionId==military::HighAltitudeIntel?4500.f-site.y:missionId==military::HoverScan?75.f:350.f;
-          const float ahead=missionId==military::HighAltitudeIntel?2500.f:missionId==military::HoverScan?120.f:450.f;
+          // (the two high sorties: the XR-30's and the XR-50's - each envelope's low, high and slow sides, by ground speed)
+          const bool hiAlt=missionId==military::HighAltitudeIntel,strat=missionId==military::StratosphericRecon,hover=missionId==military::HoverScan;
+          const float high=hiAlt?4500.f-site.y:strat?6500.f-site.y:hover?75.f:350.f;
+          const float ahead=hiAlt?2500.f:strat?5000.f:hover?120.f:450.f;
+          const float fast=hiAlt?200.f:strat?700.f:0.f;
           auto aim=[&](float altitude,float speed,float distance=-1.f) {
             if(distance<0)distance=ahead;
             g.plane.pos=site+vec3(0,altitude,distance);g.plane.vel=vec3(0,0,-speed);
             g.plane.q=quat::axisAngle(vec3(1,0,0),-atan2f(altitude,distance));
           };
-          if(i==0 && (missionId==military::HighAltitudeIntel || missionId==military::HoverScan)) {
+          if(i==0 && (hiAlt || strat || hover)) {
             const float scan=m.config.objectives[i].scan;
-            aim(high,missionId==military::HighAltitudeIntel?100.f:20.f);
+            aim(high,hiAlt?100.f:strat?300.f:20.f);
             for(int n=0;n<60;++n)g.updateHive(dt);
             check(near(m.config.objectives[i].scan,scan),"sensor rejects unsuitable actual aircraft speed "+std::to_string(missionId));
-            aim(high,0);g.plane.vel=vec3(0,missionId==military::HighAltitudeIntel?220.f:20.f,0);
+            aim(high,0);g.plane.vel=vec3(0,hiAlt?220.f:strat?700.f:20.f,0);
             for(int n=0;n<60;++n)g.updateHive(dt);
             check(near(m.config.objectives[i].scan,scan),"vertical motion cannot bypass reconnaissance speed requirements "+std::to_string(missionId));
-            aim(missionId==military::HighAltitudeIntel?3000.f-site.y:20.f,missionId==military::HighAltitudeIntel?200.f:0.f);
+            aim(hiAlt?3000.f-site.y:strat?4500.f-site.y:20.f,fast);
             for(int n=0;n<60;++n)g.updateHive(dt);
             check(near(m.config.objectives[i].scan,scan),"sensor rejects aircraft below the required altitude envelope "+std::to_string(missionId));
-            aim(missionId==military::HighAltitudeIntel?6600.f-site.y:140.f,missionId==military::HighAltitudeIntel?200.f:0.f,
-                missionId==military::HighAltitudeIntel?1000.f:ahead);
+            aim(hiAlt?6600.f-site.y:strat?8500.f-site.y:140.f,fast,hiAlt?1000.f:strat?3000.f:ahead);
             for(int n=0;n<60;++n)g.updateHive(dt);
             check(near(m.config.objectives[i].scan,scan),"sensor rejects aircraft above the required altitude envelope "+std::to_string(missionId));
           }
-          aim(high,missionId==military::HighAltitudeIntel?200.f:0.f);
+          aim(high,fast);
           for(int n=0;n<int(definition.scanSeconds/dt)+30 && !m.config.objectives[i].scanned;++n)g.updateHive(dt);
           check(m.config.objectives[i].scanned && !g.militarySiteLabels[i].empty(),
             "XR sensors complete real labeled site dwell "+std::to_string(missionId)+"/"+std::to_string(i));
@@ -855,22 +857,22 @@ struct GameTest {
 
     // Board selection is bounded to actual supplied XR aircraft. Enemy roles never become player aircraft.
     {
-      auto q=make(military::CommandStrike);Game& g=*q;const std::string before=snapshot(g.career);const auto screen=g.screen;
+      auto q=make(military::StratosphericRecon);Game& g=*q;const std::string before=snapshot(g.career);const auto screen=g.screen;   // (the board's last sortie: every one unlocked)
       for(int invalid:{-1,military::kMissionCount,9999})g.launchMilitary(invalid);
       check(g.screen==screen && !g.militaryFlight && snapshot(g.career)==before,"invalid military mission IDs cannot launch or commit an attempt");
-      bool research[4]={};bool legal=true;
+      bool research[5]={};bool legal=true;
       for(int id:military::kBoardMissionIds) {
         const auto& d=*military::mission(id);const auto c=g.career.militaryContract(id);
         legal&=validAircraft(d.aircraft) && isResearchAircraft(d.aircraft) && c.forceAircraft==d.aircraft;
-        for(int i=0;i<4;++i)research[i]|=d.aircraft==kResearchAircraft[i];
+        for(int i=0;i<5;++i)research[i]|=d.aircraft==kResearchAircraft[i];
         for(int craft=-1;craft<=kAircraftCount+4;++craft)
           legal&=g.career.canFly(c,craft)==(craft==d.aircraft?Career::SRC_MILITARY:Career::SRC_NONE);
         g.militarySelection=id;g.resCraft=(d.aircraft==kSomnus?kVigil:kSomnus);
         FrameParams preview;g.militaryPreviewCamera(preview);
         legal&=preview.plane.model==d.aircraft && preview.enemyN==0 && preview.trafficN==0;
       }
-      check(legal && research[0] && research[1] && research[2] && research[3],
-        "military board covers all four XR models and admits only the exact player loaner, never enemy roles");
+      check(legal && research[0] && research[1] && research[2] && research[3] && research[4],
+        "military board covers all five XR models and admits only the exact player loaner, never enemy roles");
       check(snapshot(g.career)==before,"previewing every loaner is read-only to the whole career");
     }
 
@@ -1106,7 +1108,7 @@ struct GameTest {
           const auto f=focused(0x6D1000u+row);const auto L=g.militaryLayout();
           inBounds&=f!=g.focusList.end() && f->x>=0 && f->y>=L.top && f->x+f->w<=g_ren.W && f->y+f->h<=L.bot;
         }
-        check(keyboard && inBounds,"keyboard walks and selects all nine military rows with focused row kept visible at "+std::to_string(size.first));
+        check(keyboard && inBounds,"keyboard walks and selects all ten military rows with focused row kept visible at "+std::to_string(size.first));
         for(int row=military::kBoardMissionCount-2;row>=0;--row) {
           g.in.pad=true;g.in.buttonsPressed=PAD_UP;frame();controller&=g.focusId==0x6D1000u+row;
           g.in.buttonsPressed=PAD_A;frame();controller&=g.militarySelection==military::kBoardMissionIds[row] && g.screen==SCR_HUB;
@@ -1404,7 +1406,7 @@ struct GameTest {
         g.in.pad=false;g.padActive=false;g.focusNav=false;g.in.mx=g.in.my=-100;
         g.practiceForward=hive::ForwardSet::Kinetic;g.practiceBomb=hive::BombSet::EMP;g.practiceWave=3;
         const auto chosen=values();bool preserved=true;
-        for(int n=0;n<4;++n) {
+        for(int n=0;n<int(std::size(kResearchAircraft));++n) {   // (once round the research craft, back to the XR-40)
           g.in.pressed[K_TAB]=true;frame();frame();FrameParams fp{};g.researchPreviewCamera(fp);
           preserved&=values()==chosen && fp.plane.model==g.resCraft &&
             (g.resCraft==kSomnus ? visible(control(kitIds[0])) : !control(kitIds[0]).id);

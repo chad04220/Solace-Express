@@ -27,6 +27,12 @@ const int PT_YOKE_SHAFT = 0, PT_YOKE_WHEEL = 1, PT_PEDAL = 2, PT_THR_KNOB = 3, P
 #if !defined(PART_BAKE) || (!defined(AF_LIGHT) && !defined(AF_JET))
 const int PT_WR_KINETIC = 47, PT_WR_CHARGED = 48, PT_WR_PENETRATOR = 49, PT_WR_EMP = 50;
 #endif
+#if HAS_MORPHEUS
+// the XR-50's (morpheus_sdf.glsl mrPartField, posed by mrPartPose): per side its swing wing's panel and flaperon, its
+// all-moving V-tail surface, its vectoring nozzle and the lift fan's bottom door; the fan and its top door
+const int PT_MR_WING = 51, PT_MR_FLAPERON = 52, PT_MR_TAIL = 53, PT_MR_NOZZLE = 54, PT_MR_FANDOOR = 55, PT_MR_FAN = 56, PT_MR_FANBOT = 57;
+bool partIsMorpheus(int k){ return k >= PT_MR_WING && k <= PT_MR_FANBOT; }
+#endif
 bool partIsJet(int k){ return (k >= PT_JT_ELEVON && k <= PT_JT_RUDDER) || (k >= PT_JT_NOZZLE && k <= PT_JT_DOORN); }
 bool partIsSomnus(int k){ return (k >= PT_WR_PODF && k <= PT_WR_RUDV) || k == PT_WR_ACT || (k >= PT_WR_KINETIC && k <= PT_WR_EMP); }
 const vec3 WRP_POD[4] = vec3[4](vec3(-2.35, -0.08, -3.3), vec3(2.35, -0.08, -3.3), vec3(-2.75, 0.05, 3.45), vec3(2.75, 0.05, 3.45));   // (somnus_sdf.glsl WR_POD)
@@ -642,11 +648,57 @@ Pose partPoseCockpit(int k, vec2 sd){
   else if (k == PT_WR_PEDAL) {
     X.R = mat3(sd.x, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
     bool nocturne=int(gM[0].z+.5)==5;
+#if HAS_MORPHEUS
+    nocturne=nocturne||int(gM[0].z+.5)==7;   // (the XR-50 flies the XR-30's sealed pod)
+#endif
     X.T = E.xyz + (nocturne?vec3(sd.x*.145,-.820,-.73-sd.x*cYaw*.055):vec3(sd.x*.16,-.675,-.78-sd.x*cYaw*.04));   // (right rudder, yaw > 0, pushes the right pedal forward, -z: it pulled it back)
   }
 #endif
   return X;
 }
+#if HAS_MORPHEUS
+// ---- the XR-50 Morpheus (aircraft.h kMorpheus*): its swing wings' pivots and their sweep range, the V-tail's roots and
+// cant, the nozzles' swivels, the lift fan's openings. Its state (game.cpp fillPlaneVisual): gWr[0] the wing's sweep, its
+// flaps, the fan's doors and the fan's angle; gWr[1] the nozzles' swivel, each one's pitch (left, right) and their yaw;
+// gWr[2] the rocket's flame, the leading edges' glow, the scram and ram combustion; gWr[3] the reaction jets
+const vec3 MR_PIVOT = vec3(2.1, -0.06, -0.4), MR_TAILROOT = vec3(1.02, 0.40, 7.05), MR_NOZZLE = vec3(0.78, -0.02, 7.4), MR_FAN = vec3(0.0, 0.05, -5.0);
+const float MR_SWEEP_MIN = 0.27925268, MR_SWEEP_MAX = 1.18682389, MR_CANT = 0.8377580;   // (16 and 68 deg; the V-tail 48 deg off the vertical)
+const float MR_FAN_TOP = 0.84, MR_FAN_BOT = -0.72, MR_FAN_R = 0.62;   // (the fan's duct: its openings' heights, its radius)
+// the engine shoulders' upper skin at (x, z): an ellipsoid each side, where the mains lie folded (mapMorpheus draws it)
+float mrShoulderTop(float x, float z){
+  vec2 e = vec2((abs(x) - 1.35)/0.85, (z - 2.4)/5.2);
+  return -0.10 + 0.42*sqrt(max(1.0 - dot(e, e), 0.0));
+}
+float mrSweep(){ return clamp(gWr[0].x, MR_SWEEP_MIN, MR_SWEEP_MAX); }
+// the wing panel: its frame (x along its span from the pivot, z aft, unswept) swung aft about the pivot; mirrored left
+Pose mrWingPose(float side){ mat3 S = partMirror(side); Pose X; X.R = S*partRxz(mrSweep()); X.T = S*MR_PIVOT; return X; }
+Pose mrPartPose(int k, vec2 sd){
+  float cPitch = gCtl.x, cRoll = gCtl.y, cYaw = gCtl.z;
+  mat3 S = partMirror(sd.x);
+  Pose X; X.R = mat3(1.0); X.T = vec3(0.0);
+  if (k == PT_MR_WING) return mrWingPose(sd.x);
+  if (k == PT_MR_FLAPERON) {   // hinged at 75% of the panel's chord: down with the flaps (26 deg), up and down with the roll
+    mat3 Ar = mat3(1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0); vec3 a = vec3(0.0, 0.8, 0.0);   // (span, chord from the LE, thickness)
+    mat3 D; vec3 d; surfDefl(5.8, 2.4, 1.0, 0.0, 0.75, gWr[0].y*0.45 - cRoll*sd.x*0.35, 0.0, D, d);
+    return poseMul(mrWingPose(sd.x), surfPoseAffine(Ar, Ar, a, D, d));
+  }
+  if (k == PT_MR_TAIL) {   // all-moving about its span: together for pitch, apart for yaw
+    float C = cos(MR_CANT), Sn = sin(MR_CANT);
+    mat3 Rc = mat3(Sn, C, 0.0, -C, Sn, 0.0, 0.0, 0.0, 1.0);   // (its span up and out, its thickness across, its chord aft)
+    X.R = S*Rc*partRyz(-cPitch*0.35 + cYaw*sd.x*0.3); X.T = S*MR_TAILROOT;
+    return X;
+  }
+  if (k == PT_MR_NOZZLE) {   // swivelled down and vectored in pitch about its front, in yaw about its own axis
+    float a = gWr[1].x + (sd.x < 0.0 ? gWr[1].y : gWr[1].z);
+    X.R = S*partRyz(a)*partRxz(sd.x*gWr[1].w); X.T = S*MR_NOZZLE;
+    return X;
+  }
+  if (k == PT_MR_FANDOOR) { X.R = partRyz(gWr[0].z*1.22); X.T = vec3(0.0, MR_FAN_TOP, MR_FAN.z + 0.68); return X; }   // (hinged aft, opening 70 deg into the airflow)
+  if (k == PT_MR_FAN) { X.R = partRxz(gWr[0].w); X.T = MR_FAN; return X; }
+  if (k == PT_MR_FANBOT) { X.R = S*partRxy(gWr[0].z*1.48); X.T = S*vec3(MR_FAN_R + 0.02, MR_FAN_BOT, MR_FAN.z); return X; }   // (hinged outboard, swinging down 85 deg)
+  return X;
+}
+#endif
 // The research jets' retracting tricycle gear (the XR-30's and the XR-40's, under their own airframes). The mains swing
 // into the wing with the wheel turned flat (gearSwingR): the XR-30's aft (its main stands just behind the swept
 // leading edge), the XR-40's forward, its leg raked aft at rest so the wheel comes to lie where the wing is thicker.
@@ -670,6 +722,9 @@ float jtBelly(float z, float x){
 // the jet's wing's upper skin at span x, body z (sdPanel's frame and sizes: plane_sdf.glsl mapJet, somnus_sdf.glsl
 // mapSomnus with wrSection's centre line)
 float jtWingTop(float x, float z){
+#if HAS_MORPHEUS
+  if (int(gM[0].z + 0.5) == 7) return mrShoulderTop(x, z);   // (the XR-50's mains fold into its engine shoulders)
+#endif
   bool wr = int(gM[0].z + 0.5) == 6;
   float s = wr ? x - 1.0 : x, c = wr ? z + 3.0 : z + 1.6;
   float span = wr ? 5.2 : 5.6, rc = wr ? 8.2 : 7.2, tc = wr ? 1.35 : 1.2, sweep = wr ? 4.7 : 5.6, th = wr ? 0.035 : 0.04;
@@ -776,6 +831,9 @@ Pose partPose(int k, vec2 sd){
 #if HAS_SOMNUS
   if (partIsSomnus(k)) return wrPartPose(k, sd);
 #endif
+#if HAS_MORPHEUS
+  if (partIsMorpheus(k)) return mrPartPose(k, sd);
+#endif
 #if HAS_RESEARCH
   if (partIsJet(k)) return jtPartPose(k, sd);
 #endif
@@ -791,6 +849,9 @@ Pose partPose(int k, vec2 sd){
 vec2 gearPartField(int k, vec3 l);   // (plane_sdf.glsl)
 vec2 wrPartField(int k, vec3 l);   // (somnus_sdf.glsl)
 vec2 jtPartField(int k, vec3 l);   // (plane_sdf.glsl)
+#if HAS_MORPHEUS
+vec2 mrPartField(int k, vec3 l);   // (morpheus_sdf.glsl)
+#endif
 #endif
 // each part's shape in its own frame: distance and material id (the cockpit's controls and the light aircraft's surfaces)
 vec2 partFieldCockpit(int k, vec3 l){
@@ -891,6 +952,9 @@ vec2 partFieldCockpit(int k, vec3 l){
     float ped = max(sdBox(l, vec3(0.05, 0.075, 0.012)), (abs(l.x) + abs(l.y))*0.70711 - 0.08);
     ped = min(ped, sdCapsule(l, vec3(0.0, -0.07, 0.02), vec3(0.0, -0.09, 0.1), 0.012));
     res = vec2(ped, int(gM[0].z+.5)==5?47.0:71.0);
+#if HAS_MORPHEUS
+    if (int(gM[0].z+.5)==7) res.y = 47.0;   // (the XR-30's pod's pedals)
+#endif
   }
   if(compactTwinPowerBank() && (k==PT_THR_LEVER || k==PT_FLAP_LEVER)){
     res=opU(res,vec2(sdCylX(l,.016,.010),60.0));
@@ -904,6 +968,9 @@ vec2 partFieldCockpit(int k, vec3 l){
 vec2 partField(int k, vec3 l){
 #if HAS_SOMNUS
   if (partIsSomnus(k)) return wrPartField(k, l);
+#endif
+#if HAS_MORPHEUS
+  if (partIsMorpheus(k)) return mrPartField(k, l);
 #endif
 #if HAS_RESEARCH
   if (partIsJet(k)) return jtPartField(k, l);

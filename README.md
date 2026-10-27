@@ -174,9 +174,11 @@ with your inputs.
 | Kittiwake A9 | Single-turboprop amphibian | 9 / 900 kg | 1,450 km | 165 kt | 600 m paved, or a water lane | CPL |
 
 The numbers are what each aircraft actually does in the flight model, measured by flying it (`flight_test --table`).
-The tanks are real: three to seven hours of fuel for each career type (docs/FUEL.md). Four research craft sit beyond the career:
-the XR-10 Vigil, the XR-20 Reverie, the XR-30 Nocturne (Mach 2.85, thrust vectoring) and the XR-40 Somnus (Mach 4.4,
-four tilting thruster pods, a cloak, lasers and plasma bombs).
+The tanks are real: three to seven hours of fuel for each career type (docs/FUEL.md). Five research craft sit beyond the career:
+the XR-10 Vigil, the XR-20 Reverie, the XR-30 Nocturne (Mach 2.85, thrust vectoring), the XR-40 Somnus (Mach 4.4,
+four tilting thruster pods, a cloak, lasers and plasma bombs) and the XR-50 Morpheus: a swing-wing waverider that
+takes off vertically on a lift fan and swivelling nozzles, crosses Mach 7 on its scramjets at 27 km and climbs to
+84 km on its rocket, its leading edges glowing at 1,600 °C (docs/XR50.md).
 
 ### Flying
 
@@ -306,7 +308,8 @@ Menus work with the mouse or a gamepad (the left stick moves a cursor, **A** cli
 - Hold **O + P** for a second and the Nocturne display pair joins you for a show all the way to your destination.
 - Hold **U + I** on the main menu (or click both sticks) to open the Project NIGHTGLASS research terminal. It gets a
   menu entry once you hold the Airline Transport licence. The XR-40 Somnus: **F / V** tilt the pods, **X** cloaks,
-  **Y** arms the lasers and the bomb bay.
+  **Y** arms the lasers and the bomb bay. The XR-50 Morpheus: **F / V** swivel the nozzles (the lift fan comes in with
+  them), **X** or a double tap of the brake lights the rocket, and a full pull through the stick's stop goes post-stall.
 
 </details>
 

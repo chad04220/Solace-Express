@@ -67,13 +67,13 @@ class MeshToolTests(unittest.TestCase):
         self.raw.mkdir()
         self.source = {"schema": 1, "digest": "22" * 32, "geometry_digest": "11" * 32,
                        "files": [{"path": "fixture", "sha256": "33" * 32, "kind": "cpu"}]}
-        self.roster = [(f"model_{i}", f"Aircraft {i}") for i in range(16)]
+        self.roster = [(f"model_{i}", f"Aircraft {i}") for i in range(assets.MODEL_COUNT)]
         self.report = {"schema": 1, "complete": True, "full_quality": True,
                        "implementation": assets.IMPLEMENTATION, "source_digest": self.source["digest"],
                        "geometry_digest": self.source["geometry_digest"], "format_version": 1,
-                       "algorithm_version": 24, "asset_count": 32,
+                       "algorithm_version": 24, "asset_count": assets.MODEL_COUNT * 2,
                        "gl": {"vendor": "Fixture", "renderer": "Fixture GPU", "version": "3.3"}, "files": []}
-        for model in range(16):
+        for model in range(assets.MODEL_COUNT):
             for slot in (0, 1):
                 filename, data = mesh_bytes(model, slot)
                 (self.raw / filename).write_bytes(data)
@@ -117,11 +117,11 @@ class MeshToolTests(unittest.TestCase):
         self.assertEqual(first.read_bytes(), second.read_bytes())
         output = self.root / "release" / "aircraft"
         manifest = assets.extract(first, output, self.source, self.roster)
-        self.assertEqual(manifest["asset_count"], 32)
+        self.assertEqual(manifest["asset_count"], assets.MODEL_COUNT * 2)
         for entry in self.report["files"]:
             self.assertEqual((self.raw / entry["file"]).read_bytes(), (output / entry["file"]).read_bytes())
         with zipfile.ZipFile(first) as archive:
-            self.assertEqual(len(archive.infolist()), 34)
+            self.assertEqual(len(archive.infolist()), assets.MODEL_COUNT * 2 + 2)
             self.assertTrue(all(item.date_time == (1980, 1, 1, 0, 0, 0) for item in archive.infolist()))
 
     def test_failed_bundle_preserves_existing_output(self):
@@ -212,7 +212,7 @@ class MeshToolTests(unittest.TestCase):
 
     def test_version_quality_reserved_and_count_bounds(self):
         original = self.first_asset().read_bytes()
-        for offset, value in ((8, 2), (12, 196), (16, 0), (20, 23), (24, 16), (28, 2),
+        for offset, value in ((8, 2), (12, 196), (16, 0), (20, 23), (24, assets.MODEL_COUNT), (28, 2),
                               (32, 2), (36, 1), (40, 0xffffffff), (44, 2), (48, 0), (52, 4), (60, 1), (168, 1)):
             self.first_asset().write_bytes(original)
             self.mutate(offset, "<I", value)

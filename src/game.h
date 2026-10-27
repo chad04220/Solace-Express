@@ -700,6 +700,8 @@ private:
   std::string hiveObjectiveText() const;
   void drawCombatPractice(float x, float y, float width);
   void somnusControls(float dt);
+  void morpheusControls(float dt);   // the XR-50's: its rocket (game_morpheus.cpp)
+  int morpheusMode = 0; float morpheusModeT = 0.f; bool morpheusHot = false, morpheusRocketOut = false;   // (what it last announced)
   void updateSomnus(float dt);
   void somnusVisual(FrameParams& fp);
   void buildFeedCameras(FrameParams& fp);
@@ -942,7 +944,10 @@ private:
   int stepResearchSite(int from, int step) const;   // the next launch site that way: the land fields alone (no seaplane base)
   // research test cards: each asks a craft for its limits or exercises one of its systems, step by step. The table is
   // in game_research_ui.cpp; the flight tracks the current step here and a finished card is remembered in settings.cfg.
-  enum ResStepKind { RS_MACH = 0, RS_ALT, RS_G, RS_NEGG, RS_ROLL, RS_SLOW, RS_STALL, RS_CLIMB, RS_HOVER, RS_VLAND, RS_CLOAK, RS_LASER, RS_BOMB, RS_LAND };
+  // (the XR-50's: past an angle of attack, on the scramjets past a Mach number, the rocket lit, back to wingborne flight -
+  // the nozzles aft, the fan out - past an airspeed)
+  enum ResStepKind { RS_MACH = 0, RS_ALT, RS_G, RS_NEGG, RS_ROLL, RS_SLOW, RS_STALL, RS_CLIMB, RS_HOVER, RS_VLAND, RS_CLOAK, RS_LASER, RS_BOMB, RS_LAND,
+                     RS_ALPHA, RS_SCRAM, RS_ROCKET, RS_CONVERT };
   struct ResStep { int kind; float v, hold; const char* label; };
   // (fuelKg: a card built on the fuel gauge launches with that much, the tanks otherwise full: since v4.1 they hold hours)
   struct ResCard { int craft; const char* id; const char* title; const char* brief; ResStep steps[5]; int n; float fuelKg = 0; };

@@ -149,7 +149,7 @@ struct FrameParams {
   WreckVisual wreck;
   FxVisual fx;
   FeedCamera feeds[kMaxFeeds];   // research jets: the cameras whose pictures the cockpit displays show (feed_cameras.h)
-  int feedRig = 0;               // their rig: 0 none, 1 XR-30, 2 XR-40
+  int feedRig = 0;               // their rig: 0 none, 1 XR-30, 2 XR-40, 3 XR-50 (feed_cameras.h)
   int warmCockpit = -1;          // the loading screen: the cockpit's body built now, and this camera rig's mounts (-1 off)
   vec3 landLightPos, landLightDir; float landLight = 0;
   vec3 flameLightPos, flameLight;  // a blast's light (radiance; zero when off), folded into the point lights

@@ -31,6 +31,17 @@ static const vec3 kSomnusWingTip(6.2f, -0.24f, 2.0f);
 // research craft exhaust exits and jet directions (body coords): XR-30 two 2D nozzles, XR-40 four pods.
 // strength: that exhaust's share of the thrust (1 = the XR-30's)
 static int jetExhausts(const Plane& p, vec3* pos, vec3* dir, float* strength) {
+  if (p.spec->special == 3) {   // the XR-50: its two nozzles, swivelled and vectored, and the rocket between them while it burns
+    int n = 0;
+    for (int s = 0; s < 2; s++) {
+      const float sd = s ? 1.f : -1.f, a = p.nzSwivel + p.nzPitch[s], y = p.nzYaw[s];
+      pos[n] = vec3(sd * kMorpheusNozzle.x, kMorpheusNozzle.y, kMorpheusNozzle.z) + vec3(0, -sinf(p.nzSwivel), cosf(p.nzSwivel)) * 1.15f;
+      dir[n] = normalize(vec3(-sinf(y), -sinf(a) * cosf(y), cosf(a) * cosf(y)));
+      strength[n++] = 1.f;
+    }
+    if (p.rocketN > 1.f) { pos[n] = kMorpheusRocket; dir[n] = vec3(0, 0, 1); strength[n++] = clampf(p.rocketN / 270000.f, 0.f, 1.f); }
+    return n;
+  }
   if (p.spec->special == 2) {
     for (int i = 0; i < 4; i++) {
       float a0 = p.podTilt[i], a = a0 + p.podVane[i], y = p.podYaw[i];
@@ -64,7 +75,7 @@ const ActionInfo kActions[ACT_COUNT] = {
   {"radio", "Internet radio", 2, 'R', 0},                       {"anr", "Headset noise cancelling", 2, 'M', PAD_LS},
   {"zoom", "Cockpit zoom (hold; wheel zooms too)", 2, 'U', 0},
   {"photo", "Photo mode", 2, K_F2, 0},   // (not a letter: they are all taken, K by the J + K hold)
-  {"cloak", "Cloak (or double-tap brake)", 3, 'X', 0},          {"weapons", "Weapons hot / safe", 3, 'Y', PAD_Y},
+  {"cloak", "Cloak / XR-50 rocket (or double-tap brake)", 3, 'X', 0},          {"weapons", "Weapons hot / safe", 3, 'Y', PAD_Y},
   {"fire", "Fire lasers (or left mouse)", 3, K_ENTER, PAD_RB},  {"bomb", "Drop bomb (or middle mouse)", 3, K_BACK, PAD_LB},
 };
 
@@ -1824,6 +1835,10 @@ void Game::updateResearchCard(float dt) {
     case RS_LASER: inst = somnus.shots >= (int)st.v; break;
     case RS_BOMB: inst = somnus.dropped >= (int)st.v; break;
     case RS_LAND: { float dA; int ap = g_world.nearestAirport(plane.pos.x, plane.pos.z, &dA); inst = plane.onGround && touchedDown && gs < 2.f && ap == resAirport && dA < g_world.airports[ap].length * 0.5f + 600.f; } break;
+    case RS_ALPHA: inst = air && plane.alpha / DEG >= st.v; break;
+    case RS_SCRAM: { const float tb = plane.tbcc[0] + plane.tbcc[1] + plane.tbcc[2]; inst = air && plane.mach >= st.v && tb > 1.f && plane.tbcc[2] > 0.5f * tb; } break;
+    case RS_ROCKET: inst = plane.rocketN > 1.f; break;
+    case RS_CONVERT: inst = air && plane.nozzle < 0.05f && plane.fanClutch < 0.05f && plane.ias >= st.v; break;
   }
   resHold = inst ? resHold + dt : 0.f;
   if (!inst || resHold < st.hold) return;
@@ -2719,7 +2734,9 @@ void Game::flightControls(float dt) {
   c.trim = clampf(c.trim + tr * 0.35f * dt, -1, 1);
   // flaps
   auto flapToast = [&]() {
-    if (plane.spec->special == 2) toast(flapNotch > 0.99f ? "Pods 90 deg - VTOL hover" : fmt("Pods %d deg", (int)lroundf(flapNotch * 90)), vec3(0.8f, 0.55f, 1));
+    if (plane.spec->special == 3)   // (the XR-50's lever swivels its nozzles; the lift fan comes in with them, slow)
+      toast(flapNotch > 0.99f ? "Nozzles 95 deg, lift fan in - VTOL" : flapNotch > 0.01f ? fmt("Nozzles %d deg, lift fan in - STOVL", (int)lroundf(flapNotch * 95)) : "Nozzles aft - lift fan out", vec3(1.f, 0.72f, 0.3f));
+    else if (plane.spec->special == 2) toast(flapNotch > 0.99f ? "Pods 90 deg - VTOL hover" : fmt("Pods %d deg", (int)lroundf(flapNotch * 90)), vec3(0.8f, 0.55f, 1));
     else toast(fmt("Flaps %d%%", (int)lroundf(flapNotch * 100)), vec3(0.8f, 0.9f, 1));
     if (plane.spec->special == 2 && flapNotch > 0.99f && !plane.apOn)
       toast("VTOL: hold " + actLabel(ACT_THR_UP, padActive, true) + "; release to idle", vec3(0.8f, 0.55f, 1));
@@ -2758,6 +2775,7 @@ void Game::flightControls(float dt) {
     else toast("Autopilot ON: the stick trims heading and altitude, throttle sets speed", vec3(0.6f, 1, 0.6f));
   }
   if (plane.spec->special == 2) somnusControls(dt);
+  else if (plane.spec->special == 3) morpheusControls(dt);
   // on the water the same control moors the aircraft (once all but stopped: the physics makes the lines fast) and
   // casts it off (docs/WINGS_OVER_WATER.md)
   if (actKeyP(ACT_PARK) || actJoyP(ACT_PARK) || (!showMap && actPadP(ACT_PARK))) {
@@ -3236,7 +3254,7 @@ void Game::updateFlight(float dt) {
   if (!plane.onGround && plane.wxl.cloud > 0.03f) vapK = std::max(vapK, 0.35f * smoothstepf(0.03f, 0.3f, plane.wxl.cloud) * smoothstepf(20.f, 50.f, plane.airspeed));   // (in cloud the tips' vortices stir it at any g)
   if (vapK > 0.f || tipOn) {
     if (vapK > 0.f && !tipOn) tipSeg++;
-    vec3 tip = plane.spec->special == 2 ? kSomnusWingTip : plane.spec->special ? kJetWingTip : modelWingTip(kModels[typeOf(plane.spec)]);
+    vec3 tip = plane.spec->special == 3 ? morpheusWingTip(plane.sweep) : plane.spec->special == 2 ? kSomnusWingTip : plane.spec->special ? kJetWingTip : modelWingTip(kModels[typeOf(plane.spec)]);
     for (int sd = 0; sd < 2; sd++) {
       float sx = sd ? 1.f : -1.f;
       TipPt t{plane.pos + plane.q.rotate(vec3(sx * tip.x, tip.y, tip.z + 0.3f)), 0.f, vapK, tipSeg};
@@ -3879,11 +3897,13 @@ void Game::buildLights(FrameParams& fp) {
     }
   }
   // fixture positions (body space)
-  vec3 tip = s.special == 2 ? kSomnusWingTip : s.special ? kJetWingTip : modelWingTip(md);
-  vec3 tail = s.special == 2 ? vec3(0, -0.1f, 7.86f) : s.special ? vec3(0, 0.45f, 7.6f) : modelTailTip(md);
-  vec3 bcn = s.special == 2 ? vec3(0, 0.53f, 1.6f) : s.special ? vec3(0, 0.67f, 1.6f) : modelFinTop(md);
+  const bool xr50 = s.special == 3;   // (its tips swing with its wing)
+  vec3 tip = xr50 ? morpheusWingTip(plane.sweep) : s.special == 2 ? kSomnusWingTip : s.special ? kJetWingTip : modelWingTip(md);
+  vec3 tail = xr50 ? kMorpheusTail : s.special == 2 ? vec3(0, -0.1f, 7.86f) : s.special ? vec3(0, 0.45f, 7.6f) : modelTailTip(md);
+  vec3 bcn = xr50 ? kMorpheusBeacon : s.special == 2 ? vec3(0, 0.53f, 1.6f) : s.special ? vec3(0, 0.67f, 1.6f) : modelFinTop(md);
   vec3 ldg;   // left landing light, in the wing leading edge
-  if (s.special == 2) ldg = vec3(-0.2f, -0.38f, -6.6f);   // XR-40: under the chin, ahead of the pods, turrets and gear
+  if (xr50) ldg = kMorpheusLanding;
+  else if (s.special == 2) ldg = vec3(-0.2f, -0.38f, -6.6f);   // XR-40: under the chin, ahead of the pods, turrets and gear
   else if (s.special) ldg = vec3(-1.8f, -0.26f, 0.15f);
   else { float k = 0.3f, x = md.wing[0] * k; ldg = vec3(-x, md.wing[4] + x * tanf(md.wing[6] * DEG), md.wing[5] + md.wing[3] * k - 0.02f); }
   bool on = plane.engineRunning || plane.onGround;
@@ -4512,6 +4532,19 @@ static void fillPlaneVisual(PlaneVisual& pv, const Plane& p, float propAngle, bo
     pv.flame[1] = std::max(pv.flame[1], pv.exhaust.power[i][1]);
   }
   pv.flame[2] = s.special == 1 ? jetNozzleAngle(p) : 0.f; pv.flame[3] = p.mach;
+  if (s.special == 3) {
+    // the XR-50's state for its own build (plane_sdf.glsl mapMorpheus, plane_parts.glsl mrPartPose read it as gWr): the
+    // wing's sweep, its flaps, the lift fan's doors and its fan; the nozzles' swivel and vectoring; the rocket's flame,
+    // the leading edges' glow (from 900 C), the ram and scram combustion's shares; the reaction jets
+    const float tb = p.tbcc[0] + p.tbcc[1] + p.tbcc[2];
+    pv.wr[0][0] = p.sweep; pv.wr[0][1] = p.hiLift; pv.wr[0][2] = p.fanClutch; pv.wr[0][3] = p.fanAngle;
+    pv.wr[1][0] = p.nzSwivel; pv.wr[1][1] = p.nzPitch[0]; pv.wr[1][2] = p.nzPitch[1]; pv.wr[1][3] = 0.5f * (p.nzYaw[0] + p.nzYaw[1]);
+    pv.wr[2][0] = clampf(p.rocketN / 270000.f, 0.f, 1.f); pv.wr[2][1] = clampf((p.skinT - 1173.f) / (kMorpheusSkinLimit - 1173.f), 0.f, 1.2f);
+    pv.wr[2][2] = tb > 1.f ? p.tbcc[2] / tb : 0.f; pv.wr[2][3] = tb > 1.f ? p.tbcc[1] / tb : 0.f;
+    pv.wr[3][0] = p.rcs.x; pv.wr[3][1] = p.rcs.y; pv.wr[3][2] = p.rcs.z;
+    // (outside, the surfaces as its fly-by-wire deflects them; in the cockpit the stick as the pilot holds it)
+    if (!inside && p.flightTime > 0.f) { pv.Ctl[0] = p.surf.x; pv.Ctl[1] = p.surf.z; pv.Ctl[2] = p.surf.y; }
+  }
 }
 
 FrameParams Game::buildFrame() {
@@ -5478,13 +5511,14 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
     float navI = (0.6f + 2.5f * night) * (1.f - somnus.stealth) * glint;   // a cloaked XR-40 runs dark
     const ModelDef& md = kModels[typeOf(plane.spec)];
     bool jet = s.special != 0;   // the XR-30 is an SDF of its own: its lights don't follow the generic model layout
-    vec3 tip = s.special == 2 ? kSomnusWingTip : jet ? kJetWingTip : modelWingTip(md);
+    const bool xr50 = s.special == 3;
+    vec3 tip = xr50 ? morpheusWingTip(plane.sweep) : s.special == 2 ? kSomnusWingTip : jet ? kJetWingTip : modelWingTip(md);
     vec3 lt = plane.pos + plane.q.rotate(vec3(-tip.x, tip.y, tip.z)), rtp = plane.pos + plane.q.rotate(tip);
     if (camMode != 1) {
       bill(add, lt, ls, vec3(1.f, 0.1f, 0.05f) * navI, 1, SPR_GLOW, 0.3f);
       bill(add, rtp, ls, vec3(0.1f, 1.f, 0.2f) * navI, 1, SPR_GLOW, 0.3f);
-      bill(add, plane.pos + plane.q.rotate(s.special == 2 ? vec3(0, -0.1f, 7.93f) : jet ? vec3(0, 0.45f, 7.67f) : modelTailTip(md)), ls, vec3(1.f) * navI, 1, SPR_GLOW, 0.3f);
-      if (plane.engineRunning && somnus.stealth < 0.5f && fmodf(t, 1.0f) < 0.12f) bill(add, plane.pos + plane.q.rotate(s.special == 2 ? vec3(0, 0.6f, 1.6f) : jet ? vec3(0, 0.74f, 1.6f) : modelFinTop(md) + vec3(0, 0.06f, 0)), ls * 1.6f, vec3(1.f, 0.05f, 0.02f) * (2.f + 3.f * night) * glint, 1, SPR_GLOW, 0.3f);
+      bill(add, plane.pos + plane.q.rotate(xr50 ? kMorpheusTail + vec3(0, 0, 0.07f) : s.special == 2 ? vec3(0, -0.1f, 7.93f) : jet ? vec3(0, 0.45f, 7.67f) : modelTailTip(md)), ls, vec3(1.f) * navI, 1, SPR_GLOW, 0.3f);
+      if (plane.engineRunning && somnus.stealth < 0.5f && fmodf(t, 1.0f) < 0.12f) bill(add, plane.pos + plane.q.rotate(xr50 ? kMorpheusBeacon + vec3(0, 0.07f, 0) : s.special == 2 ? vec3(0, 0.6f, 1.6f) : jet ? vec3(0, 0.74f, 1.6f) : modelFinTop(md) + vec3(0, 0.06f, 0)), ls * 1.6f, vec3(1.f, 0.05f, 0.02f) * (2.f + 3.f * night) * glint, 1, SPR_GLOW, 0.3f);
       float st = fmodf(t, 1.3f);
       if (!plane.onGround && somnus.stealth < 0.5f && (st < 0.05f || (st > 0.12f && st < 0.16f))) { bill(add, lt, ls * 3.f, vec3(4.f) * glint, 1, SPR_GLOW, 0.3f); bill(add, rtp, ls * 3.f, vec3(4.f) * glint, 1, SPR_GLOW, 0.3f); }
     }
@@ -6694,9 +6728,9 @@ void Game::debugScene(const std::string& name) {
     printf("pad: A skips the career crash to the results: %s\n", wasCrash && screen == SCR_DEBRIEF ? "ok" : "FAIL");
     return;
   }
-  if (name == "research" || name == "research40" || name == "research10" || name == "research20") {   // the terminal, settled (selection decrypted)
+  if (name == "research" || name == "research40" || name == "research10" || name == "research20" || name == "research50") {   // the terminal, settled (selection decrypted)
     screen = SCR_RESEARCH; realTime = 30; resOpened = 20; resAuthed = true;
-    resCraft = name == "research40" ? kSomnus : name == "research10" ? kVigil : name == "research20" ? kReverie : kResearchJet; resLastCraft = resCraft; resSelT = 20; resAirport = std::max(0, g_world.findAirport("CAP"));
+    resCraft = name == "research40" ? kSomnus : name == "research10" ? kVigil : name == "research20" ? kReverie : name == "research50" ? kMorpheus : kResearchJet; resLastCraft = resCraft; resSelT = 20; resAirport = std::max(0, g_world.findAirport("CAP"));
     resSeqOpened = resOpened; resSeq = realTime - resOpened; resSeqAt = realTime; resWarm = false; resWork = 1.f;   // (the boot sequence's own clock long past the shutters: drawResearch)
     return;
   }
@@ -7264,7 +7298,7 @@ void Game::debugScene(const std::string& name) {
   // loading-screen pictures (--loadshots): loadshot_<CODE> an airport from an elevated three-quarter view with the aircraft
   // on its runway; loadshot_air_<n> aircraft n in flight, filmed from alongside. Afternoon light, a little cloud.
   if (name.compare(0, 13, "loadshot_air_") == 0) {
-    static const char* kSpot[kAircraftCount] = {"MDB", "PMB", "ORC", "KLO", "FJH", "CAP", "PVI", "VCF", "LHK", "SMP", "GLS", "NPT", "HFS", "ORC", "CAP", "GLR"};   // a different place each (the Kittiwake low over the sea by Gull Rock)
+    static const char* kSpot[kAircraftCount] = {"MDB", "PMB", "ORC", "KLO", "FJH", "CAP", "PVI", "VCF", "LHK", "SMP", "GLS", "NPT", "HFS", "ORC", "CAP", "GLR", "FJH"};   // a different place each (the Kittiwake low over the sea by Gull Rock, the XR-50 over the fjord)
     int n = std::clamp(atoi(name.c_str() + 13), 0, kAircraftCount - 1);
     resCraft = n; resAirborne = true; resTime = 16.3f; resWx = 0; resAirport = std::max(0, g_world.findAirport(kSpot[n]));
     launchResearch();
@@ -7591,6 +7625,7 @@ void Game::setupMilitaryEncounter() {
   // Separate insertion and objective areas. Mission positions remain canonical over world seams.
   vec3 origin=plane.pos; origin.y=std::max(origin.y,g_world.height(origin.x,origin.z)+650.f);
   if(mission->id==military::HighAltitudeIntel) origin.y=4500.f;
+  if(mission->id==military::StratosphericRecon) origin.y=6500.f;
   camPos+=origin-plane.pos; // Keep the flight camera with the supplied insertion altitude.
   plane.pos=origin;
   hive::MissionConfig m; m.extraction=origin; m.extractionRadius=300;
@@ -7709,11 +7744,11 @@ std::string Game::hiveObjectiveText() const {
     for(int i=0;i<m.config.objectiveCount;++i) { const auto& o=m.config.objectives[i]; n+=o.scanned; if(!o.scanned) { float d=length(hiveCombat.displacement(plane.pos,o.position)); if(d<nearest) { nearest=d; target=i+1; scan=o.scan; } } }
     const auto* spec=military::missionForContract(contract.type);
     // Mandatory sensor conditions lead the HUD line: long site names are ellipsized by the flight UI.
-    if(spec && spec->id==military::HighAltitudeIntel) {
-      if(plane.pos.y<spec->minAltitude) return "SCAN PAUSED / CLIMB TO 3500 m MSL";
-      if(plane.pos.y>spec->maxAltitude) return "SCAN PAUSED / DESCEND BELOW 6500 m MSL";
+    if(spec && military::groundSpeedSortie(spec->id)) {
+      if(plane.pos.y<spec->minAltitude) return fmt("SCAN PAUSED / CLIMB TO %.0f m MSL",spec->minAltitude);
+      if(plane.pos.y>spec->maxAltitude) return fmt("SCAN PAUSED / DESCEND BELOW %.0f m MSL",spec->maxAltitude);
       const float speed=sqrtf(plane.vel.x*plane.vel.x+plane.vel.z*plane.vel.z);
-      if(speed<spec->minSpeed) return fmt("SCAN PAUSED / SPEED %.0f kt / NEED 350+",speed*MS_TO_KT);
+      if(speed<spec->minSpeed) return fmt("SCAN PAUSED / SPEED %.0f kt / NEED %.0f+",speed*MS_TO_KT,spec->minSpeed*MS_TO_KT);
     }
     if(spec && spec->id==military::HoverScan) {
       const float speed=length(plane.vel), above=plane.pos.y-m.config.objectives[0].position.y;
@@ -7791,7 +7826,7 @@ void Game::updateHive(float dt) {
   if(militaryFlight) {
     const auto* mission=military::missionForContract(contract.type);
     const float roof=hiveCombat.mission.config.objectiveCount?hiveCombat.mission.config.objectives[0].position.y:0.f;
-    const float speed=mission && mission->id==military::HighAltitudeIntel?sqrtf(plane.vel.x*plane.vel.x+plane.vel.z*plane.vel.z):length(plane.vel);
+    const float speed=mission && military::groundSpeedSortie(mission->id)?sqrtf(plane.vel.x*plane.vel.x+plane.vel.z*plane.vel.z):length(plane.vel);
     p.scanning=mission && military::sensorEnvelope(*mission,plane.pos.y,speed,roof);
   }
   p.up=plane.up();

@@ -1,3 +1,36 @@
+## What's new in the next release: the XR-50 Morpheus
+
+The fifth research craft, and the one the others lead to. It takes off vertically, swings its wings back past the
+speed of sound, crosses Mach 7 on its scramjets in the narrow corridor between too thick and too thin, and lights a
+rocket that carries it to the edge of space. Everything below is measured by flying it in the flight model
+(docs/XR50.md).
+
+### The aircraft
+- **A swing-wing waverider.** A flat-bottomed forebody that rides its own shock, a thick glove to the wing pivots,
+  and outer panels the flight computer sweeps from 16 degrees (take-off, hover, landing) to 68 (past Mach 1.45). Span
+  15.5 m forward, 9.1 m swept. An all-moving V-tail. The canopy is pitched along the forebody's own line, rising out of
+  the nose without a step and fairing back into the spine.
+- **Three engines in two, and a rocket.** Turbofans with reheat to Mach 3.3, ramjets through Mach 5, scramjets to
+  Mach 7.1 at 27 km. Their thrust comes from the air the inlets capture, so low down they run out of thrust before
+  the heat would stop them. Between them a rocket with 3,400 kg of liquid oxygen: from the scramjet corridor it climbs
+  to 84 km.
+- **Vertical flight.** A shaft-driven lift fan behind the cockpit and nozzles that swivel 95 degrees down, balanced in
+  pitch at every setting, with roll posts under the gloves. It holds a hover to within 20 cm.
+- **Control from whatever has it.** The fly-by-wire asks for moments and takes them from the control surfaces, then
+  20 degrees of thrust vectoring in pitch and yaw, then the fan and posts, then reaction jets where the air is too
+  thin. It pulls 11 g; pulled through the stick's stop, it goes post-stall to 80 degrees.
+- **Heat is the limit.** The carbon-carbon leading edges glow with their temperature. Mach 7.3 at 24 km burns them
+  through in under two minutes; at 29 km the same speed is safe. The LEAD EDGE tile shows which side you're on.
+- **Endurance.** 8,200 kg of fuel: 22 minutes on the scramjets, five and a half hours at Mach 0.9 cruise.
+
+### Flying it
+- **F / V** swivel the nozzles; below Mach 0.45 the lift fan comes in with them. **X**, or a double tap of the brake,
+  lights the rocket. Nyx calls the engine modes, the rocket and the nozzles.
+- **Four test cards** on the research terminal: vertical flight and conversion, the scramjet corridor, the edge of
+  space, and post-stall.
+- **A tenth military sortie**, the last on the board: a supersonic sweep of three airfields at Mach 2 from 5,000 to
+  8,000 m.
+
 ## What's new in v4.1.0: Real fuel, floats for your aircraft, the mechanic, and the hangar at the airport
 
 Every aircraft now carries real fuel, so a long haul across the real Earth is a matter of tanks. Six of the aircraft
