@@ -7,11 +7,12 @@
 //! XR-30 pod). The cut-out was a pass of the triangles the bake labelled as screens: its edge came out a row of
 //! triangle teeth, and the depth it was compared with - interpolated in log space across the large flat triangles of
 //! the walls behind - let whole wall panels through at some angles (the owner's report on the XR-40).
-#ifndef SOMNUS_ON   // (the build's aircraft: plane_common.glsl; the depth pre-pass, without it, keeps both jets)
+#ifndef SOMNUS_ON   // (the build's aircraft: plane_common.glsl; the depth pre-pass, without it, keeps all three)
 #define SOMNUS_ON true
 #define JET_ON true
 #define HAS_SOMNUS 1
 #define HAS_JET 1
+#define HAS_MORPHEUS 1
 #endif
 const float kWinGlass = 0.004, kWinFrameTop = 0.019, kWinBand = 0.023;
 // A line of sight is cut only where it comes down into the opening inside the outline at the frame's top and is still
@@ -46,9 +47,21 @@ bool winFrontCut(vec3 q, bool inFront){
   vec3 p = winCylAt(q, WF_R - kWinGlass, false);
   return wrFrontShape(p, wrFront(p).xy) < 0.0;
 }
-// model: 5 the XR-30, 6 the XR-40; bomb: the XR-40's floor panes show the bomb camera (kept); part: a moving part
+// the XR-50's station: its four camera monitors (the telemetry strip draws its own page)
+bool morpheusWindowCut(vec3 q, bool inFront){
+  for (int i = 0; i < 4; i++) {
+    ResearchPanel P = morpheusPane(i);
+    if (winPaneCut(q, P.c, P.n, vec3(0.0, 1.0, 0.0), P.h, P.corner, inFront)) return true;
+  }
+  return false;
+}
+// model: 5 the XR-30, 6 the XR-40, 7 the XR-50; bomb: the XR-40's floor panes show the bomb camera (kept); part: a
+// moving part
 bool cabinWindowCut(vec3 q, int model, bool bomb, bool part){
   bool inFront = !part;
+#if HAS_MORPHEUS
+  if (model == 7) return morpheusWindowCut(q, inFront);
+#endif
 #if HAS_SOMNUS
   if (SOMNUS_ON && (!JET_ON || model == 6)) {
     vec3 aq = vec3(abs(q.x), q.y, q.z);
@@ -89,6 +102,7 @@ bool cabinScreenId(int mid){ return (mid >= 41 && mid <= 43) || (mid >= 61 && mi
 // a panel's edge (a step far finer than its lattice) the label zigzagged, so a display came out with a ragged border
 // or half of it the mount's (the XR-40's console displays, the owner's report). q: the point, eye at the origin.
 int cabinPanelId(vec3 q, int model, int mid){
+  if (model == 7) return mid;   // (the XR-50's station: its own ids)
 #if HAS_SOMNUS
   if (SOMNUS_ON && (!JET_ON || model == 6)) {
     if (mid != 65 && mid != 68 && mid != 69 && mid != 76) return mid;

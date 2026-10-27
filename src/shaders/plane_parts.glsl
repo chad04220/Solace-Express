@@ -618,6 +618,10 @@ Pose partPoseCockpit(int k, vec2 sd){
       X.T = vec3(pw*0.6, pc.y + ph - 0.02, pc.z + pd*(compactTwinPowerBank()?.80:.10));
     }
   }
+#if HAS_MORPHEUS
+  else if (morpheusStation() && k == PT_JET_STICK) { X.R = transpose(partRxy(cRoll*0.25)*partRyz(-cPitch*0.25)); X.T = E.xyz + vec3(0.42, -0.385, -0.40); }   // (the XR-50's station: on its desk)
+  else if (morpheusStation() && k == PT_JET_THR) X.T = E.xyz + vec3(-0.42, -0.33, -0.40 + 0.12*(0.5 - cThr));
+#endif
   else if (k == PT_JET_STICK) { X.R = transpose(partRxy(cRoll*0.25)*partRyz(-cPitch*0.25)); X.T = E.xyz + (isReverie()?vec3(.43,-.535,-.28):vec3(0.42, -0.375, -0.02)); }
   else if (k == PT_JET_THR) X.T = E.xyz + (isReverie()?vec3(-.43,-.505,-.28+0.12*(0.5-cThr)):vec3(-0.42, -0.34, -0.02 + 0.12*(0.5 - cThr)));
   else if (k == PT_WR_STICK) { X.R = transpose(partRxy(cRoll*0.25)*partRyz(-cPitch*0.25)); X.T = E.xyz + vec3(0.5, -0.41, -0.06); }
@@ -648,10 +652,10 @@ Pose partPoseCockpit(int k, vec2 sd){
   else if (k == PT_WR_PEDAL) {
     X.R = mat3(sd.x, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
     bool nocturne=int(gM[0].z+.5)==5;
-#if HAS_MORPHEUS
-    nocturne=nocturne||int(gM[0].z+.5)==7;   // (the XR-50 flies the XR-30's sealed pod)
-#endif
     X.T = E.xyz + (nocturne?vec3(sd.x*.145,-.820,-.73-sd.x*cYaw*.055):vec3(sd.x*.16,-.675,-.78-sd.x*cYaw*.04));   // (right rudder, yaw > 0, pushes the right pedal forward, -z: it pulled it back)
+#if HAS_MORPHEUS
+    if (morpheusStation()) X.T = E.xyz + vec3(sd.x*0.16, -1.10, -0.60 - sd.x*cYaw*0.05);   // (the XR-50's: under its station's desk)
+#endif
   }
 #endif
   return X;
@@ -953,9 +957,12 @@ vec2 partFieldCockpit(int k, vec3 l){
     ped = min(ped, sdCapsule(l, vec3(0.0, -0.07, 0.02), vec3(0.0, -0.09, 0.1), 0.012));
     res = vec2(ped, int(gM[0].z+.5)==5?47.0:71.0);
 #if HAS_MORPHEUS
-    if (int(gM[0].z+.5)==7) res.y = 47.0;   // (the XR-30's pod's pedals)
+    if (morpheusStation()) res.y = 169.0;   // (the XR-50's station: its stick, throttle and pedals in its metal)
 #endif
   }
+#if HAS_MORPHEUS
+  if (morpheusStation() && (k == PT_JET_STICK || k == PT_JET_THR)) res.y = 169.0;
+#endif
   if(compactTwinPowerBank() && (k==PT_THR_LEVER || k==PT_FLAP_LEVER)){
     res=opU(res,vec2(sdCylX(l,.016,.010),60.0));
     res.x=max(res.x,-sdCylX(l,.008,.025)); // 1mm running clearance around fixed7mm axle

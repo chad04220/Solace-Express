@@ -9,10 +9,15 @@
 // either side of the core, the main gear folded in them; a dorsal spine (the rocket's oxidizer) to the tail, the rocket's
 // bell under its end between the two vectoring nozzles; an all-moving V-tail on the shoulders' ends; ventral inlets for
 // the combined-cycle engines; the lift fan's duct straight through the body behind the cockpit, closed by its doors; a
-// gold-filmed sensor canopy over the sealed cockpit (the XR-30's pod: plane_sdf.glsl mapJetCockpit).
+// gold-filmed sensor canopy over its camera bay. No one is aboard: its "cockpit" is the ground station it is flown from
+// (mapMorpheusStation), drawn round the eye where a cockpit would be.
 // Materials: 150 the skin (its thermal coating above, its black tiles below: plane_material.glsl), 151 the carbon-carbon
 // leading edges, 152 the sensor canopy, 153 the nozzles' titanium, 154 the amber light strips, 155 the inlets' and the
 // duct's insides, 156 the rocket's bell, 157 the engines' hot insides, 158 the fan's blades, 159 the wingtips' lenses.
+// The station's: 160-164 its monitors' glass (research_cockpit_layout.glsl morpheusPane: main, left, right, chin,
+// telemetry), 165 the walls and ceiling, 166 the desk, 167 the monitors' and the rack's housings, 168 the chair, 169 its
+// metal (stands, base, controls), 170 the ceiling's light panels, 171 the accent strips, 172 the floor, 173 the wall's
+// sign and uplink lamp, 174 the rack's lamps, 175 the keyboard.
 
 vec2 mrPartField(int k, vec3 l);
 // a part in the whole airframe's field, at its pose (a flaperon's is affine: its hinge's sweep shears it)
@@ -62,9 +67,87 @@ float mrShell(vec3 p){
   b = smin(b, mrCanopy(p), 0.16);   // the sensor canopy
   return b;
 }
+// ---- the ground station (eye at the origin: x right, y up, -z ahead): a sealed operations room 2.7 m across, the
+// operator seated at a desk with the monitor bank before them - the main monitor ahead, one either side angled in, the
+// chin monitor in the desk's console and the telemetry strip above - a side stick on the desk to the right, the
+// throttle to the left, pedals under it; the chair, a rack of the uplink's equipment beside it, light panels overhead
+#if HAS_CABIN
+vec2 mapMorpheusStation(vec3 p){
+  vec3 q = p - gM[22].xyz;
+  // the room: its walls, ceiling and floor (everything outside it solid)
+  vec2 res = vec2(-sdRoundBox(q - vec3(0.0, -0.12, 0.20), vec3(1.35, 1.10, 1.25), 0.10), q.y < -1.15 ? 172.0 : 165.0);
+  // the desk: its top (0.82 m off the floor), side panels and modesty panel; an accent strip under its front edge
+  float desk = sdRoundBox(q - vec3(0.0, -0.425, -0.62), vec3(1.10, 0.025, 0.32), 0.012);
+  desk = min(desk, sdRoundBox(vec3(abs(q.x) - 1.08, q.y + 0.83, q.z + 0.62), vec3(0.02, 0.39, 0.30), 0.008));
+  desk = min(desk, sdRoundBox(q - vec3(0.0, -0.80, -0.92), vec3(1.06, 0.36, 0.015), 0.006));
+  res = opU(res, vec2(desk, 166.0));
+  res = opU(res, vec2(sdCapsule(q, vec3(-1.04, -0.455, -0.312), vec3(1.04, -0.455, -0.312), 0.006), 171.0));
+  // the monitor bank: each a housing 45 mm deep with a 22 mm bezel standing 15 mm proud of its glass (the window's
+  // frame: cabin_windows.glsl kWinGlass, kWinFrameTop), on a neck down to the desk; the chin monitor in a sloped
+  // console on the desk, the telemetry strip on an arm from the wall
+  for (int i = 0; i < MS_PANES; i++) {
+    ResearchPanel P = morpheusPane(i);
+    vec3 l = researchPanelFrame(q, P);
+    float sh = researchPanelShape(l.xy, P);
+    float body = sdRoundBox(l - vec3(0.0, 0.0, i == 3 ? -0.05 : -0.013), vec3(P.h + vec2(0.022), i == 3 ? 0.069 : 0.032), 0.008);
+    body = max(body, -max(sh, 0.004 - l.z));   // (the opening down to the glass)
+    res = opU(res, vec2(body, sh < 0.0 && l.z < 0.010 ? 160.0 + float(i) : 167.0));
+    vec3 back = P.c - P.n*0.05;
+    if (i <= 2) {
+      float neck = sdCapsule(q, back, vec3(back.x, -0.40, back.z), 0.022);
+      neck = min(neck, sdRoundBox(q - vec3(back.x, -0.393, back.z), vec3(0.12, 0.007, 0.09), 0.005));
+      res = opU(res, vec2(neck, 169.0));
+    } else if (i == 4) res = opU(res, vec2(sdCapsule(q, back, vec3(back.x, back.y + 0.03, -1.04), 0.018), 169.0));
+  }
+  // the keyboard; the stick's base and the throttle's quadrant (a slot its grip rides in), the stick and the grip
+  // themselves rigid parts (plane_parts.glsl: the XR-50's pose them here); the pedals under the desk on their bar
+  res = opU(res, vec2(sdRoundBox(q - vec3(0.0, -0.392, -0.355), vec3(0.19, 0.008, 0.055), 0.004), q.y > -0.387 ? 175.0 : 167.0));
+  res = opU(res, vec2(sdRoundBox(q - vec3(0.42, -0.392, -0.40), vec3(0.055, 0.012, 0.075), 0.01), 167.0));
+  {
+    float quad = sdRoundBox(q - vec3(-0.42, -0.385, -0.40), vec3(0.055, 0.02, 0.11), 0.01);
+    quad = max(quad, -sdBox(q - vec3(-0.42, -0.365, -0.40), vec3(0.012, 0.02, 0.085)));
+    res = opU(res, vec2(quad, 167.0));
+  }
+  res = partAt(res, PT_JET_STICK, vec2(0.0), p);
+  res = partAt(res, PT_JET_THR, vec2(0.0), p);
+  res = partAt(res, PT_WR_PEDAL, vec2(-1.0, 0.0), p); res = partAt(res, PT_WR_PEDAL, vec2(1.0, 0.0), p);
+  res = opU(res, vec2(sdCapsule(q, vec3(-0.26, -1.195, -0.56), vec3(0.26, -1.195, -0.56), 0.02), 169.0));
+  // the chair: its seat, its backrest and headrest (reclined 7 deg), the arms on their posts; the gas lift and the
+  // five-spoked base on its casters
+  {
+    float ch = sdRoundBox(q - vec3(0.0, -0.80, 0.12), vec3(0.25, 0.045, 0.24), 0.04);
+    vec3 bq = q - vec3(0.0, -0.42, 0.36); bq.yz = rot2(bq.yz, -0.12);
+    ch = min(ch, sdRoundBox(bq, vec3(0.235, 0.36, 0.045), 0.045));
+    vec3 hq = q - vec3(0.0, 0.0, 0.32); hq.yz = rot2(hq.yz, -0.12);
+    ch = min(ch, sdRoundBox(hq, vec3(0.13, 0.075, 0.035), 0.03));
+    ch = min(ch, sdRoundBox(vec3(abs(q.x) - 0.31, q.y + 0.55, q.z - 0.14), vec3(0.035, 0.022, 0.16), 0.02));
+    res = opU(res, vec2(ch, 168.0));
+    float mt = sdCapsule(vec3(abs(q.x), q.yz), vec3(0.31, -0.57, 0.20), vec3(0.26, -0.78, 0.22), 0.016);
+    mt = min(mt, sdCapsule(vec3(abs(q.x), q.yz), vec3(0.06, -0.10, 0.36), vec3(0.06, -0.06, 0.37), 0.012));   // (the headrest's posts)
+    mt = min(mt, sdCapsule(q, vec3(0.0, -0.85, 0.14), vec3(0.0, -1.10, 0.14), 0.028));
+    for (int k = 0; k < 5; k++) {
+      float a = float(k)*1.2566371;
+      vec3 tip = vec3(0.30*sin(a), -1.16, 0.14 + 0.30*cos(a));
+      mt = min(mt, sdCapsule(q, vec3(0.0, -1.12, 0.14), tip, 0.02));
+      mt = min(mt, length(q - tip - vec3(0.0, -0.03, 0.0)) - 0.03);
+    }
+    res = opU(res, vec2(mt, 169.0));
+  }
+  // the room's fittings: the two light panels in the ceiling, the accent strip along the front wall's top, the sign
+  // and the uplink's lamp over the monitors, the equipment rack beside the chair (its lamps on its face)
+  res = opU(res, vec2(sdRoundBox(vec3(abs(q.x) - 0.55, q.y - 0.965, q.z - 0.15), vec3(0.16, 0.015, 0.45), 0.008), 170.0));
+  res = opU(res, vec2(sdCapsule(q, vec3(-1.25, 0.925, -1.02), vec3(1.25, 0.925, -1.02), 0.008), 171.0));
+  res = opU(res, vec2(sdRoundBox(q - vec3(0.0, 0.72, -1.04), vec3(0.50, 0.06, 0.012), 0.006), 173.0));
+  {
+    float rack = sdRoundBox(q - vec3(-1.17, -0.62, 0.55), vec3(0.17, 0.60, 0.28), 0.01);
+    res = opU(res, vec2(rack, q.x > -1.004 && abs(q.z - 0.55) < 0.25 && abs(q.y + 0.62) < 0.56 ? 174.0 : 167.0));
+  }
+  return res;
+}
+#endif
 vec2 mapMorpheus(vec3 p){
 #if HAS_CABIN
-  if (gPS.w > 0.5) return mapJetCockpit(p);   // (the XR-30's sealed pod: its displays show the outside)
+  if (gPS.w > 0.5) return mapMorpheusStation(p);   // (no one aboard: the ground station it is flown from)
 #endif
   vec3 ap = vec3(abs(p.x), p.y, p.z);
   float shell = mrShell(p);

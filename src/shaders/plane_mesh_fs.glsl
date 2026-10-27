@@ -39,8 +39,14 @@ void main(){
     if (!gWreckPart && brkOwner(vB) != uPcK) discard;
     gWreckIn = !gl_FrontFacing && !gWreckPart;   // (a part's pose may mirror its winding)
   }
+  int msPane = -1;   // (the XR-50's station: a monitor's glass kept for its symbology - plane_screens.glsl morpheusHud)
 #if HAS_RESEARCH
-  if (RESEARCH_ON && uScrSkip == 1 && cabinWindowCut(vB - uScrEye, uScrModel, uBombPane == 1, uPartInst >= 0)) discard;
+  if (RESEARCH_ON && uScrSkip == 1 && cabinWindowCut(vB - uScrEye, uScrModel, uBombPane == 1, uPartInst >= 0)) {
+#if HAS_MORPHEUS
+    if (uScrModel == 7 && uPartInst < 0) msPane = morpheusGlassPane(vB - uScrEye);
+#endif
+    if (msPane < 0) discard;
+  }
 #endif
   gZero = min(uQuality, 0);
   // (a traffic aircraft is drawn with its type's own build too - the XR-30s of the formations and the escort pair: an own
@@ -99,6 +105,7 @@ void main(){
   if (FLEET_ON && !traf && gPS.w > 0.5 && uPartInst < 0 && int(gM[0].z + 0.5) < 5 && !fleetCabin() && !isReverie() && clusterFrame(vB, -transpose(uRot)*uPos, mid, frN)) ln = frN;
 #endif
   bool pod = !traf && uPlaneOn == 1 && gPS.w > 0.5 && uWreck == 0;
+  if (msPane >= 0) mid = 160 + msPane;   // (planeToGB draws the symbology, or lets the world through)
 #ifdef PROBE_MESH_SHADE
   if (!traf) { gbWritePrelit(t, ln, GB_POD, vec3(0.05)); oG3 = vec4(1.0, 1.0, 1.0, float(GBF_RIGID)/255.0); return; }   // (the analysis's probe build: Renderer::kProbeMeshShade)
 #endif

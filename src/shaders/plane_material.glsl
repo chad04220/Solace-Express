@@ -90,7 +90,7 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
   if (mid == 11) { vec3 sc = fusSection(lp.z); vec3 rad = vec3(lp.x, lp.y - sc.z, 0.0); if (dot(ln, rad) > 0.55*length(rad) && lp.y > gM[22].y - 0.9) mid = 1; }
   m.metal = 0.0; m.emit = vec3(0.0); m.nrm = vec3(0,0,1);
   m.alb = gColBase; m.rough = 0.28;
-  interior = (mid >= 10 && mid <= 14) || (mid >= 40 && mid < 94);   // (94+: the light fixtures, outside)
+  interior = (mid >= 10 && mid <= 14) || (mid >= 40 && mid < 94) || (mid >= 160 && mid < 176);   // (94+: the light fixtures, outside; 160-175: the XR-50's station)
   vec3 sec = fusSection(lp.z);
   vec4 WS = gM[23]; vec4 E = gM[22];
   int ck = int(gM[21].z + 0.5);
@@ -482,6 +482,96 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
       if (gOwn) m.emit = li < uLensN ? uLensC[li].rgb : vec3(0.0);
     }
   }
+  else if (mid >= 160 && mid < 176) {   // the XR-50's ground station (morpheus_sdf.glsl mapMorpheusStation)
+    gPixM = t*uTanHalf*2.0/uRes.y; gPixG = gPixM/max(abs(dot(ln, transpose(uPlaneRot)*rd)), 0.2);
+    vec3 nT; vec4 tx; vec3 qd = lp - E.xyz;
+    if (mid <= 163) { m.alb = vec3(0.004); m.rough = 0.05; m.metal = 0.0; }   // a camera monitor's dark glass (planeToGB draws it)
+    else if (mid == 164) {   // the telemetry strip: the uplink's page - its bars, the airframe's load, the engines' mode
+      ResearchPanel P = morpheusPane(4);
+      vec3 l = researchPanelFrame(qd, P); vec2 u = l.xy;
+      float fp = gPixM; gAA = fp*0.6;
+      vec3 c = vec3(0.01, 0.025, 0.035);
+      float edge = smoothstep(0.0, 0.004, -researchPanelShape(u, P));
+      const vec3 CY = vec3(0.3, 0.9, 1.0), AM = vec3(1.0, 0.66, 0.2);
+      float on = txt(u - vec2(-0.38, 0.030), 0.016, ivec4(77, 79, 82, 80), ivec4(72, 69, 85, 83), 0);   // MORPHEUS
+      on = max(on, txt(u - vec2(-0.232, 0.030), 0.016, ivec4(47, 47, 32, 82), ivec4(69, 77, 79, 84), 0));   // // REMOT
+      on = max(on, txt(u - vec2(-0.1185, 0.030), 0.016, ivec4(69, 32, 79, 80), ivec4(83, 0, 0, 0), 0));      // E OPS
+      c += CY*1.4*on;
+      // the uplink's signal: five bars, one flickering
+      for (int k = 0; k < 5; k++) {
+        vec2 b = u - vec2(0.12 + float(k)*0.018, -0.02 + float(k)*0.004);
+        float lit = k < 4 ? 1.0 : step(0.3, fract(uTime*0.7));
+        c += CY*1.2*lit*step(abs(b.x), 0.005)*step(abs(b.y), 0.012 + float(k)*0.004);
+      }
+      // the airframe's load against its 600 g structure, a bar to the right; the engines' mode by its colour
+      float gk = clamp(abs(uHud2.x)/600.0, 0.0, 1.0);
+      vec2 gb = u - vec2(0.29, 0.0);
+      float bar = step(abs(gb.y), 0.008)*step(-0.09, gb.x)*step(gb.x, -0.09 + 0.18*gk);
+      float box = hudBox(u, vec2(0.29, 0.0), vec2(0.092, 0.012), 0.0015);
+      c += mix(CY, vec3(1.0, 0.2, 0.15), step(0.8, gk))*1.3*max(bar, box);
+      float scr = gWr[2].z, ram = gWr[2].w;
+      vec3 mode = scr > 0.5 ? vec3(0.8, 0.4, 1.0) : ram > 0.5 ? AM : vec3(0.4, 1.0, 0.6);
+      c += mode*1.3*step(length(u - vec2(-0.36, -0.03)), 0.009);
+      c += AM*1.2*txt(u - vec2(-0.34, -0.03), 0.014, scr > 0.5 ? ivec4(83, 67, 82, 65) : ram > 0.5 ? ivec4(82, 65, 77, 0) : ivec4(84, 85, 82, 66), scr > 0.5 ? ivec4(77, 0, 0, 0) : ram > 0.5 ? ivec4(0) : ivec4(79, 0, 0, 0), 0);
+      m.alb = vec3(0.004); m.rough = 0.06; m.emit = c*edge; gDispPx = true;
+    }
+    else if (mid == 165) {   // the walls and the ceiling: charcoal acoustic panels, 60 cm square, in fine-woven fabric
+      tx = triSample(lp, ln, M_FABRIC, 1.2, nT); m.nrm = mix(vec3(0.0, 0.0, 1.0), nT, 0.6);
+      vec2 pq = abs(ln.y) > 0.7 ? qd.xz : abs(ln.x) > 0.7 ? qd.zy : qd.xy;
+      float seam = max(aaLines(pq.x/0.6 + 0.5, 0.02, gPixG/0.6), aaLines(pq.y/0.6 + 0.5, 0.02, gPixG/0.6));
+      m.alb = vec3(0.045, 0.047, 0.052)*(0.75 + 0.5*tx.r); m.rough = 0.92;
+      m.alb = mix(m.alb, vec3(0.012), seam);
+      if (qd.y > 0.9) m.alb *= 1.6;   // (the ceiling a shade lighter)
+    }
+    else if (mid == 166) {   // the desk: matte graphite laminate, a brushed edge band
+      tx = triSample(lp, ln, M_PLASTIC, 0.5, nT); m.nrm = nT;
+      m.alb = vec3(0.05, 0.052, 0.056)*(0.85 + 0.3*tx.r); m.rough = 0.6; m.metal = 0.05;
+      if (abs(ln.y) < 0.5 && qd.y > -0.45) { m.alb = vec3(0.32, 0.32, 0.34); m.metal = 0.85; m.rough = 0.35; }
+    }
+    else if (mid == 167) { tx = triSample(lp, ln, M_PLASTIC, 0.3, nT); m.alb = vec3(0.018, 0.019, 0.021)*(0.8 + 0.4*tx.r); m.rough = 0.5; m.metal = 0.1; m.nrm = nT; }   // housings: matte black
+    else if (mid == 168) {   // the chair: a dark mesh fabric, a gold piping round its back
+      tx = triSample(lp, ln, M_FABRIC, 0.15, nT); m.alb = tx.rgb*vec3(0.12, 0.12, 0.13); m.rough = 0.85; m.nrm = nT;
+      if (qd.z > 0.3 && abs(abs(qd.x) - 0.215) < 0.006) m.emit = gColStripe*0.05;
+    }
+    else if (mid == 169) { tx = triSample(lp, ln, M_METAL, 0.3, nT); m.alb = tx.rgb*vec3(0.30, 0.30, 0.32); m.metal = 0.85; m.rough = 0.38; m.nrm = nT; }   // brushed dark aluminium
+    else if (mid == 170) { m.alb = vec3(0.7, 0.68, 0.64); m.rough = 0.3; m.emit = ln.y < -0.5 ? vec3(1.0, 0.86, 0.68)*0.45 : vec3(0.0); }   // the ceiling's light panels
+    else if (mid == 171) { m.alb = vec3(0.05); m.emit = gColStripe*0.35; }   // the accent strips (the XR-50's amber)
+    else if (mid == 172) {   // the floor: dark carpet tiles, 50 cm, laid in alternate directions
+      tx = triSample(lp, ln, M_FABRIC, 2.0, nT); m.nrm = mix(vec3(0.0, 0.0, 1.0), nT, 0.5);
+      vec2 c2 = floor(qd.xz/0.5); float alt = mod(c2.x + c2.y, 2.0);
+      m.alb = vec3(0.032, 0.033, 0.036)*(0.8 + 0.4*tx.r)*(0.9 + 0.2*alt); m.rough = 0.95;
+    }
+    else if (mid == 173) {   // the sign over the bank, and the uplink's lamp at its right end
+      m.alb = vec3(0.012); m.rough = 0.3;
+      vec2 u = vec2(qd.x, qd.y - 0.72);
+      if (ln.z > 0.5) {
+        gAA = gPixM*0.6;
+        float on = txt(u - vec2(-0.43, 0.0), 0.03, ivec4(78, 73, 71, 72), ivec4(84, 71, 76, 65), 0);   // NIGHTGLA
+        on = max(on, txt(u - vec2(-0.199, 0.0), 0.03, ivec4(83, 83, 32, 47), ivec4(47, 32, 88, 82), 0));   // SS // XR
+        on = max(on, txt(u - vec2(0.0035, 0.0), 0.03, ivec4(45, 53, 48, 32), ivec4(79, 80, 83, 0), 0));   // -50 OPS
+        m.emit = gColStripe*0.9*on;
+        float lamp = step(length(u - vec2(0.43, 0.0)), 0.016);
+        m.emit += vec3(0.25, 1.0, 0.4)*2.2*lamp*(0.75 + 0.25*sin(uTime*3.0));
+      }
+    }
+    else if (mid == 174) {   // the rack's face: rows of status lamps
+      m.alb = vec3(0.02); m.rough = 0.45; m.metal = 0.2;
+      vec2 r = vec2(qd.z - 0.55, qd.y + 0.62);
+      vec2 c2 = floor(r/vec2(0.03, 0.045) + 0.5), f2 = r - c2*vec2(0.03, 0.045);
+      float hk = hash2i(ivec2(c2) + ivec2(17, 3));
+      float led = step(length(f2), 0.004)*step(0.35, hk);
+      m.emit = led*(hk < 0.8 ? vec3(0.2, 1.0, 0.35) : vec3(1.0, 0.6, 0.15))*(0.6 + 1.2*step(0.5, fract(uTime*(0.4 + hk) + hk*7.0)));
+      if (abs(f2.y + 0.02) < 0.002) m.alb = vec3(0.05);   // (the units' seams)
+    }
+    else {   // 175: the keyboard's keys, their legends faintly lit
+      m.alb = vec3(0.015); m.rough = 0.5;
+      vec2 kq = qd.xz - vec2(0.0, -0.355);
+      vec2 c2 = floor(kq/0.019 + 0.5), f2 = kq - c2*0.019;
+      float key = step(max(abs(f2.x), abs(f2.y)), 0.0075);
+      m.alb = mix(m.alb, vec3(0.04), key);
+      m.emit = gColStripe*0.06*key*step(length(f2), 0.0025);
+    }
+  }
 #endif
 #if HAS_FLEET
   else if (FLEET_ON && mid >= 60) {  // light-aircraft / airliner cockpit parts (PBR texture sets)
@@ -639,5 +729,5 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
 #endif
   n = applyTS(n, m.nrm, interior ? 0.35 : 0.12);
   int engM = int(gM[0].z + 0.5);
-  podMat = RESEARCH_ON && !trafHit && mid >= 40 && mid < 80 && engM >= 5;   // research jets only: light aircraft use ids 60+ for their cockpits
+  podMat = RESEARCH_ON && !trafHit && ((mid >= 40 && mid < 80) || (mid >= 160 && mid < 176)) && engM >= 5;   // research jets only: light aircraft use ids 60+ for their cockpits
 }

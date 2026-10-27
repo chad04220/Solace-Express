@@ -66,14 +66,14 @@ const ResCraftInfo kResCraft[] = {
    100.f, -50.f, 50.f, 90.f, -45.f, 4.4f, 0.32f,
    {"F / V tilt the pods: 0 forward, 90 hover", "X or double-tap brake: cloak", "Y weapons hot: lasers LMB/Enter, bomb Bksp",
     "Slow on low power the pods do the flying", "6,000 kg: 2 h of full boost, 16 h of cruise"}, "XR40"},
-  {kMorpheus, "NG-XR50-M  //  BLK 1", "XR-50", "MORPHEUS", R_GOLD, {0.98f, 0.78f, 0.40f}, "VARIABLE-SWEEP HYPERSONIC VTOL RESEARCH MODEL",
-   {{"CONFIGURATION", "Waverider body, swing wing 16-68 deg, V-tail", -1}, {"PROPULSION", "2 x turbofan / ramjet / scramjet + rocket", 0.95f},
-    {"THRUST / WEIGHT", "1.3 in reheat, 2.4 with the rocket", 0.62f}, {"TOP SPEED", "Mach 7.1 at 27 km, scramjet", 1.f},
-    {"VTOL", "Lift fan, nozzles swivel to 95 deg", 0.9f}, {"CEILING", "84 km on the rocket", 1.f},
-    {"AIRFRAME", "+13 / -6 g; edges to 1,650 C", 0.14f}, {"ENDURANCE", "8,200 kg: 20 min scramjet, 5 h cruise", 0.6f}},
-   16.f, -8.f, 4.f, 13.f, -6.f, 7.1f, 0.17f,
-   {"F / V: nozzles 0-95 deg; the lift fan comes in", "X or double-tap brake: the rocket (~55 s of LOX)", "The wing sweeps itself: 16 deg slow, 68 past Mach 1.45",
-    "Mach 7 needs 27 km: watch LEAD EDGE (1,650 C)", "Full aft stick past its stop: post-stall to 80 deg"}, "XR50"},
+  {kMorpheus, "NG-XR50-M  //  BLK 2", "XR-50", "MORPHEUS", R_GOLD, {0.98f, 1.f, 0.40f}, "REMOTELY PILOTED HYPERSONIC VTOL RESEARCH MODEL",
+   {{"CONFIGURATION", "Waverider, blown swing wing 16-68 deg, V-tail", -1}, {"PROPULSION", "2 x 525 kN combined-cycle + 540 kN rocket", 1.f},
+    {"THRUST / WEIGHT", "7.5 in reheat: twice the XR-40's", 1.f}, {"TOP SPEED", "Mach 7.1 at 27 km; 83 km on the rocket", 1.f},
+    {"VTOL", "Lift fan 840 kN, nozzles swivel to 95 deg", 1.f}, {"ROLL RATE", "800 deg/s", 1.f},
+    {"AIRFRAME", "+600 / -600 g: no one aboard", 1.f}, {"ENDURANCE", "8,200 kg: 8 min reheat, 1 h scramjet, 29 h cruise", 0.9f}},
+   200.f, -200.f, 100.f, 160.f, -140.f, 7.1f, 0.11f,
+   {"Flown from the ground station: C shows its monitors", "F / V: nozzles 0-95 deg; X: the rocket (~30 s of LOX)", "The wing sweeps itself and is blown: 3x its lift",
+    "Mach 7 needs 27 km: watch LEAD EDGE (1,650 C)", "Full aft stick past its stop: post-stall to 90 deg"}, "XR50"},
 };
 const int kNumResCraft = sizeof(kResCraft) / sizeof(kResCraft[0]);
 int resCraftSlot(int idx) { for (int k = 0; k < kNumResCraft; k++) if (kResCraft[k].idx == idx) return k; return 1; }
@@ -221,8 +221,8 @@ const Game::ResCard Game::kResCards[] = {
    {{RS_ALT, 24000.f, 0.f, "Climb through 24,000 m"}, {RS_SCRAM, 6.5f, 30.f, "Mach 6.5 on the scramjets"}, {RS_LAND, 0, 0, "Land back at the range"}}, 3},
   {kMorpheus, "XR50-3", "EDGE OF SPACE", "From the corridor pull up and light the rocket (X). Climb through 80 km - up there the reaction jets steer - then bring it back without burning up.",
    {{RS_ROCKET, 0, 5.f, "Rocket lit for 5 s"}, {RS_ALT, 80000.f, 0.f, "Climb through 80,000 m"}, {RS_LAND, 0, 0, "Land back at the range"}}, 3},
-  {kMorpheus, "XR50-4", "POST-STALL", "Slow, high: the stick hard against its stop takes it through the gate - 70 deg of angle of attack on the nozzles. Then a 230 deg/s roll and 11 g.",
-   {{RS_ALPHA, 70.f, 0.f, "70 deg angle of attack"}, {RS_ROLL, 230.f, 0.f, "Roll at 230 deg/s"}, {RS_G, 11.f, 0.f, "Pull 11 g"}, {RS_LAND, 0, 0, "Land back at the range"}}, 4},
+  {kMorpheus, "XR50-4", "NO ONE ABOARD", "Twice the XR-40, flown from the ground: 160 g, -80 g, a 760 deg/s roll - fast and low it has the lift for all of it. Then slow, the stick through its stop: 70 deg of angle of attack on the nozzles.",
+   {{RS_G, 160.f, 0.f, "Pull 160 g"}, {RS_NEGG, -80.f, 0.f, "Push to -80 g"}, {RS_ROLL, 760.f, 0.f, "Roll at 760 deg/s"}, {RS_ALPHA, 70.f, 0.f, "70 deg angle of attack"}, {RS_LAND, 0, 0, "Land back at the range"}}, 5},
 };
 const int Game::kNumResCards = sizeof(Game::kResCards) / sizeof(Game::kResCards[0]);
 
@@ -625,7 +625,7 @@ void Game::drawResearch(const FrameParams& fp) {
     if (wr) calls = {{vec3(0, 0, -fl), "SENSOR NOSE  //  PASSIVE", -1}, {kSomnusPods[1], "POD 2  //  130 kN  0-90 DEG", 1},
                      {kSomnusPods[2], "POD 3  //  VECTORING VANES", -1}, {vec3(6.2f, -0.24f, 2.0f), "FACETED SKIN  //  CLOAK MESH", 1}};
     else if (RC.idx == kMorpheus) calls = {{vec3(0, 0.1f, -fl), "WAVERIDER  //  C-C EDGES 1,650 C", -1}, {morpheusWingTip(kMorpheusSweepMin), "SWING WING  //  16-68 DEG", 1},
-                  {vec3(0, 0.84f, -5.f), "LIFT FAN  //  160 kN", -1}, {vec3(0.78f, -0.02f, 8.3f), "3D NOZZLE  //  95 DEG SWIVEL", 1}};
+                  {vec3(0, 0.84f, -5.f), "LIFT FAN  //  840 kN", -1}, {vec3(0.78f, -0.02f, 8.3f), "3D NOZZLE  //  95 DEG SWIVEL", 1}};
     else if (RC.idx == kResearchJet) calls = {{vec3(0, 0, -fl), "SYNTHETIC-VISION POD", -1}, {vec3(2.1f, 0.1f, -4.4f), "CANARD  //  ALL-MOVING", 1},
                   {vec3(5.62f, -0.38f, 4.4f), "CRANKED DELTA  //  NO FLAPS", 1}, {vec3(-0.82f, -0.12f, 7.75f), "2D NOZZLE  //  +-29 DEG", -1}};
     else {   // a conventional airframe: its parts from the parametric model
@@ -717,10 +717,10 @@ void Game::drawResearch(const FrameParams& fp) {
     float ch = range ? 120 * s : std::min(120 * s, L.bot - py - 120 * s);
     if (ch > 50 * s) {
       float gx0 = px + 26 * s, gw = iw - 30 * s, gy0 = py, gh = ch;
-      float mMax = RC.idx == kVigil ? 1.6f : (RC.vMax > 1.5f ? 4.f : 1.f), nTop = RC.nTop, nBot = RC.nBot, nStep = RC.nStep;   // each craft on its own scale
+      float mMax = RC.idx == kVigil ? 1.6f : (RC.vMax > 4.5f ? 8.f : RC.vMax > 1.5f ? 4.f : 1.f), nTop = RC.nTop, nBot = RC.nBot, nStep = RC.nStep;   // each craft on its own scale (the XR-50's to Mach 8)
       auto X = [&](float m) { return gx0 + m / mMax * gw; };
       auto Y = [&](float n) { return gy0 + (nTop - n) / (nTop - nBot) * gh; };
-      for (int m = 0; m <= 4; m++) { float mm = m * mMax / 4.f; g_ren.rect(X(mm), gy0, 1, gh, R_DIM, 0.18f * e); g_ren.text(X(mm), gy0 + gh + 3 * s, 9 * s, RC.idx != kVigil && mMax > 1.5f ? fmt("M%d", m) : fmt("M%.2f", mm), R_DIM, e, 1, false); }
+      for (int m = 0; m <= 4; m++) { float mm = m * mMax / 4.f; g_ren.rect(X(mm), gy0, 1, gh, R_DIM, 0.18f * e); g_ren.text(X(mm), gy0 + gh + 3 * s, 9 * s, RC.idx != kVigil && mMax > 1.5f ? fmt("M%.0f", mm) : fmt("M%.2f", mm), R_DIM, e, 1, false); }
       for (float n = nBot; n <= nTop + 0.1f; n += nStep) { g_ren.rect(gx0, Y(n), gw, 1, R_DIM, n == 0 ? 0.4f : 0.18f * e); g_ren.text(gx0 - 4 * s, Y(n) - 5 * s, 9 * s, fmt("%+.0f", n), R_DIM, e, 2, false); }
       float nMax = RC.nMax, nMin = RC.nMin, vMax = RC.vMax, ms = RC.ms;
       std::vector<std::pair<float, float>> env;

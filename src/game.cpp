@@ -39,7 +39,7 @@ static int jetExhausts(const Plane& p, vec3* pos, vec3* dir, float* strength) {
       dir[n] = normalize(vec3(-sinf(y), -sinf(a) * cosf(y), cosf(a) * cosf(y)));
       strength[n++] = 1.f;
     }
-    if (p.rocketN > 1.f) { pos[n] = kMorpheusRocket; dir[n] = vec3(0, 0, 1); strength[n++] = clampf(p.rocketN / 270000.f, 0.f, 1.f); }
+    if (p.rocketN > 1.f) { pos[n] = kMorpheusRocket; dir[n] = vec3(0, 0, 1); strength[n++] = clampf(p.rocketN / kMorpheusRocketVac, 0.f, 1.f); }
     return n;
   }
   if (p.spec->special == 2) {
@@ -3092,7 +3092,9 @@ void Game::updateFlight(float dt) {
     // it (Plane::step: overG fails it at 1, twice the limit at once), so it is fully over the view as the airframe lets go
     const float frac = plane.gLoad >= 0.f ? plane.gLoad / plane.spec->gLimitPos() : plane.gLoad / plane.spec->gLimitNeg();
     const float stress = clampf(std::max(plane.overG, frac - 1.f), 0.f, 1.f);
-    const float target = crashed ? 0.f : 0.85f * clampf((frac - 0.8f) / 0.2f, 0.f, 1.f) + 0.15f * stress;
+    // (not at the XR-50's ground station: no one there feels its loads - its telemetry strip shows them)
+    const bool station = camMode == 1 && plane.spec->special == 3;
+    const float target = crashed || station ? 0.f : 0.85f * clampf((frac - 0.8f) / 0.2f, 0.f, 1.f) + 0.15f * stress;
     gTunnel = gTunnelPin >= 0.f ? gTunnelPin : approach(gTunnel, target, target > gTunnel ? 4.f : crashed ? 1.2f : 2.f, dt);
   }
   if (crashed) {
@@ -4539,7 +4541,7 @@ static void fillPlaneVisual(PlaneVisual& pv, const Plane& p, float propAngle, bo
     const float tb = p.tbcc[0] + p.tbcc[1] + p.tbcc[2];
     pv.wr[0][0] = p.sweep; pv.wr[0][1] = p.hiLift; pv.wr[0][2] = p.fanClutch; pv.wr[0][3] = p.fanAngle;
     pv.wr[1][0] = p.nzSwivel; pv.wr[1][1] = p.nzPitch[0]; pv.wr[1][2] = p.nzPitch[1]; pv.wr[1][3] = 0.5f * (p.nzYaw[0] + p.nzYaw[1]);
-    pv.wr[2][0] = clampf(p.rocketN / 270000.f, 0.f, 1.f); pv.wr[2][1] = clampf((p.skinT - 1173.f) / (kMorpheusSkinLimit - 1173.f), 0.f, 1.2f);
+    pv.wr[2][0] = clampf(p.rocketN / kMorpheusRocketVac, 0.f, 1.f); pv.wr[2][1] = clampf((p.skinT - 1173.f) / (kMorpheusSkinLimit - 1173.f), 0.f, 1.2f);
     pv.wr[2][2] = tb > 1.f ? p.tbcc[2] / tb : 0.f; pv.wr[2][3] = tb > 1.f ? p.tbcc[1] / tb : 0.f;
     pv.wr[3][0] = p.rcs.x; pv.wr[3][1] = p.rcs.y; pv.wr[3][2] = p.rcs.z;
     // (outside, the surfaces as its fly-by-wire deflects them; in the cockpit the stick as the pilot holds it)
@@ -4682,7 +4684,8 @@ FrameParams Game::buildFrame() {
     if (photo.on) { camPos = photo.pos; fwd = photoForward(); upRef = photoUp(); }   // (photo mode's free camera)
     if (dbgCam && dbgFollow) { dbgCamPos = plane.pos + dbgFollowOff; dbgCamLook = plane.pos; }
     if (dbgCam) { camPos = dbgCamPos; fwd = normalize(dbgCamLook - dbgCamPos); upRef = vec3(0, 1, 0); }
-    if (screen == SCR_FLIGHT && !dbgCam && !photo.on && camMode != 3 && set.camShake > 0.f) {   // (the shake: small turns of the view, 2-5 Hz)
+    const bool station = camMode == 1 && plane.spec && plane.spec->special == 3;   // (the XR-50's ground station: the room never moves)
+    if (screen == SCR_FLIGHT && !dbgCam && !photo.on && camMode != 3 && !station && set.camShake > 0.f) {   // (the shake: small turns of the view, 2-5 Hz)
       const float a = (shakeTrauma * shakeTrauma + shakeBuffet) * set.camShake * (camMode == 1 ? 0.7f : 1.f);
       if (a > 1e-4f) {
         const float t = shakeT;
@@ -6306,12 +6309,12 @@ void Game::update(float dt) {
     // resWarmFrames frames, the first the boot screen alone, then one view each and the selected craft until the check
     // below), the scenery chunks made out of the most the site has waited on (counted from the first frame of the
     // site), and its terrain lighting
-    const int nViews = 2 * resCraftCount() + 3, f = resWarmFrames;
+    const int nViews = 4 * resCraftCount() + 3, f = resWarmFrames;
     const bool site = f >= 2, lit = site && !loadingShadowPending();
     if (site) resPend0 = std::max(resPend0, g_ren.entPending);
     const float views = clampf((f - 1.f) / nViews, 0.f, 1.f), chunks = !site ? 0.f : resPend0 > 0 ? 1.f - (float)g_ren.entPending / resPend0 : 1.f;
     resWork = std::max(resWork, 0.25f * views + 0.65f * chunks + 0.10f * (lit ? 1.f : 0.f));
-    if (resWarmFrames > 2 * resCraftCount() + 3 && !baked && g_ren.entPending == 0 && !loadingShadowPending()) { resWarm = false; resWarmCraft = -1; resWarmCk = false; g_ren.entBudgetMs = 2.5f; resWork = 1.f; }
+    if (resWarmFrames > 4 * resCraftCount() + 3 && !baked && g_ren.entPending == 0 && !loadingShadowPending()) { resWarm = false; resWarmCraft = -1; resWarmCk = false; g_ren.entBudgetMs = 2.5f; resWork = 1.f; }
   }
   if (screen == SCR_FLIGHT && (actKeyP(ACT_RADIO) || actJoyP(ACT_RADIO) || (!paused && actPadP(ACT_RADIO)))) showRadio = !showRadio;
   { PartTimer pt(*this, "radio"); radio.poll(); }
@@ -6427,13 +6430,16 @@ void Game::render() {
     resWarmFrames++;
     // every research craft, outside and from the cockpit, one a frame: each one's shells bake now behind the boot
     // screen, so picking one in the terminal never stalls on a bake (the XR-40's, with the most moving parts, froze
-    // the game for seconds when it was first selected); then the selected craft again
-    const int item = resWarmFrames - 2, nItems = 2 * resCraftCount();
-    resWarmCraft = item >= 0 && item < nItems ? resCraftAt(item / 2) : -1;
+    // the game for seconds when it was first selected); then all of them again, each now drawn with its baked body:
+    // the first draw with a type's own mesh build costs the driver its compile (seconds for the research craft's,
+    // the stall picking one - the XR-50's - still had), and in the first round each frame drew a body still baking,
+    // so that build first ran when the craft was picked. Then the selected craft again
+    const int item = resWarmFrames - 2, nItems = 4 * resCraftCount();
+    resWarmCraft = item >= 0 && item < nItems ? resCraftAt((item % (2 * resCraftCount())) / 2) : -1;
     resWarmCk = item >= 0 && item < nItems && (item & 1);
     resLoadTask.clear();resTaskDone=resTaskUnits=0;
     g_ren.onMeshProgress=[this](float f,const std::string& task){
-      const float views=clampf((std::max(0,resWarmFrames-2)+f)/(2.f*resCraftCount()+3.f),0.f,1.f);
+      const float views=clampf((std::max(0,resWarmFrames-2)+f)/(4.f*resCraftCount()+3.f),0.f,1.f);
       const float chunks=resPend0>0?clampf(1.f-float(g_ren.entPending)/resPend0,0.f,1.f):0.f;
       resWork=std::max(resWork,.25f*views+.65f*chunks+.10f*(resWarmFrames>=2&&!loadingShadowPending()?1.f:0.f));
       resLoadTask=task;resTaskDone=resTaskUnits=1;
@@ -6737,7 +6743,7 @@ void Game::debugScene(const std::string& name) {
   if (name.rfind("researchscan", 0) == 0) {   // the biometric sequence at a moment: researchscan<tenths of a second into the sequence>, the warm-up as far on as the scans show
     screen = SCR_RESEARCH; realTime = 30; resAuthed = false; resOpened = realTime - atoi(name.c_str() + 12) / 10.f;
     resSeq = realTime - resOpened; resSeqAt = realTime; resSeqOpened = resOpened;
-    resWarm = resSeq < kResScan1; resWork = clampf((resSeq - kResScan0) / (kResScan1 - kResScan0), 0.f, 1.f); resWarmFrames = 1 + (int)(resWork * 4.f * (2 * resCraftCount() + 3)); resWarmCraft = -1;
+    resWarm = resSeq < kResScan1; resWork = clampf((resSeq - kResScan0) / (kResScan1 - kResScan0), 0.f, 1.f); resWarmFrames = 1 + (int)(resWork * 4.f * (4 * resCraftCount() + 3)); resWarmCraft = -1;
     return;
   }
   if (name.compare(0, 3, "wr_") == 0) {   // XR-40: wr_<mode>_<cam yaw>_<cam pitch>_<cam dist>_<seconds>[_<airport>_<weather>_<hour>_<over town>]
@@ -6878,7 +6884,10 @@ void Game::debugScene(const std::string& name) {
   if (name == "jet") { c = g_story[g_story.size() - 4]; spec = 6; }
   if (name == "night") { c = g_story[11]; c.wx.timeOfDay = 21.5f; spec = 1; }
   if (name == "snow") { c = g_story[20]; spec = 2; }
-  if (const char* sp = getenv("SPEC")) for (int t : kCareerAircraft) if (t == atoi(sp)) spec = t;   // (SPEC=<career aircraft>: that one flies the scene)
+  if (const char* sp = getenv("SPEC")) {   // (SPEC=<career or research aircraft>: that one flies the scene)
+    for (int t : kCareerAircraft) if (t == atoi(sp)) spec = t;
+    for (int t : kResearchAircraft) if (t == atoi(sp)) spec = t;
+  }
   startFlight(c, spec, Career::SRC_OWNED);
   if (const char* w = !s_wxScene.empty() ? s_wxScene.c_str() : getenv("WX")) {   // weather checks: WX="cover,base m,precip,storm,wind kt,from deg,gust kt,turbulence,time of day"
     float v[9] = {wx.cloudCover, wx.cloudBase, (float)wx.precip, wx.storm ? 1.f : 0.f, wx.windSpeed * MS_TO_KT, wx.windFrom, wx.gust * MS_TO_KT, wx.turbulence, wx.timeOfDay};

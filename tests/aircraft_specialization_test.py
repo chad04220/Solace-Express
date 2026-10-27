@@ -90,15 +90,15 @@ if a.shader_dir:
         'galleonFixedWingFootprint': (14,), 'galleonRootFairing': (14,), 'galleonFairingOwns': (14,),
         'thistledownStickShaft': (13,), 'thistledownStickGrip': (13,), 'thistledownStickPivot': (13,),
         'galleonNavFrame': (14,), 'galleonOverheadFrame': (14,), 'mapNewFleetFurnishings': (13, 14),
-        'mapJet': (10,), 'mapJetCockpit': (10, 16), 'nocturnePanoramaBezel': (10, 16), 'jetScreen': (10, 16), 'jtNozzleShape': (10,),   # (the XR-50 flies the XR-30's sealed pod)
-        'mapMorpheus': (16,),
+        'mapJet': (10,), 'mapJetCockpit': (10,), 'nocturnePanoramaBezel': (10,), 'jetScreen': (10,), 'jtNozzleShape': (10,),
+        'mapMorpheus': (16,), 'mapMorpheusStation': (16,), 'morpheusHud': (16,), 'morpheusStationLight': (16,),   # (the XR-50's ground station)
         'mapSomnus': (12,), 'mapSomnusCockpit': (12,), 'somnusScreen': (12,), 'shadeSomnusCockpit': (12,),
     }
-    shading = ('shadeFleetCabin', 'fuselagePaint', 'wavecrestCabinAlbedo', 'jetScreen', 'somnusScreen', 'shadeSomnusCockpit')
+    shading = ('shadeFleetCabin', 'fuselagePaint', 'wavecrestCabinAlbedo', 'jetScreen', 'somnusScreen', 'shadeSomnusCockpit', 'morpheusHud', 'morpheusStationLight')
     cabin = ('mapFleetPanel', 'cutwaterSeatPadded', 'cutwaterPowerFurniture', 'cutwaterYokeWheel', 'cutwaterDisplayRearSupports', 'scrubrunnerSeatPadded',
              'scrubrunnerPowerFurniture', 'scrubrunnerStickGrip', 'scrubrunnerRaisedPrimaryRisers', 'mapWavecrestCabinTrim', 'twinPowerBankField',
              'mapReverieCockpit', 'mapJetCockpit', 'nocturnePanoramaBezel', 'mapSomnusCockpit', 'thistledownStickShaft', 'thistledownStickGrip',
-             'thistledownStickPivot', 'galleonNavFrame', 'galleonOverheadFrame', 'mapNewFleetFurnishings')
+             'thistledownStickPivot', 'galleonNavFrame', 'galleonOverheadFrame', 'mapNewFleetFurnishings', 'mapMorpheusStation')
     for m in range(aircraft_count):
         for prog in (f'plane_mesh_af{m}.frag', f'hullbake_af{m}.frag', f'hullbake_out_af{m}.frag', f'objects_af{m}.frag', f'shadow_proxy_af{m}.frag'):
             src = (a.shader_dir / 'pruned' / prog).read_text()

@@ -120,14 +120,17 @@ const AircraftSpec kAircraft[] = {
   // scramjets to Mach 7.5), a rocket with its own oxidizer, a lift fan, 3D vectoring nozzles, reaction jets: its own path
   // through the flight model (special 3, aircraft_morpheus.cpp). The span and the lift slope are the wing's swept
   // forward; its slats and flaps are its own (flapCL 0: the lever is the nozzles', as the XR-40's is its pods').
-  // A hot structure good for +13 / -6 g; its fly-by-wire holds it to 12
+  // Flown from the ground, with no one aboard (no seat, no life support: 1.5 t lighter than a piloted one), and twice
+  // the XR-40 in what makes it aggressive: engines that are fiction as its pods are (525 kN rated each, a real engine's
+  // fuel per throttle setting: 5.25 times its thrust for the fuel), 7.5 times its weight in full reheat at full tanks,
+  // a hot structure good for +600 / -600 g
   {"xr50_morpheus", "XR-50 Morpheus", "Variable-sweep hypersonic research craft", ENG_JET, 2, 0, 0, 0, 0,
-   12800, 8200, 0, 0, 48.0f, 15.5f, 3.4f,
+   11300, 8200, 0, 0, 48.0f, 15.5f, 3.4f,
    0.05f, 4.2f, 1.75f, 0.0f, 0.011f, 0.010f, 0.0f, 0.80f,
-   100000, 0, 64, 72, 460, 5200, 900, true, false, true,
+   525000, 0, 64, 72, 460, 28000, 900, true, false, true,
    90000, 330000, 410000, 0.45f, 0.080f, 0.060f, LIC_STUDENT, 0, 0,
-   21.0f, 0.85f, -0.07f, -0.4f, 2, 1, vec3(0.80f, 0.81f, 0.82f), vec3(1.0f, 0.60f, 0.16f), 3, 7.6f, 13.f, -6.f, false, 1.95f, .2f, 1.55f,
-   2.1e-5f, 5.2e-5f, 12000, 265, .13f, 24500},
+   21.0f, 0.85f, -0.07f, -0.4f, 2, 1, vec3(0.80f, 0.81f, 0.82f), vec3(1.0f, 0.60f, 0.16f), 3, 7.6f, 600.f, -600.f, false, 1.95f, .2f, 1.55f,
+   4.0e-6f, 9.9e-6f, 12000, 265, .023f, 23000},
 };
 // clang-format on
 static_assert(sizeof(kAircraft) / sizeof(kAircraft[0]) == kAircraftCount, "Aircraft table must match roster count");

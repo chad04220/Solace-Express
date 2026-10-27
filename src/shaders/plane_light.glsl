@@ -36,6 +36,10 @@ vec3 planeLight(vec3 p, vec3 rd, float t, int mid, Mat m, vec3 n, vec3 lp, vec3 
   if (RESEARCH_ON && podMat) {  // sealed research cockpit: lit only by its modelled fixtures, low and moody
     mat3 inv = transpose(gPR);
     int engP = int(gM[0].z + 0.5);
+#if HAS_MORPHEUS
+    if (engP == 7) col = morpheusStationLight(lp, inv*n, inv*(-rd), m, E.xyz)*ao + m.emit;   // (the XR-50's ground station)
+    else
+#endif
 #if HAS_SOMNUS && HAS_JET
     col = (engP == 6 ? somnusPodLight(lp, inv*n, inv*(-rd), m, E.xyz) : podLight(lp, inv*n, inv*(-rd), m, E.xyz))*ao + m.emit;
 #elif HAS_SOMNUS

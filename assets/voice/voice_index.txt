@@ -1402,11 +1402,16 @@ research.nyx.c52579ad7d48	nyx/research.nyx.c52579ad7d48.wav	XR-50 MORPHEUS // RE
 research.nyx.572d8bb795df	nyx/research.nyx.572d8bb795df.wav	XR-50 MORPHEUS // TEST CARD VERTICAL FLIGHT	nyx	40	line		
 research.nyx.57054edf582e	nyx/research.nyx.57054edf582e.wav	XR-50 MORPHEUS // TEST CARD SCRAMJET CORRIDOR	nyx	40	line		
 research.nyx.ba9bbedfd004	nyx/research.nyx.ba9bbedfd004.wav	XR-50 MORPHEUS // TEST CARD EDGE OF SPACE	nyx	40	line		
-research.nyx.796a960d43b8	nyx/research.nyx.796a960d43b8.wav	XR-50 MORPHEUS // TEST CARD POST-STALL	nyx	40	line		
 research.nyx.93b2ae0d181c	nyx/research.nyx.93b2ae0d181c.wav	TEST CARD XR50-1 COMPLETE - VERTICAL FLIGHT SIGNED OFF	nyx	40	line		
 research.nyx.556905d91847	nyx/research.nyx.556905d91847.wav	TEST CARD XR50-2 COMPLETE - SCRAMJET CORRIDOR SIGNED OFF	nyx	40	line		
 research.nyx.7afbc2193c7b	nyx/research.nyx.7afbc2193c7b.wav	TEST CARD XR50-3 COMPLETE - EDGE OF SPACE SIGNED OFF	nyx	40	line		
-research.nyx.ef0965da71cb	nyx/research.nyx.ef0965da71cb.wav	TEST CARD XR50-4 COMPLETE - POST-STALL SIGNED OFF	nyx	40	line		
+research.nyx.3b58a7b1a693	nyx/research.nyx.3b58a7b1a693.wav	XR-50 MORPHEUS // TEST CARD NO ONE ABOARD	nyx	40	line		
+research.nyx.bfeb2b09ca9a	nyx/research.nyx.bfeb2b09ca9a.wav	TEST CARD XR50-4 COMPLETE - NO ONE ABOARD SIGNED OFF	nyx	40	line		
+research.nyx.1e21403390d0	nyx/research.nyx.1e21403390d0.wav	STEP 1 of 5: Pull 160 g	nyx	40	line		
+research.nyx.369faef13eca	nyx/research.nyx.369faef13eca.wav	STEP 2 of 5: Push to -80 g	nyx	40	line		
+research.nyx.38d81f088b9d	nyx/research.nyx.38d81f088b9d.wav	STEP 3 of 5: Roll at 760 deg/s	nyx	40	line		
+research.nyx.55f3a1433bd2	nyx/research.nyx.55f3a1433bd2.wav	STEP 4 of 5: 70 deg angle of attack	nyx	40	line		
+research.nyx.4110b39d7836	nyx/research.nyx.4110b39d7836.wav	STEP 5 of 5: Land back at the range	nyx	40	line		
 research.nyx.fc92193c80c9	nyx/research.nyx.fc92193c80c9.wav	STEP 1 of 3: Hover for 10 s	nyx	40	line		
 research.nyx.9007cb8f48f6	nyx/research.nyx.9007cb8f48f6.wav	STEP 2 of 3: Wingborne past 250 kt, nozzles aft	nyx	40	line		
 research.nyx.859a732a4daf	nyx/research.nyx.859a732a4daf.wav	STEP 3 of 3: Land vertically	nyx	40	line		
@@ -1414,9 +1419,6 @@ research.nyx.d35b1658e696	nyx/research.nyx.d35b1658e696.wav	STEP 1 of 3: Climb t
 research.nyx.02a4dfc12e56	nyx/research.nyx.02a4dfc12e56.wav	STEP 2 of 3: Mach 6.5 on the scramjets	nyx	40	line		
 research.nyx.80bba326718e	nyx/research.nyx.80bba326718e.wav	STEP 1 of 3: Rocket lit for 5 s	nyx	40	line		
 research.nyx.7ba1cb53629e	nyx/research.nyx.7ba1cb53629e.wav	STEP 2 of 3: Climb through 80,000 m	nyx	40	line		
-research.nyx.6eecd9b45e2b	nyx/research.nyx.6eecd9b45e2b.wav	STEP 1 of 4: 70 deg angle of attack	nyx	40	line		
-research.nyx.179baa21f24a	nyx/research.nyx.179baa21f24a.wav	STEP 2 of 4: Roll at 230 deg/s	nyx	40	line		
-research.nyx.4c3080a6338b	nyx/research.nyx.4c3080a6338b.wav	STEP 3 of 4: Pull 11 g	nyx	40	line		
 research.nyx.204c17e10039	nyx/research.nyx.204c17e10039.wav	ROCKET SHUT DOWN	nyx	40	line		
 research.nyx.3215a27b3352	nyx/research.nyx.3215a27b3352.wav	ROCKET: its oxidizer is spent	nyx	40	line		
 research.nyx.d81f61a02d20	nyx/research.nyx.d81f61a02d20.wav	ROCKET: no fuel	nyx	40	line		

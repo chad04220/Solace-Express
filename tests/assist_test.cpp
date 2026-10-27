@@ -25,7 +25,7 @@ struct GameTest {
       const AircraftSpec& s = kAircraft[spec];
       g.plane.reset(&s, vec3(sea.x, alt, sea.z), 90.f, s.maxFuel, 100.f, true, s.cruise);
       g.takeoffAnnounced = true; g.engineAutoStarted = true; g.screen = SCR_FLIGHT; g.paused = false;
-      g.plane.ctl.throttle = s.special ? 0.55f : 0.75f;
+      g.plane.ctl.throttle = s.special == 3 ? 0.105f : s.special ? 0.55f : 0.75f;   // (about level at its cruise: the XR-50 with five times the thrust at a fifth of the throttle)
       const float dt = 1.f / 60.f;
       auto fly = [&](float seconds, int action = -1) {
         const int key = action >= 0 ? g.set.keyBind[action] : 0;

@@ -45,6 +45,46 @@ struct GameTest {
     }
     return 0;
   }
+  // the research terminal warmed, then each craft chosen in turn (TAB, as the player does): every frame of the next 90
+  // after each choice timed, and the slow ones named by what they did (programs compiled, bodies baked or loaded)
+  static int researchSwitch(Game& game) {
+    game.debugScene("menu");
+    if (getenv("PREWARM")) game.prewarm([](float, const std::string&) {}, true);
+    g_ren.entSync = false;
+    for (int i = 0; i < 3; i++) { game.update(1.f / 30.f); game.render(); }
+    game.in.down['U'] = game.in.down['I'] = true; game.in.pressed['U'] = true;
+    auto last = std::chrono::steady_clock::now();
+    g_ren.profileRegionRender = true;   // (each slow frame's passes, timed to their ends)
+    auto frame = [&](const char* tag, int f) {
+      const int m0 = g_shaderCacheMisses, h0 = g_shaderCacheHits, b0 = g_ren.bakeCount;
+      const auto t0 = std::chrono::steady_clock::now();
+      const float dt = std::min(0.25f, std::max(1.f / 240.f, std::chrono::duration<float>(t0 - last).count())); last = t0;
+      game.update(dt); const auto t1 = std::chrono::steady_clock::now(); game.render(); glFinish(); game.in.endFrame();
+      const auto t2 = std::chrono::steady_clock::now();
+      const double up = std::chrono::duration<double, std::milli>(t1 - t0).count(), rd = std::chrono::duration<double, std::milli>(t2 - t1).count();
+      const int compiled = (int)g_shaderCacheMisses - m0, loaded = (int)g_shaderCacheHits - h0, baked = g_ren.bakeCount - b0;
+      if (compiled || loaded || baked || up > 50.0 || rd > 1000.0) {
+        const auto& a = g_ren.regionAuxRenderMs;
+        printf("  %s frame %3d: update %.0f ms, render %.0f ms, programs compiled %d, loaded %d, bodies baked/loaded %d\n"
+               "      world %.0f  ground shadow %.0f  lighting %.0f  aircraft shadow %.0f  traffic shadow %.0f  stores %.0f  displays %.0f  feeds %.0f  objects %.0f  shadow proxy %.0f  post %.0f ms\n",
+               tag, f, up, rd, compiled, loaded, baked, g_ren.regionTerrainRenderMs, g_ren.regionShadowRenderMs, g_ren.regionLightingRenderMs, a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]);
+        fflush(stdout);
+      }
+      return up + rd;
+    };
+    for (int f = 0; f < 8000 && (game.resWarm || game.resSeq < 5.5f); f++) { frame("warm-up", f); game.in.down['U'] = game.in.down['I'] = false; }
+    printf("terminal ready: craft %s\n", kAircraft[game.resCraft].name);
+    const int nf = getenv("SWITCHFRAMES") ? std::max(2, atoi(getenv("SWITCHFRAMES"))) : 90;   // (frames on each craft)
+    for (int k = 0; k < 6; k++) {
+      game.in.pressed[K_TAB] = true;
+      const int m0 = g_shaderCacheMisses, b0 = g_ren.bakeCount; double worst = 0, sum = 0;
+      for (int f = 0; f < nf; f++) { const double ms = frame(kAircraft[game.resCraft].name, f); worst = std::max(worst, ms); sum += ms; }
+      printf("chose %-16s worst frame %.0f ms, mean %.0f ms, programs compiled %d, bodies %d\n", kAircraft[game.resCraft].name, worst, sum / nf,
+             (int)g_shaderCacheMisses - m0, g_ren.bakeCount - b0);
+      fflush(stdout);
+    }
+    return 0;
+  }
   // the XR-40 in flight: outside, then the cockpit, then bombs away, then outside and back in - each frame's update and
   // render timed, and the slow ones named by what they did (programs compiled, bodies baked or loaded, scenery gathered)
   static int somnusHitch(Game& game) {
@@ -682,6 +722,7 @@ void main(){
     return 0;
   }
   if (scene == "researchwarm") return GameTest::researchWarm(game);
+  if (scene == "researchswitch") return GameTest::researchSwitch(game);
   if (getenv("PREWARM")) game.prewarm([](float, const std::string& what) { if (getenv("PREWARMLOG")) printf("prewarm: %s\n", what.c_str()); });   // (every aircraft's body built first, as the game's launch does: the traffic drawn from meshes; PREWARMLOG: what each step says)
   if (getenv("NOTRAFFIC")) game.set.traffic = false;   // (A/B timings of the player's aircraft alone)
   if (getenv("PERFWARM")) for (int i : kCareerAircraft) Plane::perf(&kAircraft[i]);   // (every career type's performance learned first, as the game's launch does)

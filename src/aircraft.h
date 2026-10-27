@@ -152,10 +152,11 @@ static const vec3 kSomnusPods[4] = {vec3(-2.35f, -0.08f, -3.3f), vec3(2.35f, -0.
 // XR-50 Morpheus (docs/XR50.md; body coords, +z aft): where its forces act, the same for the flight model
 // (aircraft_morpheus.cpp) and the drawn airframe (plane_sdf.glsl mapMorpheus): the right swing wing's pivot, the lift
 // fan behind the cockpit, the right nozzle's swivel, the right roll post, the rocket's exit; the wing's sweep, forward
-// (take-off, landing, the hover) to aft (supersonic and beyond); the rocket's oxidizer when full (kg)
+// (take-off, landing, the hover) to aft (supersonic and beyond); the rocket's oxidizer when full (kg) and its thrust in
+// vacuum (N)
 static const vec3 kMorpheusPivot(2.1f, -0.06f, -0.4f), kMorpheusFan(0.f, 0.05f, -5.f), kMorpheusNozzle(0.78f, -0.02f, 7.4f);
 static const vec3 kMorpheusPost(2.65f, -0.36f, 1.4f), kMorpheusRocket(0.f, 0.28f, 8.95f);
-static const float kMorpheusSweepMin = 16.f * DEG, kMorpheusSweepMax = 68.f * DEG, kMorpheusOxidizer = 3400.f;
+static const float kMorpheusSweepMin = 16.f * DEG, kMorpheusSweepMax = 68.f * DEG, kMorpheusOxidizer = 3400.f, kMorpheusRocketVac = 540000.f;
 // the leading edges' temperature limits (K): the warning, and past the other the carbon-carbon starts to burn away
 static const float kMorpheusSkinWarn = 1823.f, kMorpheusSkinLimit = 1923.f;
 // its lamps (body coords): the right wingtip's, on the swing wing where it is at a sweep; the tail light at the end of the
@@ -381,8 +382,9 @@ public:
   // slow); the rocket's oxidizer (kg), lit or not, its thrust (N); the air-breathing engines' thrust by mode (turbofan,
   // ramjet, scramjet: N); the leading edges' temperature (K) and how far past their limit they have been (1: burned
   // through); the lift fan's clutch (0..1) and its thrust and the roll posts' (N); the nozzles' swivel down and each
-  // one's pitch and yaw vectoring (rad); the reaction jets' commands (pitch, yaw, roll: -1..1)
-  float sweep = 0, hiLift = 0, oxidizer = 0, rocketThr = 0, rocketN = 0; bool rocketLit = false;
+  // one's pitch and yaw vectoring (rad); the reaction jets' commands (pitch, yaw, roll: -1..1); the supercirculation's
+  // blowing (0..1: the wing's lift and roll authority raised to 1 + 2 circ times a plain wing's)
+  float sweep = 0, hiLift = 0, circ = 0, oxidizer = 0, rocketThr = 0, rocketN = 0; bool rocketLit = false;
   float tbcc[3] = {0, 0, 0}, skinT = 288.f, heatOver = 0, fanClutch = 0, fanN = 0, postN[2] = {0, 0};
   float nzSwivel = 0, nzPitch[2] = {0, 0}, nzYaw[2] = {0, 0}; vec3 rcs;
   float sweepTarget() const;   // the sweep the schedule asks for now (Mach, the lever, the gear)
@@ -419,11 +421,11 @@ public:
   float rangeLeftKm() const;
   float cd0Value() const { return cd0; }
   // fly-by-wire rate command of the research craft: full-stick pitch and roll rates (rad/s)
-  // (the XR-50's is a load factor command up and away - the rate that holds its 12 g fly-by-wire limit - and a rate
-  // command slow, where its vectoring takes it past the stall)
+  // (the XR-50, flown from the ground with no one aboard, has twice the XR-40's: the rate of a 160 g pull, 4 to 12 rad/s,
+  // and 14 rad/s of roll)
   float fbwPitchMax(float V) const {
     V = std::max(V, 1.f);
-    if (spec->special == 3) return clampf(11.f * G0 / V, 0.3f, 1.7f);
+    if (spec->special == 3) return clampf(160.f * G0 / V, 4.0f, 12.0f);
     return spec->special == 2 ? clampf(80.f * G0 / V, 2.0f, 6.0f) : clampf(66.f * G0 / V, 1.8f, 5.2f);
   }
   static const PerfModel& perf(const AircraftSpec* s);   // learned once per type (aircraft_perf.cpp)
@@ -438,7 +440,7 @@ public:
   static void wantFinals(int airport);
   static bool perfLoad(const std::string& path, const std::string& stamp);   // every type's, from a cache of this build's
   static void perfSave(const std::string& path, const std::string& stamp);
-  float fbwRollMax(float hover) const { return (spec->special == 2 ? 7.0f : spec->special == 3 ? 4.4f : 5.5f) * (1.f - 0.6f * hover); }
+  float fbwRollMax(float hover) const { return (spec->special == 2 ? 7.0f : spec->special == 3 ? 14.0f : 5.5f) * (1.f - 0.6f * hover); }
   // Assisted flying (the game's Flight assists, and always in time warp): the pilot's inputs (-1..1) command a roll rate
   // and a pitch rate; let go, the aircraft holds its bank (wings level from under 10 deg) and its flight path, and the
   // rudder coordinates (assistYaw adds the pilot's own). Flown through the autopilot's inner loops (apRates) inside the

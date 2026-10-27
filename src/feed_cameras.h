@@ -33,8 +33,8 @@ struct FeedMount {
   vec3 screen; float screenR = 0.f;   // its display: centre and radius
 };
 
-// 1 XR-30, 2 XR-40, 3 XR-50 (the XR-30's sealed pod and displays, its cameras mounted on its own airframe: a rig of its
-// own, so its lenses are measured on its own skin - camera_feeds.cpp g_feedMounts)
+// 1 XR-30, 2 XR-40, 3 XR-50 (its ground station's camera monitors, the cameras on its own airframe: its lenses are
+// measured on its own skin - camera_feeds.cpp g_feedMounts)
 inline int feedRigOf(const AircraftSpec* s) { if (!s) return 0; int sp = s->special; return sp == 1 ? 1 : sp == 2 ? 2 : sp == 3 ? 3 : 0; }
 
 // A flat panel: centre c, normal n (facing the pilot), "up" hint u, half size s; mirrored to the left side when
@@ -68,7 +68,19 @@ inline FeedMount feedPanel(vec3 c, vec3 n, vec3 u, vec2 s, bool left, float foca
 // the rig of a research jet (empty for anything else); focal: the main view's focal length in pixels (sets the
 // pictures' resolution: the displays are as sharp as the screen they're seen on)
 inline int feedRig(int rig, float focal, FeedMount out[kMaxFeeds]) {
-  if (rig == 1 || rig == 3) {
+  if (rig == 3) {
+    // XR-50: the station's monitors (research_cockpit_layout.glsl morpheusPane, each facing the eye): the main one the
+    // nose camera's, the two angled in beside it, the chin monitor's camera forward and down (slots 1 and 2 unused)
+    const vec3 Y(0, 1, 0), C0(0.f, 0.04f, -0.78f), C1(0.671f, 0.04f, -0.436f), C3(0.f, -0.31f, -0.48f);
+    out[0] = feedPanel(C0, C0 * -1.f, Y, vec2(0.52f, 0.29f), false, focal);
+    for (int k = 1; k <= 2; k++) { out[k] = out[0]; out[k].w = out[k].h = 0; }   // (no camera: the atlas skips it)
+    out[3] = feedPanel(C1, C1 * -1.f, Y, vec2(0.30f, 0.19f), true, focal);   // (the left: the right one mirrored)
+    out[4] = feedPanel(C1, C1 * -1.f, Y, vec2(0.30f, 0.19f), false, focal);
+    out[5] = feedPanel(C3, C3 * -1.f, Y, vec2(0.20f, 0.10f), false, focal);
+    out[0].nose = out[5].nose = true;
+    return 6;
+  }
+  if (rig == 1) {
     // XR-30: a panoramic display on a cylinder around the eye (r 0.64 m, +-1.25 rad, y 0.02 +- 0.30), shown by one
     // panoramic camera at the nose whose picture is that same cylinder (slots 1 and 2 are unused); a side display bay
     // either side

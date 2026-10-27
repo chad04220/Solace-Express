@@ -255,8 +255,9 @@ width, headrest, dome light, armrests, visor height and slope, overhead, vents).
   vectoring, finite jet fuel burn, the research drag rise, a +/-180 g structure); 2, the XR-40 (four tilting thruster pods,
   vertical flight, a +/-300 g structure: both past all their fly-by-wire can pull); 3, the XR-50 (`aircraft_morpheus.cpp`:
   a scheduled swing wing, turbofan / ramjet / scramjet thrust from captured dynamic pressure, a rocket with its own
-  oxidizer, a lift fan and swivelling nozzles, control allocation across surfaces, nozzles, fan and reaction jets, and
-  leading-edge heating that can burn through). A new Tier B type with new physics
+  oxidizer, a lift fan and swivelling nozzles, a blown wing, control allocation across surfaces, nozzles, fan and
+  reaction jets, and leading-edge heating that can burn through; flown from a ground station, with a +/-600 g
+  structure). A new Tier B type with new physics
   needs a new value and a new path. A conventional research type uses `special = 0` with `designMach`, `gPos`, `gNeg`
   (the XR-10 and XR-20).
 - **Learned performance.** At launch, `Plane::perf` flies short test sorties per type (stall speeds, best climb, idle
@@ -365,6 +366,7 @@ Material ids (`plane_material.glsl`, `planeMaterialN`), as the field returns the
 | 94, 95–100, 101–104 | light fixture housings, own lenses, traffic lenses | the second chain |
 | 120–124 | the Wavecrest's cabin trim (`gModelId == 8`) | its own block |
 | 150–159 | the XR-50's airframe: skin and tiles, carbon-carbon edges, canopy, nozzles, strips, ducts, rocket bell, hot sections, fan blades, tip lenses | its own block (`HAS_MORPHEUS`) |
+| 160–175 | the XR-50's ground station (its cockpit): monitor glass 160–164, walls, desk, housings, chair, metal, light panels, accent strips, floor, sign, rack lamps, keyboard | its own block (`HAS_MORPHEUS`); lit by `morpheusStationLight` |
 
 Rules learned the hard way:
 

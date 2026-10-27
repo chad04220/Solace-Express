@@ -98,7 +98,7 @@ inline ExhaustVisual buildExhaustVisual(const Plane& p, const ModelDef& m) {
     const int j = out.count++;
     out.exit[j][0] = kMorpheusRocket.x; out.exit[j][1] = kMorpheusRocket.y; out.exit[j][2] = kMorpheusRocket.z; out.exit[j][3] = .34f;
     out.axis[j][0] = 0.f; out.axis[j][1] = 0.f; out.axis[j][2] = 1.f; out.axis[j][3] = .34f;
-    out.power[j][0] = 1.f; out.power[j][1] = 1.f; out.power[j][2] = clampf(p.rocketN / 270000.f, 0.f, 1.f) * 1.5f;
+    out.power[j][0] = 1.f; out.power[j][1] = 1.f; out.power[j][2] = clampf(p.rocketN / kMorpheusRocketVac, 0.f, 1.f) * 1.5f;
     out.power[j][3] = exhaustFinite(p.mach, 0.f, 5.f); out.engine[j] = 2;
   }
   return out;

@@ -8,6 +8,20 @@ void planeToGB(vec3 p, vec3 rd, float t, int mid, vec3 ln, bool pod, bool trafHi
   int eng = int(gM[0].z + 0.5);
   bool wr = SOMNUS_ON && (!JET_ON || eng == 6);
   // a research jet's display from the pilot's seat: its camera's picture, with the display's own look and symbology
+#if HAS_MORPHEUS
+  // the XR-50's station: a camera monitor, its symbology over the world its window lets through (or over its camera's
+  // picture, with the cameras on: SCREENFEEDS)
+  if (RESEARCH_ON && pod && eng == 7 && mid >= 160 && mid <= 163) {
+    vec3 scrL = transpose(uPlaneRot)*(gRelSet ? gRel + (uCamPos - uPlanePos) : p - uPlanePos);
+    vec4 hud = morpheusHud(mid - 160, scrL - gM[22].xyz, rd);
+    vec3 col;
+    if (uScrWin == 1) { if (hud.a < 0.3) discard; col = hud.rgb; }
+    else { vec3 rdc; bool bomb; col = feedScreen(mid, scrL, rdc, bomb); col = mix(col, hud.rgb, hud.a*0.9); }
+    gbWritePrelit(t, -rd, GB_DISPLAY, clamp(col, vec3(0.0), vec3(3e4)));
+    oG3 = vec4(1.0, 1.0, 1.0, float(GBF_DISPLAY)/255.0);
+    return;
+  }
+#endif
 #if HAS_RESEARCH
   if (RESEARCH_ON && pod && eng >= 5 && ((mid >= 41 && mid <= 43) || (mid >= 61 && mid <= 63))) {
     vec3 scrL = transpose(uPlaneRot)*(gRelSet ? gRel + (uCamPos - uPlanePos) : p - uPlanePos);
@@ -18,7 +32,7 @@ void planeToGB(vec3 p, vec3 rd, float t, int mid, vec3 ln, bool pod, bool trafHi
     col = bomb ? wrFeedOverlay(col, scrL) : wr ? somnusScreen(col, rdc, mid, scrL) : jetScreen(col, rdc, mid, scrL);
 #elif HAS_SOMNUS
     col = bomb ? wrFeedOverlay(col, scrL) : somnusScreen(col, rdc, mid, scrL);
-#else
+#elif HAS_NOCTURNE
     col = jetScreen(col, rdc, mid, scrL);   // (the XR-30's own: no bomb camera)
 #endif
 #if HAS_SOMNUS

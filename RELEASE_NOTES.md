@@ -1,3 +1,45 @@
+## What's new in v4.3.0: the XR-50 unleashed
+
+The XR-50 Morpheus is now flown from the ground, with no one aboard, so its loads are no longer limited by what a
+pilot can survive. It is twice the XR-40 in everything that makes a research craft aggressive, each measured on both
+craft in the same air (docs/XR50.md).
+
+### Twice the XR-40
+- **Thrust.** 7.45 times its weight in full reheat at full tanks (the XR-40's 3.72). Its engines are fiction, as the
+  XR-40's pods are: five times a real engine's thrust for the same fuel at a throttle setting. A minute of full reheat
+  costs what it did; cruise, at a sliver of throttle, lasts 29 hours.
+- **Pull and push.** 163 g in a full pull at Mach 1.6 low down (the XR-40's 85), 71 g at Mach 0.95 (its 26), -136 g
+  in a full push (its -65). Its wing is blown with the engines' bleed (supercirculation), which raises its lift to
+  nearly five times a plain wing's. Its structure is good for +600 / -600 g, and the fly-by-wire holds it there.
+- **Roll.** 804 deg/s (the XR-40's 401), its blown flaperons working one side against the other.
+- **It snaps.** Pitch rates to 12 rad/s, rate loops twice as stiff, nozzles that slew stop to stop in under a quarter
+  of a second. The angle-of-attack limiter brakes the nose as it nears 32 degrees, or 90 through the stick's gate, so
+  it stops at the limit instead of tumbling past it.
+- **Still a hypersonic craft.** Mach 7.1 at 27 km, the heat corridor as before, 83 km on a rocket now twice as
+  strong. The lift fan scales with the engines: 1,380 kN available in the hover.
+- **Its fourth test card is new:** 160 g, -80 g, a 760 deg/s roll, then post-stall.
+
+### Its own ground station
+- **The cockpit view is the room it is flown from.** A sealed operations room with a desk, a side stick and a
+  throttle, pedals, a chair, an equipment rack and the programme's sign. Before the operator is a bank of monitors:
+  the nose camera ahead, two cameras angled in either side, a chin camera in the desk's console for hovering and
+  landing, and a telemetry strip above.
+- **The monitors carry the remote pilot's symbology** over what each camera sees: on the main monitor the boresight,
+  flight-path marker, horizon and pitch ladder, heading tape, speed, altitude, Mach, load and throttle, the uplink's
+  latency and a recording lamp. The side cameras show the horizon and their heading, and the chin camera the radar
+  altitude. The telemetry strip shows the uplink's signal, the load against the structure and the engines' mode.
+- The room is lit by its monitors (sky ahead, ground below), its ceiling panels and the XR-50's amber accent strips.
+  Looking at a side, chin or telemetry monitor magnifies it, but the main monitor never does: it is the view ahead.
+- Nothing in the room moves with the aircraft: no camera shake and no g-force iris there. The telemetry strip shows the
+  load against the structure instead.
+
+### Fixes
+- **Picking a craft in the research terminal no longer stalls.** The terminal's boot sequence baked each craft's body
+  but never drew it, so the graphics driver compiled the body's shader the first time you picked that craft, a pause
+  of up to several seconds (the XR-50's was the longest). The boot sequence now draws each baked body once, inside
+  and out, so that compile happens behind the boot screen.
+- The research terminal's manoeuvre envelope for the XR-50 now runs to Mach 8 instead of leaving the chart at Mach 4.
+
 ## What's new in v4.2.0: the XR-50 Morpheus
 
 The fifth research craft, and the one the others lead to. It takes off vertically, swings its wings back past the

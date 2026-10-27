@@ -199,6 +199,10 @@ float galleonWindow(vec3 p){
 }
 
 bool isReverie(){ return int(gM[0].z + 0.5) == 4 && abs(gM[22].x) < 0.001 && gM[13].y < -3.0; }
+#if HAS_MORPHEUS
+// the XR-50's ground station: its cockpit is the room it is flown from (morpheus_sdf.glsl mapMorpheusStation)
+bool morpheusStation(){ return int(gM[0].z + 0.5) == 7; }
+#endif
 const float MT_CANT = 0.48;
 const float MT_FIN_X = 1.05;   // fin roots stay on the shoulders when the engine moves to the centerline
 const vec3 MT_INLET = vec3(0.0, 1.05, -0.65);

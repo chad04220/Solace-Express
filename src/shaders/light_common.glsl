@@ -121,6 +121,28 @@ vec3 somnusPodLight(vec3 p, vec3 n, vec3 v, Mat m, vec3 E){
   return L;
 }
 
+#if HAS_MORPHEUS
+// the XR-50's ground station: lit by its monitors with what they show (the sky ahead, the ground under the chin
+// camera), the two light panels overhead, dimmed, the accent strips under the desk and along the front wall
+vec3 morpheusStationLight(vec3 p, vec3 n, vec3 v, Mat m, vec3 E){
+  vec3 fw = uPlaneRot*vec3(0.0, 0.0, -1.0), upw = uPlaneRot*vec3(0.0, 1.0, 0.0);
+  float day = smoothstep(-0.08, 0.15, uSunDir.y);
+  vec3 skyF = skyColor(normalize(fw + upw*0.15))*0.9;
+  vec3 ground = vec3(0.16, 0.2, 0.12)*(uSunCol*max(uSunDir.y, 0.0)*1.5 + vec3(0.03))*(0.5 + 0.5*day);
+  vec3 L = m.alb*vec3(0.03, 0.033, 0.04);
+  L += fixtureLight(p, n, v, m, E + vec3(-0.45, 0.04, -0.76), E + vec3(0.45, 0.04, -0.76), skyF*0.30, 2.2, vec3(0.0, -0.05, 1.0));
+  for (int i = -1; i <= 1; i += 2) {
+    float s = float(i);
+    L += fixtureLight(p, n, v, m, E + vec3(0.51*s, 0.04, -0.68), E + vec3(0.83*s, 0.04, -0.19), mix(skyF, ground, 0.4)*0.14, 2.5, vec3(-0.84*s, 0.0, 0.55));
+    L += fixtureLight(p, n, v, m, E + vec3(0.55*s, 0.955, -0.25), E + vec3(0.55*s, 0.955, 0.55), vec3(1.0, 0.85, 0.66)*0.10, 6.0, vec3(0.0, -1.0, 0.0));
+  }
+  L += fixtureLight(p, n, v, m, E + vec3(-0.16, -0.31, -0.48), E + vec3(0.16, -0.31, -0.48), ground*0.5, 3.0, vec3(0.0, 0.55, 0.84));
+  L += fixtureLight(p, n, v, m, E + vec3(-0.35, 0.47, -0.74), E + vec3(0.35, 0.47, -0.74), vec3(0.3, 0.85, 1.0)*0.03, 4.0, vec3(0.0, -0.54, 0.84));
+  L += fixtureLight(p, n, v, m, E + vec3(-1.0, -0.455, -0.312), E + vec3(1.0, -0.455, -0.312), gColStripe*0.04, 10.0, vec3(0.0, -0.7, 0.7));
+  L += fixtureLight(p, n, v, m, E + vec3(-1.2, 0.925, -1.02), E + vec3(1.2, 0.925, -1.02), gColStripe*0.05, 6.0, vec3(0.0, -0.6, 0.8));
+  return L;
+}
+#endif
 // the aircraft's shadow in point light i's beam at p (d from the light along l): each pass defines its own (the
 // lighting pass reads the shadow proxy; the aircraft passes leave their own lights' shadows out)
 float lightShadow(int i, vec3 p, vec3 n, vec3 l, float d);

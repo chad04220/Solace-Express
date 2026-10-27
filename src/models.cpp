@@ -179,7 +179,8 @@ const ModelDef kModels[] = {
     vec3(-.38f,.66f,-2.45f), 1, -4.05f,-2.95f,.40f,-2.10f },
   // ---------------------------------------------------------------- XR-50 Morpheus (hypersonic VTOL research craft; its own SDF in the shader, engine code 7)
   // A waverider forebody and chined lifting body: the stations are its core (the belly the nose gear folds into, the
-  // sealed cockpit's place). The swing wing, the V-tail, the nozzles and the lift fan are plane_sdf.glsl mapMorpheus's;
+  // camera bay's place; its eye is its ground station's, morpheus_sdf.glsl). The swing wing, the V-tail, the nozzles
+  // and the lift fan are mapMorpheus's;
   // the wing row is the panel swept forward (the lights, the gear's bounds), the fin row one canted half of the V-tail
   { {{-11.80f,.03f,.03f,-.22f},{-10.30f,.40f,.24f,-.16f},{-8.20f,.78f,.50f,-.04f},{-6.00f,1.00f,.78f,.08f},{-2.00f,1.10f,.82f,.06f},{2.50f,1.25f,.78f,.02f},{6.40f,1.18f,.62f,.02f},{9.20f,.98f,.50f,.04f}}, .35f,
     {7.75f,2.40f,1.00f,1.60f,-.06f,-1.40f,0.0f,.045f}, 0,0,0,.82f, 0,0,
@@ -371,6 +372,8 @@ int modelCockpitFocusTargets(int model,CockpitFocusTarget* out,int capacity){
   }else if(model==kResearchJet){
     for(int i=0;i<5;i++){auto p=cockpitResearch::nocturnePanel(i);add(E+p.c,p.n,p.h);}
     for(int side:{-1,1})add(E+vec3(side*.54f,-.39f,-.12f),vec3(0,1,0),vec2(.075f,.06f));
+  }else if(model==kMorpheus){   // its ground station's side, chin and telemetry monitors (the main one is the view ahead: never magnified)
+    for(int i=1;i<cockpitResearch::MS_PANES;i++){auto p=cockpitResearch::morpheusPane(i);add(E+p.c,p.n,p.h);}
   }else{
     for(int i=0;i<3;i++){auto p=cockpitResearch::somnusPanel(i);add(E+p.c,p.n,p.h);}
     for(int side:{-1,1})add(E+vec3(side*.575f,-.395f,-.36f),vec3(0,cosf(.55f),sinf(.55f)),vec2(.09f,.055f));

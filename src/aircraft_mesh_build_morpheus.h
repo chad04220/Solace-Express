@@ -30,7 +30,7 @@ inline int parts(const float*, bool inside, PartInst* out, int) {
     out[n++] = {PT_JT_LEGN, 0, 0}; out[n++] = {PT_JT_WHEELN, 0, 0}; out[n++] = {PT_JT_DOORN, 0, -1}; out[n++] = {PT_JT_DOORN, 0, 1};
     return n;
   }
-  // (its cockpit is the XR-30's sealed pod: the side stick, the throttle and the pedals)
+  // (its ground station: the side stick, the throttle and the pedals, at the desk - plane_parts.glsl)
   out[n++] = {PT_JET_STICK, 0, 0}; out[n++] = {PT_JET_THR, 0, 0}; out[n++] = {PT_WR_PEDAL, -1, 0}; out[n++] = {PT_WR_PEDAL, 1, 0};
   return n;
 }

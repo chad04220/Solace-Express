@@ -64,3 +64,24 @@ int somnusPanelIndex(vec3 q){ return q.x < -0.28 ? 0 : q.x > 0.28 ? 2 : 1; }
 const vec3 WR_HOLO_EMITTER = vec3(-0.675, -0.409, -0.932);
 const vec3 WR_HOLO_CENTRE = vec3(-0.675, -0.299, -0.866);
 const float WR_HOLO_RADIUS = 0.037;
+// The XR-50's ground station (morpheus_sdf.glsl mapMorpheusStation): its monitor bank, each pane facing the eye. 0 the
+// main monitor (the nose camera), 1 and 2 the left and right ones angled in beside it (57 deg off the nose), 3 the chin
+// monitor in the desk's console (forward and down, for the hover and the landing), 4 the telemetry strip above the main
+// one (its own page, not a window). Each is a window as the research cockpits' displays are (cabin_windows.glsl), its
+// symbology over the world it lets through (plane_screens.glsl morpheusHud)
+const int MS_PANES = 5;
+ResearchPanel morpheusPane(int i){
+  ResearchPanel p;
+  float sx = i == 1 ? -1.0 : 1.0;
+  p.c = i == 0 ? vec3(0.0, 0.04, -0.78) : i <= 2 ? vec3(sx*0.671, 0.04, -0.436) : i == 3 ? vec3(0.0, -0.31, -0.48) : vec3(0.0, 0.47, -0.74);
+  p.n = normalize(-p.c);
+  p.h = i == 0 ? vec2(0.52, 0.29) : i <= 2 ? vec2(0.30, 0.19) : i == 3 ? vec2(0.20, 0.10) : vec2(0.40, 0.065);
+  p.corner = i == 0 ? 0.02 : i <= 2 ? 0.015 : 0.01;
+  p.page = i;
+  return p;
+}
+// which pane a point of the bank is nearest (eye at the origin)
+int morpheusPaneIndex(vec3 q){
+  float a = atan(q.x, -q.z), e = atan(q.y, sqrt(q.x*q.x + q.z*q.z));
+  return e > 0.45 ? 4 : e < -0.37 && a > -0.5 && a < 0.5 ? 3 : a < -0.61 ? 1 : a > 0.61 ? 2 : 0;
+}

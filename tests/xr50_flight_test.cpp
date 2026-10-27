@@ -1,7 +1,8 @@
 // The XR-50 Morpheus's flight model (docs/XR50.md; src/aircraft_morpheus.cpp), flown through Plane::step by a simple
 // test pilot: its swing wing's schedule, each propulsion mode's reach (the turbofans' Mach 3, the scramjets' corridor),
 // the leading edges' heat and its limit, the rocket's climb out of the atmosphere, the hover on its lift fan and nozzles,
-// the post-stall manoeuvring its vectoring allows, and the fly-by-wire's 12 g. "--report" prints what it measured.
+// the post-stall manoeuvring its vectoring allows - and that it is twice the XR-40 in what makes either aggressive: its
+// thrust for its weight, its pull and push, its roll, each measured on both in the same air. "--report" prints them.
 #include "../src/aircraft.h"
 #include "test_world.h"
 #include <cstdio>
@@ -18,11 +19,23 @@ const Weather calm{};
 const float dt = 1.f / 120.f;
 void trace(const Plane& p, float t, const char* tag);
 
-// a level start over the open sea, wings level, heading east, at a height and Mach number
-void start(Plane& p, float alt, float mach, float fuelFrac = 0.7f) {
+// a level start over the open sea, wings level, heading east, at a height and Mach number (the XR-50, or another)
+void start(Plane& p, float alt, float mach, float fuelFrac = 0.7f, int type = kMorpheus) {
   const vec3 at(-WORLD_HALF * 0.9f, alt, -WORLD_HALF * 0.9f);
-  p.reset(&kAircraft[kMorpheus], at, 90.f, kAircraft[kMorpheus].maxFuel * fuelFrac, 85.f, true, mach * isa(alt).a);
+  p.reset(&kAircraft[type], at, 90.f, kAircraft[type].maxFuel * fuelFrac, 85.f, true, mach * isa(alt).a);
   p.sceneryHits = false; p.engineRunning = true; p.engineSpool = 1.f; p.ctl.throttle = 1.f;
+}
+// the stick held at a setting for a few seconds from a level start: the most load (g, the most either way by the sign of
+// the pitch) and the fastest roll (rad/s) it makes
+float pull(int type, float alt, float mach, float pitch, float roll, float secs, float* rollMax = nullptr) {
+  Plane p; start(p, alt, mach, 0.7f, type);
+  float gMost = 0.f, wMax = 0.f;
+  for (float t = 0.f; t < secs && !p.ev.crashed; t += dt) {
+    p.ctl.pitch = pitch; p.ctl.roll = roll; p.ctl.yaw = 0.f; p.step(dt, calm, t); trace(p, t, type != kMorpheus ? "other" : pitch < 0.f ? "push" : roll != 0.f ? "roll" : "pull");
+    gMost = pitch < 0.f ? std::min(gMost, p.gLoad) : std::max(gMost, p.gLoad); wMax = std::max(wMax, fabsf(p.w.z));
+  }
+  if (rollMax) *rollMax = wMax;
+  return p.ev.crashed ? 0.f : gMost;
 }
 // the test pilot: a flight path angle (deg) held through the fly-by-wire's pitch rate, damped on the flight path's own
 // rate (fast, the path lags the nose by many seconds: undamped it porpoised), the wings level
@@ -43,9 +56,9 @@ void hold(Plane& p, float alt, float t = 0.f) {
 }
 // XR50TRACE: a line a second of what it is doing
 void trace(const Plane& p, float t, const char* tag) {
-  static const bool on = getenv("XR50TRACE") != nullptr;
-  if (!on || fmodf(t, 1.f) >= dt) return;
-  printf("  %s t %5.1f alt %7.0f M %5.2f a %5.1f pitch %5.1f g %5.1f tf %4.0f ram %4.0f scr %4.0f rkt %4.0f fan %4.0f skin %5.0f sw %4.1f %s\n", tag, t, p.pos.y, p.mach,
+  static const bool on = getenv("XR50TRACE") != nullptr, every = on && !strcmp(getenv("XR50TRACE"), "all");
+  if (!on || (fmodf(t, 1.f) >= dt && !every)) return;
+  printf("  %s t %5.1f alt %7.0f M %5.2f a %5.1f pitch %5.1f g %5.1f tf %4.0f ram %4.0f scr %4.0f rkt %4.0f fan %4.0f skin %5.0f sw %4.1f cd0 %.4f %s\n", tag, t, p.pos.y, p.mach,
          p.alpha / DEG, p.pitchDeg(), p.gLoad, p.tbcc[0] / 1e3f, p.tbcc[1] / 1e3f, p.tbcc[2] / 1e3f, p.rocketN / 1e3f, p.fanN / 1e3f, p.skinT - 273.15f, p.sweep / DEG, p.cd0Value(),
          p.ev.crashed ? p.ev.crashReason.c_str() : "");
 }
@@ -69,6 +82,7 @@ int main(int argc, char** argv) {
   // ---- the schedule: forward slow, aft fast, forward again with the lever down
   {
     Plane p; start(p, 9000.f, 0.5f);
+    p.ctl.throttle = p.engineSpool = 0.2f;   // (in full reheat it is past Mach 0.72 in two seconds)
     for (float t = 0.f; t < 3.f; t += dt) hold(p, 9000.f, t);
     const float slow = p.sweep;
     start(p, 12000.f, 1.8f);
@@ -84,7 +98,7 @@ int main(int argc, char** argv) {
     float skin = 0.f;
     const float m10 = topMach(10000.f, 0.9f, 240.f), m18 = topMach(18000.f, 2.2f, 300.f), m27 = topMach(27000.f, 6.0f, 300.f, &skin);
     if (report) printf("top Mach: %.2f at 10 km, %.2f at 18 km, %.2f at 27 km (leading edges %.0f C)\n", m10, m18, m27, skin - 273.15f);
-    check(m10 > 2.0f && m10 < 4.f, "the turbofans in reheat and the ramjets take it past Mach 2 at 10 km - and the combustors' limit stops it short of Mach 4");
+    check(m10 > 2.0f && m10 < 4.3f, "the turbofans in reheat and the ramjets take it past Mach 2 at 10 km - and the combustors' limit stops it short of Mach 4.3");
     check(m18 > 4.f, "the ramjets take it past Mach 4 at 18 km");
     check(m27 > 6.8f && m27 < 7.6f, "the scramjets hold it past Mach 6.8 in their corridor, at 27 km");
   }
@@ -117,9 +131,9 @@ int main(int argc, char** argv) {
     };
     const float scram = minutes(25000.f, 6.5f), scramHeld = held, cruise = minutes(12000.f, 0.9f);
     const float planned = cruiseMinutes(kAircraft[kMorpheus], kAircraft[kMorpheus].maxFuel);
-    if (report) printf("endurance: %.0f min at Mach %.2f on the scramjets (25 km), %.0f min at Mach %.2f (12 km, spool %.2f; the planner's %.0f)\n", scram, scramHeld,
+    if (report) printf("endurance: %.0f min at Mach %.2f on the scramjets (25 km), %.0f min at Mach %.2f (12 km, spool %.3f; the planner's %.0f)\n", scram, scramHeld,
                        cruise, held, spool, planned);
-    check(scram > 10.f && cruise > 90.f, "the tanks last over 10 minutes on the scramjets and an hour and a half at cruise");
+    check(scram > 30.f && cruise > 600.f, "the tanks last over half an hour on the scramjets and ten hours at cruise");
     check(fabsf(planned / cruise - 1.f) < 0.15f, "the fuel planner's cruise is the one it flies");
   }
   // ---- the rocket: from the scramjets' corridor, a pull to 35 deg and the rocket lit - out of the atmosphere
@@ -143,11 +157,14 @@ int main(int argc, char** argv) {
     Plane p; start(p, 300.f, 0.f, 0.5f);
     p.vel = vec3(); p.ctl.flaps = p.flaps = p.nozzle = 1.f; p.ctl.gearDown = true; p.gear = 1.f;
     p.fanClutch = 1.f; p.nzSwivel = 95.f * DEG;   // (established in the hover)
-    float hMin = 1e9f, hMax = -1e9f, attMax = 0.f, thrI = 0.75f;
+    // (the test pilot's throttle: from what holds its weight, its gains for the thrust a throttle's worth makes)
+    const float wt = p.mass() * G0 / p.liftThrustMax();
+    float hMin = 1e9f, hMax = -1e9f, attMax = 0.f, thrI = 0.85f * wt;
+    p.engineSpool = thrI;
     for (float t = 0.f; t < 40.f && !p.ev.crashed; t += dt) {
       p.ctl.flaps = 1.f; p.ctl.pitch = 0.f; p.ctl.roll = 0.f; p.ctl.yaw = 0.f;
       const float e = (300.f - p.pos.y) * 0.3f - p.vel.y;
-      thrI = clampf(thrI + e * 0.05f * dt, 0.f, 1.f); p.ctl.throttle = clampf(thrI + e * 0.15f, 0.f, 1.f);
+      thrI = clampf(thrI + e * 0.05f * wt * dt, 0.f, 1.f); p.ctl.throttle = clampf(thrI + e * 0.15f * wt, 0.f, 1.f);
       p.step(dt, calm, t); trace(p, t, "hover");
       if (t > 10.f) { hMin = std::min(hMin, p.pos.y); hMax = std::max(hMax, p.pos.y); attMax = std::max(attMax, std::max(fabsf(p.pitchDeg()), fabsf(p.bankDeg()))); }
     }
@@ -156,19 +173,29 @@ int main(int argc, char** argv) {
     check(!p.ev.crashed && hMax - hMin < 6.f && attMax < 5.f, "it hovers level within a few metres");
     check(p.liftThrustMax() > 1.1f * p.mass() * G0, "the autopilot sees it can hover (and lands vertically)");
   }
-  // ---- the fly-by-wire's limit: a full pull at Mach 0.95 low down holds about 12 g, never past the 13 g structure
+  // ---- twice the XR-40: its thrust for its weight at full tanks (static, in full reheat and full boost); the most load
+  // a full pull and a full push make from the same start, subsonic and at Mach 1.6 low down; the fastest roll
   {
-    Plane p; start(p, 3000.f, 0.95f);
-    float gMax = 0.f;
-    for (float t = 0.f; t < 6.f && !p.ev.crashed; t += dt) { p.ctl.pitch = 1.f; p.ctl.roll = 0.f; p.step(dt, calm, t); trace(p, t, "pull"); gMax = std::max(gMax, p.gLoad); }
-    if (report) printf("full pull at Mach 0.95: %.1f g\n", gMax);
-    check(!p.ev.crashed && gMax > 10.5f && gMax < 13.f, "a full pull holds the fly-by-wire's 12 g");
+    auto twr = [](int type) { Plane p; start(p, 0.f, 0.f, 1.f, type); return p.thrustAt(1.f, 0.f, 0.f, 1.225f) / (p.mass() * G0); };
+    const float tw50 = twr(kMorpheus), tw40 = twr(kSomnus);
+    const float g50 = pull(kMorpheus, 3000.f, 0.95f, 1.f, 0.f, 4.f), g40 = pull(kSomnus, 3000.f, 0.95f, 1.f, 0.f, 4.f);
+    const float f50 = pull(kMorpheus, 1000.f, 1.6f, 1.f, 0.f, 2.f), f40 = pull(kSomnus, 1000.f, 1.6f, 1.f, 0.f, 2.f);
+    const float n50 = pull(kMorpheus, 1000.f, 1.6f, -1.f, 0.f, 2.f), n40 = pull(kSomnus, 1000.f, 1.6f, -1.f, 0.f, 2.f);
+    float r50 = 0.f, r40 = 0.f;
+    pull(kMorpheus, 3000.f, 0.9f, 0.f, 1.f, 2.f, &r50); pull(kSomnus, 3000.f, 0.9f, 0.f, 1.f, 2.f, &r40);
+    if (report) printf("vs the XR-40: thrust/weight %.2f / %.2f; full pull at Mach 0.95 %.0f g / %.0f, at Mach 1.6 %.0f g / %.0f; full push %.0f g / %.0f; roll %.0f deg/s / %.0f\n",
+                       tw50, tw40, g50, g40, f50, f40, n50, n40, r50 / DEG, r40 / DEG);
+    check(tw50 > 1.95f * tw40, "twice the XR-40's thrust for its weight");
+    check(g50 > 1.9f * g40 && f50 > 1.9f * f40 && f50 >= 160.f, "twice the XR-40's pull, 160 g and more fast and low");
+    check(n50 < 1.9f * n40 && n50 <= -80.f, "twice the XR-40's push, past -80 g");
+    check(r50 > 1.9f * r40 && r50 / DEG > 760.f, "twice the XR-40's roll, past 760 deg/s");
+    check(f50 < kAircraft[kMorpheus].gLimitPos() && n50 > kAircraft[kMorpheus].gLimitNeg(), "inside its 600 g structure either way");
   }
   // ---- post-stall: slow, a full pull stands it past 70 deg of angle of attack, and it recovers
   {
     Plane p; start(p, 4000.f, 0.35f);
     float aMax = 0.f, t = 0.f;
-    for (; t < 3.f; t += dt) { p.ctl.pitch = 1.f; p.ctl.roll = 0.f; p.step(dt, calm, t); aMax = std::max(aMax, p.alpha / DEG); }
+    for (; t < 3.f; t += dt) { p.ctl.pitch = 1.f; p.ctl.roll = 0.f; p.step(dt, calm, t); trace(p, t, "post"); aMax = std::max(aMax, p.alpha / DEG); }
     for (; t < 15.f; t += dt) hold(p, 4000.f, t);
     if (report) printf("post-stall: %.0f deg of angle of attack, then %s at %.0f m\n", aMax, p.ev.crashed ? "crashed" : "flying", p.pos.y);
     check(aMax > 70.f && !p.ev.crashed, "the vectoring takes it past 70 deg of angle of attack and back");
