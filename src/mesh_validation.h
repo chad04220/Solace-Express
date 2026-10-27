@@ -10,7 +10,7 @@
 namespace aircraftMesh {
 // Explicit algorithm manifest: change when extraction/projection/simplification changes.
 inline constexpr uint32_t kAlgorithmVersion = 24;
-inline constexpr uint32_t kMaxPartType = 50; // update alongside the PT_* enum when adding a rigid part
+inline constexpr uint32_t kMaxPartType = 57; // update alongside the PT_* enum when adding a rigid part (aircraft_mesh.cpp asserts it)
 inline constexpr const char* kSomnusLoadoutManifest = "somnus-loadout3:verified-planar-and-round-face-normals;separate-rigid-kinetic-charged-penetrator-emp;3mm-lattice;shared-mount-poses;selected-parts-all-passes";
 inline constexpr float kGalleonDoorMaxEdge = .20f;
 inline constexpr const char* kAlgorithmManifest = "mesh24:upstream-part-creases;exterior-edge500mm;finite-gradient-adjacency;prune-zero-area;semantic-fixtures;compact-flat;bounded-workers;vigil-overhead-edge80mm;galleon-main-door-edge200mm;skerry-verified-planar;conventional-cabin-coherent-winding;galleon-swept-root-bays;nocturne-toggle-detail3.90625mm";

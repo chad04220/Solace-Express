@@ -19,6 +19,10 @@
 #include "somnus_hardware_normals.h"
 #include "mesh_simplify.h"
 #include "mesh_validation.h"
+#include "aircraft_mesh_build_types.h"
+// (a part the validator doesn't know is rejected with its whole mesh, and the aircraft marched every frame: v4.2's XR-50
+// parts 51-57 were, until its release bake refused them)
+static_assert(aircraftMesh::kMaxPartType == aircraftBuild::PT_MR_FANBOT, "kMaxPartType must be the newest PT_* rigid part");
 #include "aircraft_mesh_overhead.h"
 #include "aircraft_mesh_nocturne_detail.h"
 #include "aircraft_mesh_orientation.h"

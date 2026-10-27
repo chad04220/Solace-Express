@@ -183,7 +183,7 @@ int integer(const char* value) {
 int main(int argc, char** argv) {
   if (argc == 2 && std::string(argv[1]) == "--help") {
     std::printf("Usage: aircraft_mesh_export OUTPUT_DIRECTORY\n"
-                "Creates a new directory with all 32 full-quality production aircraft meshes.\n"
+                "Creates a new directory with all 34 full-quality production aircraft meshes.\n"
                 "Existing directories and diagnostic geometry overrides are refused.\n"
                 "Diagnostic worker: aircraft_mesh_export --bake-one MODEL SLOT EXISTING_DIRECTORY\n"
                 "A single worker result is incomplete and cannot be packaged.\n");
@@ -209,7 +209,7 @@ int main(int argc, char** argv) {
     std::printf("Canonical producer: %s | %s | %s\nBuild source: %s\n", gl.vendor.c_str(), gl.renderer.c_str(), gl.version.c_str(), kAircraftBuildSourceDigest);
     std::ostringstream files;
     for (int model = 0; model < kAircraftCount; ++model) for (int slot = 0; slot < 2; ++slot) {
-      std::printf("Baking %d/32: %s %s\n", model * 2 + slot + 1, kAircraft[model].name, slot ? "cockpit" : "exterior");
+      std::printf("Baking %d/%d: %s %s\n", model * 2 + slot + 1, kAircraftCount * 2, kAircraft[model].name, slot ? "cockpit" : "exterior");
       std::fflush(stdout);
       const auto started = std::chrono::steady_clock::now();
       runWorker(executable, model, slot, staging);
@@ -232,7 +232,7 @@ int main(int argc, char** argv) {
     }
     std::ostringstream report;
     report << "{\n  \"schema\":1,\n  \"implementation\":\"production-strict-fresh-v1\",\n"
-           << "  \"complete\":true,\n  \"full_quality\":true,\n  \"asset_count\":32,\n"
+           << "  \"complete\":true,\n  \"full_quality\":true,\n  \"asset_count\":" << kAircraftCount * 2 << ",\n"
            << "  \"format_version\":" << aircraftAsset::kFormatVersion << ",\n  \"algorithm_version\":" << aircraftMesh::kAlgorithmVersion << ",\n"
            << "  \"source_digest\":" << jsonString(kAircraftBuildSourceDigest) << ",\n"
            << "  \"geometry_digest\":" << jsonString(kAircraftGeometrySourceDigest) << ",\n"
@@ -243,7 +243,7 @@ int main(int argc, char** argv) {
     // independently revalidates every binary, source input and count before ZIP.
     if (fs::exists(output)) throw std::runtime_error("Output appeared during export; refusing replacement");
     fs::rename(staging, output); staging.clear();
-    std::printf("Exported 32 full-quality meshes to %s\nValidate and bundle with tools/mesh_assets/mesh_assets.py.\n", output.string().c_str());
+    std::printf("Exported %d full-quality meshes to %s\nValidate and bundle with tools/mesh_assets/mesh_assets.py.\n", kAircraftCount * 2, output.string().c_str());
     return 0;
   } catch (const std::exception& error) {
     std::fprintf(stderr, "Aircraft mesh export failed: %s\nNo release bundle was published.\n", error.what());
