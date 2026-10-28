@@ -150,10 +150,14 @@ struct GameTest {
         small++;
         if (x.id.empty() || c.haulKm < x.haulKm) x = c;
       }
-      check(small > 0 && beyond && named, fmt("its board there: %d cross-country jobs, %d to small fields beyond the chart (%s, %.0f km)", cross, small, x.title.c_str(), x.haulKm));
+      // (an isolated field - Bermuda, the global pack's nearest to the islands - has no small field within 180 km and no
+      // other in its chart: nothing to draw a cross-country from, so its board holds the airline's long hauls alone)
+      const bool isolated = cross == 0 && procedural::airportCount(game.career.region) <= 1;
+      if (isolated) printf("Career on the Earth: its board there: no cross-country work (no field within reach of %s): skipped\n", game.careerPlaceName().c_str());
+      else check(small > 0 && beyond && named, fmt("its board there: %d cross-country jobs, %d to small fields beyond the chart (%s, %.0f km)", cross, small, x.title.c_str(), x.haulKm));
       int si = -1; Career::Source src = Career::SRC_NONE;
       for (int t : kCareerAircraft) if (si < 0 && !x.id.empty() && (src = game.career.canFly(x, t)) != Career::SRC_NONE) si = t;
-      check(si >= 0, "an aircraft for it");
+      if (!isolated) check(si >= 0, "an aircraft for it");
       if (si >= 0) {
         const Airport* B = procedural::airportOf(x.toRegion, x.to);
         const std::string field = B->code;

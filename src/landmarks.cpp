@@ -282,15 +282,18 @@ void realLighthouses(const World& world, WorldSceneryState& state, std::vector<P
     vec2 at(l.x, l.z);
     if (g(at) < 0.5f) {
       bool found = false;
+      vec2 best = at;
       for (float r = 10.f; r <= 120.f && !found; r += 10.f) {
-        float lowest = 1e9f;   // (on the ring: the lowest land, nearest the water)
+        float lowest = 1e9f;   // (on the ring round its place: the lowest land, nearest the water)
         for (int a = 0; a < 24; a++) {
           const vec2 p = at + vec2(cosf(a * 0.2618f), sinf(a * 0.2618f)) * r;
           const float h = g(p);
-          if (h >= 0.8f && h < lowest) { lowest = h; at = p; found = true; }
+          if (h >= 0.8f && h < lowest) { lowest = h; best = p; found = true; }
         }
       }
-      if (!found) at = vec2(l.x, l.z);
+      // (chosen once the ring is scanned: moved as each point bettered the last, a light walked off round the ring,
+      // past the 120 m it may stand from its place)
+      at = found ? best : vec2(l.x, l.z);
     }
     const float s = std::clamp((l.height > 0.f ? l.height : 16.f) / 27.f, 0.45f, 1.6f), R = 6.f * s;
     vec2 sea(0.f, 1.f); float low = 1e9f;

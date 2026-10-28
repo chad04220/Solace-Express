@@ -8,6 +8,15 @@
   left - or the gamepad's A), or **X**, lights the rocket and shuts it off, as often as you like while the oxidizer
   lasts.
 
+### The real Earth, checked against the published pack
+The streamed install, the charts, the fine elevation, the sliding flight and the career's long hauls were run against
+the pack on the game's release (not the test fixture): New York and Boston build from the streamed data in about 50 s
+on a fresh install (35 of them the chart itself, the rest its first pieces fetched), with Copernicus GLO-90 read for
+the fine ground. One fix came out of it:
+- **A lighthouse could walk off its place.** Where the ground has a light in the sea, it moves to the nearest land
+  within 120 m; the search moved it again at each better point round the ring, so a light could end up further than
+  that from its place (North Brother Island's, in the East River). It stands where the ring's best point is.
+
 ### Every screen checked for overlap
 A pass over every menu and card at 720p, 1080p and 140% UI scale:
 - **Research terminal:** the XR-50's card sat on the test-card list (the register was laid out for four airframes);

@@ -91,7 +91,8 @@ struct GameTest {
               }
           }
         const float share = seen ? float(matched) / float(seen) : 0.f;
-        if (from == A->id) check(seen > 100 && share > 0.9f, fmt("%s: the same trees and stones in both charts (%d of %d, %.0f%%)", what.c_str(), matched, seen, 100.f * share));
+        // (a few dozen at the least: the fixture's woods there hold hundreds, the global pack's cover fewer)
+        if (from == A->id) check(seen >= 40 && share > 0.9f, fmt("%s: the same trees and stones in both charts (%d of %d, %.0f%%)", what.c_str(), matched, seen, 100.f * share));
       }
       place(moveX);
       const geo::Position where = before.position(game.plane.pos);

@@ -711,6 +711,28 @@ Decisions taken with the defaults (the owner can change them):
 
 ---
 
+### 6.2 Checked against the published pack (2026-10-28)
+
+The pieces above were run against the pack on the game's `earth` release, not the fixture, from a container with a
+plain connection to GitHub and to the Copernicus bucket:
+
+- **Install.** The core zip (14 MB) matches `SHA256SUMS`; unpacked with `stream.txt` naming the release, the pack opens
+  streamed in 0.03 s. An ident lookup or a picker search over the 70,000 airports takes 0.03-0.04 s.
+- **Streaming.** A ranged request through the release's redirect takes 0.2-0.6 s. New York's chart (6 airports, 80
+  towns, 61,500 roads) and Boston's (8, 80, 69,600) each build in 35-38 s here; a fresh streamed install adds about
+  13 s for their first pieces (66 of them, 1.3 MB). Opened again, nothing is fetched.
+- **GLO-90.** A real Copernicus tile (N40W074, 1.9 MB, 1.3 s) decodes and is read for New York's chart: the airports'
+  elevations and the lighthouses' feet change with it, and the chart's cache key counts it.
+- **Flying.** `earth_slide_test` over the real pack: both slides (Martha's Vineyard to Hyannis to Nantucket) prepare
+  the next chart ahead, stage its scenery (1,500 chunks), carry the airports, the autopilot, the clearance and the
+  circuit's traffic. `earth_career_test`: a long haul from the islands to Bermuda, the hub there, the save, home.
+  Bermuda has no other field within 180 km and none else in its chart, so its board holds the airline's long hauls
+  alone (the test says so rather than failing there).
+- **A fix.** A lighthouse the ground had in the sea could be walked round its ring past the 120 m it may stand from
+  its place; it takes the ring's best point once scanned (North Brother Island's light, in the East River).
+- **Not run here:** the Windows download of the whole 1.5 GB zip (WinHTTP; the resume logic has its own tests over
+  file addresses) and a flight on a real GPU.
+
 ## 7. Contracts to keep (they have tests)
 
 - **CPU and GPU agree** on the terrain height (`World::height` / `terrainH`), the road bed (`road_grade_gpu_test`) and

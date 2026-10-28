@@ -17,28 +17,39 @@ static void check(bool ok, const std::string& what) {
 }
 
 int main(int argc, char** argv) {
-  std::string dir = "tests/fixtures/earth2", ident = "KMVY", save;
+  std::string dir = "tests/fixtures/earth2", ident = "KMVY", save, glo90;
   for (int i = 1; i < argc; i++) {
     const std::string a = argv[i];
     if (a == "--pack" && i + 1 < argc) dir = argv[++i];
+    else if (a == "--glo90" && i + 1 < argc) glo90 = argv[++i];   // (a folder of fetched Copernicus tiles: the game's download cache)
     else if (a == "--airport" && i + 1 < argc) ident = argv[++i];
     else if (a == "--save" && i + 1 < argc) save = argv[++i];
     else if (i == 1) dir = a;
   }
   std::string why;
+  const auto tOpen = std::chrono::steady_clock::now();
   auto pack = earth::Pack::open(dir, &why);
   check(pack != nullptr, "the pack opens: " + why);
   if (!pack) return 1;
+  if (!glo90.empty()) pack->setGlo90Cache(glo90);
   earthCharts::usePack(pack);
+  const auto tFind = std::chrono::steady_clock::now();
   const auto chart = earthCharts::chartForAirport(ident);
   check(chart.has_value(), "a chart for " + ident);
   if (!chart) return 1;
+  const auto tSearch = std::chrono::steady_clock::now();
+  const size_t hits = earthCharts::searchAirports("new york", 40).size();
+  printf("pack opened in %.2f s (%s), %s found in %.2f s, a picker search in %.2f s (%zu hits)\n",
+         std::chrono::duration<double>(tFind - tOpen).count(), pack->streamed() ? "streamed" : "whole", ident.c_str(),
+         std::chrono::duration<double>(tSearch - tFind).count(), std::chrono::duration<double>(std::chrono::steady_clock::now() - tSearch).count(), hits);
   printf("chart %s (%s) at %.5f, %.5f\n", chart->id.c_str(), chart->name.c_str(), chart->origin.latitude, chart->origin.longitude);
   check(earthCharts::find(chart->id).has_value() && earthCharts::find(chart->id)->id == chart->id, "the chart's id finds it again");
   check(!earthCharts::find("earth:01:2") && !earthCharts::find("earth:1:2x") && !earthCharts::find("earth:99999:0"), "malformed ids refused");
   {   // (the job board and the picker take an airport's chart from its record: the same as its ident finds)
+    // (a few hundred of them: each ident's lookup reads the whole table, and the global pack holds seventy thousand)
     bool same = true; int airports = 0;
     for (const auto& a : pack->airports(pack->box())) {
+      if (airports >= 300) break;
       const auto byIdent = earthCharts::chartForAirport(a.ident);
       same = same && byIdent && byIdent->id == earthCharts::chartForAirport(a).id; airports++;
     }
@@ -142,7 +153,12 @@ int main(int argc, char** argv) {
       const PlacedEnt* got = nullptr;
       for (const PlacedEnt& p : landmarks(w))
         if (p.kind == EK_LIGHTHOUSE && hypotf(p.e.x - l.x, p.e.z - l.z) < 121.f) got = &p;
-      if (!got) { printf("  no lighthouse for %s at %.0f %.0f\n", l.name.c_str(), l.x, l.z); continue; }
+      if (!got) {
+        float nearest = 1e9f;
+        for (const PlacedEnt& p : landmarks(w)) if (p.kind == EK_LIGHTHOUSE) nearest = std::min(nearest, hypotf(p.e.x - l.x, p.e.z - l.z));
+        printf("  no lighthouse for %s at %.0f %.0f (ground there %.1f; the nearest placed %.0f m away)\n", l.name.c_str(), l.x, l.z, w.groundHeight(l.x, l.z, 8), nearest);
+        continue;
+      }
       const float g = w.groundHeight(got->e.x, got->e.z, 8), top = got->e.y + kEntInfo[EK_LIGHTHOUSE].h * got->e.sy;
       const float want = std::clamp(l.height > 0.f ? l.height : 16.f, 0.45f * 27.f, 1.6f * 27.f);
       if (got->e.y >= -2.2f && got->e.y <= std::max(g, -2.f) + 0.1f && fabsf(top - std::max(got->e.y, 0.f) - want) < 0.5f) placed++;
