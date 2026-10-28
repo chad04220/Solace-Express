@@ -227,6 +227,10 @@ int main(int argc,char**argv) {
         eye=normalize(offset)*size*1.8f; target=vec3(0,(std::string(view)=="profile"||std::string(view)=="quarter")?.1f:-.15f,0);
         if(std::string(view)=="gearfront") { target=vec3(M[18*4+0],-M[19*4+0]*0.5f,M[18*4+2]); eye=target+normalize(offset)*size*1.8f; } glUniform1f(loc("vScale"),size*zoom); glUniform1i(loc("vPerspective"),0);
       }
+      if(!inside&&getenv("AVT_CAM")) {   // (AVT_CAM=ex,ey,ez,tx,ty,tz: a perspective view of the outside from anywhere, body space)
+        sscanf(getenv("AVT_CAM"),"%f,%f,%f,%f,%f,%f",&eye.x,&eye.y,&eye.z,&target.x,&target.y,&target.z);
+        glUniform1f(loc("vScale"),.68f); glUniform1i(loc("vPerspective"),1);
+      }
       vec3 back=normalize(eye-target),right=normalize(cross(vec3(0,1,0),back)),up=cross(back,right);
       v3("vEye",eye);v3("vRight",right);v3("vUp",up);v3("vBack",back);
       glDrawArrays(GL_TRIANGLES,0,3);glFinish();

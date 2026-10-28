@@ -159,10 +159,11 @@ static const vec3 kMorpheusPost(2.65f, -0.36f, 1.4f), kMorpheusRocket(0.f, 0.28f
 static const float kMorpheusSweepMin = 16.f * DEG, kMorpheusSweepMax = 68.f * DEG, kMorpheusOxidizer = 3400.f, kMorpheusRocketVac = 540000.f;
 // the leading edges' temperature limits (K): the warning, and past the other the carbon-carbon starts to burn away
 static const float kMorpheusSkinWarn = 1823.f, kMorpheusSkinLimit = 1923.f;
-// its lamps (body coords): the right wingtip's, on the swing wing where it is at a sweep; the tail light at the end of the
-// dorsal spine, the beacon on its top behind the lift fan, the left landing light in the glove's leading edge
+// its lamps (body coords): the right wingtip's, on the swing wing where it is at a sweep; the tail light on the boat
+// tail's end over the rocket's bell, the beacon on its top behind the lift fan, the left landing light in the glove's
+// leading edge
 vec3 morpheusWingTip(float sweep);
-static const vec3 kMorpheusTail(0.f, 0.46f, 9.25f), kMorpheusBeacon(0.f, 0.93f, -1.4f), kMorpheusLanding(-1.32f, -0.22f, -3.6f);
+static const vec3 kMorpheusTail(0.f, 0.53f, 8.38f), kMorpheusBeacon(0.f, 0.93f, -1.4f), kMorpheusLanding(-1.32f, -0.22f, -3.6f);
 // Its combined-cycle engines' thrust by mode (N, both engines; tfDry the turbofans' without reheat) at a spool, a true
 // airspeed, the air's density and its speed of sound; what they burn making it (kg/s); the thrust it can turn straight
 // down in this air, balanced in pitch (N); its span at a sweep (m) (aircraft_morpheus.cpp)

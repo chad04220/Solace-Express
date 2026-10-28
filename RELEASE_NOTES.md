@@ -33,7 +33,19 @@ craft in the same air (docs/XR50.md).
 - Nothing in the room moves with the aircraft: no camera shake and no g-force iris there. The telemetry strip shows the
   load against the structure instead.
 
+### Real engine exhausts
+- **The XR-50's nozzles now stand free behind the airframe.** Its body used to run past them. They sat buried in it,
+  so behind the airframe there were only ragged openings in the skin, through which you could see into its empty
+  inside. The body now ends at the engines, except for a narrow boat tail between them (out to the rocket's bell) and
+  the V-tail's root fairings over them.
+- **There are engines inside.** Down each nozzle you can see the afterburner's lined bore, the flame holder, the
+  turbine's tail cone and its bladed face. They glow dull red at idle, orange as the engines spool up, and brighter in
+  reheat.
+
 ### Fixes
+- **The Cutwater S6's wings now meet its fuselage.** The wing hung below the cabin with a gap all along its root. It
+  now sits 12 cm higher, its top in the belly. The lower fuselage is carried down onto the wing along the whole root
+  and filleted into it, then ramps back up behind the trailing edge.
 - **Picking a craft in the research terminal no longer stalls.** The terminal's boot sequence baked each craft's body
   but never drew it, so the graphics driver compiled the body's shader the first time you picked that craft, a pause
   of up to several seconds (the XR-50's was the longest). The boot sequence now draws each baked body once, inside

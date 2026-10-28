@@ -194,6 +194,27 @@ vec2 gearBay(vec3 q, vec2 res, vec3 c, vec2 h, float depth, float below, float o
   }
   return res;
 }
+#if HAS_CUTWATER
+// The Cutwater's belly over its wing root. Its round cabin's underside rises toward the tail well ahead of the root's
+// trailing edge, so the wing met the body along a keel line at best; here the lower half is carried down onto the
+// wing's upper surface (2.5 cm into it) along the whole root chord, squarer than the cabin so the root meets it across a
+// width, then ramps back up into the tailcone behind the trailing edge. Where the cabin's own belly is lower (ahead of
+// the root's thickest) it is the fuselage exactly, so it swells out of it with no step. Exterior only.
+float cutwaterBelly(vec3 p){
+  vec4 W0 = gM[9], W1 = gM[10];
+  float rc = W0.y, zLE = W1.y, zTE = W1.y + rc;
+  vec3 sec = fusSection(p.z);
+  float r1 = W1.w*rc*0.5, r2 = max(0.004*rc, 0.005);
+  float hth = mix(r1, r2, clamp((p.z - zLE - r1)/max(rc - r1 - r2, 0.01), 0.0, 1.0));   // (the root's half thickness)
+  float bottom = sec.z - sec.y, keel = min(W1.x + hth - 0.025 + 0.6*max(p.z - zTE + 0.1, 0.0), bottom);
+  float deep = clamp((bottom - keel)/0.12, 0.0, 1.0), top = sec.z + sec.y;
+  vec2 q = vec2(p.x, p.y - 0.5*(top + keel)), h = vec2(sec.x, 0.5*(top - keel));
+  float rnd = mix(gM[15].z, 0.45, deep), m = min(h.x, h.y), r = m*mix(0.3, 1.0, rnd);
+  vec2 d = abs(q) - h + r;
+  float b = mix(length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - r, (length(q/h) - 1.0)*m, rnd);
+  return 0.85*max(b, max(p.y - sec.z, max(zLE - p.z, p.z - zTE - 1.4)));   // (its section changes along z: kept a bound)
+}
+#endif
 float sdFuselage(vec3 p){
   vec3 sec = fusSection(p.z);
   vec2 q = vec2(p.x, p.y - sec.z);
@@ -1007,6 +1028,10 @@ vec2 mapPlaneBody(vec3 p){
     res = opU(res, vec2(max(f + 0.03, abs(p.z - zB) - 0.02), 63.0));
   }
 #endif
+#if HAS_CUTWATER
+  if (MODEL_IS(7) && inside < 0.5 && p.y < 0.2 && p.z > gM[10].y - 0.3 && p.z < gM[10].y + gM[9].y + 1.6)
+    res.x = smin(res.x, cutwaterBelly(p), 0.06);   // (its belly over the wing root, faired into the cabin's sides)
+#endif
   // Each part below is skipped when its bounding box is farther than the nearest surface found so far (plus its blend
   // radius): its own distance can only be larger, so the result is unchanged - but a sample in the cabin no longer
   // evaluates the wingtips, the tail and the wheels (the cockpit view takes ~30 such samples per pixel).
@@ -1050,7 +1075,7 @@ vec2 mapPlaneBody(vec3 p){
         wd = max(wd, -f);
       res.x = min(res.x, wd);
     }
-    else res.x = smin(res.x, wd, 0.08*R);
+    else res.x = smin(res.x, wd, MODEL_IS(7) ? 0.12 : 0.08*R);   // (the Cutwater's root: a fillet onto its belly)
     if (wd < fd) res.y = 2.0;
     // lift struts
     if (W2.x > 0.5) {

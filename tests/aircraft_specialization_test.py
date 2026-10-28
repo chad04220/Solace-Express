@@ -81,7 +81,7 @@ if a.shader_dir:
     own_code = {
         'mapFleetPanel': (*range(10), 13, 14, 15), 'shadeFleetCabin': (*range(10), 13, 14, 15), 'fuselagePaint': (*range(10), 11, 13, 14, 15),
         'floatSt': (15,), 'floatHull': (15,), 'floatStruts': (15,), 'floatRudder': (15,), 'floatMainOf': (15,), 'floatNosePivot': (15,),
-        'cutwaterSeatPadded': (7,), 'cutwaterPowerFurniture': (7,), 'cutwaterYokeWheel': (7,), 'cutwaterDisplayRearSupports': (7,),
+        'cutwaterBelly': (7,), 'cutwaterSeatPadded': (7,), 'cutwaterPowerFurniture': (7,), 'cutwaterYokeWheel': (7,), 'cutwaterDisplayRearSupports': (7,),
         'scrubrunnerSeatPadded': (2,), 'scrubrunnerPowerFurniture': (2,), 'scrubrunnerStickGrip': (2,), 'scrubrunnerRaisedPrimaryRisers': (2,),
         'mapWavecrestCabinTrim': (8,), 'wavecrestCabinAlbedo': (8,), 'twinPowerBankField': (3, 8),
         'mapReverieCockpit': (11,),

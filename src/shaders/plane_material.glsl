@@ -469,10 +469,15 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
       float lit = clamp(gWr[2].x, 0.0, 1.0), throat = smoothstep(8.6, 8.1, lp.z);
       m.emit = (vec3(1.0, 0.42, 0.12)*0.6*lit + vec3(1.0, 0.85, 0.6)*6.0*lit*throat)*step(length(lp.xy - vec2(0.0, 0.28)), 0.31);
     }
-    else if (mid == 157) {   // the engines' hot insides, the roll posts: soot-black, red-hot with their thrust
+    else if (mid == 157) {   // the engines' hot insides, the roll posts: heat-stained metal (not a void down the nozzles),
+                             // red-hot with their thrust - the turbine's face and the flame holder deepest in, dull red
+                             // even at idle, the liner cooling toward the exit; the reheat's flame over it all
       vec4 ep = exhaustEnginePower(lp.x < 0.0 ? 0 : 1);
-      m.alb = vec3(0.012, 0.011, 0.012); m.metal = 0.3; m.rough = 0.8;
-      m.emit = (vec3(1.0, 0.32, 0.08)*(0.15*ep.x*ep.x) + mix(vec3(1.0, 0.45, 0.12), vec3(1.0, 0.8, 0.55), ep.y)*ep.y*3.0)*ep.z;
+      tx = triSample(lp, ln, M_METAL, 0.6, nT);
+      m.alb = tx.rgb*vec3(0.075, 0.068, 0.062); m.metal = 0.55; m.rough = 0.6; m.nrm = mix(vec3(0.0, 0.0, 1.0), nT, 0.5);
+      float deep = smoothstep(7.9, 6.9, lp.z);
+      m.emit = (vec3(1.0, 0.30, 0.07)*(0.05 + 0.55*ep.x*ep.x)*(0.25 + 0.75*deep)
+              + mix(vec3(1.0, 0.45, 0.12), vec3(1.0, 0.8, 0.55), ep.y)*ep.y*3.0)*ep.z;
       if (abs(lp.x) > 2.2) m.emit = vec3(1.0, 0.35, 0.1)*0.6*gWr[0].z*gCtl.w;   // (a roll post's: its jet with the lift fan in)
     }
     else if (mid == 158) { tx = triSample(lp, ln, M_METAL, 0.3, nT); m.alb = tx.rgb*vec3(0.55, 0.56, 0.6); m.metal = 0.9; m.rough = 0.25; m.nrm = nT; }   // the fan's blades

@@ -28,6 +28,7 @@ vec2 mrPartAt(vec2 res, int k, vec2 sd, vec3 p){
 // the glove: a thick 66 deg delta from the chines to the swing wings' pivots (sdPanel: its span from the centreline,
 // its chord from the root's leading edge) - and how far a point is behind its leading edge
 const float MR_GLOVE_SPAN = 3.05, MR_GLOVE_LE0 = -8.4, MR_GLOVE_RC = 13.6, MR_GLOVE_TC = 6.0, MR_GLOVE_SWEEP = 6.6, MR_GLOVE_Y = -0.07;
+const float MR_TAIL_END = 7.45;   // (the airframe's aft bulkhead round the nozzles, just behind their bearing rings)
 float mrGlove(vec3 p){ return sdPanel(abs(p.x), p.z - MR_GLOVE_LE0, p.y - MR_GLOVE_Y, MR_GLOVE_SPAN, MR_GLOVE_RC, MR_GLOVE_TC, MR_GLOVE_SWEEP, 0.042, 1.0, 0.0, 0.0); }
 float mrGloveLE(vec3 p){ return p.z - (MR_GLOVE_LE0 + MR_GLOVE_SWEEP*clamp(abs(p.x)/MR_GLOVE_SPAN, 0.0, 1.0)); }
 // the forebody's chines: a blade from the nose tip widening to meet the glove's leading edge, along the section's
@@ -65,7 +66,15 @@ float mrShell(vec3 p){
   b = smin(b, sdEllipsoid(ap - vec3(1.0, 0.38, 7.45), vec3(0.24, 0.24, 1.45)), 0.14);   // the V-tail's root fairings
   b = smin(b, sdRoundBox(p - vec3(0.0, -0.64, -1.0), vec3(1.02, 0.16, 2.9), 0.13), 0.32);   // the ventral inlet's cowl (both engines')
   b = smin(b, mrCanopy(p), 0.16);   // the sensor canopy
-  return b;
+  // the airframe ends where the engines do: behind the nozzles' bearing rings only the boat tail between them (to the
+  // rocket's bell, standing free behind it) and the V-tail's root fairings over them (its booms) go on, each nozzle
+  // standing free with 6 cm round it. (The lifting body ran on to 9.2 m, past the nozzles' exits and the bell's: they lay
+  // buried in it, and the bores came out of its skin as ragged scoops into it)
+  float keel = sdRoundBox(p - vec3(0.0, 0.12, 7.85), vec3(0.20, 0.45, 0.45), 0.06);
+  float boom = sdEllipsoid(ap - vec3(1.0, 0.38, 7.45), vec3(0.24, 0.24, 1.45));
+  float behind = max(MR_TAIL_END - p.z, max(-keel, -boom));
+  float clear = max(7.4 - p.z, length(ap.xy - vec2(0.78, -0.02)) - 0.56);
+  return -smin(-b, min(behind, clear), 0.04);
 }
 // ---- the ground station (eye at the origin: x right, y up, -z ahead): a sealed operations room 2.7 m across, the
 // operator seated at a desk with the monitor bank before them - the main monitor ahead, one either side angled in, the
@@ -152,6 +161,8 @@ vec2 mapMorpheus(vec3 p){
   vec3 ap = vec3(abs(p.x), p.y, p.z);
   float shell = mrShell(p);
   vec2 res = vec2(shell, 150.0);
+  // the aft bulkhead round the nozzles and the boat tail between them: the nozzles' titanium (the booms keep their paint)
+  if (p.z > MR_TAIL_END - 0.05 && sdEllipsoid(ap - vec3(1.0, 0.38, 7.45), vec3(0.24, 0.24, 1.45)) > 0.005) res.y = 153.0;
   // the leading edges: carbon-carbon along the glove's and the chines' edges and on the nose (they glow when hot)
   if (shell < 0.05) {
     float le = mrGloveLE(p);
@@ -172,15 +183,27 @@ vec2 mapMorpheus(vec3 p){
     float duct = max(length(p.xz - MR_FAN.xz) - MR_FAN_R, abs(p.y - 0.10) - 1.2);
     if (duct < res.x + 0.05) { res.x = -smin(-res.x, duct, 0.02); if (-duct >= res.x - 0.002) res.y = 155.0; }
   }
-  // the engines' exits: the last turbine stage and the hot cone deep in each bay's end, where the nozzle swivels on
+  // the engines' exits, each bay's end where its nozzle swivels on: the afterburner's bore, lined in the engines' hot
+  // metal, and down it the flame holder (two V-gutter rings on four spraybar struts), the turbine's tail cone and the
+  // last stage's face, its blades - soot-dark, glowing with the thrust (plane_material.glsl 157). Bounded by where it
+  // lies, not by the airframe's distance: deep in the bay the solid's distance is far below the bore's, a test against
+  // it skipped the cut and all that fills it there, and the bore came out a hole into the airframe's empty inside
   {
     vec3 q = ap - vec3(0.78, -0.04, 7.4);
-    float bore = max(length(q.xy) - 0.40, -q.z - 0.6);
-    if (bore < res.x + 0.05) {
+    float r = length(q.xy);
+    if (r < 0.62 && q.z > -0.8) {
+      float bore = max(r - 0.40, -q.z - 0.6), s0 = res.x;
       res.x = max(res.x, -bore);
-      float cone = sdRoundCone(q, vec3(0.0, 0.0, -0.55), vec3(0.0, 0.0, -0.05), 0.24, 0.05);
-      res = opU(res, vec2(max(cone, length(q.xy) - 0.38), 157.0));
-      res = opU(res, vec2(max(abs(q.z + 0.58) - 0.02, length(q.xy) - 0.41), 157.0));   // (the turbine's face)
+      if (-bore > s0) res.y = 157.0;
+      float hot = max(sdRoundCone(q, vec3(0.0, 0.0, -0.55), vec3(0.0, 0.0, -0.05), 0.24, 0.05), r - 0.38);   // the tail cone
+      hot = min(hot, max(abs(q.z + 0.58) - 0.02, r - 0.41));                                                 // the face
+      float sec = 6.2831853/36.0, a = atan(q.y, q.x), ab = a - sec*floor(a/sec + 0.5);
+      hot = min(hot, max(max(abs(q.z + 0.55) - 0.012, abs(r*sin(ab)) - 0.005), max(0.25 - r, r - 0.40)));    // its 36 blades
+      hot = min(hot, length(vec2(r - 0.16, q.z + 0.22)) - 0.014);                                            // the gutters
+      hot = min(hot, length(vec2(r - 0.31, q.z + 0.22)) - 0.014);
+      vec2 aq = abs(q.xy);
+      hot = min(hot, max(length(vec2((aq.x - aq.y)*0.7071, q.z + 0.22)) - 0.011, max(0.14 - r, r - 0.405)));   // the spraybars
+      res = opU(res, vec2(hot, 157.0));
     }
   }
   // the roll posts: a nozzle under each glove, flush (its doors open with the fan: the shader's glow)

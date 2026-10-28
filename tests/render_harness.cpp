@@ -25,6 +25,17 @@ static void* getProc(const char* n) { void* p = s_getProc((const unsigned char*)
 
 struct GameTest {
   static void clean(Game& g) { g.hudOn = false; g.toasts.clear(); g.hint.clear(); }   // (a picture without the HUD)
+  // CAMMODE=<0 chase, 1 cockpit, 2 orbit, 3 flyby>: the scene from that view, placed as the camera key places it
+  // (ORBIT="<yaw deg>,<pitch deg>,<zoom>": the orbit camera there, in any scene - its yaw from dead astern)
+  static void setCam(Game& g, int mode) {
+    g.camMode = mode;
+    if (mode == 3) g.camPos = g.plane.pos + normalize(vec3(g.plane.vel.x, 0, g.plane.vel.z) + vec3(0.01f, 0, 0)) * 350.f + g.plane.right() * 40.f + vec3(0, 12, 0);
+    if (const char* o = getenv("ORBIT")) {
+      float y = 0, p = 7, z = 0.5f; sscanf(o, "%f,%f,%f", &y, &p, &z);
+      g.camMode = 2; g.camYaw = (y - g.plane.heading()) * DEG; g.camPitch = p * DEG; g.camZoom = z;
+    }
+    for (int i = 0; i < 30; i++) g.updateCamera(0.1f);
+  }
   static int researchWarm(Game& game) {   // the research terminal opened from the menu after the launch's prewarm: its warm-up, its bar and the boot sequence, frame by frame on the real clock
     game.debugScene("menu");
     if (getenv("PREWARM")) game.prewarm([](float, const std::string&) {}, true);   // (as the launch does; without it the warm-up bakes the research craft itself)
@@ -727,6 +738,8 @@ void main(){
   if (getenv("NOTRAFFIC")) game.set.traffic = false;   // (A/B timings of the player's aircraft alone)
   if (getenv("PERFWARM")) for (int i : kCareerAircraft) Plane::perf(&kAircraft[i]);   // (every career type's performance learned first, as the game's launch does)
   game.debugScene(scene);
+  if (getenv("CAMMODE") || getenv("ORBIT")) GameTest::setCam(game, getenv("CAMMODE") ? atoi(getenv("CAMMODE")) & 3 : 2);
+  if (getenv("NOHUD")) GameTest::clean(game);   // (the airframe alone: no HUD, toasts or hints)
   if (getenv("PREPASSAUTO")) {   // ground depth first, measured as in play (PREPASSAUTO=<frames to the first trial>)
     g_ren.prepassAutoOn = true; g_ren.prepareTerrainDepth(); g_ren.prepassAuto.countdown = std::max(1, atoi(getenv("PREPASSAUTO")));
   }

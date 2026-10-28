@@ -78,7 +78,7 @@ const ModelDef kModels[] = {
   {-2.95f,.49f,.41f,-.035f},{-1.90f,.62f,.66f,.075f},
   {-.25f,.63f,.65f,.105f},{1.55f,.43f,.43f,.160f},
   {3.70f,.14f,.18f,.270f},{4.25f,.055f,.075f,.315f}}, .94f, // elliptical cabin
-  {5.70f,1.98f,1.02f,.72f,-.74f,-1.13f,5.0f,.125f}, // low tapered wing; spar below floor
+  {5.70f,1.98f,1.02f,.72f,-.62f,-1.13f,5.0f,.125f}, // low tapered wing, its top in the belly (plane_sdf.glsl cutwaterBelly)
   0,0.0f,.34f,.57f,0,0,                               // no struts; winglets; 57% flaps
   {1.90f,1.08f,.62f,.40f,.28f,3.06f,0.0f},0,           // conventional horizontal tail
   {1.55f,1.55f,.55f,.76f,.23f,2.70f},                  // fin and rudder
