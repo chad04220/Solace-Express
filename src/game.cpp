@@ -75,7 +75,7 @@ const ActionInfo kActions[ACT_COUNT] = {
   {"radio", "Internet radio", 2, 'R', 0},                       {"anr", "Headset noise cancelling", 2, 'M', PAD_LS},
   {"zoom", "Cockpit zoom (hold; wheel zooms too)", 2, 'U', 0},
   {"photo", "Photo mode", 2, K_F2, 0},   // (not a letter: they are all taken, K by the J + K hold)
-  {"cloak", "Cloak / XR-50 rocket (or double-tap brake)", 3, 'X', 0},          {"weapons", "Weapons hot / safe", 3, 'Y', PAD_Y},
+  {"cloak", "Cloak / XR-50 rocket (or double-press A)", 3, 'X', 0},          {"weapons", "Weapons hot / safe", 3, 'Y', PAD_Y},
   {"fire", "Fire lasers (or left mouse)", 3, K_ENTER, PAD_RB},  {"bomb", "Drop bomb (or middle mouse)", 3, K_BACK, PAD_LB},
 };
 

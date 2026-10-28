@@ -67,12 +67,12 @@ const ResCraftInfo kResCraft[] = {
    {"F / V tilt the pods: 0 forward, 90 hover", "X or double-tap brake: cloak", "Y weapons hot: lasers LMB/Enter, bomb Bksp",
     "Slow on low power the pods do the flying", "6,000 kg: 2 h of full boost, 16 h of cruise"}, "XR40"},
   {kMorpheus, "NG-XR50-M  //  BLK 2", "XR-50", "MORPHEUS", R_GOLD, {0.98f, 1.f, 0.40f}, "REMOTELY PILOTED HYPERSONIC VTOL RESEARCH MODEL",
-   {{"CONFIGURATION", "Waverider, blown swing wing 16-68 deg, V-tail", -1}, {"PROPULSION", "2 x 525 kN combined-cycle + 540 kN rocket", 1.f},
-    {"THRUST / WEIGHT", "7.5 in reheat: twice the XR-40's", 1.f}, {"TOP SPEED", "Mach 7.1 at 27 km; 83 km on the rocket", 1.f},
+   {{"CONFIGURATION", "Waverider, blown swing wing 16-68 deg, V-tail", -1}, {"PROPULSION", "2 x 525 kN combined-cycle + 1,620 kN rocket", 1.f},
+    {"THRUST / WEIGHT", "7.5 in reheat: twice the XR-40's", 1.f}, {"TOP SPEED", "Mach 7.1 at 27 km; 2,000 km on the rocket", 1.f},
     {"VTOL", "Lift fan 840 kN, nozzles swivel to 95 deg", 1.f}, {"ROLL RATE", "800 deg/s", 1.f},
     {"AIRFRAME", "+600 / -600 g: no one aboard", 1.f}, {"ENDURANCE", "8,200 kg: 8 min reheat, 1 h scramjet, 29 h cruise", 0.9f}},
    200.f, -200.f, 100.f, 160.f, -140.f, 7.1f, 0.11f,
-   {"Flown from the ground station: C shows its monitors", "F / V: nozzles 0-95 deg; X: the rocket (~30 s of LOX)", "The wing sweeps itself and is blown: 3x its lift",
+   {"Flown from the ground station: C shows its monitors", "F / V: nozzles 0-95 deg; A A or X: the rocket (~150 s of LOX)", "The wing sweeps itself and is blown: 3x its lift",
     "Mach 7 needs 27 km: watch LEAD EDGE (1,650 C)", "Full aft stick past its stop: post-stall to 90 deg"}, "XR50"},
 };
 const int kNumResCraft = sizeof(kResCraft) / sizeof(kResCraft[0]);

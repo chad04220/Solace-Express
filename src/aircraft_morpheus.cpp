@@ -18,7 +18,8 @@
 namespace {
 const float kCapture = 1.8f, kQMax = 85000.f;            // the inlets' capture area, both (m^2), and the combustors' pressure limit (Pa of q)
 const float kRocketVac = kMorpheusRocketVac, kRocketExit = 0.55f;   // the rocket's thrust in vacuum (N) and its bell's exit area (m^2)
-const float kRocketIsp = 360.f, kRocketOF = 2.4f;         // its specific impulse in vacuum (s) and oxidizer-to-fuel ratio
+const float kRocketIsp = 5400.f, kRocketOF = 2.4f;        // its specific impulse in vacuum (s: fiction, fifteen times a LOX engine's, so the
+                                                          // same 3.4 t of oxidizer gives 1,620 kN for about 150 s) and oxidizer-to-fuel ratio
 const float kFanShare = 0.8f, kPostShare = 0.06f;         // the lift fan's and each roll post's thrust at full dry power, sea level, for the engines' rated thrust
 const float kVecMax = 20.f * DEG, kSwivelMax = 95.f * DEG;
 const float kRamTsfc = 2.5e-5f, kScramTsfc = 3.6e-5f;     // kg / (N s): an Isp of ~4,100 s and ~2,800 (fiction: a real ramjet's is ~1,600, a scramjet's ~1,100)

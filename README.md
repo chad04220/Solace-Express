@@ -179,7 +179,7 @@ the XR-10 Vigil, the XR-20 Reverie, the XR-30 Nocturne (Mach 2.85, thrust vector
 four tilting thruster pods, a cloak, lasers and plasma bombs) and the XR-50 Morpheus: a remotely piloted swing-wing
 waverider, twice the XR-40 in thrust for its weight, pull and roll (160 g, 800 deg/s), flown from a ground station's
 monitors. It takes off vertically on a lift fan and swivelling nozzles, crosses Mach 7 on its scramjets at 27 km and
-climbs to 83 km on its rocket, its leading edges glowing at 1,600 °C (docs/XR50.md).
+climbs out of the atmosphere on its rocket, its leading edges glowing at 1,600 °C (docs/XR50.md).
 
 ### Flying
 
@@ -310,7 +310,8 @@ Menus work with the mouse or a gamepad (the left stick moves a cursor, **A** cli
 - Hold **U + I** on the main menu (or click both sticks) to open the Project NIGHTGLASS research terminal. It gets a
   menu entry once you hold the Airline Transport licence. The XR-40 Somnus: **F / V** tilt the pods, **X** cloaks,
   **Y** arms the lasers and the bomb bay. The XR-50 Morpheus: **F / V** swivel the nozzles (the lift fan comes in with
-  them), **X** or a double tap of the brake lights the rocket, and a full pull through the stick's stop goes post-stall.
+  them), a double press of **A** (or **X**) lights the rocket and shuts it off, and a full pull through the stick's
+  stop goes post-stall.
   Its cockpit view (**C**) is the ground station it is flown from: its monitors show its cameras with their symbology.
 
 </details>

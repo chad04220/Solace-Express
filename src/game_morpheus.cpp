@@ -3,13 +3,20 @@
 #include "game.h"
 
 void Game::morpheusControls(float dt) {
-  // X, or a double tap of gamepad A (A stays the wheel brake: the XR-40's cloak control): the rocket. Lit, it burns at
-  // the throttle - 40% at the least - until it is shut down or its oxidizer is gone (aircraft_morpheus.cpp)
-  SomnusState& W = somnus;   // (the double tap's clock is the XR-40's: one craft flies at a time)
+  // A double press of A - the keyboard's (two short taps: a held A is the roll it always was) or the gamepad's (A stays
+  // the wheel brake: the XR-40's cloak control) - or X: the rocket, shut off and lit again as often as the pilot likes.
+  // Lit, it burns at the throttle - 40% at the least - until it is shut down or its oxidizer is gone (aircraft_morpheus.cpp)
+  SomnusState& W = somnus;   // (the pad's double tap's clock is the XR-40's: one craft flies at a time)
   bool dblA = false;
   W.padATap += dt;
   if (actPadP(ACT_BRAKE) && !showMap) {
     if (W.padATap < 0.35f) { dblA = true; W.padATap = 9.f; } else W.padATap = 0;
+  }
+  morpheusKeyTap += dt;
+  if (in.down['A']) morpheusKeyHeld += dt; else morpheusKeyHeld = 0.f;
+  if (morpheusKeyHeld > 0.25f) morpheusKeyTap = 9.f;   // (held: a roll, not a tap)
+  if (in.pressed['A'] && !showMap) {
+    if (morpheusKeyTap < 0.35f) { dblA = true; morpheusKeyTap = 9.f; } else morpheusKeyTap = 0;
   }
   const vec3 AMBER(1.f, 0.72f, 0.3f), RED(1.f, 0.45f, 0.35f);
   if (actPressed(ACT_CLOAK) || dblA) {

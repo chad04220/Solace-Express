@@ -156,7 +156,7 @@ static const vec3 kSomnusPods[4] = {vec3(-2.35f, -0.08f, -3.3f), vec3(2.35f, -0.
 // vacuum (N)
 static const vec3 kMorpheusPivot(2.1f, -0.06f, -0.4f), kMorpheusFan(0.f, 0.05f, -5.f), kMorpheusNozzle(0.78f, -0.02f, 7.4f);
 static const vec3 kMorpheusPost(2.65f, -0.36f, 1.4f), kMorpheusRocket(0.f, 0.28f, 8.95f);
-static const float kMorpheusSweepMin = 16.f * DEG, kMorpheusSweepMax = 68.f * DEG, kMorpheusOxidizer = 3400.f, kMorpheusRocketVac = 540000.f;
+static const float kMorpheusSweepMin = 16.f * DEG, kMorpheusSweepMax = 68.f * DEG, kMorpheusOxidizer = 3400.f, kMorpheusRocketVac = 1620000.f;
 // the leading edges' temperature limits (K): the warning, and past the other the carbon-carbon starts to burn away
 static const float kMorpheusSkinWarn = 1823.f, kMorpheusSkinLimit = 1923.f;
 // its lamps (body coords): the right wingtip's, on the swing wing where it is at a sweep; the tail light on the boat

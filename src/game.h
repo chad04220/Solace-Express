@@ -712,6 +712,7 @@ private:
   void somnusControls(float dt);
   void morpheusControls(float dt);   // the XR-50's: its rocket (game_morpheus.cpp)
   int morpheusMode = 0; float morpheusModeT = 0.f; bool morpheusHot = false, morpheusRocketOut = false;   // (what it last announced)
+  float morpheusKeyTap = 9.f, morpheusKeyHeld = 0.f;   // the rocket's double press of A: since the last short tap, how long A has been held
   void updateSomnus(float dt);
   void somnusVisual(FrameParams& fp);
   void buildFeedCameras(FrameParams& fp);

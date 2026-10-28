@@ -1,5 +1,14 @@
-## What's new in v4.4.1: every screen checked for overlap
+## What's new in v4.4.1: the XR-50's rocket, and every screen checked for overlap
 
+### The rocket
+- **Three times the thrust, five times the burn.** 1,620 kN (was 540) for about 150 s at full throttle (was 30), from
+  the same 3,400 kg of oxidizer. A full burn from the scramjet corridor now tops out around 2,000 km up; shut it off
+  early for less.
+- **Shut off and relit at will.** A double press of **A** (two short taps on the keyboard - a held A is still roll
+  left - or the gamepad's A), or **X**, lights the rocket and shuts it off, as often as you like while the oxidizer
+  lasts.
+
+### Every screen checked for overlap
 A pass over every menu and card at 720p, 1080p and 140% UI scale:
 - **Research terminal:** the XR-50's card sat on the test-card list (the register was laid out for four airframes);
   the specification's long values ran off the rail's edge, and at a large UI scale the rail ran out of its foot into
