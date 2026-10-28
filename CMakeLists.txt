@@ -790,6 +790,9 @@ set_tests_properties(roads PROPERTIES COST 20)
 add_executable(landmarks_test tests/landmarks_test.cpp ${ENV_OBJS})
 target_include_directories(landmarks_test PRIVATE src)
 add_test(NAME landmarks COMMAND landmarks_test)
+add_executable(scenery_streaming_test tests/scenery_streaming_test.cpp ${ENV_OBJS})
+target_include_directories(scenery_streaming_test PRIVATE src)
+add_test(NAME scenery_streaming COMMAND scenery_streaming_test)
 add_executable(road_traffic_test tests/road_traffic_test.cpp ${ENV_OBJS})
 target_include_directories(road_traffic_test PRIVATE src)
 add_test(NAME road_traffic COMMAND road_traffic_test)
@@ -814,7 +817,7 @@ foreach(t airport_environment airport_layouts cockpit_camera community_layout uf
           environment_scale_audit earth_rebase_flight flight_model_1 flight_model_2 flight_model_3 gameplay_loop_1 gameplay_loop_2 gameplay_loop_3
           gameplay_loop_4 assist_and_warp pilot_profile campaign_progression_1 campaign_progression_2 campaign_progression_3 career_saves save_format soak military_career military_career_fastmath military_gameplay hangar_preview_controls hive_world_collision hive_world_collision_fastmath terrain_shadow_bake
           volcano_effects new_aircraft_performance xr50_flight new_aircraft_autoland_thistledown new_aircraft_autoland_galleon new_aircraft_go_around
-          vtol_throttle wreck_pose bridges roads landmarks road_traffic road_grade_gpu menu_plan_cache)
+          vtol_throttle wreck_pose bridges roads landmarks scenery_streaming road_traffic road_grade_gpu menu_plan_cache)
   if(TEST ${t})
     set_property(TEST ${t} APPEND PROPERTY FIXTURES_REQUIRED world)
     set_property(TEST ${t} APPEND PROPERTY ENVIRONMENT "SOMNIUM_TEST_WORLD=${CMAKE_BINARY_DIR}/test_world.bin")
@@ -824,7 +827,7 @@ foreach(t airport_environment_test airport_layout_test cockpit_camera_test commu
           entity_raycast_test envelope_test environment_scale_audit geo_flight_test flight_test gameplay_test assist_test profile_test progression_test save_test save_format_test soak_test
           military_career_test military_career_fastmath_test military_gameplay_test hangar_preview_controls_test hive_world_collision_test hive_world_collision_fastmath_test
           terrain_shadow_test volcano_effects_test new_aircraft_performance_test xr50_flight_test new_aircraft_autoland_test vtol_throttle_test
-          bridges_test roads_test landmarks_test road_traffic_test road_grade_gpu_test menu_plan_cache_test)
+          bridges_test roads_test landmarks_test scenery_streaming_test road_traffic_test road_grade_gpu_test menu_plan_cache_test)
   if(TARGET ${t})
     add_dependencies(${t} test_world)
   endif()

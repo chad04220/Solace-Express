@@ -5068,7 +5068,12 @@ void Game::menuBackgroundCamera(FrameParams& fp) {
   if (screen == SCR_MENU && !getenv("MENUORBIT")) { menuTour(fp); return; }
   if (screen == SCR_RESEARCH) { researchPreviewCamera(fp); return; }
   if (screen == SCR_HUB && hubTab == TAB_CONTRACTS && hubList == 2) { militaryPreviewCamera(fp); return; }
-  if (screen == SCR_FREE_FLIGHT || (screen == SCR_HUB && hubTab == TAB_HANGAR)) { hangarPreviewCamera(fp); return; }
+  if (screen == SCR_FREE_FLIGHT || (screen == SCR_HUB && hubTab == TAB_HANGAR)) {
+    hangarPreviewCamera(fp);
+    // Free Flight: the departure picked streamed while it is picked (the stand is at the hub's field: researchPreviewCamera)
+    if (screen == SCR_FREE_FLIGHT && freeAirport >= 0 && freeAirport < (int)g_world.airports.size()) fp.prefetchPos = g_world.airports[freeAirport].pos();
+    return;
+  }
   // An Ambler circles over the islands while the camera chases it in a slow arc
   static Plane demo;
   static bool initd = false;
@@ -5257,6 +5262,7 @@ void Game::militaryPreviewCamera(FrameParams& fp) {
   const float s=std::min(S(),std::min(H/720.f,W/1120.f));
   const float pixels=std::max(1.f,.40f*std::min(L.px1-L.px0,L.bot-L.top-135*s));
   stageFlyingCamera(fp,militaryView,craft,L.cx,L.cy,pixels,false);   // (over the preview stage, as the research terminal's)
+  if (c.from >= 0 && c.from < (int)g_world.airports.size()) fp.prefetchPos = g_world.airports[c.from].pos();   // (the mission's field streamed while it is on the board: researchPreviewCamera)
   fp.vignette=.45f;
   // Reuse the hangar's geometry-only outline. Registrations, paint, cockpit
   // screens and effects cannot leak into a classified preview.
@@ -5378,6 +5384,9 @@ void Game::researchPreviewCamera(FrameParams& fp) {
   const ResLayout L = researchLayout();
   const float pixels = std::max(1.f, .40f * std::min(L.px1 - L.px0, L.bot - L.top - 56 * S()));
   stageFlyingCamera(fp, researchView, craft, L.cx, L.cy, pixels, resWarm && resWarmCk);   // (warming up, each craft's cockpit for a frame too: its cabin shell drawn now, not when the sortie opens)
+  // the sortie's own site streamed while the terminal is open (its loading screen waits for every chunk about where it
+  // opens - some eight thousand to the quality's far range - and the stage is at the hub's field, not the site)
+  if (resAirport >= 0 && resAirport < (int)g_world.airports.size()) { const Airport& a = g_world.airports[resAirport]; fp.prefetchPos = resAirborne ? a.pos() + a.dir() * 1500.f : a.pos(); }
   if (sp.special == 2) {
     // Preview the chosen hardware, not the live flight's old loadout. This is
     // visual-only: no ammunition, encounter or career state changes in the terminal.
@@ -7594,7 +7603,12 @@ void Game::loadLogTick() {
     return;
   }
   loadLogging = false;
-  if (!loadLog.empty()) loadLog.push_back({ms, false, false, loadFrames, std::max(0, g_ren.entPending), loadViewsStep, false, loadWarmStep, loadShownInside});   // (the last frame of it)
+  if (!loadLog.empty()) {   // (the last frame of it - the flight's first - with what its update and render did, as any frame's)
+    LoadLogFrame L{ms, false, false, loadFrames, std::max(0, g_ren.entPending), loadViewsStep, false, loadWarmStep, loadShownInside};
+    L.upd = lastUpdate.total; L.rnd = lastRenderMs; L.baked = lastRenderBaked; L.compiled = lastRenderCompiled; L.compileMs = lastRenderCompileMs;
+    for (const auto& p : lastUpdate.parts) if (p.second >= 20.0) L.parts += fmt("%s%s %.0f", L.parts.empty() ? "" : ", ", p.first, p.second);
+    loadLog.push_back(std::move(L));
+  }
   loadShownInside = 0;
   FILE* f = fopen((saveDir + "/loading.log").c_str(), "w");
   if (!f) return;
@@ -7605,7 +7619,7 @@ void Game::loadLogTick() {
   for (size_t i = 0; i < loadLog.size(); i++) {
     const LoadLogFrame& L = loadLog[i];
     if (L.card) fprintf(f, "%5zu %8.1f  the card (the flight not set up yet)", i, L.ms);
-    else fprintf(f, "%5zu %8.1f  %s: scene frame %d, warmed %d of %d, %d scenery chunks to make, views drawn %d of 2%s%s", i, L.ms, L.setUp ? "set up, the loading screen alone" : i + 1 == loadLog.size() ? "the last" : "loading",
+    else fprintf(f, "%5zu %8.1f  %s: scene frame %d, warmed %d of %d, %d scenery chunks to make, views drawn %d of 2%s%s", i, L.ms, L.setUp ? "set up, the loading screen alone" : i + 1 == loadLog.size() ? (screen == SCR_FLIGHT ? "the last, the flight's first frame" : "the last") : "loading",
                  L.frames, std::min(L.warm, loadWarmItems()), loadWarmItems(), L.pending, std::min(L.views, 2), L.shadows ? ", terrain shadows to do" : "",
                  L.shown ? fmt(", shown %d times from inside a bake", L.shown).c_str() : "");
     // (a frame over 50 ms: its update and render, and what each did)

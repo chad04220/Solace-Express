@@ -73,6 +73,7 @@ struct Scenery::Async {
   std::mutex m;
   std::condition_variable cv;
   std::deque<Job> todo;
+  int todoLoad = 0;                    // the work queued, in jobLoad units (request caps it)
   std::vector<Job> done;
   std::unordered_map<int, int> busy;   // chunk index -> level being generated (main thread only)
   std::vector<std::thread> threads;
@@ -80,6 +81,12 @@ struct Scenery::Async {
   bool draining = false;
   int epoch = 0;                       // bumped by clear(): results from before it are dropped
   int active = 0;                      // workers reading the active world outside the queue lock
+  // What a job costs, roughly: a level-1 chunk (buildings; most of them sea, empty) is made in about 0.02 ms, a
+  // level-2 (trees, bushes, boulders too) in about 1 ms. The queue is capped by this, not by its count: capped at
+  // two chunks a worker and refilled once a frame, it streamed 12 chunks a frame at 60 fps however quick they were
+  // (the workers idle for most of every frame), and a flight's loading screen made its 8,000 chunks in 11 s.
+  static int jobLoad(int level) { return level >= 2 ? 16 : 1; }
+  static constexpr int kLoadPerWorker = 512;   // (32 level-2 chunks a worker: some two frames of work at the most)
 };
 
 Scenery::Scenery(int workerCount, const World* src) : async(new Async()), source(src) {
@@ -95,7 +102,7 @@ Scenery::Scenery(int workerCount, const World* src) : async(new Async()), source
           std::unique_lock<std::mutex> lk(A.m);
           A.cv.wait(lk, [&] { return A.stop || !A.todo.empty(); });
           if (A.stop) return;
-          j = std::move(A.todo.front()); A.todo.pop_front();
+          j = std::move(A.todo.front()); A.todo.pop_front(); A.todoLoad -= Async::jobLoad(j.level);
           A.active++;
         }
         generate(j.c, j.cx, j.cz, j.level);
@@ -117,7 +124,7 @@ int Scenery::workers() const { return (int)async->threads.size(); }
 
 void Scenery::beginDrain() {
   std::lock_guard<std::mutex> lk(async->m);
-  async->draining = true; async->todo.clear(); async->busy.clear(); async->epoch++;
+  async->draining = true; async->todo.clear(); async->todoLoad = 0; async->busy.clear(); async->epoch++;
 }
 bool Scenery::isDrained() const {
   std::lock_guard<std::mutex> lk(async->m);
@@ -132,7 +139,7 @@ void Scenery::clear() {
   // No new request/ensure/pump may run concurrently. A region replacement must wait for
   // readers of the old world, rather than merely throwing their eventual results away.
   std::unique_lock<std::mutex> lk(async->m);
-  async->draining = true; async->todo.clear(); async->busy.clear(); async->epoch++;
+  async->draining = true; async->todo.clear(); async->todoLoad = 0; async->busy.clear(); async->epoch++;
   async->cv.wait(lk, [&] { return async->active == 0; });
   async->done.clear();
   chunks.clear(); async->draining = false;
@@ -149,9 +156,11 @@ bool Scenery::request(int cx, int cz, int level) {
   if (Chunk* c = get(cx, cz)) { if (c->level >= level) return true; j.c = *c; }
   {
     std::lock_guard<std::mutex> lk(A.m);
-    // keep the queue short so it always holds the chunks nearest the camera, not ones requested frames ago
-    if ((int)A.todo.size() >= 2 * (int)A.threads.size()) return false;
+    // keep the queue short (in work, not chunks: Async::jobLoad) so it always holds the chunks nearest the camera,
+    // not ones requested frames ago
+    if (A.todoLoad + Async::jobLoad(level) > Async::kLoadPerWorker * (int)A.threads.size()) return false;
     j.epoch = A.epoch;
+    A.todoLoad += Async::jobLoad(level);
     A.todo.push_back(std::move(j));
   }
   A.busy[idx] = level;
@@ -214,7 +223,7 @@ void Scenery::adopt(Scenery& staged) {
   staged.pump(got);   // (any finished since its last call; its workers are idle)
   {
     std::lock_guard<std::mutex> lk(async->m);
-    async->todo.clear(); async->done.clear(); async->busy.clear(); async->epoch++;
+    async->todo.clear(); async->todoLoad = 0; async->done.clear(); async->busy.clear(); async->epoch++;
   }
   chunks = std::move(staged.chunks);
   for (auto& p : chunks) if (p) { p->lastUse = 0; p->markChanged(); }

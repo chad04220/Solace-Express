@@ -1,12 +1,20 @@
-## What's new in v4.4.1: the XR-50's rocket, and every screen checked for overlap
+## What's new in v4.4.2: the flight opens sooner
 
-### The rocket
-- **Three times the thrust, five times the burn.** 1,620 kN (was 540) for about 150 s at full throttle (was 30), from
-  the same 3,400 kg of oxidizer. A full burn from the scramjet corridor now tops out around 2,000 km up; shut it off
-  early for less.
-- **Shut off and relit at will.** A double press of **A** (two short taps on the keyboard - a held A is still roll
-  left - or the gamepad's A), or **X**, lights the rocket and shuts it off, as often as you like while the oxidizer
-  lasts.
+From the v4.4.1 diagnostics: an XR-40 sortie's loading screen took 12 s, eleven of them making the scenery about its
+site at exactly 12 chunks a frame.
+
+### Scenery streams as fast as it is made
+- **The worker threads' queue held two chunks each and was refilled once a frame.** At a locked 60 fps that made 12
+  chunks a frame however quick they were - and most of them are sea, made in 0.02 ms - so the workers sat idle for
+  most of every frame. The queue is now capped by the work in it (a wood counts sixteen times a stretch of sea), and a
+  loading screen's own thread makes chunks too in the time it spent waiting for the display. The 16,000 chunks a
+  flight wants at Solace Capital on high quality, 45 s of refills on three workers here, now stream in under 2 s.
+- **The research terminal, the service board and Free Flight stream the launch site while you choose.** v4.4.0 drew
+  every preview over one stage at your field; a sortie launched anywhere else streamed its whole 18 km of scenery
+  under its loading screen. The site chosen in each menu is built in the background from the moment it is picked.
+- **The loading log names the flight's first frame.** The v4.4.1 log ended on a 1 s frame it said nothing about (the
+  one that opened the flight); the next log says what that frame's update and render did and whether a shader program
+  was compiled in it.
 
 ### The real Earth, checked against the published pack
 The streamed install, the charts, the fine elevation, the sliding flight and the career's long hauls were run against
@@ -16,6 +24,16 @@ the fine ground. One fix came out of it:
 - **A lighthouse could walk off its place.** Where the ground has a light in the sea, it moves to the nearest land
   within 120 m; the search moved it again at each better point round the ring, so a light could end up further than
   that from its place (North Brother Island's, in the East River). It stands where the ring's best point is.
+
+## What's new in v4.4.1: the XR-50's rocket, and every screen checked for overlap
+
+### The rocket
+- **Three times the thrust, five times the burn.** 1,620 kN (was 540) for about 150 s at full throttle (was 30), from
+  the same 3,400 kg of oxidizer. A full burn from the scramjet corridor now tops out around 2,000 km up; shut it off
+  early for less.
+- **Shut off and relit at will.** A double press of **A** (two short taps on the keyboard - a held A is still roll
+  left - or the gamepad's A), or **X**, lights the rocket and shuts it off, as often as you like while the oxidizer
+  lasts.
 
 ### Every screen checked for overlap
 A pass over every menu and card at 720p, 1080p and 140% UI scale:

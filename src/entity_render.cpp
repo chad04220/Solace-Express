@@ -173,10 +173,12 @@ void Renderer::drawEntities(const FrameParams& fp) {
       auto t0 = std::chrono::steady_clock::now();
       for (const Need& n : need) {
         // close chunks are generated here and now so they are never missing; the rest go to the worker threads
-        // (or, without workers, are generated here within the frame's time budget)
+        // (or, without workers, are generated here within the frame's time budget). A loading screen (its budget
+        // raised: Game::updateLoading) builds on here too once the queue is full, in the time this thread would
+        // spend waiting for the display
         bool now = entSync || n.d <= 700.f;
         if (!now && g_scenery.request(n.cx, n.cz, n.level)) continue;
-        if (!now && g_scenery.workers() > 0) break;   // queue full: ask again next frame
+        if (!now && g_scenery.workers() > 0 && entBudgetMs < 10.f) break;   // queue full: ask again next frame
         double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
         if (!now && ms > entBudgetMs) break;
         g_scenery.ensure(n.cx, n.cz, n.level)->lastUse = entFrame;
