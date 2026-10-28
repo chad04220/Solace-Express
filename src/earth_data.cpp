@@ -447,7 +447,7 @@ Pack::~Pack() = default;
 std::shared_ptr<Pack> Pack::open(const std::string& dir, std::string* error) {
   auto fail = [&](const std::string& why) -> std::shared_ptr<Pack> { if (error) *error = why; return nullptr; };
   std::vector<uint8_t> idx;
-  if (!readFile(joinPath(dir, "pack.idx"), idx)) return fail("no Earth pack in " + dir);
+  if (!readFile(joinPath(dir, "pack.idx"), idx)) return fail("nothing at " + joinPath(dir, "pack.idx"));
   std::shared_ptr<Pack> pack(new Pack());
   pack->dir_ = dir;
   pack->impl_ = std::make_unique<Impl>();

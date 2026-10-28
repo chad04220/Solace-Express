@@ -186,6 +186,7 @@ Game::ResLayout Game::researchLayout() const {
 }
 
 std::vector<std::string> wrap(const std::string& s, float width, float size);   // game_ui.cpp
+void clipFade(float x, float bottom, float w, float h, vec3 c);   // game_ui.cpp
 
 // The test cards. Each step: what is measured, the value, how long it must be held (0: once is enough), its label.
 const Game::ResCard Game::kResCards[] = {
@@ -518,8 +519,10 @@ void Game::drawResearch(const FrameParams& fp) {
     if (availableCardH < 64 * s) {
       // A compact register preserves room for every test card. Tiny stacked statistics
       // are less useful here than readable airframe names and real reachable row targets.
+      // (two cards to a row, as many rows as the register needs: the XR-50's fifth card once sat on the test cards)
+      const int rows = (kNumResCraft + 1) / 2;
       const float gap = 12 * s, tw = (w - gap) * .5f;
-      const float th = clampf((L.bot - y - listH - 2 * gap) * .5f, 48 * s, 90 * s);
+      const float th = clampf((L.bot - y - listH - rows * gap) / rows, 48 * s, 90 * s);
       for (int k = 0; k < kNumResCraft; ++k) {
         const ResCraftInfo& C = kResCraft[k];
         const float tx = x + (k % 2) * (tw + gap), ty = y + (k / 2) * (th + gap);
@@ -531,7 +534,7 @@ void Game::drawResearch(const FrameParams& fp) {
         g_ren.text(tx + 10 * s, ty + th - 17 * s, 10.5f * s, C.name, C.colour, e, 0, false);
         if (click(tx, ty, tw, th, 0x7E5C0000u + uint32_t(k))) resCraft = C.idx;
       }
-      y += 2 * (th + gap);
+      y += rows * (th + gap);
     } else {
       float h = clampf(availableCardH, 64 * s, 150 * s), f = h / (150 * s);
       for (int k = 0; k < kNumResCraft; k++) {
@@ -660,9 +663,10 @@ void Game::drawResearch(const FrameParams& fp) {
     tag(x, y, s, range ? "RANGE CONFIGURATION  //  XR-40" : "SPECIFICATION  //  DECRYPTED", ACC, e); y += 24 * s;
     slab(x, y, w, L.bot - y, s, ACC, e);
     float px = x + 14 * s, iw = w - 28 * s, py = y + 12 * s;
-    // The equipment owns the existing side rail, never the live aircraft stage. At compact
-    // sizes the whole rail scrolls, rather than pinning the kit above a one-line specification.
-    // Keep this transient viewport state on the Game instance, including capture/test instances.
+    // The equipment owns the existing side rail, never the live aircraft stage. The whole rail scrolls (the kit, the
+    // specification, the envelope, the directives) whenever it is taller than the slab - at a large UI scale the plain
+    // specification is too - rather than running out of its foot into the sortie bar. Keep this transient viewport
+    // state on the Game instance, including capture/test instances.
     float& rangeScroll = uiAnim[0x7E5F0100u]; float& rangeContent = uiAnim[0x7E5F0101u];
     float& railFor = uiAnim[0x7E5F0102u]; float& railOpened = uiAnim[0x7E5F0103u];
     const int railKey = RC.idx * 2 + (range ? 1 : 0);
@@ -670,39 +674,33 @@ void Game::drawResearch(const FrameParams& fp) {
     const float railTop = py, railBot = L.bot - 24 * s;
     const size_t railFocus0 = focusList.size();
     bool rangeWheeled = false;
+    if (hovered(x, railTop, w, railBot - railTop) && in.wheel != 0) {
+      rangeScroll -= in.wheel * 44 * s; in.wheel = 0; rangeWheeled = true;
+    }
+    rangeScroll = std::clamp(rangeScroll, 0.f, std::max(0.f, rangeContent - (railBot - railTop)));
+    hitClipOn = true; hitClip[0] = x + 8 * s; hitClip[1] = railTop;
+    hitClip[2] = x + w - 8 * s; hitClip[3] = railBot;
+    g_ren.uiClip(hitClip[0], hitClip[1], hitClip[2], hitClip[3]);
+    py -= rangeScroll;
     if (range) {
-      if (hovered(x, railTop, w, railBot - railTop) && in.wheel != 0) {
-        rangeScroll -= in.wheel * 44 * s; in.wheel = 0; rangeWheeled = true;
-      }
-      rangeScroll = std::clamp(rangeScroll, 0.f, std::max(0.f, rangeContent - (railBot - railTop)));
-      hitClipOn = true; hitClip[0] = x + 8 * s; hitClip[1] = railTop;
-      hitClip[2] = x + w - 8 * s; hitClip[3] = railBot;
-      g_ren.uiClip(hitClip[0], hitClip[1], hitClip[2], hitClip[3]);
-      py -= rangeScroll;
       drawCombatPractice(px, py, iw);
       py += 212 * std::min(s, iw / 250.f);
       g_ren.rect(px, py, iw, s, ACC, .22f * e); py += 16 * s;
       tag(px, py, s, "SPECIFICATION  //  DECRYPTED", ACC, e); py += 24 * s;
     }
-    if (range) {
-      for (const auto& line : wrap(RC.title, iw, 11 * s)) {
-        g_ren.text(px, py, 11 * s, decrypt(line, selT, .01f), ACC, e, 0, false); py += 15 * s;
-      }
-      py += 3 * s;
-    } else {
-      g_ren.text(px, py, 11 * s, decrypt(RC.title, selT, 0.01f), ACC, e, 0, false); py += 18 * s;
+    for (const auto& line : wrap(RC.title, iw, 11 * s)) {
+      g_ren.text(px, py, 11 * s, decrypt(line, selT, .01f), ACC, e, 0, false); py += 15 * s;
     }
+    py += 3 * s;
     const SpecRow* rows = RC.rows;
     for (int i = 0; i < 8; i++) {
       float rt = selT - 0.1f - i * 0.06f;
       g_ren.text(px, py, 10 * s, rows[i].k, R_DIM, e, 0, false);
-      float extra = 0.f;
-      if (range) {
-        const auto lines = wrap(rows[i].v, iw - 112 * s, 12 * s);
-        for (size_t line = 0; line < lines.size(); ++line)
-          g_ren.text(px + 112 * s, py - s + line * 16 * s, 12 * s, decrypt(lines[line], rt, .012f), R_TEXT, e, 0, false);
-        extra = std::max(0, int(lines.size()) - 1) * 16 * s;
-      } else g_ren.text(px + 112 * s, py - 1 * s, 12 * s, decrypt(rows[i].v, rt, 0.012f), R_TEXT, e, 0, false);
+      // (a value wrapped inside the rail whichever mode: the XR-50's propulsion and endurance ran off its edge)
+      const auto lines = wrap(rows[i].v, iw - 112 * s, 12 * s);
+      for (size_t line = 0; line < lines.size(); ++line)
+        g_ren.text(px + 112 * s, py - s + line * 16 * s, 12 * s, decrypt(lines[line], rt, .012f), R_TEXT, e, 0, false);
+      const float extra = std::max(0, int(lines.size()) - 1) * 16 * s;
       if (rows[i].bar >= 0) {
         float f = rows[i].bar * smoothstepf(0.f, 0.5f, rt);
         g_ren.rect(px + 112 * s, py + extra + 15 * s, iw - 112 * s, 2 * s, ACC, 0.12f * e);
@@ -713,8 +711,8 @@ void Game::drawResearch(const FrameParams& fp) {
     // manoeuvre envelope (V-n): load factor against Mach
     py += 6 * s;
     tag(px, py, s, "MANOEUVRE ENVELOPE", ACC, e); py += 20 * s;
-    float ch = range ? 120 * s : std::min(120 * s, L.bot - py - 120 * s);
-    if (ch > 50 * s) {
+    {
+      const float ch = 120 * s;
       float gx0 = px + 26 * s, gw = iw - 30 * s, gy0 = py, gh = ch;
       float mMax = RC.idx == kVigil ? 1.6f : (RC.vMax > 4.5f ? 8.f : RC.vMax > 1.5f ? 4.f : 1.f), nTop = RC.nTop, nBot = RC.nBot, nStep = RC.nStep;   // each craft on its own scale (the XR-50's to Mach 8)
       auto X = [&](float m) { return gx0 + m / mMax * gw; };
@@ -734,22 +732,21 @@ void Game::drawResearch(const FrameParams& fp) {
       py += gh + 22 * s;
     }
     tag(px, py, s, "HANDLING DIRECTIVES", ACC, e); py += 20 * s;
-    for (int i = 0; i < 5 && (range || py < L.bot - 16 * s); i++) {
-      if (range) {
-        for (const auto& line : wrap(std::string("> ") + RC.notes[i], iw, 11 * s)) {
-          g_ren.text(px, py, 11 * s, line, R_DIM, e, 0, false); py += 16 * s;
-        }
-      } else { g_ren.text(px, py, 11 * s, std::string("> ") + RC.notes[i], R_DIM, e, 0, false); py += 16 * s; }
+    for (int i = 0; i < 5; i++) {
+      for (const auto& line : wrap(std::string("> ") + RC.notes[i], iw, 11 * s)) {   // (wrapped inside the rail)
+        g_ren.text(px, py, 11 * s, line, R_DIM, e, 0, false); py += 16 * s;
+      }
     }
-    if (range) {
+    {
       rangeContent = py + rangeScroll - railTop + 4 * s;
       hitClipOn = false; g_ren.uiClipOff();
       const float viewH = railBot - railTop, limit = std::max(0.f, rangeContent - viewH);
       if (limit > 0) {
+        clipFade(x + 8 * s, railBot, w - 16 * s, 20 * s, svui::codePanel * 0.12f + svui::codeInk * 0.88f);
         const float thumb = std::max(24 * s, viewH * viewH / rangeContent);
         g_ren.rect(x + w - 5 * s, railTop, 2 * s, viewH, R_DIM, .18f * e);
         g_ren.rect(x + w - 5 * s, railTop + (viewH - thumb) * std::min(rangeScroll / limit, 1.f), 2 * s, thumb, ACC, .85f * e);
-        g_ren.text(px, L.bot - 16 * s, 9.5f * s, ellipsize(padPrompts() ? "R-STICK SCROLL  //  EQUIPMENT + SPECS" : "SCROLL  //  EQUIPMENT + SPECIFICATIONS", iw, 9.5f * s), R_DIM, e, 0, false);
+        g_ren.text(px, L.bot - 16 * s, 9.5f * s, ellipsize(padPrompts() ? (range ? "R-STICK SCROLL  //  EQUIPMENT + SPECS" : "R-STICK SCROLL  //  SPECIFICATIONS") : range ? "SCROLL  //  EQUIPMENT + SPECIFICATIONS" : "SCROLL  //  SPECIFICATIONS", iw, 9.5f * s), R_DIM, e, 0, false);
       }
       focusScrollPixels(railFocus0, 0x7E5F0020u, x, railTop, w, railBot, rangeScroll, rangeWheeled, limit > 0);
     }

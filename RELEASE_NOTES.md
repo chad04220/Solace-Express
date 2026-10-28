@@ -1,3 +1,17 @@
+## What's new in v4.4.1: every screen checked for overlap
+
+A pass over every menu and card at 720p, 1080p and 140% UI scale:
+- **Research terminal:** the XR-50's card sat on the test-card list (the register was laid out for four airframes);
+  the specification's long values ran off the rail's edge, and at a large UI scale the rail ran out of its foot into
+  the sortie bar. The register grows a row per pair of airframes; the rail wraps its values and scrolls as one.
+- **Scrolling panels** (the hangar inspector, a job's brief, the logbook, the airline, the settings pages, the research
+  rail) fade their last row into the panel instead of cutting it in half against the footer under it.
+- **Contracts:** the status line beside FLY! ("Tip: check the Hangar...") ran under the button; it wraps beside it.
+- **Settings > Joystick:** at a large UI scale the last axes ran under the note at the foot; the axes scroll.
+- **Credits:** the Close button moves to the top corner, clear of the widest lines of the roll.
+- **Free Flight:** the subtitle no longer runs off a small screen; the Earth map's region buttons no longer sit on a
+  longitude label. The missing-pack message reads "nothing at earth/pack.idx" instead of "no Earth pack in earth".
+
 ## What's new in v4.4.0: responsive menus
 
 A pass over everything between the launch and the flight: the menus, the craft previews, the loading screens and the

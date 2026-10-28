@@ -269,6 +269,16 @@ static std::string ellipsize(const std::string& str, float width, float size) {
   return t + "...";
 }
 
+// A soft edge over the foot of a clipped, scrolling region: the row the clip cuts fades into the panel instead of
+// ending in half glyphs against the footer under it (the hangar inspector, a job's brief, the logbook, the airline, the
+// research rail). c is the panel's colour where the fade sits: panelAt for the hub's panels.
+void clipFade(float x, float bottom, float w, float h, vec3 c) {
+  const int n = 8;
+  for (int i = 0; i < n; i++) g_ren.rect(x, bottom - h + h * i / n, w, h / n + 1, c, 0.95f * (i + 1) / n);
+}
+// (the hub's panels shade from svui::panel at the top to svui::ink at the foot: their colour at a height)
+static vec3 panelAt(float y0, float h, float y) { const float t = clampf((y - y0) / std::max(h, 1.f), 0.f, 1.f); return svui::panel * (1 - t) + svui::ink * t; }
+
 // A key in a key / value list: plain, or in the hub's glass style a small upper-case label
 static std::string upperS(std::string t) { for (char& c : t) c = (char)toupper((unsigned char)c); return t; }
 static std::string lowerS(std::string t) { for (char& c : t) c = (char)tolower((unsigned char)c); return t; }
@@ -1025,6 +1035,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   if (c.from != career.location && c.type != CT_LESSON) { int pc = career.positioningCost(c); row("Positioning", pc ? fmt("Airline ticket to %s: %s", A.code, fmtMoney(pc).c_str()) : "Free courtesy ride", C_DIM); }
   g_ren.uiClipOff();
   detMax = std::max(0.f, py + detScroll - detBot);   // (how far the region scrolls: next frame's limit)
+  if (detMax > 0.f) clipFade(px, detBot, textW, 18 * s, panelAt(y, h, detBot));
   focusScrollPixels(detFocus0, uid(0, 0, "job-details-scroll"), px, detTop, textW + 14 * s, detBot, detScroll, detWheeled, detMax > 0.f);
   if (detMax > 0.f) {   // a thin bar beside the text: where the view is in the briefing
     const float trackH = detBot - detTop, barH = std::max(20 * s, trackH * trackH / (trackH + detMax));
@@ -1162,10 +1173,18 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
     if (cd.trial >= 0) startTrial(cd.trial, selAircraft, (int)src);   // (a trial: off the books, its ghost loaded)
     else if (cd.job) continueJob(selAircraft, src); else beginCareerFlight(go, selAircraft, src);
   }
-  if (commitBlocked()) g_ren.text(px, y + h - 50 * s, 14 * s, "Your last result isn't saved yet (" + saveWhy + "). Retrying...", C_BAD, 1);
-  else if (otherWhileJob) g_ren.text(px, y + h - 50 * s, 14 * s, "Deliver or release the job in progress first (its card is at the top).", C_WARN, 1);
-  else if (overweight) g_ren.text(px, y + h - 50 * s, 14 * s, "Over the take-off weight limit: take less fuel (the arrows by the fuel row), or a bigger aircraft.", C_BAD, 1);
-  else if (!can) g_ren.text(px, y + h - 50 * s, 14 * s, "Tip: check the Hangar to buy an aircraft, or earn your next licence through the story.", C_DIM, 1);
+  // (the line beside the buttons, in the width left of them: on two lines when it needs them, never under them)
+  auto status = [&](const std::string& t, vec3 col) {
+    const float sw = std::max(120 * s, dx + dw - 262 * s - (cd.job ? 300 * s : 0.f) - 12 * s - px);
+    auto lines = wrap(t, sw, 14 * s);
+    if (lines.size() > 2) { lines.resize(2); lines[1] = ellipsize(lines[1] + " ...", sw, 14 * s); }
+    float ly = y + h - (lines.size() > 1 ? 60 : 50) * s;
+    for (auto& l : lines) { g_ren.text(px, ly, 14 * s, l, col, 1); ly += 18 * s; }
+  };
+  if (commitBlocked()) status("Your last result isn't saved yet (" + saveWhy + "). Retrying...", C_BAD);
+  else if (otherWhileJob) status("Deliver or release the job in progress first (its card is at the top).", C_WARN);
+  else if (overweight) status("Over the take-off weight limit: take less fuel (the arrows by the fuel row), or a bigger aircraft.", C_BAD);
+  else if (!can) status("Tip: check the Hangar to buy an aircraft, or earn your next licence through the story.", C_DIM);
 }
 
 bool Game::menuPreviewTarget() const {
@@ -1533,6 +1552,7 @@ void Game::drawHubHangar(float x, float y, float w, float h) {
   contentH = py + scroll - regTop;
   hitClipOn = false; buttonContentOffsetY = 0; g_ren.uiClipOff();
   if (contentH > regBot - regTop) {
+    clipFade(rx + 8 * s, regBot, rw - 16 * s, 24 * s, panelAt(y, h, regBot));
     const float track = regBot - regTop, thumb = std::max(24 * s, track * track / contentH), limit = contentH - track;
     g_ren.rect(rx + rw - 7 * s, regTop, 2 * s, track, C_DIM, 0.16f);
     g_ren.rect(rx + rw - 7 * s, regTop + (track - thumb) * std::min(scroll / limit, 1.f), 2 * s, thumb, C_ACCENT, 0.8f);
@@ -1598,7 +1618,7 @@ void Game::drawRegionPicker() {
   for (int lon = -180; lon <= 180; lon += 30) {
     const float px = x + (lon + 180.f) / 360.f * w;
     g_ren.line(px, y, px, y + h, 1, C_ACCENT, lon == 0 ? .36f : .12f);
-    if (lon % 60 == 0) g_ren.text(px, y + h + 6 * s, 9 * s, fmt("%d", lon), C_DIM, 1, 1, false);
+    if (lon % 60 == 0 && lon != 180) g_ren.text(px, y + h + 6 * s, 9 * s, fmt("%d", lon), C_DIM, 1, 1, false);   // (180's label would sit under the region buttons)
   }
   for (int lat = -90; lat <= 90; lat += 30) {
     const float py = y + (90.f - lat) / 180.f * h;
@@ -1757,9 +1777,9 @@ void Game::drawFreeFlightSetup(const FrameParams& fp) {
     const bool failed = install->state() == earthInstall::Installer::FAILED;
     g_ren.text(x, 61 * s, 14 * s, ellipsize(install->status(), W - 48 * s, 14 * s), failed ? C_WARN : C_ACCENT, 1);
   } else {
-    g_ren.text(x, 61 * s, 14 * s, realEarth ? "Fly Solace, the real Earth or generated destinations. No fees, missions or career changes." :
+    g_ren.text(x, 61 * s, 14 * s, ellipsize(realEarth ? "Fly Solace, the real Earth or generated destinations. No fees, missions or career changes." :
                offerInstall ? "Fly Solace or generated Earth destinations. No fees, missions or career changes. The real Earth: get it here, its land streamed as you fly." :
-               "Fly Solace or generated Earth destinations. No fees, missions or career changes. (The real Earth: its pack in an earth folder beside the game.)", C_DIM, 1);
+               "Fly Solace or generated Earth destinations. No fees, missions or career changes. (The real Earth: its pack in an earth folder beside the game.)", W - 48 * s, 14 * s), C_DIM, 1);
   }
   const float selectW = std::max(240 * s, W - (realEarth || offerInstall ? 800 : 490) * s);
   if (button(x, 86 * s, 30 * s, 28 * s, "<")) freeRegion = (freeRegion + (int)freeRegions.size() - 1) % (int)freeRegions.size();
@@ -1918,6 +1938,7 @@ void Game::drawHubAirline(float x, float y, float w, float h) {
     hitClipOn = false; buttonContentOffsetY = 0; g_ren.uiClipOff();
     float track = clipBottom - clipTop, limit = std::max(0.f, airContent[col] - track);
     if (limit > 0) {
+      clipFade(clipX + 8 * s, clipBottom, clipW - 16 * s, 20 * s, panelAt(y, h, clipBottom));
       float thumb = std::max(24 * s, track * track / airContent[col]);
       g_ren.rect(clipX + clipW - 7 * s, clipTop, 2 * s, track, C_DIM, 0.16f);
       g_ren.rect(clipX + clipW - 7 * s, clipTop + (track - thumb) * std::min(airScroll[col] / limit, 1.f), 2 * s, thumb, C_ACCENT, 0.8f);
@@ -2188,6 +2209,7 @@ void Game::drawHubLogbook(float x, float y, float w, float h) {
     g_ren.uiClipOff();
     float track = bottom - top, limit = std::max(0.f, total[column] - track);
     if (limit > 0) {
+      clipFade(bx + 12 * s, bottom, bw - 24 * s, 20 * s, panelAt(y, h, bottom));
       float thumb = std::max(24 * s, track * track / total[column]);
       g_ren.rect(bx + bw - 7 * s, top, 2 * s, track, C_DIM, 0.15f);
       g_ren.rect(bx + bw - 7 * s, top + (track - thumb) * std::min(scroll[column] / limit, 1.f), 2 * s, thumb, C_ACCENT, 0.8f);
@@ -2349,6 +2371,7 @@ void Game::drawSettings(float x, float y, float w, float h) {
   hitClipOn = false;
   g_ren.uiClipOff();
   if (genMax > 0.f) {   // where the list stands: a thin track at the right edge
+    clipFade(x - 8 * s, regBot, w + 16 * s, 20 * s, panelAt(y, h, regBot));
     const float th = regBot - regTop, bh = std::max(24 * s, th * th / (th + genMax)), by = regTop + (th - bh) * (genScroll / genMax);
     g_ren.rect(x + w + 2 * s, regTop, 3 * s, th, C_ACCENT, 0.12f, 1.5f * s);
     g_ren.rect(x + w + 2 * s, by, 3 * s, bh, C_ACCENT, 0.7f, 1.5f * s);
@@ -2510,7 +2533,19 @@ void Game::drawJoystick(float x, float y, float w, float h) {
   }
   py += 8 * s;
   header(x, py, w - 16 * s, "FLIGHT AXES"); py += 30 * s;
-  const float rowH = std::min(62 * s, std::max(48 * s, (y + h - py - 40 * s) / AX_COUNT));
+  // the axes in a clipped region of their own, scrolled (the wheel, the right stick, the focus) when the panel is too
+  // short for five rows - at a large UI scale on a small screen the last rows ran under the note at the foot
+  const float regTop = py, regBot = y + h - 40 * s;
+  static float axScroll = 0.f, axMax = 0.f;
+  bool axWheeled = false;
+  if (hovered(x - 8 * s, regTop, w + 16 * s, regBot - regTop) && in.wheel != 0) { axScroll -= in.wheel * 48.f * s; in.wheel = 0; axWheeled = true; }
+  axScroll = std::clamp(axScroll, 0.f, axMax);
+  buttonContentOffsetY = axScroll;
+  const size_t focus0 = focusList.size();
+  g_ren.uiClip(x - 8 * s, regTop, x + w + 8 * s, regBot);
+  hitClipOn = true; hitClip[0] = x - 8 * s; hitClip[1] = regTop; hitClip[2] = x + w + 8 * s; hitClip[3] = regBot;
+  py -= axScroll;
+  const float rowH = std::min(62 * s, std::max(56 * s, (regBot - regTop) / AX_COUNT));
   const float bx = x + std::min(210 * s, w * 0.27f), bw = std::min(270 * s, w * 0.36f), mx = bx + bw + 16 * s, mw = std::max(40 * s, x + w - 16 * s - mx);
   const float u = std::min(1.f, (w - 32 * s) / (600 * s));   // (the second line's controls, narrower in a small window)
   for (int i = 0; i < AX_COUNT; i++) {
@@ -2559,7 +2594,16 @@ void Game::drawJoystick(float x, float y, float w, float h) {
     if (b.bound() && button(lx, ly, 80 * s * u, lh, "Clear" + sfx + "-clear")) { b = AxisBind(); saveSettings(); }
     py += rowH;
   }
-  g_ren.text(x, std::min(py + 4 * s, y + h - 16 * s), 12 * s, "Keys and the gamepad keep working alongside. A throttle lever takes over when it moves; a key or trigger takes it back.", C_DIM, 0.85f, 0, false);
+  axMax = std::max(0.f, py + axScroll - regBot);
+  buttonContentOffsetY = 0; hitClipOn = false; g_ren.uiClipOff();
+  if (axMax > 0.f) {   // where the list stands: a thin track at the right edge
+    clipFade(x - 8 * s, regBot, w + 16 * s, 20 * s, panelAt(y, h, regBot));
+    const float th = regBot - regTop, bh = std::max(24 * s, th * th / (th + axMax)), by = regTop + (th - bh) * (axScroll / axMax);
+    g_ren.rect(x + w + 2 * s, regTop, 3 * s, th, C_ACCENT, 0.12f, 1.5f * s);
+    g_ren.rect(x + w + 2 * s, by, 3 * s, bh, C_ACCENT, 0.7f, 1.5f * s);
+  }
+  focusScrollPixels(focus0, uid(0, 2, "settings-scroll"), x - 8 * s, regTop, w + 16 * s, regBot, axScroll, axWheeled, axMax > 0.f);
+  g_ren.text(x, y + h - 28 * s, 12 * s, ellipsize("Keys and the gamepad keep working alongside. A throttle lever takes over when it moves; a key or trigger takes it back.", w, 12 * s), C_DIM, 0.85f, 0, false);
 }
 
 void Game::drawRadioPanel(float x, float y) {
@@ -3994,8 +4038,9 @@ void Game::drawCredits() {
     }
     py += sz + 14 * s;
   }
-  if (button(W - 170 * s, H - 64 * s, 140 * s, 40 * s, "Close", true, true)) { showCredits = false; return; }
-  g_ren.text(30 * s, H - 52 * s, 12 * s, padPrompts() ? padGlyph("B") + "  CLOSE" : std::string("ESC  CLOSE"), C_DIM, 0.8f, 0, false);
+  // (the button and its hint in the top corners, where the roll has faded out: at the foot the widest lines ran under them)
+  if (button(W - 170 * s, 24 * s, 140 * s, 40 * s, "Close", true, true)) { showCredits = false; return; }
+  g_ren.text(30 * s, 38 * s, 12 * s, padPrompts() ? padGlyph("B") + "  CLOSE" : std::string("ESC  CLOSE"), C_DIM, 0.8f, 0, false);
 }
 
 // The first start: what to call the pilot, how to fly (assisted or realistic), and the road from the first lesson to
