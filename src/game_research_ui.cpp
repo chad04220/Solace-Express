@@ -472,7 +472,6 @@ void Game::drawResearch(const FrameParams& fp) {
   }
   resAuthed = true;
   float e = smoothstepf(kIntro, kIntro + 0.5f, T);
-  float dt = uiDt;
   ResLayout L = researchLayout();
   // selection changes re-run the scan and the decryption
   researchView.select(resCraft);
@@ -610,7 +609,7 @@ void Game::drawResearch(const FrameParams& fp) {
     // brackets on the stage
     float sx0 = L.px0, sy0 = L.top, sw = L.px1 - L.px0, sh = stageBot - L.top;
     corners(sx0, sy0, sw, sh, 18 * s, 2 * s, ACC, 0.7f * e);
-    g_ren.text(sx0 + 10 * s, sy0 + 8 * s, 11 * s, "LIVE RENDER  //  " + std::string(g_world.airports[resAirport].code) + " RANGE", ACC, e, 0, false);
+    g_ren.text(sx0 + 10 * s, sy0 + 8 * s, 11 * s, "LIVE RENDER  //  " + std::string(g_world.airports[std::clamp(previewStage().airport, 0, (int)g_world.airports.size() - 1)].code) + " RANGE", ACC, e, 0, false);
     // re-scan band after a selection change
     if (selT < 1.2f) {
       float yb = cy - R + 2 * R * smoothstepf(0.f, 1.1f, selT);
@@ -792,7 +791,7 @@ void Game::drawResearch(const FrameParams& fp) {
     g_ren.text(c3, cy, 10 * hs, "ATMOSPHERE", R_DIM, e, 0, false);
     const char* wxs[] = {"CLEAR", "OVERCAST", "STORM"};
     for (int i = 0; i < 3; i++) if (chip(c3 + i * 80 * hs, cy + 16 * s, 76 * hs, 34 * s, wxs[i], resWx == i, 0x7E5E0010u + (uint32_t)i)) resWx = i;
-    // time of day slider (the preview's light follows it)
+    // time of day slider (the sortie's: the range's preview keeps the stage's light, baked once at the launch)
     float c4 = c3 + 256 * hs, tw = std::max(50 * hs, x1 - 16 * hs - 226 * hs - c4);
     g_ren.text(c4, cy, 10 * hs, fmt("LOCAL TIME  %02d:00", (int)resTime), R_DIM, e, 0, false);
     {

@@ -390,20 +390,21 @@ void Game::drawIntro(float progress, const std::string& stage, float t, unsigned
   svui::bar(R,px,by+190*s,room,7*s,p,gold,e);
   const std::string status=p>=1.f?"Ready. Welcome aboard.":pace&&work.idle>=5?fmt("Task running  /  %.0f s since its last completed unit",work.idle):"Progress measures completed work; task duration can vary.";
   R.text(px,by+215*s,11*s,fit(status,room,11*s),C_DIM,e,0,false);
-  if(pace) {
-    const int n=std::min(6,int(work.groups.size()));
+  if(pace) {   // every category of the launch's work (load_pacer.h: its steps grouped by label), each with its own bar
+    const int n=std::min(9,int(work.groups.size()));
+    const float rowH=std::min(35.f,(264.f-26.f)/std::max(1,n))*s;
     for(int i=0;i<n;++i) {
-      const auto& g=work.groups[i];const float units=g.units+g.skipped,f=units>0?clampf(g.done/units,0.f,1.f):1.f,yy=by+(23+i*35)*s;
+      const auto& g=work.groups[i];const float units=g.units+g.skipped,f=units>0?clampf(g.done/units,0.f,1.f):1.f,yy=by+23*s+i*rowH;
       const vec3 c=g.skipped>0?gold:f>=1.f?ice:g.active?gold:C_DIM;
       R.rect(rail,yy+3*s,4*s,4*s,c,(g.active?.85f:.40f)*e,2*s);
       R.text(rail+12*s,yy,10*s,fit(g.label,rw-60*s,10*s),c,e,0,false);
       R.text(rail+rw,yy,10*s,g.skipped>0?"SKIPPED":f>=1.f?"READY":fmt("%d%%",std::min(99,int(f*100))),c,e,2,false);
-      svui::bar(R,rail+12*s,yy+19*s,rw-12*s,3*s,f,c,e);
+      svui::bar(R,rail+12*s,yy+std::min(19.f*s,rowH-7*s),rw-12*s,3*s,f,c,e);
     }
   } else {
-    const char* labels[]={"GRAPHICS & WORLD","PILOT SYSTEMS","RENDERER","MENU SCENERY","AIRCRAFT"};
+    const char* labels[]={"SHADER PROGRAMS","WORLD","PILOT SYSTEMS","RENDERER","MENU SCENERY","AIRCRAFT BODIES","PREVIEW STAGE"};
     R.text(rail,by+23*s,11*s,"SYSTEM CHECKLIST",gold,e,0,false);
-    for(int i=0;i<5;++i)R.text(rail,by+(57+i*32)*s,11*s,labels[i],C_DIM,.8f*e,0,false);
+    for(int i=0;i<7;++i)R.text(rail,by+(52+i*29)*s,11*s,labels[i],C_DIM,.8f*e,0,false);
   }
   R.text(60*s,H-24*s,10*s,"2026 CDAIII.  ALL RIGHTS RESERVED.",C_DIM,.6f*e,0,false);
   R.text(W-60*s,H-24*s,10*s,"SOMNIUM VOLANDI",gold,.6f*e,2,false);
@@ -436,13 +437,13 @@ void Game::drawLoading() {
   const vec3 dim = military ? vec3(.69f,.73f,.64f) : research ? svui::codeDim : C_DIM;
   bool air = pending ? flight.startAirborne : !plane.onGround;
   const Airport& ap = g_world.airports[air && !flight.longHaul() ? flight.to : flight.from];
-  // a picture rendered by render_loading.bat - the airport, or the aircraft in flight - when there is one on disk
+  // a picture rendered by SomniumVolandi.exe --loadshots (platform_win32.cpp) - the airport, or the aircraft in flight - when there is one on disk
   std::string key = g_world.procedural ? g_world.regionId + "/" + ap.code :
     (military || air) ? fmt("air_%d", pendingService ? flight.forceAircraft : queued ? queued->spec : typeOf(plane.spec)) : std::string(ap.code);
   auto li = loadImg.find(key);
   if (li == loadImg.end() && !pending) {
     unsigned tex = 0; int w = 0, h = 0; std::vector<uint8_t> px;
-    // a picture rendered on this PC by render_loading.bat (.png) wins over the one that ships with the game (.jpg)
+    // a picture rendered on this PC by --loadshots (.png) wins over the one that ships with the game (.jpg)
     for (const char* ext : {".png", ".jpg"})
       if (!g_world.procedural && !tex && g_ren.ok && readImage((assetDir + "/loading/" + key + ext).c_str(), w, h, px)) tex = g_ren.makeTexture(px.data(), w, h);
     li = loadImg.emplace(key, tex).first;
@@ -2001,7 +2002,6 @@ void Game::drawHubAirline(float x, float y, float w, float h) {
   g_ren.text(rx, ry + 4 * s, 12 * s, "FOR HIRE", C_DIM, 1, 0, false); ry += 22 * s;
   auto cands = career.pilotCandidates();
   const std::vector<std::string> note = wrap("Rating 3 fills the cabin and rarely bends anything; rating 1 is cheap and has incidents. Insurance covers their repairs too.", rw, 12 * s);
-  const float noteH = note.size() * 17 * s;   // (kept clear at the panel's foot for the note)
   for (size_t ci = 0; ci < cands.size(); ci++) {
     const Career::Pilot& p = cands[ci];
     g_ren.text(rx, ry + 4 * s, 14 * s, ellipsize(fmt("%s   rating %d   %s a flight", p.name.c_str(), p.rating, fmtMoney(p.wage).c_str()), rw - 100 * s, 14 * s), C_DIM, 1);

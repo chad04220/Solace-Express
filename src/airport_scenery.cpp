@@ -27,7 +27,6 @@ struct Placer {
     }
     out.push_back({kind, {p.x, y - (footprint ? 0.05f : 0.f), p.z, yaw, sx, sy, sz, seed >= 0 ? seed : rnd()}});
   }
-  void putS(int kind, float u, float vv, float fu, float fvv, float s, bool footprint = true) { put(kind, u, vv, fu, fvv, s, s, s, footprint); }
   // building facing the runway with its front on the line vv = front
   void facing(int kind, float u, float front, float sx, float sy, float sz) { put(kind, u, front + kEntInfo[kind].hz * sz, 0, -1, sx, sy, sz); }
   // Conservative runway-local footprint, used for the new landside details. The original

@@ -538,9 +538,9 @@ struct GameTest {
     else if(sc.rfind("freeflight",0)==0){FrameParams fp{};g.drawFreeFlightSetup(fp);}
     else if(sc.rfind("intro",0)==0){
       float p=.4f,t=5;sscanf(sc.c_str(),"intro_%f_%f",&p,&t);g.shaderFirstRun=true;
-      LoadPacer pace;int ids[6];const char* labels[]={"GRAPHICS & WORLD","SHADER CACHE","PILOT SYSTEMS","RENDERER","MENU SCENERY","AIRCRAFT"};
-      for(int i=0;i<6;++i)ids[i]=pace.add(labels[i],10,0,labels[i]);
-      const int at=std::min(5,int(p*6));pace.begin(ids[at]);pace.setSub(p*6-at);pace.task("Surface field / GPU rows",32,128);
+      LoadPacer pace;int ids[8];const char* labels[]={"SHADER PROGRAMS","WORLD","PILOT SYSTEMS","RENDERER","MENU SCENERY","AIRCRAFT BODIES","PREVIEW STAGE","HIVE CRAFT"};
+      for(int i=0;i<8;++i)ids[i]=pace.add(labels[i],10,0,labels[i]);
+      const int at=std::min(7,int(p*8));pace.begin(ids[at]);pace.setSub(p*8-at);pace.task("Surface field / GPU rows",32,128);
       if(p>=1)pace.end();
       g.drawIntro(p,p>=1?"All flight systems ready":"Preparing aircraft geometry: XR-40 Somnus / exterior | Surface field evaluation",t,g.iconTex,1.f,g_ren,&pace);
     }

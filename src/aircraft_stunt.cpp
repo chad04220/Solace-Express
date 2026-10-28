@@ -21,8 +21,7 @@ const Step kFig[Plane::STUNT_COUNT][12] = {
   {{'P', 225}, {'H', 0.8f}, {'R', 180}, {'H', 1.f}, {'P', 270}, {'H', 0.8f}, {'R', 180}, {'H', 1.f}, {'X', 0}},   // Cuban eight
   {{'U', 30}, {'W', 0}, {'X', 0}},                                                                 // wingover
 };
-// height each figure needs above the entry (up) and below it (down), in loop radii
-const float kUp[Plane::STUNT_COUNT] = {2.2f, 0.3f, 1.2f, 2.2f, 0.3f, 2.2f, 1.f};
+// height each figure needs below the entry, in loop radii
 const float kDown[Plane::STUNT_COUNT] = {0.3f, 0.5f, 0.8f, 0.2f, 5.f, 0.6f, 0.8f};   // (a split-S picks up speed on the way down)
 // the load each figure needs at the least: those that pull through the vertical 2.5 g, a barrel roll's corkscrew less,
 // a roll or a wingover barely any (an airliner's +2.5 g structure, less its gust margin, flies only those two)

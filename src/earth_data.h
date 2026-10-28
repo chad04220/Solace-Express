@@ -22,7 +22,6 @@ enum Cover : uint8_t {
 inline bool coverForest(int c) { return (c >= 111 && c <= 116) || (c >= 121 && c <= 126); }
 inline bool coverClosedForest(int c) { return c >= 111 && c <= 116; }
 inline int coverForestType(int c) { return coverForest(c) ? (c % 10) : 0; }   // 1..6 as above, 0 not a forest
-inline bool coverWater(int c) { return c == COVER_WATER || c == COVER_SEA; }
 
 // A box of latitude and longitude (degrees, south < north, west < east, never across the antimeridian)
 struct Box {

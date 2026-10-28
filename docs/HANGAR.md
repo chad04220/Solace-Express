@@ -99,21 +99,28 @@ The Ambler flown level at 75% power: 66.6 m/s on its wheels, 62.5 on floats.
 - **At the sale** an aircraft is worth half of what was fitted to it, over its own value.
 - **In Free Flight** the six types have an "On floats / On wheels" button beside the aircraft.
 
-## The hangar's preview: a stand at the airport
+## The preview stage: one stand for every preview
 
-The hangar's aircraft (and Free Flight's) are shown in the live world, not in a room of their own: the selected
-aircraft stands on the apron in front of one of the airport's hangars, nose out of the door, at the time of day and in
-the weather the hub has. Its size reads against the building behind it, the other hangars, the masts and the parked
+Every craft preview in the game is drawn at the same place in the world: the hangar's aircraft and Free Flight's stand
+on it, the research terminal's craft and the service board's fly a circuit over it. The selected aircraft stands on the
+apron in front of one of the airport's hangars, nose out of the door, in one light and sky shared by every menu past
+the main menu's tour. Its size reads against the building behind it, the other hangars, the masts and the parked
 aircraft. A Dawnlark sits small before a maintenance hangar's door; a Galleon dwarfs Meadowbrook's buildings and fits
 Solace Capital's.
 
-- **The stand** (game.cpp `hangarStandAt`): among the airport's own hangars (`airportItems`: hangars, arch hangars,
-  T-hangars), the one before which the circle the aircraft sweeps as it turns is clear of everything the airport has
-  placed. The way out over the apron to the camera must be clear too, above the lowest sight line. The ground must be
-  level and dry. Of those, the biggest building wins. The career's hangar uses the field you're at; Free Flight uses
-  the departure you've picked. A seaplane base, or a field with no clear stand, uses the nearest airport that has one.
-  The stand is kept until the airport or the aircraft changes, and the hub's background builds what stands round it
-  ahead of the cut to the hangar's tab.
+- **The stand** (game.cpp `previewStage`, `hangarStandAt`): at the field you're at (the career's; Solace Capital
+  without one), among the airport's own hangars (`airportItems`: hangars, arch hangars, T-hangars), the one before
+  which the circle the largest craft in the roster sweeps as it turns is clear of everything the airport has placed -
+  the largest, so the stand is the same place for every craft. The way out over the apron to the camera must be clear
+  too, above the lowest sight line. The ground must be level and dry. Of those, the biggest building wins. A seaplane
+  base, or a field with no clear stand, uses the nearest airport that has one. The stand is kept until the world or the
+  field changes.
+- **Built once, kept.** The launch's loading screen streams the stand's scenery and the circuit's over it and bakes
+  its terrain shadow (`prewarm`, the PREVIEW STAGE category), and every menu keeps it resident (`prefetchNearPos`),
+  so no cut between the hub, the hangar, Free Flight, the research terminal and the service board builds anything,
+  and no craft picked in them streams a new site. (Until 4.4 Free Flight stood at the departure picked, the research
+  terminal flew a 10 km circuit through its launch site in the sortie's own light and the service board hovered over
+  each mission's field: every cut and every pick streamed and re-lit a place of its own.)
 - **The view:** the showroom's turntable and lens. The aircraft turns in place (ROTATE, drag); the camera stays out
   over the apron at the same azimuth, its elevation and zoom as before, so the hangar stays behind the aircraft. No
   traffic is drawn while you look. After dark the hangar's two floodlights over its door light it.

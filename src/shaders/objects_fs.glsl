@@ -22,7 +22,7 @@ void main(){
   }
   if (tmax <= 0.0) discard;
   bool onScr = false;   // a research jet's display from the pilot's seat
-  // pod: a pixel on the aircraft in a cockpit view - shaded from the cockpit alone, no fog, no clouds (rt_main.glsl)
+  // pod: a pixel on the aircraft in a cockpit view - shaded from the cockpit alone, no fog, no clouds
   bool pod = false, cockpitView = uPlaneOn == 1 && gPS.w > 0.5 && uWreck == 0;
   // the aircraft hull was rasterized along exactly this ray: start the airframe march where it is (0: on its inside)
   float hullT = 0.0;
@@ -84,7 +84,7 @@ void main(){
     oG3 = vec4(1.0, 1.0, 1.0, float(GBF_MOVING)/255.0);
     return;
   }
-  if (hit == 6) {   // a debris chunk: torn painted skin or charred metal (rt_shade.glsl debrisShade)
+  if (hit == 6) {   // a debris chunk: torn painted skin or charred metal
     vec3 nT; vec4 tx = triSample(p*2.0, dn, M_METAL, 1.0, nT);
     Mat m; m.metal = 0.5; m.emit = vec3(0.0); m.nrm = nT;
     float burn = vnoise(p.xz*3.0 + p.y);

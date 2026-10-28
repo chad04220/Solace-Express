@@ -120,7 +120,7 @@ public:
   // the launch's last steps: the menu's first place, then every aircraft's meshes (outside and cockpit; allCraft: the
   // research jets' too). With a pacer, each is a step of its own (menuStep, then itemSteps in prewarmItems' order)
   // and `progress` gets the pacer's fraction
-  void prewarm(const std::function<void(float, const std::string&)>& progress, bool allCraft = false, class LoadPacer* pace = nullptr, int menuStep = -1, const std::vector<int>* itemSteps = nullptr);
+  void prewarm(const std::function<void(float, const std::string&)>& progress, bool allCraft = false, class LoadPacer* pace = nullptr, int menuStep = -1, const std::vector<int>* itemSteps = nullptr, int stageStep = -1);
   static std::vector<std::pair<int, bool>> prewarmItems(bool allCraft);   // (aircraft, cockpit) in the order prewarm builds them
   static int prewarmHiveItems(bool allCraft);   // the hive's craft types it builds after them (with allCraft: the research and Defense Command flights')
   // what preparing an aircraft's body (inside: its cockpit's) is doing: 0 starting, 1 read ready-built from the aircraft
@@ -694,6 +694,16 @@ private:
   void warmCombatCollision();
   void prefetchCombatCollision();
   void hiveVisual(FrameParams& fp);
+  // One readiness model for every loading path - the flight's loading screen, the research terminal's boot, the launch's
+  // menu and preview-stage steps: what the scene still has to do this frame (chunks pending round the camera, its terrain
+  // shadow baking, a body baked since the caller last looked), ready when none of it is; and one progress formula for
+  // their bars, the work's parts weighted alike everywhere
+  struct SceneWork { int pending = 0; bool shadow = false; bool baked = false; bool ready() const { return pending == 0 && !shadow && !baked; } };
+  SceneWork sceneWork(int& bakeSeen) const;
+  static float sceneProgress(float setup, int pending, int pend0, bool lit, float verified) {
+    const float chunks = pend0 > 0 ? 1.f - float(pending) / pend0 : 1.f;
+    return 0.20f * setup + 0.55f * chunks + 0.15f * (lit ? 1.f : 0.f) + 0.10f * verified;
+  }
   int loadWarmItems() const;   // the loading screen's warm-up items before the flight's views: each hive craft, then the XR-40's stores
   float loadSetupDone() const;   // the loading screen's scene setup, 0..1 (its first stage bar)
   hive::WorldCallbacks hiveWorld();
@@ -876,8 +886,17 @@ private:
   void buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, std::vector<SpriteVert>& add);
   void feedAudio();
   void menuBackgroundCamera(FrameParams& fp);
+  // The preview stage: the one place in the world every craft preview is drawn at - the hangar's stand at the hub's
+  // field (the hangar, Free Flight, the research terminal's range, the service board), so switching menus or craft
+  // streams nothing new, and the launch builds and keeps its scenery (prewarm). ok false: no stand (a water-only world)
+  struct PreviewStage { bool ok = false; int airport = -1; vec3 ground; float heading = 0; };
+  PreviewStage previewStage() const;
   void hangarPreviewCamera(FrameParams& fp);
   void hangarApronCamera(FrameParams& fp, class Plane& demo, vec3 ground, float heading);   // (the live world's stand)
+  // the craft flying a circuit over the stage (the research terminal's and the service board's previews), framed in a
+  // preview ring (cx, cy, pixels) and orbited by the view; cockpit: its cabin drawn (the warm-up)
+  void stageFlyingCamera(FrameParams& fp, MenuPreviewView& view, int craft, float cx, float cy, float pixels, bool cockpit);
+  int prewarmStage = 0;   // the launch streaming the stage's scenery: 1 the stand, 2-5 the circuit's quarters (prewarm only)
   void menuTour(FrameParams& fp);   // main menu: a tour of the islands
   int hubField() const;   // the hub's airport when its world is loaded, else -1
   vec3 hubOrbitAt(vec3 centre) const;   // where the hub's camera circles round centre now (on the ground plane)

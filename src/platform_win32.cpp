@@ -817,6 +817,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   g_ren.checkMeshCache();
   const bool perfFresh = game.cacheDir.empty() || !exists(game.cacheDir + "\\perf.bin");
   LoadPacer pace;
+  // the launch's bar paced by the last launch's measured times (load_pacer.h): a step moves it as far as its real work
+  if (!game.cacheDir.empty()) pace.loadTimes(game.cacheDir + "\\launch_pacing.txt");
   if (ctx2 && !g_shaderCacheDir.empty() && !cacheCurrent) {
     SECURITY_ATTRIBUTES sa = {sizeof(sa), nullptr, TRUE};
     HANDLE rd = nullptr, wr = nullptr;
@@ -849,7 +851,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   // everything else (the tools start theirs in buildBodies)
   AircraftShaderHelpers afHelpers;
   if (!tool) afHelpers.start(g_shaderCacheDir);
-  const int stStart = pace.add("start", Renderer::kProgramCount + 16, 0.f, "GRAPHICS & WORLD");   // (each shader program built or loaded, and the islands)
+  // the launch's steps, each a category on the loading screen: what each really loads, and the bar paced by the time
+  // each took at the last launch (pace.loadTimes)
+  const int stStart = pace.add("start", Renderer::kProgramCount, 0.f, "SHADER PROGRAMS");   // (each shader program built or loaded)
+  const int stWorld = pace.add("world", 16, 0.f, "WORLD");   // (the islands, built or read from the cache beside them)
   const int stCache = child.hProcess ? pace.add("optional-cache", Renderer::kProgramCount, 0.f, "SHADER CACHE") : -1;
   const int stInit = pace.add("career", kNumAircraft + 4, 0.f, "PILOT SYSTEMS");
   const int stTex = pace.add("renderer", 11, 0.f, "RENDERER");
@@ -857,9 +862,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   const int stMenu = tool ? -1 : pace.add("menu", 12, 0.f, "MENU SCENERY");
   std::vector<int> meshSteps;
   if (!tool)
-    for (const auto& it : Game::prewarmItems(true)) meshSteps.push_back(pace.add("mesh" + std::to_string(it.first) + (it.second ? "c" : "o"),9,9.f,"AIRCRAFT"));
+    for (const auto& it : Game::prewarmItems(true)) meshSteps.push_back(pace.add("mesh" + std::to_string(it.first) + (it.second ? "c" : "o"), 9, 9.f, "AIRCRAFT BODIES"));
+  const int stStage = tool ? -1 : pace.add("stage", 10, 0.f, "PREVIEW STAGE");   // (the stand every craft preview is drawn at, and its circuit)
   if (!tool)   // (then the hive's craft, after the aircraft: prewarmHiveItems)
-    for (int k = 0; k < Game::prewarmHiveItems(true); k++) meshSteps.push_back(pace.add("mesh-hive" + std::to_string(k), 9, 9.f, "AIRCRAFT"));
+    for (int k = 0; k < Game::prewarmHiveItems(true); k++) meshSteps.push_back(pace.add("mesh-hive" + std::to_string(k), 9, 9.f, "HIVE CRAFT"));
   pace.begin(stStart);
   std::thread compileThread;
   if (ctx2) compileThread = std::thread([&] {
@@ -907,7 +913,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       float t = (float)(n.QuadPart - t0.QuadPart) / freq.QuadPart;
       float dt = std::max(0.f, t - lastTime); lastTime = t;
       if (st == 2) { fade -= dt / 0.35f; if (fade <= 0.f) break; }
-      if (synchronousShaders) pace.setDone(stStart, (float)progDone + 16.f);
+      if (synchronousShaders) { pace.setDone(stStart, (float)progDone); pace.setDone(stWorld, 16.f); }
       LoadPacer* lp = intro.pacer;
       float target = lp ? lp->fraction() : (float)intro.target;
       shown = clampf(target,0.f,1.f); // exact completed work; the independent decoration supplies motion
@@ -1012,7 +1018,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       stage += "   " + std::to_string(std::min(d + 1, Renderer::kProgramCount)) + " of " + std::to_string(Renderer::kProgramCount);
     } else stage = "Shaders ready";
     if (!built) stage += " | "+std::string(g_worldLoadTask.load())+fmt(" (%d%%)",int(g_worldLoadProgress.load()*100));
-    pace.setDone(stStart, (float)std::min((int)progDone, Renderer::kProgramCount) + (built ? 16.f : 16.f*g_worldLoadProgress.load()));   // (the programs done, and the islands)
+    pace.setDone(stStart, (float)std::min((int)progDone, Renderer::kProgramCount));   // (the programs done, and the islands beside them)
+    pace.setDone(stWorld, built ? 16.f : 16.f*g_worldLoadProgress.load());
     if(compileState==0)pace.task("Graphics programs",float(std::min((int)progDone,Renderer::kProgramCount)),float(Renderer::kProgramCount));
     else pace.task(g_worldLoadTask.load(),g_worldLoadProgress.load(),1.f);
     introFrame(pace.fraction(), stage, 1.f);
@@ -1038,7 +1045,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     bool shaderOk = g_ren.compilePrograms(&progDone);
     synchronousShaders = false;
     if (!shaderOk) { stopIntro(false); fatal(g_ren.error); return 1; }
-    pace.setDone(stStart, (float)Renderer::kProgramCount + 16.f);
+    pace.setDone(stStart, (float)Renderer::kProgramCount); pace.setDone(stWorld, 16.f);
   }
   if (ctx2 && compileState == 1 && !stampPath.empty() && !cacheCurrent && g_ren.dispError.empty())   // the cache now holds this build
     if (FILE* f = fopen(stampPath.c_str(), "w")) { fprintf(f, "%s\n", stamp.c_str()); fclose(f); }
@@ -1080,8 +1087,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
       pace.clearTask();
     }
     if (game.quit) { stopIntro(false); return 0; }
-    if (!tool) game.prewarm([&](float f, const std::string& what) { introFrame(f, what, 1.f); }, true, &pace, stMenu, &meshSteps);
-    if (!game.quit) pace.end();
+    if (!tool) game.prewarm([&](float f, const std::string& what) { introFrame(f, what, 1.f); }, true, &pace, stMenu, &meshSteps, stStage);
+    if (!game.quit) { pace.end(); if (!tool && !game.cacheDir.empty()) pace.saveTimes(game.cacheDir + "\\launch_pacing.txt"); }
     if (game.quit) { stopIntro(false); return 0; }
     stopIntro(!tool);   // the bench and shot tools draw straight away; a normal start fades the intro out
   }
@@ -1093,10 +1100,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
               afHelpers.lastBuilt, afHelpers.lastCount, afHelpers.lastSecs, afHelpers.lastItems);
     fprintf(f, "Ground photographs: %s\n", g_ren.matEnvScanned ? (g_ren.envMatCompressed ? "2K, block-compressed (BC3)" : "2K, uncompressed") : g_ren.matEnvFallbackScanned ? "512" : "none (procedural)");
     fprintf(f, "Foveated shading: %s\n", g_ren.vrsAvailable ? "available (NVIDIA variable-rate shading)" : "not available on this card (Auto resolution lowers the whole frame)");
-    fprintf(f, "Launch: shaders and islands %.1f s (islands %s), career %.1f s, renderer %.1f s, ",
-            pace.tookOf("start"), g_world.fromCache ? "from the cache" : "generated", pace.tookOf("career"), pace.tookOf("renderer"));
-    if (tool) fprintf(f, "menu and aircraft meshes not prepared (a tool's run: its scenes prepare their own)\n");
-    else fprintf(f, "menu %.1f s, aircraft meshes %.1f s (%d built)\n", pace.tookOf("menu"), pace.tookOf("mesh"), g_ren.bakeBuilt);
+    fprintf(f, "Launch: shaders %.1f s, islands %.1f s (%s), career %.1f s, renderer %.1f s, ",
+            pace.tookOf("start"), pace.tookOf("world"), g_world.fromCache ? "from the cache" : "generated", pace.tookOf("career"), pace.tookOf("renderer"));
+    if (tool) fprintf(f, "menu, aircraft meshes and the preview stage not prepared (a tool's run: its scenes prepare their own)\n");
+    else fprintf(f, "menu %.1f s, aircraft meshes %.1f s (%d built), preview stage %.1f s\n", pace.tookOf("menu"), pace.tookOf("mesh"), g_ren.bakeBuilt, pace.tookOf("stage"));
     if (!g_ren.dispError.empty()) fprintf(f, "Display shader failed (cockpit screens disabled):\n%s\n", g_ren.dispError.c_str());
     if (!g_ren.proxyError.empty()) fprintf(f, "Shadow proxy shader failed (aircraft shadows from the shadow maps only):\n%s\n", g_ren.proxyError.c_str());
     if (!g_shaderNotes.empty()) fprintf(f, "%s", g_shaderNotes.c_str());   // (programs the driver's compiler rejected, and what built instead)

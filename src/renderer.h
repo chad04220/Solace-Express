@@ -496,7 +496,7 @@ private:
   uint64_t groundShadowKey[2] = {};   // the driven vehicles each cascade last drew (a change re-renders it)
   int entFrame = 0, entGenCount = 0;
   bool initEntities();
-  // ---- terrain envelope mesh (terrain_envelope.cpp): where each pixel's exact terrain march starts
+  // ---- terrain envelope mesh (world.cpp's cell maxima, built in renderer.cpp): where each pixel's exact terrain march starts
   GLuint fboEnv = 0, texEnv = 0, texEnvDepth = 0;   // the hull passes' target (createHullTarget)
   std::vector<float> envInst;
   void createHullTarget();

@@ -5,7 +5,7 @@ uniform sampler2D uHMax;  // conservative max height per cell, mip L = 256>>L ce
 const int HMAXN = 256; const int HMAXL = 5;
 // Ray march the heightfield. Cells the ray passes entirely above (per the max-height mip chain) are skipped,
 // which keeps grazing rays over lowlands from running out of steps (they used to fall through to the sea).
-// gTStart: where the march may begin (the terrain envelope mesh on this pixel - see terrain_envelope.cpp); 1e30 means
+// gTStart: where the march may begin (the terrain envelope mesh on this pixel - renderer.cpp); 1e30 means
 // the ray meets no terrain in the world. A start that turns out to be under the ground (it never should) is ignored.
 uniform int uEnvOn;
 float gTStart = 1.0;

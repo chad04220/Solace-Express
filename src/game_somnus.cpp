@@ -20,21 +20,6 @@ static void bombLaunch(const Plane& plane, vec3& p, vec3& v) {
   v = plane.vel - plane.up() * kBombEject;
 }
 float groundAt(vec3 p) { return std::max(pitGround(p.x, p.z, g_world.height(p.x, p.z)), 0.f); }   // (into the craters: WLD-1)
-// first point where a segment from a (direction d, length L) meets the ground or the sea; t < 0 when clear
-float groundHit(vec3 a, vec3 d, float L) {
-  float t = 0, prev = 0;
-  while (t < L) {
-    float step = t < 300.f ? 6.f : t < 1500.f ? 15.f : 30.f;
-    prev = t; t = std::min(t + step, L);
-    vec3 p = a + d * t;
-    if (p.y < groundAt(p)) {
-      float lo = prev, hi = t;
-      for (int i = 0; i < 8; i++) { float m = 0.5f * (lo + hi); vec3 q = a + d * m; if (q.y < groundAt(q)) hi = m; else lo = m; }
-      return hi;
-    }
-  }
-  return -1.f;
-}
 }
 
 void Game::somnusControls(float dt) {

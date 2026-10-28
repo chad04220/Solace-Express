@@ -1,3 +1,36 @@
+## What's new in v4.4.0: responsive menus
+
+A pass over everything between the launch and the flight: the menus, the craft previews, the loading screens and the
+code behind them. The aim is that nothing past the launch screen waits for anything to be built.
+
+### One preview stage
+- **Every craft preview is drawn at the same place.** The hangar's aircraft and Free Flight's stand on the apron in
+  front of a hangar at your field; the research terminal's craft and the service board's fly a circuit over the same
+  stand. One light, one sky, one patch of scenery for all of them. Each menu keeps its own look, controls and camera.
+- **Nothing streams between menus.** The launch builds the stand's scenery, the circuit's and its terrain shadow and
+  keeps them resident, so cutting from the hub to the hangar, to Free Flight, to the research terminal or to the
+  service board, and picking any craft or mission in them, builds nothing. (Free Flight stood at the departure you
+  picked, the research terminal flew a 10 km circuit through its launch site in the sortie's own light and the
+  service board hovered over each mission's field: every cut and every pick streamed and re-lit a place of its own.)
+- The research terminal's time-of-day and weather still set the sortie; the range's preview keeps the stage's light.
+
+### The loading screen, recalibrated
+- **The categories name what is really loading:** shader programs, the world, pilot systems, the renderer, the
+  aircraft's shader programs, the menu's scenery, every aircraft's body, the preview stage and the hive's craft, each
+  with its own bar.
+- **The main bar follows the real work.** Each step is weighted by the time it took at the last launch (kept beside
+  the shader cache), so a step with ten times the work moves the bar ten times as far, and it advances only with
+  completed things - never with time, and never to 100% before everything is done.
+
+### One readiness model
+- The flight's loading screen, the research terminal's boot and the launch's own steps now share one check for a
+  scene being ready (scenery streamed, terrain lit, nothing baking, stable frames) and one progress formula for their
+  bars.
+
+### Behind the curtain
+- Dead code removed: unused functions, variables and a stale fairing helper; comments naming files and tools that no
+  longer exist corrected.
+
 ## What's new in v4.3.0: the XR-50 unleashed
 
 The XR-50 Morpheus is now flown from the ground, with no one aboard, so its loads are no longer limited by what a

@@ -247,7 +247,7 @@ std::vector<vec2> fillet(const std::vector<vec2>& p, float R) {
     float t = R * tanf(theta * 0.5f);
     t = std::min(t, 0.48f * std::min(lu, lv));
     const float r = t / tanf(theta * 0.5f);
-    const vec2 s = b - u * t, e = b + v * t;
+    const vec2 s = b - u * t;
     const float side = u.x * v.y - u.y * v.x > 0 ? 1.f : -1.f;
     const vec2 nrm(-u.y * side, u.x * side), centre = s + nrm * r;
     const int steps = std::max(2, (int)ceilf(theta * r / 12.f));

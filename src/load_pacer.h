@@ -1,14 +1,18 @@
-// Somnium Volandi - the launch's loading bar: the share of the launch's steps that is done.
+// Somnium Volandi - the launch's loading bar: the share of the launch's work that is done.
 //
 // The launch is a list of steps, each a count of things to do: the shader programs (one each, built or loaded from the
-// cache) with the islands beside them, the career, the renderer, the menu, and each aircraft's mesh. The bar shows
-// how many of those are done out of all of them, not a guess from how long they took last time: it stands still while
-// one long thing is being done (a large shader program, the first build of a mesh), and it reaches 100% only when
-// everything has. Each step's time is still measured, for the summary in startup.log.
+// cache), the islands, the career, the renderer, the menu's scenery, the preview stage, each aircraft's body and the
+// hive's craft. The bar advances only with completed things, never with time: it stands still while one long thing is
+// being done (a large shader program, the first build of a mesh), and it reaches 100% only when everything has. Each
+// step's weight on the bar is the time it took at the last launch (launch_pacing.txt beside the shader cache), so the
+// bar's pace follows the real work - a step with as many things as another but ten times the time moves it ten times
+// as far; a step with no record yet weighs its count. Each step's time is measured for that, and for startup.log.
 #pragma once
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdio>
+#include <map>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -25,11 +29,34 @@ public:
     float taskDone = 0, taskUnits = 0, taskFraction = -1;
     std::vector<Group> groups;
   };
-  // A step of `units` completed things (`key` names it for tookOf).
-  // Optional weight scales the whole step; by default each real unit weighs one.
+  // the steps' times at the last launch ("key seconds" a line): the weights of this launch's steps of the same keys
+  bool loadTimes(const std::string& path) {
+    std::lock_guard<std::mutex> lk(m);
+    FILE* f = path.empty() ? nullptr : fopen(path.c_str(), "r");
+    if (!f) return false;
+    char key[128]; double secs = 0;
+    while (fscanf(f, "%127s %lf", key, &secs) == 2) if (std::isfinite(secs) && secs >= 0) prior[key] = secs;
+    fclose(f);
+    return !prior.empty();
+  }
+  // this launch's steps' times, for the next launch's weights (a step without a time kept at its last)
+  bool saveTimes(const std::string& path) const {
+    std::lock_guard<std::mutex> lk(m);
+    FILE* f = path.empty() ? nullptr : fopen(path.c_str(), "w");
+    if (!f) return false;
+    std::map<std::string, double> out = prior;
+    for (const Step& s : steps) if (s.took >= 0 && s.skipped <= 0.f) out[s.key] = s.took;
+    for (const auto& kv : out) fprintf(f, "%s %.3f\n", kv.first.c_str(), kv.second);
+    fclose(f);
+    return true;
+  }
+  // A step of `units` completed things (`key` names it for tookOf). Its weight on the bar: the time it took at the
+  // last launch where known, else the optional weight given, else one per thing
   int add(const std::string& key, int units = 1, float weight = 0.f, const std::string& label = {}) {
     std::lock_guard<std::mutex> lk(m);
-    Step s; s.key = key; s.label = label.empty() ? key : label; s.units = std::max(units, 1); s.weight = std::isfinite(weight) && weight > 0.f ? weight : (float)s.units;
+    Step s; s.key = key; s.label = label.empty() ? key : label; s.units = std::max(units, 1);
+    const auto it = prior.find(key);
+    s.weight = it != prior.end() ? std::max(0.05f, (float)it->second) : std::isfinite(weight) && weight > 0.f ? weight : (float)s.units;
     steps.push_back(s);
     return (int)steps.size() - 1;
   }
@@ -114,6 +141,7 @@ public:
 private:
   struct Step { std::string key, label; int units = 1; float done = 0.f, skipped = 0.f, weight = 1.f; double t0 = -1, took = -1, changed = -1; };
   std::vector<Step> steps;
+  std::map<std::string, double> prior;   // (the last launch's times by key: loadTimes)
   std::string taskLabel;
   float taskDone = 0, taskUnits = 0;
   int cur = -1;
