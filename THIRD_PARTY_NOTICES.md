@@ -91,9 +91,6 @@ inputs in `manifest.json`.
 
   Supplied without warranties and not suitable for navigation; no endorsement implied.
 
-The older `tools/earth/` Phase 0 prototype's synthetic fixture (`tests/fixtures/earth/`) is authored test data, not
-survey data.
-
 ## The stars (`src/star_catalog.h`)
 
 The night sky's stars are the Yale Bright Star Catalogue, 5th revised edition: D. Hoffleit and W. H. Warren Jr., Yale

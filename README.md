@@ -366,6 +366,7 @@ src/
   settlements.*, road_*, bridges.*  towns, the road network, its bridges, furniture and traffic
   procedural_regions.*              the generated regions: descriptors, recipes, sights
   geo.*, region_travel.*            geodesy on the sphere; charts and handoffs between regions
+  earth_*, world_earth.cpp          the real Earth: the pack reader and its streaming, the installer, charts, far terrain
   distant_regions.*                 far region silhouettes for the horizon
   regional_surface.*                their collision counterparts
   weather.*, sky.*                  the wind field, clouds and rain; the sun, moon and stars
@@ -381,7 +382,7 @@ src/
   platform_win32.cpp, *_win.cpp     the Windows window, input, joysticks, radio and crash reports
   steam.*                           Steamworks, loaded at runtime
 tests/                              CTest suites, the render and UI harnesses, fixtures
-tools/                              shader embedding, material packing, CI test selection, mesh, voice, Steam
+tools/                              shader embedding, material packing, CI test selection, mesh, voice, Steam, the Earth pack builder (earth2)
 assets/                             materials, voices, cockpit layouts, loading pictures, icons
 steam/                              Steamworks configuration, store assets, upload scripts
 docs/                               design notes (below) and the README's pictures (docs/media)
@@ -407,7 +408,9 @@ docs/                               design notes (below) and the README's pictur
 | [steam/README.md](steam/README.md) | Steamworks settings, achievements, the demo and the upload |
 | [docs/PLAYTEST_KIT.md](docs/PLAYTEST_KIT.md), [docs/HARDWARE_MATRIX.md](docs/HARDWARE_MATRIX.md) | Running a closed playtest and measuring PCs |
 | [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md) | Signing the release executable |
-| [docs/REAL_EARTH_PLAN.md](docs/REAL_EARTH_PLAN.md) | The on-hold plan for real-world terrain data |
+| [docs/REAL_EARTH_PLAN.md](docs/REAL_EARTH_PLAN.md) | The real Earth: the data pack, its streaming install, charts, sliding flight and the career on it |
+| [docs/XR50.md](docs/XR50.md) | The XR-50 Morpheus: its propulsion, airframe and ground station |
+| [docs/COLLABORATION.md](docs/COLLABORATION.md) | How the agents and reviewers work on the repository |
 
 ## Copyright
 

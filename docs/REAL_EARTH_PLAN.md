@@ -34,7 +34,7 @@ So two charts that overlap agree wherever they both reach. That is what lets a f
 next anywhere, over land too. Today's handoffs need open ocean, because each generated region is its own invented world.
 
 ```
-offline (tools/earth, Python + NumPy, in CI)                 at run time (src/earth_*.cpp)
+offline (tools/earth2, Python + NumPy, in CI)                at run time (src/earth_*.cpp)
   ETOPO 2022 30" ─► elev bundles (1° tiles, int16) ─┐        pack reader (bundles, inflate, LRU tile cache)
   CGLS-LC100 ─────► cover bundles (1° tiles, uint8) ├─ pack ─►  height(lat, lon) / cover(lat, lon) / airports /
   OurAirports ────► airports.bin                    │          places / roads by area
@@ -766,8 +766,9 @@ plain connection to GitHub and to the Copernicus bucket:
 
 - 2026-10-11/12: Codex's Phase 0 (`tools/earth` v1: cube tiles, zstd, the source and terms review in
   `EARTH_DATA_SOURCES.md` and `EARTH_LANDCOVER_REVIEW.md`, the sampling studies). The cube contract and `geo.h`'s
-  tiles stay for the generated regions' addresses. The v2 pack uses 1° geographic tiles because the elevation and
-  land-cover sources are already on that grid.
+  tiles stay for the generated regions' addresses (`tools/earth/cube.py`, `earth_cube_parity`); the rest of the v1
+  tooling, its tests, workflow and studies were removed in v4.4.2. The v2 pack uses 1° geographic tiles because the
+  elevation and land-cover sources are already on that grid.
 - 2026-10-13: the owner moved to procedural regions (`PROCEDURAL_EARTH.md`): 6,143 generated regions, ocean handoffs,
   the far silhouettes and the coarse collision fallback. All of that is reused here.
 - 2026-10-20: the feasibility study measured the packs (section 2) and built a Madeira prototype with GLO-90 in the

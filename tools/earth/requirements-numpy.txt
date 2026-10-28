@@ -1,4 +1,0 @@
-# Optional accelerated-producer/test environment, measured with Python 3.12.
-# The scalar sampler and zlib fixtures require neither package.
-numpy==2.3.5
-zstandard==0.25.0

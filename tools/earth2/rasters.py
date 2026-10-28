@@ -18,7 +18,7 @@ COVER_CLASSES = (0, 20, 30, 40, 50, 60, 70, 80, 90, 100, 111, 112, 113, 114, 115
 
 
 class EnviGrid:
-    """A north-up float32 BSQ ENVI raster on a geographic grid (tools/earth's to_envi.py output), memory mapped."""
+    """A north-up float32 BSQ ENVI raster on a geographic grid, memory mapped."""
 
     def __init__(self, path):
         hdr = {}

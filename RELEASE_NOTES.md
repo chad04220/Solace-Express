@@ -16,6 +16,12 @@ site at exactly 12 chunks a frame.
   one that opened the flight); the next log says what that frame's update and render did and whether a shader program
   was compiled in it.
 
+### Housekeeping
+- The Phase 0 Earth tooling (`tools/earth` v1, its sampler, verifier, USGS handoff, tests, workflow and studies) is
+  gone; the game's packs come from `tools/earth2`. Only `cube.py` stays, as the contract `geo.h` is checked against.
+  Three one-off fixture audits from the Living Islands work went with it. The README's layout and document list match
+  the code again.
+
 ### The real Earth, checked against the published pack
 The streamed install, the charts, the fine elevation, the sliding flight and the career's long hauls were run against
 the pack on the game's release (not the test fixture): New York and Boston build from the streamed data in about 50 s

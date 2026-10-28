@@ -1,2 +1,0 @@
-# Fixture SHA-256 pins must survive Windows autocrlf checkouts unchanged.
-* text eol=lf
