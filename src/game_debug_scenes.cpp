@@ -753,6 +753,10 @@ void Game::debugScene(const std::string& name) {
     float size = std::max(plane.spec->span, plane.spec->fusLen), R = size * 1.5f + 6.f;
     dbgCam = true; dbgFollow = true;
     dbgFollowOff = plane.right() * (R * 0.85f) + plane.forward() * (R * 0.55f) + vec3(0, R * 0.16f, 0);
+    if (n == kPhantasos) {   // (the XR-60, obsidian: closer and from below, against the sky and the snow rather than the forest)
+      R = size * 1.05f + 4.f;
+      dbgFollowOff = plane.right() * (R * 0.80f) + plane.forward() * (R * 0.60f) - vec3(0, R * 0.14f, 0);
+    }
     toasts.clear(); hint.clear(); uiHidden = true; return;
   }
   if (name.compare(0, 4, "gav_") == 0) {   // an aircraft parked on the runway, orbit view: gav_<spec>_<yaw>_<pitch>_<dist>[_<gear>[_<lift m>]]
