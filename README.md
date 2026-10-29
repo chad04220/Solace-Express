@@ -411,6 +411,7 @@ docs/                               design notes (below) and the README's pictur
 | [docs/REAL_EARTH_PLAN.md](docs/REAL_EARTH_PLAN.md) | The real Earth: the data pack, its streaming install, charts, sliding flight and the career on it |
 | [docs/XR50.md](docs/XR50.md) | The XR-50 Morpheus: its propulsion, airframe and ground station |
 | [docs/COLLABORATION.md](docs/COLLABORATION.md) | How the agents and reviewers work on the repository |
+| [docs/CODE_REWORK_PLAN.md](docs/CODE_REWORK_PLAN.md) | The code's shape as measured, and what should be reworked, in order |
 
 ## Copyright
 
