@@ -165,9 +165,9 @@ void Game::debugScene(const std::string& name) {
     printf("pad: A skips the career crash to the results: %s\n", wasCrash && screen == SCR_DEBRIEF ? "ok" : "FAIL");
     return;
   }
-  if (name == "research" || name == "research40" || name == "research10" || name == "research20" || name == "research50") {   // the terminal, settled (selection decrypted)
+  if (name == "research" || name == "research40" || name == "research10" || name == "research20" || name == "research50" || name == "research60") {   // the terminal, settled (selection decrypted)
     screen = SCR_RESEARCH; realTime = 30; resOpened = 20; resAuthed = true;
-    resCraft = name == "research40" ? kSomnus : name == "research10" ? kVigil : name == "research20" ? kReverie : name == "research50" ? kMorpheus : kResearchJet; resLastCraft = resCraft; resSelT = 20; resAirport = std::max(0, g_world.findAirport("CAP"));
+    resCraft = name == "research40" ? kSomnus : name == "research10" ? kVigil : name == "research20" ? kReverie : name == "research50" ? kMorpheus : name == "research60" ? kPhantasos : kResearchJet; resLastCraft = resCraft; resSelT = 20; resAirport = std::max(0, g_world.findAirport("CAP"));
     resSeqOpened = resOpened; resSeq = realTime - resOpened; resSeqAt = realTime; resWarm = false; resWork = 1.f;   // (the boot sequence's own clock long past the shutters: drawResearch)
     return;
   }
@@ -738,7 +738,7 @@ void Game::debugScene(const std::string& name) {
   // loading-screen pictures (--loadshots): loadshot_<CODE> an airport from an elevated three-quarter view with the aircraft
   // on its runway; loadshot_air_<n> aircraft n in flight, filmed from alongside. Afternoon light, a little cloud.
   if (name.compare(0, 13, "loadshot_air_") == 0) {
-    static const char* kSpot[kAircraftCount] = {"MDB", "PMB", "ORC", "KLO", "FJH", "CAP", "PVI", "VCF", "LHK", "SMP", "GLS", "NPT", "HFS", "ORC", "CAP", "GLR", "VBY"};   // a different place each (the Kittiwake low over the sea by Gull Rock, the XR-50 over the bay)
+    static const char* kSpot[kAircraftCount] = {"MDB", "PMB", "ORC", "KLO", "FJH", "CAP", "PVI", "VCF", "LHK", "SMP", "GLS", "NPT", "HFS", "ORC", "CAP", "GLR", "VBY", "FJH"};   // a different place each (the Kittiwake low over the sea by Gull Rock, the XR-50 over the bay, the XR-60 over the fjord)
     int n = std::clamp(atoi(name.c_str() + 13), 0, kAircraftCount - 1);
     resCraft = n; resAirborne = true; resTime = 16.3f; resWx = 0; resAirport = std::max(0, g_world.findAirport(kSpot[n]));
     launchResearch();

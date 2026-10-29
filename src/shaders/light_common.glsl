@@ -143,6 +143,31 @@ vec3 morpheusStationLight(vec3 p, vec3 n, vec3 v, Mat m, vec3 E){
   return L;
 }
 #endif
+#if HAS_PHANTASOS
+// the XR-60's operations pod: lit by its monitors with what they show (the sky ahead, the ground under the chin
+// camera), the two light discs overhead, dimmed, the violet strips under the console and round the ceiling's edge,
+// and the core column's lamps
+vec3 xr60StationLight(vec3 p, vec3 n, vec3 v, Mat m, vec3 E){
+  vec3 fw = uPlaneRot*vec3(0.0, 0.0, -1.0), upw = uPlaneRot*vec3(0.0, 1.0, 0.0);
+  float day = smoothstep(-0.08, 0.15, uSunDir.y);
+  vec3 skyF = skyColor(normalize(fw + upw*0.15))*0.9;
+  vec3 ground = vec3(0.16, 0.2, 0.12)*(uSunCol*max(uSunDir.y, 0.0)*1.5 + vec3(0.03))*(0.5 + 0.5*day);
+  vec3 VIO = vec3(0.55, 0.30, 1.0), CY = vec3(0.30, 0.9, 1.0);
+  vec3 L = m.alb*vec3(0.028, 0.03, 0.045);
+  L += fixtureLight(p, n, v, m, E + vec3(-0.45, 0.03, -0.70), E + vec3(0.45, 0.03, -0.70), skyF*0.30, 2.2, vec3(0.0, -0.05, 1.0));
+  for (int i = -1; i <= 1; i += 2) {
+    float s = float(i);
+    L += fixtureLight(p, n, v, m, E + vec3(0.42*s, 0.03, -0.62), E + vec3(0.76*s, 0.03, -0.30), mix(skyF, ground, 0.4)*0.14, 2.5, vec3(-0.79*s, 0.0, 0.62));
+    L += fixtureLight(p, n, v, m, E + vec3(0.52*s, 0.98, 0.0), E + vec3(0.52*s, 0.98, 0.3), vec3(0.9, 0.9, 1.0)*0.09, 6.0, vec3(0.0, -1.0, 0.0));
+  }
+  L += fixtureLight(p, n, v, m, E + vec3(-0.16, -0.30, -0.47), E + vec3(0.16, -0.30, -0.47), ground*0.5, 3.0, vec3(0.0, 0.55, 0.84));
+  L += fixtureLight(p, n, v, m, E + vec3(-0.35, 0.42, -0.70), E + vec3(0.35, 0.42, -0.70), CY*0.03, 4.0, vec3(0.0, -0.54, 0.84));
+  L += fixtureLight(p, n, v, m, E + vec3(-0.9, -0.455, -0.45), E + vec3(0.9, -0.455, -0.45), VIO*0.04, 10.0, vec3(0.0, -0.7, 0.7));
+  L += fixtureLight(p, n, v, m, E + vec3(-1.15, 0.94, -0.5), E + vec3(1.15, 0.94, -0.5), VIO*0.04, 6.0, vec3(0.0, -0.6, 0.8));
+  L += fixtureLight(p, n, v, m, E + vec3(-0.8, -0.9, 0.62), E + vec3(-0.8, 0.1, 0.62), CY*0.02, 4.0, vec3(1.0, 0.0, 0.0));
+  return L;
+}
+#endif
 // the aircraft's shadow in point light i's beam at p (d from the light along l): each pass defines its own (the
 // lighting pass reads the shadow proxy; the aircraft passes leave their own lights' shadows out)
 float lightShadow(int i, vec3 p, vec3 n, vec3 l, float d);

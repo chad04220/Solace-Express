@@ -174,12 +174,16 @@ with your inputs.
 | Kittiwake A9 | Single-turboprop amphibian | 9 / 900 kg | 1,450 km | 165 kt | 600 m paved, or a water lane | CPL |
 
 The numbers are what each aircraft actually does in the flight model, measured by flying it (`flight_test --table`).
-The tanks are real: three to seven hours of fuel for each career type (docs/FUEL.md). Five research craft sit beyond the career:
+The tanks are real: three to seven hours of fuel for each career type (docs/FUEL.md). Six research craft sit beyond the career:
 the XR-10 Vigil, the XR-20 Reverie, the XR-30 Nocturne (Mach 2.85, thrust vectoring), the XR-40 Somnus (Mach 4.4,
-four tilting thruster pods, a cloak, lasers and plasma bombs) and the XR-50 Morpheus: a remotely piloted swing-wing
+four tilting thruster pods, a cloak, lasers and plasma bombs), the XR-50 Morpheus: a remotely piloted swing-wing
 waverider, twice the XR-40 in thrust for its weight, pull and roll (160 g, 800 deg/s), flown from a ground station's
 monitors. It takes off vertically on a lift fan and swivelling nozzles, crosses Mach 7 on its scramjets at 27 km and
-climbs out of the atmosphere on its rocket, its leading edges glowing at 1,600 °C (docs/XR50.md).
+climbs out of the atmosphere on its rocket, its leading edges glowing at 1,600 °C (docs/XR50.md). And the XR-60
+Phantasos: a knife of black glass with forward-swept blade wings and a ring of plasma for a drive, three times the
+XR-50 in everything (21 times its weight in thrust, 500 g, 2,500 deg/s), Mach 12 on its MHD scramjet, a hover with no
+moving parts, a surge that triples the drive for forty seconds, and a ring that needs no air to leave the atmosphere.
+It is flown from an operations pod (docs/XR60.md).
 
 ### Flying
 
@@ -313,6 +317,8 @@ Menus work with the mouse or a gamepad (the left stick moves a cursor, **A** cli
   them), a double press of **A** (or **X**) lights the rocket and shuts it off, and a full pull through the stick's
   stop goes post-stall.
   Its cockpit view (**C**) is the ground station it is flown from: its monitors show its cameras with their symbology.
+  The XR-60 Phantasos: **F / V** hand the ring's stream to its field emitters (the hover), a double press of **A** (or
+  **X**) lights the surge and shuts it off, the tip blades fold themselves; its cockpit view is its operations pod.
 
 </details>
 
@@ -424,6 +430,7 @@ docs/                               design notes (below) and the README's pictur
 | [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md) | Signing the release executable |
 | [docs/REAL_EARTH_PLAN.md](docs/REAL_EARTH_PLAN.md) | The real Earth: the data pack, its streaming install, charts, sliding flight and the career on it |
 | [docs/XR50.md](docs/XR50.md) | The XR-50 Morpheus: its propulsion, airframe and ground station |
+| [docs/XR60.md](docs/XR60.md) | The XR-60 Phantasos: its ring drive, fields, airframe and operations pod |
 | [docs/COLLABORATION.md](docs/COLLABORATION.md) | How the agents and reviewers work on the repository |
 | [docs/CODE_REWORK_PLAN.md](docs/CODE_REWORK_PLAN.md) | The code's shape as measured, and what should be reworked, in order |
 

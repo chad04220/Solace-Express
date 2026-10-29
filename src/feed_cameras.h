@@ -35,7 +35,7 @@ struct FeedMount {
 
 // 1 XR-30, 2 XR-40, 3 XR-50 (its ground station's camera monitors, the cameras on its own airframe: its lenses are
 // measured on its own skin - camera_feeds.cpp g_feedMounts)
-inline int feedRigOf(const AircraftSpec* s) { if (!s) return 0; int sp = s->special; return sp == 1 ? 1 : sp == 2 ? 2 : sp == 3 ? 3 : 0; }
+inline int feedRigOf(const AircraftSpec* s) { if (!s) return 0; int sp = s->special; return sp == 1 ? 1 : sp == 2 ? 2 : sp == 3 ? 3 : sp == 4 ? 4 : 0; }
 
 // A flat panel: centre c, normal n (facing the pilot), "up" hint u, half size s; mirrored to the left side when
 // left. The camera looks out through it (along -n, with the panel's own axes) and the display shows it as a window
@@ -76,6 +76,17 @@ inline int feedRig(int rig, float focal, FeedMount out[kMaxFeeds]) {
     for (int k = 1; k <= 2; k++) { out[k] = out[0]; out[k].w = out[k].h = 0; }   // (no camera: the atlas skips it)
     out[3] = feedPanel(C1, C1 * -1.f, Y, vec2(0.30f, 0.19f), true, focal);   // (the left: the right one mirrored)
     out[4] = feedPanel(C1, C1 * -1.f, Y, vec2(0.30f, 0.19f), false, focal);
+    out[5] = feedPanel(C3, C3 * -1.f, Y, vec2(0.20f, 0.10f), false, focal);
+    out[0].nose = out[5].nose = true;
+    return 6;
+  }
+  if (rig == 4) {
+    // XR-60: the pod's monitors (research_cockpit_layout.glsl xr60Pane): the same rig as the XR-50's on its own panes
+    const vec3 Y(0, 1, 0), C0(0.f, 0.03f, -0.72f), C1(0.59f, 0.03f, -0.46f), C3(0.f, -0.30f, -0.47f);
+    out[0] = feedPanel(C0, C0 * -1.f, Y, vec2(0.50f, 0.28f), false, focal);
+    for (int k = 1; k <= 2; k++) { out[k] = out[0]; out[k].w = out[k].h = 0; }
+    out[3] = feedPanel(C1, C1 * -1.f, Y, vec2(0.26f, 0.20f), true, focal);
+    out[4] = feedPanel(C1, C1 * -1.f, Y, vec2(0.26f, 0.20f), false, focal);
     out[5] = feedPanel(C3, C3 * -1.f, Y, vec2(0.20f, 0.10f), false, focal);
     out[0].nose = out[5].nose = true;
     return 6;

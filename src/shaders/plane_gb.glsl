@@ -8,12 +8,18 @@ void planeToGB(vec3 p, vec3 rd, float t, int mid, vec3 ln, bool pod, bool trafHi
   int eng = int(gM[0].z + 0.5);
   bool wr = SOMNUS_ON && (!JET_ON || eng == 6);
   // a research jet's display from the pilot's seat: its camera's picture, with the display's own look and symbology
-#if HAS_MORPHEUS
-  // the XR-50's station: a camera monitor, its symbology over the world its window lets through (or over its camera's
-  // picture, with the cameras on: SCREENFEEDS)
-  if (RESEARCH_ON && pod && eng == 7 && mid >= 160 && mid <= 163) {
+#if HAS_MORPHEUS || HAS_PHANTASOS
+  // the XR-50's station, the XR-60's pod: a camera monitor, its symbology over the world its window lets through (or
+  // over its camera's picture, with the cameras on: SCREENFEEDS)
+  if (RESEARCH_ON && pod && ((eng == 7 && mid >= 160 && mid <= 163) || (eng == 8 && mid >= 186 && mid <= 189))) {
     vec3 scrL = transpose(uPlaneRot)*(gRelSet ? gRel + (uCamPos - uPlanePos) : p - uPlanePos);
-    vec4 hud = morpheusHud(mid - 160, scrL - gM[22].xyz, rd);
+    vec4 hud = vec4(0.0);
+#if HAS_MORPHEUS
+    if (eng == 7) hud = morpheusHud(mid - 160, scrL - gM[22].xyz, rd);
+#endif
+#if HAS_PHANTASOS
+    if (eng == 8) hud = xr60Hud(mid - 186, scrL - gM[22].xyz, rd);
+#endif
     vec3 col;
     if (uScrWin == 1) { if (hud.a < 0.3) discard; col = hud.rgb; }
     else { vec3 rdc; bool bomb; col = feedScreen(mid, scrL, rdc, bomb); col = mix(col, hud.rgb, hud.a*0.9); }

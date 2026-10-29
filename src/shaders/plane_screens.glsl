@@ -73,27 +73,37 @@ vec3 jetScreen(vec3 col, vec3 rd, int id, vec3 sl){
   }
   return mix(col, hc*1.6, clamp(hud, 0.0, 1.0)*0.85);
 }
-#if HAS_MORPHEUS
-// The XR-50's ground station: the symbology over its camera monitors (research_cockpit_layout.glsl morpheusPane 0-3:
-// main, left, right, chin), each a window to the world its camera sees with the remote pilot's overlay on the glass.
-// q: the point (eye at the origin), rd: the world ray through it. rgb its colour, a its coverage
+#if HAS_MORPHEUS || HAS_PHANTASOS
+// The remotely piloted craft's stations - the XR-50's ground station, the XR-60's operations pod: the symbology over
+// their camera monitors (research_cockpit_layout.glsl morpheusPane / xr60Pane 0-3: main, left, right, chin), each a
+// window to the world its camera sees with the remote pilot's overlay on the glass. q: the point (eye at the origin),
+// rd: the world ray through it. rgb its colour, a its coverage
 // a monitor's glass, inside its outline: which (-1: none). (The mesh's fragment of the glass is the one kept where the
 // symbology is lit: what lies behind the window stays cut)
+int stationGlassPane(vec3 q, ResearchPanel P, int i){
+  vec3 l = researchPanelFrame(q, P);
+  return abs(l.z - 0.004) < 0.006 && researchPanelShape(l.xy, P) < 0.0 ? i : -1;
+}
+#if HAS_MORPHEUS
 int morpheusGlassPane(vec3 q){
-  for (int i = 0; i < 4; i++) {
-    ResearchPanel P = morpheusPane(i);
-    vec3 l = researchPanelFrame(q, P);
-    if (abs(l.z - 0.004) < 0.006 && researchPanelShape(l.xy, P) < 0.0) return i;
-  }
+  for (int i = 0; i < 4; i++) if (stationGlassPane(q, morpheusPane(i), i) >= 0) return i;
   return -1;
 }
-vec4 morpheusHud(int pane, vec3 q, vec3 rd){
-  ResearchPanel P = morpheusPane(pane);
+#endif
+#if HAS_PHANTASOS
+int xr60GlassPane(vec3 q){
+  for (int i = 0; i < 4; i++) if (stationGlassPane(q, xr60Pane(i), i) >= 0) return i;
+  return -1;
+}
+#endif
+// the symbology on pane P (its index pane): the XR-50's in green and amber, the XR-60's (px) in cyan and violet, its
+// load scale the 2,000 g structure's, its hover state the field's
+vec4 stationHud(ResearchPanel P, int pane, vec3 q, vec3 rd, bool xr60){
   vec3 l = researchPanelFrame(q, P);
   vec2 u = l.xy, hs = P.h;                         // (monitor metres, its centre the origin)
   vec3 d = transpose(uPlaneRot)*rd;
   vec2 h = vec2(atan(d.x, -d.z), atan(d.y, -d.z));   // (body-frame angles of the ray, rad)
-  const vec3 GRN = vec3(0.22, 1.0, 0.45), AMB = vec3(1.0, 0.68, 0.22), RED = vec3(1.0, 0.22, 0.16);
+  vec3 GRN = xr60 ? vec3(0.30, 0.92, 1.0) : vec3(0.22, 1.0, 0.45), AMB = xr60 ? vec3(0.78, 0.45, 1.0) : vec3(1.0, 0.68, 0.22), RED = vec3(1.0, 0.22, 0.16);
   float hud = 0.0, lab = 0.0, warn = 0.0, w = 0.0018, px = 0.0024;
   // the frame: corner brackets 6 cm along each edge, 2 cm in
   {
@@ -158,7 +168,7 @@ vec4 morpheusHud(int pane, vec3 q, vec3 rd){
     hud = max(hud, hudNum(u - al - vec2(-0.075, -0.015), uHud.y*3.28084, 5, vec2(0.018, 0.030)));
     vec2 mp = sp + vec2(-0.058, -0.056), gp = sp + vec2(-0.058, -0.090);   // ("M" and "G" pens; their numbers after)
     hud = max(hud, max(txt(u - mp, 0.017, ivec4(77, 0, 0, 0), ivec4(0), 0), numC(u - mp - vec2(0.03, 0.0), uHud.w, 0.017, 0, 2)));
-    float g = abs(uHud2.x), gw = step(400.0, g);
+    float g = abs(uHud2.x), gw = step(xr60 ? 1500.0 : 400.0, g);
     float gn = max(txt(u - gp, 0.017, ivec4(71, 0, 0, 0), ivec4(0), 0), numC(u - gp - vec2(0.03, 0.0), g, 0.017, 0, 1));
     hud = max(hud, gn*(1.0 - gw)); warn = max(warn, gn*gw);
     vec2 tb = vec2(-hs.x + 0.045, -0.12);
@@ -171,10 +181,16 @@ vec4 morpheusHud(int pane, vec3 q, vec3 rd){
     // the chin camera: the radar altitude (ft) under the boresight, the nozzles' state when they are down
     hud = max(hud, hudNum(u - vec2(-0.045, -hs.y + 0.025), uHud3.w*3.28084, 5, vec2(0.012, 0.022)));
     hud = max(hud, hudBox(u, vec2(0.0, -hs.y + 0.036), vec2(0.052, 0.018), w));
-    if (uHud2.z > 0.3) lab = max(lab, txt(u - vec2(hs.x - 0.035, hs.y - 0.045), tH, ivec4(86, 84, 79, 76), ivec4(0), 2));   // "VTOL"
+    if (uHud2.z > 0.3) lab = max(lab, txt(u - vec2(hs.x - 0.035, hs.y - 0.045), tH, xr60 ? ivec4(70, 73, 69, 76) : ivec4(86, 84, 79, 76), xr60 ? ivec4(68, 0, 0, 0) : ivec4(0), 2));   // "VTOL" / "FIELD"
   }
   float a = clamp(max(max(hud, lab), warn), 0.0, 1.0);
   vec3 c = warn > 0.5 ? RED : lab > hud ? AMB : GRN;
   return vec4(c*1.6, a);
 }
+#if HAS_MORPHEUS
+vec4 morpheusHud(int pane, vec3 q, vec3 rd){ return stationHud(morpheusPane(pane), pane, q, rd, false); }
+#endif
+#if HAS_PHANTASOS
+vec4 xr60Hud(int pane, vec3 q, vec3 rd){ return stationHud(xr60Pane(pane), pane, q, rd, true); }
+#endif
 #endif

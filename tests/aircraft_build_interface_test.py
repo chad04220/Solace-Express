@@ -12,7 +12,7 @@ glsl = read('src/shaders/plane_parts.glsl')
 pattern = r'\b(PT_[A-Z_]+)\s*=\s*(\d+)'
 assert dict(re.findall(pattern, cpu)) == dict(re.findall(pattern, glsl)), 'CPU/GLSL part identities differ'
 registry = read('src/aircraft_mesh_build.h')
-for family in ('fleet', 'nocturne', 'somnus', 'morpheus'):
+for family in ('fleet', 'nocturne', 'somnus', 'morpheus', 'phantasos'):
     module = read(f'src/aircraft_mesh_build_{family}.h')
     assert f'#include "aircraft_mesh_build_{family}.h"' in registry
     for entry in ('parts', 'partPlan', 'appendHullStates'):

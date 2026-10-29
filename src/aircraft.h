@@ -45,6 +45,7 @@ struct AircraftSpec {
   vec3 colBase, colStripe;
   int special = 0;             // 1 = XR-30 research jet: fly-by-wire, pitch thrust vectoring; 2 = XR-40 Somnus (both consume fuel);
                                // 3 = XR-50 Morpheus: swing wing, combined-cycle engines and a rocket, VTOL (aircraft_morpheus.cpp)
+                               // 4 = XR-60 Phantasos: a plasma ring drive, an MHD scramjet, field lift and torque (aircraft_xr60.cpp)
   // the research craft's performance tier (0: a conventional type). Below 1 the type is held just under the sound
   // barrier by its drag rise; above 1 the engines have reheat and the drag rise is the research jets'. gPos / gNeg are
   // the structural limits (0: the type's defaults); the airframe takes a sustained overstress before it lets go
@@ -111,8 +112,9 @@ static constexpr int kThistledown = 13; // Thistledown L4: four-seat piston tour
 static constexpr int kGalleon = 14;    // Galleon 180: twin-underwing transport
 static constexpr int kKittiwake = 15;  // Kittiwake A9: single-turboprop amphibian on floats (docs/WINGS_OVER_WATER.md)
 static constexpr int kMorpheus = 16;   // XR-50 Morpheus: variable-sweep hypersonic VTOL research craft (special 3, engine code 7: docs/XR50.md)
-static constexpr int kAircraftCount = 17; // all aircraft, including research
-static constexpr int kResearchAircraft[] = {kVigil, kReverie, kResearchJet, kSomnus, kMorpheus};
+static constexpr int kPhantasos = 17;  // XR-60 Phantasos: a plasma-driven remotely piloted hypersonic craft (special 4, engine code 8: docs/XR60.md)
+static constexpr int kAircraftCount = 18; // all aircraft, including research
+static constexpr int kResearchAircraft[] = {kVigil, kReverie, kResearchJet, kSomnus, kMorpheus, kPhantasos};
 static constexpr int kCareerAircraft[] = {0, 1, 2, 3, 4, 5, 6, 7, kWavecrest, kThistledown, kGalleon, kKittiwake};
 static constexpr int kNumAircraft = sizeof(kCareerAircraft) / sizeof(kCareerAircraft[0]); // career roster count, never an index bound
 inline constexpr bool validAircraft(int spec) { return spec >= 0 && spec < kAircraftCount; }
@@ -173,6 +175,29 @@ float morpheusFuelFlow(const AircraftSpec& s, const MorpheusThrust& t, float M, 
 float morpheusHoverMax(const AircraftSpec& s, float rho);
 float morpheusSpan(float sweep);
 float morpheusRocketSeconds(float oxidizerKg, float throttle);   // how long its oxidizer lasts at a throttle (s)
+// XR-60 Phantasos (docs/XR60.md; body coords, +z aft): where its forces act, the same for the flight model
+// (aircraft_xr60.cpp) and the drawn airframe (xr60_sdf.glsl mapXr60): the ring drive's centre at the tail, the four
+// ventral lift emitters (front left, front right, rear left, rear right), the right blade wing's root and its folding
+// tip's hinge; the surge bank's seconds when full and its recharge rate (seconds of surge per second, off); the
+// skin's temperature limits (K: the warning, and past the other the metamaterial fails); its lamps (the right tip
+// blade's lens at the hinge, the tail light over the ring, the beacon on the dorsal ridge, the left landing light in
+// the chine)
+static const vec3 kXr60Ring(0.f, 0.f, 7.0f), kXr60Emit[4] = {vec3(-1.25f, -0.42f, -2.6f), vec3(1.25f, -0.42f, -2.6f), vec3(-1.45f, -0.40f, 2.6f), vec3(1.45f, -0.40f, 2.6f)};
+static const vec3 kXr60Root(1.15f, -0.05f, 1.6f), kXr60TipHinge(4.0f, 0.35f, 1.8f);
+static const float kXr60SurgeSeconds = 40.f, kXr60SurgeRecharge = 1.f / 6.f, kXr60SkinWarn = 2623.f, kXr60SkinLimit = 2773.f;
+static const vec3 kXr60Tip(6.14f, 0.50f, -0.70f), kXr60Tail(0.f, 1.30f, 7.05f), kXr60Beacon(0.f, 0.72f, -1.6f), kXr60Landing(-0.70f, -0.12f, -4.6f);
+// the right tip blade's lens, folded down by f (0 spread .. 1 at 70 deg) about its hinge's chord line
+inline vec3 xr60TipLamp(float f) {
+  const vec3 l = kXr60Tip - kXr60TipHinge; const float a = -70.f * DEG * f;
+  return kXr60TipHinge + vec3(l.x * cosf(a) - l.y * sinf(a), l.x * sinf(a) + l.y * cosf(a), l.z);
+}
+// Its drive by mode (N): the ring's thrust (and the lift emitters' share of it: what the lever takes), the scramjet's,
+// at a throttle, a true airspeed, the air's density and its speed of sound, surge or not; what it burns (kg/s); the
+// thrust the emitters can turn straight down in this air (N) (aircraft_xr60.cpp)
+struct Xr60Thrust { float ring = 0, scram = 0; };
+Xr60Thrust xr60Drive(const AircraftSpec& s, float throttle, float V, float rho, float a, float surge);
+float xr60FuelFlow(const AircraftSpec& s, const Xr60Thrust& t);
+float xr60HoverMax(const AircraftSpec& s, float rho);
 
 // What an aircraft can do, learned by flying it: Plane::perf() flies a few short test sorties through the flight model
 // (once per type, cached) and measures its envelope. The autopilot flies to these numbers, so it pushes every type to
@@ -389,6 +414,13 @@ public:
   float tbcc[3] = {0, 0, 0}, skinT = 288.f, heatOver = 0, fanClutch = 0, fanN = 0, postN[2] = {0, 0};
   float nzSwivel = 0, nzPitch[2] = {0, 0}, nzYaw[2] = {0, 0}; vec3 rcs;
   float sweepTarget() const;   // the sweep the schedule asks for now (Mach, the lever, the gear)
+  // XR-60 (aircraft_xr60.cpp): the ring drive's thrust (N) and the scramjet's; the surge bank (0..1 of its 40 s), lit or
+  // not, and the surge it is making (0 off .. 1 full); the plasma sheath (0..1: with the core at power); the lift
+  // emitters' thrust (N, each: front left, front right, rear left, rear right) and the lever's share (0..1); the
+  // ring's vectoring (rad: pitch, yaw) and the ring's spin angle (rad); the tip blades' fold (0 spread .. 1 down); the
+  // field torque's commands (pitch, yaw, roll: -1..1)
+  float ringN = 0, scramN = 0, surgeBank = 1, surgeN = 0, sheath = 0, emitN[4] = {0, 0, 0, 0}, emitShare = 0; bool surgeOn = false;
+  float ringPitch = 0, ringYaw = 0, ringSpin = 0, tipFold = 0; vec3 field;
   FlightEvents ev;
   Failures fail;
   float iceFeed = 0;   // set by the game each step: 1 in cloud or precipitation below freezing, -1 in clear warm air
@@ -424,8 +456,10 @@ public:
   // fly-by-wire rate command of the research craft: full-stick pitch and roll rates (rad/s)
   // (the XR-50, flown from the ground with no one aboard, has twice the XR-40's: the rate of a 160 g pull, 4 to 12 rad/s,
   // and 14 rad/s of roll)
+  // (the XR-60, three times the XR-50: the rate of a 500 g pull, 8 to 24 rad/s, and 44 rad/s of roll)
   float fbwPitchMax(float V) const {
     V = std::max(V, 1.f);
+    if (spec->special == 4) return clampf(500.f * G0 / V, 8.0f, 24.0f);
     if (spec->special == 3) return clampf(160.f * G0 / V, 4.0f, 12.0f);
     return spec->special == 2 ? clampf(80.f * G0 / V, 2.0f, 6.0f) : clampf(66.f * G0 / V, 1.8f, 5.2f);
   }
@@ -441,7 +475,7 @@ public:
   static void wantFinals(int airport);
   static bool perfLoad(const std::string& path, const std::string& stamp);   // every type's, from a cache of this build's
   static void perfSave(const std::string& path, const std::string& stamp);
-  float fbwRollMax(float hover) const { return (spec->special == 2 ? 7.0f : spec->special == 3 ? 14.0f : 5.5f) * (1.f - 0.6f * hover); }
+  float fbwRollMax(float hover) const { return (spec->special == 2 ? 7.0f : spec->special == 3 ? 14.0f : spec->special == 4 ? 44.0f : 5.5f) * (1.f - 0.6f * hover); }
   // Assisted flying (the game's Flight assists, and always in time warp): the pilot's inputs (-1..1) command a roll rate
   // and a pitch rate; let go, the aircraft holds its bank (wings level from under 10 deg) and its flight path, and the
   // rudder coordinates (assistYaw adds the pilot's own). Flown through the autopilot's inner loops (apRates) inside the
@@ -474,6 +508,11 @@ private:
   bool morpheusAero(const Atmosphere& atmo, vec3 va, float V, float altAgl, float dt, vec3& F, vec3& Taero, vec3& surfMax);
   // its engines, nozzles, lift fan, roll posts, rocket and reaction jets, and the fly-by-wire that commands them all
   void morpheusThrust(vec3& F, vec3& T, vec3 Taero, vec3 surfMax, float V, float dt);
+  // XR-60 (aircraft_xr60.cpp): the sheath and the skin's heat; its lift and drag (the circulation field's lift) and the
+  // airframe's own moments, the surfaces' authority; false when the heat has destroyed it
+  bool xr60Aero(const Atmosphere& atmo, vec3 va, float V, float altAgl, float dt, vec3& F, vec3& Taero, vec3& surfMax);
+  // its ring drive, scramjet, surge, lift emitters and field torque, and the fly-by-wire that commands them all
+  void xr60Thrust(vec3& F, vec3& T, vec3 Taero, vec3 surfMax, float V, float dt);
   vec3 gust;
   float cd0 = 0.03f;
   float seaFetchT = -1.f, seaFetch = 0.f;   // (the open water upwind, looked for once a second)

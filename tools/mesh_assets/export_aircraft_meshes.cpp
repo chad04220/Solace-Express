@@ -183,7 +183,7 @@ int integer(const char* value) {
 int main(int argc, char** argv) {
   if (argc == 2 && std::string(argv[1]) == "--help") {
     std::printf("Usage: aircraft_mesh_export OUTPUT_DIRECTORY\n"
-                "Creates a new directory with all 34 full-quality production aircraft meshes.\n"
+                "Creates a new directory with all 36 full-quality production aircraft meshes.\n"
                 "Existing directories and diagnostic geometry overrides are refused.\n"
                 "Diagnostic worker: aircraft_mesh_export --bake-one MODEL SLOT EXISTING_DIRECTORY\n"
                 "A single worker result is incomplete and cannot be packaged.\n");
@@ -194,7 +194,7 @@ int main(int argc, char** argv) {
   }
   fs::path staging;
   try {
-    static_assert(kAircraftCount == 17, "Update export/bundle contract for a roster change");
+    static_assert(kAircraftCount == 18, "Update export/bundle contract for a roster change");
     rejectDebugOverrides();
     if (argc == 5) { bakeOne(integer(argv[2]), integer(argv[3]), fs::absolute(argv[4])); return 0; }
     const fs::path output = fs::absolute(argv[1]).lexically_normal();

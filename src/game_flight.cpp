@@ -140,8 +140,10 @@ void Game::updateResearchCard(float dt) {
     case RS_BOMB: inst = somnus.dropped >= (int)st.v; break;
     case RS_LAND: { float dA; int ap = g_world.nearestAirport(plane.pos.x, plane.pos.z, &dA); inst = plane.onGround && touchedDown && gs < 2.f && ap == resAirport && dA < g_world.airports[ap].length * 0.5f + 600.f; } break;
     case RS_ALPHA: inst = air && plane.alpha / DEG >= st.v; break;
-    case RS_SCRAM: { const float tb = plane.tbcc[0] + plane.tbcc[1] + plane.tbcc[2]; inst = air && plane.mach >= st.v && tb > 1.f && plane.tbcc[2] > 0.5f * tb; } break;
+    case RS_SCRAM: { const float tb = plane.tbcc[0] + plane.tbcc[1] + plane.tbcc[2];
+      inst = air && plane.mach >= st.v && (plane.spec->special == 4 ? plane.scramN > plane.ringN : tb > 1.f && plane.tbcc[2] > 0.5f * tb); } break;
     case RS_ROCKET: inst = plane.rocketN > 1.f; break;
+    case RS_SURGE: inst = plane.surgeN > 0.5f; break;
     case RS_CONVERT: inst = air && plane.nozzle < 0.05f && plane.fanClutch < 0.05f && plane.ias >= st.v; break;
   }
   resHold = inst ? resHold + dt : 0.f;
@@ -671,7 +673,9 @@ void Game::flightControls(float dt) {
   c.trim = clampf(c.trim + tr * 0.35f * dt, -1, 1);
   // flaps
   auto flapToast = [&]() {
-    if (plane.spec->special == 3)   // (the XR-50's lever swivels its nozzles; the lift fan comes in with them, slow)
+    if (plane.spec->special == 4)   // (the XR-60's lever hands the ring's stream to its field emitters)
+      toast(flapNotch > 0.99f ? "Emitters full - the field holds it: VTOL" : flapNotch > 0.01f ? fmt("Emitters %d%%", (int)lroundf(flapNotch * 100)) : "Emitters out - the ring drives", vec3(0.45f, 0.9f, 1.f));
+    else if (plane.spec->special == 3)   // (the XR-50's lever swivels its nozzles; the lift fan comes in with them, slow)
       toast(flapNotch > 0.99f ? "Nozzles 95 deg, lift fan in - VTOL" : flapNotch > 0.01f ? fmt("Nozzles %d deg, lift fan in - STOVL", (int)lroundf(flapNotch * 95)) : "Nozzles aft - lift fan out", vec3(1.f, 0.72f, 0.3f));
     else if (plane.spec->special == 2) toast(flapNotch > 0.99f ? "Pods 90 deg - VTOL hover" : fmt("Pods %d deg", (int)lroundf(flapNotch * 90)), vec3(0.8f, 0.55f, 1));
     else toast(fmt("Flaps %d%%", (int)lroundf(flapNotch * 100)), vec3(0.8f, 0.9f, 1));
@@ -713,6 +717,7 @@ void Game::flightControls(float dt) {
   }
   if (plane.spec->special == 2) somnusControls(dt);
   else if (plane.spec->special == 3) morpheusControls(dt);
+  else if (plane.spec->special == 4) xr60Controls(dt);
   // on the water the same control moors the aircraft (once all but stopped: the physics makes the lines fast) and
   // casts it off (docs/WINGS_OVER_WATER.md)
   if (actKeyP(ACT_PARK) || actJoyP(ACT_PARK) || (!showMap && actPadP(ACT_PARK))) {
@@ -1025,7 +1030,7 @@ void Game::updateFlight(float dt) {
     const float frac = plane.gLoad >= 0.f ? plane.gLoad / plane.spec->gLimitPos() : plane.gLoad / plane.spec->gLimitNeg();
     const float stress = clampf(std::max(plane.overG, frac - 1.f), 0.f, 1.f);
     // (not at the XR-50's ground station: no one there feels its loads - its telemetry strip shows them)
-    const bool station = camMode == 1 && plane.spec->special == 3;
+    const bool station = camMode == 1 && plane.spec->special >= 3;
     const float target = crashed || station ? 0.f : 0.85f * clampf((frac - 0.8f) / 0.2f, 0.f, 1.f) + 0.15f * stress;
     gTunnel = gTunnelPin >= 0.f ? gTunnelPin : approach(gTunnel, target, target > gTunnel ? 4.f : crashed ? 1.2f : 2.f, dt);
   }
@@ -1188,7 +1193,7 @@ void Game::updateFlight(float dt) {
   if (!plane.onGround && plane.wxl.cloud > 0.03f) vapK = std::max(vapK, 0.35f * smoothstepf(0.03f, 0.3f, plane.wxl.cloud) * smoothstepf(20.f, 50.f, plane.airspeed));   // (in cloud the tips' vortices stir it at any g)
   if (vapK > 0.f || tipOn) {
     if (vapK > 0.f && !tipOn) tipSeg++;
-    vec3 tip = plane.spec->special == 3 ? morpheusWingTip(plane.sweep) : plane.spec->special == 2 ? kSomnusWingTip : plane.spec->special ? kJetWingTip : modelWingTip(kModels[typeOf(plane.spec)]);
+    vec3 tip = plane.spec->special == 4 ? xr60TipLamp(plane.tipFold) : plane.spec->special == 3 ? morpheusWingTip(plane.sweep) : plane.spec->special == 2 ? kSomnusWingTip : plane.spec->special ? kJetWingTip : modelWingTip(kModels[typeOf(plane.spec)]);
     for (int sd = 0; sd < 2; sd++) {
       float sx = sd ? 1.f : -1.f;
       TipPt t{plane.pos + plane.q.rotate(vec3(sx * tip.x, tip.y, tip.z + 0.3f)), 0.f, vapK, tipSeg};

@@ -26,6 +26,14 @@
 // research craft exhaust exits and jet directions (body coords): XR-30 two 2D nozzles, XR-40 four pods.
 // strength: that exhaust's share of the thrust (1 = the XR-30's)
 int jetExhausts(const Plane& p, vec3* pos, vec3* dir, float* strength) {
+  if (p.spec->special == 4) {   // the XR-60: its ring's stream, vectored, as strong as the drive and the surge; the scramjet's out of the keel
+    int n = 0;
+    const float a = p.ringPitch, y = p.ringYaw, rated = p.spec->engines * p.spec->power;
+    pos[n] = kXr60Ring + vec3(0, 0, 0.9f); dir[n] = normalize(vec3(sinf(y), sinf(a) * cosf(y), cosf(a) * cosf(y)));
+    strength[n++] = clampf(p.ringN / rated * (1.f + 0.5f * p.surgeN), 0.f, 1.5f);
+    if (p.scramN > 1000.f) { pos[n] = vec3(0, -1.0f, 6.6f); dir[n] = vec3(0, 0, 1); strength[n++] = clampf(p.scramN / (0.3f * rated), 0.f, 1.f); }
+    return n;
+  }
   if (p.spec->special == 3) {   // the XR-50: its two nozzles, swivelled and vectored, and the rocket between them while it burns
     int n = 0;
     for (int s = 0; s < 2; s++) {
@@ -192,12 +200,13 @@ void Game::buildLights(FrameParams& fp) {
     }
   }
   // fixture positions (body space)
-  const bool xr50 = s.special == 3;   // (its tips swing with its wing)
-  vec3 tip = xr50 ? morpheusWingTip(plane.sweep) : s.special == 2 ? kSomnusWingTip : s.special ? kJetWingTip : modelWingTip(md);
-  vec3 tail = xr50 ? kMorpheusTail : s.special == 2 ? vec3(0, -0.1f, 7.86f) : s.special ? vec3(0, 0.45f, 7.6f) : modelTailTip(md);
-  vec3 bcn = xr50 ? kMorpheusBeacon : s.special == 2 ? vec3(0, 0.53f, 1.6f) : s.special ? vec3(0, 0.67f, 1.6f) : modelFinTop(md);
+  const bool xr50 = s.special == 3, xr60 = s.special == 4;   // (the XR-50's tips swing with its wing, the XR-60's fold)
+  vec3 tip = xr60 ? xr60TipLamp(plane.tipFold) : xr50 ? morpheusWingTip(plane.sweep) : s.special == 2 ? kSomnusWingTip : s.special ? kJetWingTip : modelWingTip(md);
+  vec3 tail = xr60 ? kXr60Tail : xr50 ? kMorpheusTail : s.special == 2 ? vec3(0, -0.1f, 7.86f) : s.special ? vec3(0, 0.45f, 7.6f) : modelTailTip(md);
+  vec3 bcn = xr60 ? kXr60Beacon : xr50 ? kMorpheusBeacon : s.special == 2 ? vec3(0, 0.53f, 1.6f) : s.special ? vec3(0, 0.67f, 1.6f) : modelFinTop(md);
   vec3 ldg;   // left landing light, in the wing leading edge
-  if (xr50) ldg = kMorpheusLanding;
+  if (xr60) ldg = kXr60Landing;
+  else if (xr50) ldg = kMorpheusLanding;
   else if (s.special == 2) ldg = vec3(-0.2f, -0.38f, -6.6f);   // XR-40: under the chin, ahead of the pods, turrets and gear
   else if (s.special) ldg = vec3(-1.8f, -0.26f, 0.15f);
   else { float k = 0.3f, x = md.wing[0] * k; ldg = vec3(-x, md.wing[4] + x * tanf(md.wing[6] * DEG), md.wing[5] + md.wing[3] * k - 0.02f); }

@@ -132,6 +132,21 @@ const AircraftSpec kAircraft[] = {
    90000, 330000, 410000, 0.45f, 0.080f, 0.060f, LIC_STUDENT, 0, 0,
    21.0f, 0.85f, -0.07f, -0.4f, 2, 1, vec3(0.80f, 0.81f, 0.82f), vec3(1.0f, 0.60f, 0.16f), 3, 7.6f, 600.f, -600.f, false, 1.95f, .2f, 1.55f,
    4.0e-6f, 9.9e-6f, 12000, 265, .023f, 23000},
+  // XR-60 Phantasos (docs/XR60.md): a plasma-driven remotely piloted hypersonic craft, the XR-50 several times over.
+  // One ring drive (power: its rated thrust, the same from a standstill to the vacuum - it needs no air), an MHD-bypass
+  // scramjet in its keel to Mach 12, a surge bank that triples the ring for 40 s, four field emitters under the body
+  // for the hover (flapCL 0: the lever is theirs), a circulation field over its blade wings (seven times a plain wing's
+  // lift), a plasma sheath against the heat: its own path through the flight model (special 4, aircraft_xr60.cpp).
+  // Its fuel is metallic hydrogen, both reaction mass and energy store, burned at a fiction's rate (an Isp of 146,000 s:
+  // 30 minutes of full thrust, hours at cruise). No one aboard, a metamaterial structure good for +2,000 / -2,000 g,
+  // 21 times its weight in thrust at full tanks
+  {"xr60_phantasos", "XR-60 Phantasos", "Plasma-driven hypersonic research craft", ENG_JET, 1, 0, 0, 0, 0,
+   7400, 2600, 0, 0, 44.0f, 12.4f, 3.6f,
+   0.03f, 4.0f, 1.60f, 0.0f, 0.009f, 0.010f, 0.0f, 0.82f,
+   2100000, 0, 60, 66, 600, 30000, 800, true, false, true,
+   38000, 150000, 180000, 0.48f, 0.090f, 0.065f, LIC_STUDENT, 0, 0,
+   16.6f, 0.80f, -0.05f, 2.0f, 2, 1, vec3(0.09f, 0.08f, 0.12f), vec3(0.25f, 0.95f, 1.0f), 4, 12.5f, 2000.f, -2000.f, false, 1.75f, .2f, 1.45f,
+   7.0e-7f, 0, 20000, 600, .012f, 10200},
 };
 // clang-format on
 static_assert(sizeof(kAircraft) / sizeof(kAircraft[0]) == kAircraftCount, "Aircraft table must match roster count");
@@ -140,7 +155,7 @@ static_assert(sizeof(kAircraft) / sizeof(kAircraft[0]) == kAircraftCount, "Aircr
 // tanks and ranges scaled down to suit them - a trainer that flew 45 km, an airliner 170. The table holds the real
 // figures now (a Dawnlark's 770 km, an Archipel's 1,500), and these the weights the airframes were trimmed, rigged and
 // measured at, so each flies as it did
-static const float kDesignFuel[kAircraftCount] = {70, 110, 120, 260, 420, 1500, 2200, 180, 220, 2200, 6000, 3200, 6000, 135, 20000, 400, 8200};
+static const float kDesignFuel[kAircraftCount] = {70, 110, 120, 260, 420, 1500, 2200, 180, 220, 2200, 6000, 3200, 6000, 135, 20000, 400, 8200, 2600};
 int typeOf(const AircraftSpec* s) {
   if (!s) return -1;
   if (s->fittedFrom >= 0) return s->fittedFrom;
@@ -158,7 +173,7 @@ float AircraftSpec::designFuel() const {
 // jets' fast-spooling cores in between
 float Plane::spoolRate() const {
   const AircraftSpec& s = *spec;
-  return s.engineType == ENG_PISTON ? 3.0f : (s.engineType == ENG_TURBOPROP ? 0.7f : (s.special ? 1.6f : 0.45f));
+  return s.engineType == ENG_PISTON ? 3.0f : (s.engineType == ENG_TURBOPROP ? 0.7f : (s.special == 4 ? 8.f : s.special ? 1.6f : 0.45f));   // (the XR-60's plasma drive: no spool, a tenth of a second)
 }
 
 // The engines' thrust (N, all of them) at a spool fraction, true airspeed V and forward airspeed vf (m/s), in the air
@@ -166,6 +181,10 @@ float Plane::spoolRate() const {
 float Plane::thrustAt(float spool, float V, float vf, float rho) const {
   const AircraftSpec& s = *spec;
   const float dens = rho > 0.f ? rho : density, sigmaRho = dens / 1.225f;   // (rho: another air's density, for comparisons)
+  if (s.special == 4) {   // the XR-60's ring drive and scramjet, with the surge it is making now (aircraft_xr60.cpp)
+    const Xr60Thrust t = xr60Drive(s, spool, V, dens, soundSpeed, surgeN);
+    return t.ring + t.scram;
+  }
   if (s.special == 3) {   // the XR-50's combined-cycle engines, all modes (aircraft_morpheus.cpp; the rocket is the pilot's)
     const MorpheusThrust t = morpheusEngines(s, spool, V, dens, soundSpeed);
     return t.tf + t.ram + t.scram;
@@ -198,13 +217,17 @@ float Plane::thrustAt(float spool, float V, float vf, float rho) const {
 // The thrust it can turn straight down to hold itself up (N): the XR-40's pods tilt to the vertical, the XR-50's nozzles
 // swivel down beside its lift fan; nothing else can
 float Plane::liftThrustMax() const {
-  return spec->special == 2 ? thrustAt(1.f, 0.f, 0.f) : spec->special == 3 ? morpheusHoverMax(*spec, density) : 0.f;
+  return spec->special == 2 ? thrustAt(1.f, 0.f, 0.f) : spec->special == 3 ? morpheusHoverMax(*spec, density) : spec->special == 4 ? xr60HoverMax(*spec, density) : 0.f;
 }
 
 float Plane::fuelFlowAt(float spool, float tas, float rho, float live) const {
   const AircraftSpec& s = *spec;
   spool = clampf(spool, 0.f, 1.f); live = clampf(live, 0.f, 1.f);
   if (live <= 0.f) return 0.f;
+  if (s.special == 4) {   // the XR-60: the ring's reaction mass and the scramjet's fuel (the surge is the bank's: aircraft_xr60.cpp)
+    const float dens = rho > 0.f ? rho : density;
+    return xr60FuelFlow(s, xr60Drive(s, spool, tas, dens, soundSpeed, 0.f)) * live;
+  }
   if (s.special == 3) {   // the XR-50: each mode's thrust at its own consumption (its rocket burns apart: aircraft_morpheus.cpp)
     const float dens = rho > 0.f ? rho : density;
     MorpheusThrust t = morpheusEngines(s, spool, tas, dens, soundSpeed);
@@ -328,6 +351,10 @@ void Plane::reset(const AircraftSpec* s, vec3 position, float headingDeg, float 
   nzSwivel = 0.f; nzPitch[0] = nzPitch[1] = nzYaw[0] = nzYaw[1] = 0.f; rcs = vec3();
   airspeed = speed; mach = speed / isa(position.y).a; gear = airborne && s->retract ? 0.f : 1.f;
   sweep = s->special == 3 ? sweepTarget() : 0.f; mach = 0;
+  // the XR-60's: its surge bank full and off, the drive cold, the emitters out, the tips spread
+  ringN = scramN = surgeN = sheath = emitShare = 0.f; surgeBank = 1.f; surgeOn = false;
+  for (float& e : emitN) e = 0.f;
+  ringPitch = ringYaw = ringSpin = tipFold = 0.f; field = vec3();
   onWater = false; floatWet = 0.f; seaFetchT = -1.f; floatGround = floatGroundRunway = false; floatGroundSpeed = 0.f;
   moorWanted = moored = false;
   if (airborne) {
@@ -717,6 +744,9 @@ void Plane::substep(float dt, const Weather& wx, float time) {
   } else if (s.special == 3) {   // the XR-50: its swing wing, its heat (aircraft_morpheus.cpp)
     if (!morpheusAero(atmo, va, V, altAgl, dt, F, Taero, surfMax)) return;
     T += Taero;
+  } else if (s.special == 4) {   // the XR-60: its blade wings and their field, its sheath and its heat (aircraft_xr60.cpp)
+    if (!xr60Aero(atmo, va, V, altAgl, dt, F, Taero, surfMax)) return;
+    T += Taero;
   } else if (V > 0.5f) {
     // the research craft on fly-by-wire (the XR-30, XR-40): their coefficients, and the flight control system below
     float qbar = 0.5f * density * V * V;
@@ -770,6 +800,7 @@ void Plane::substep(float dt, const Weather& wx, float time) {
     stallWarn = smoothstepf(aStall - 5 * DEG, aStall - 1.5f * DEG, alpha);
   }
   if (s.special == 3) morpheusThrust(F, T, Taero, surfMax, V, dt);   // the XR-50's propulsion and its fly-by-wire
+  else if (s.special == 4) xr60Thrust(F, T, Taero, surfMax, V, dt);   // the XR-60's drive, its fields and its fly-by-wire
   else if (s.special) {
     if (s.special == 1) F += vec3(0, 0, -thrust);   // XR-30: the nozzles vector in pitch only (no vertical flight)
     // fly-by-wire rate command through vectored thrust and reaction jets: authority independent of airspeed

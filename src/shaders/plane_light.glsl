@@ -40,6 +40,10 @@ vec3 planeLight(vec3 p, vec3 rd, float t, int mid, Mat m, vec3 n, vec3 lp, vec3 
     if (engP == 7) col = morpheusStationLight(lp, inv*n, inv*(-rd), m, E.xyz)*ao + m.emit;   // (the XR-50's ground station)
     else
 #endif
+#if HAS_PHANTASOS
+    if (engP == 8) col = xr60StationLight(lp, inv*n, inv*(-rd), m, E.xyz)*ao + m.emit;   // (the XR-60's operations pod)
+    else
+#endif
 #if HAS_SOMNUS && HAS_JET
     col = (engP == 6 ? somnusPodLight(lp, inv*n, inv*(-rd), m, E.xyz) : podLight(lp, inv*n, inv*(-rd), m, E.xyz))*ao + m.emit;
 #elif HAS_SOMNUS

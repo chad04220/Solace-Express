@@ -55,8 +55,9 @@
 #define HAS_CABIN 1
 #endif
 // HAS_<type> for the preprocessor (HAS_CUTWATER, HAS_REVERIE...): the build carries that type's own code - every build
-// of its family but another aircraft's own. (The jet family's two: HAS_NOCTURNE the XR-30's own airframe, HAS_MORPHEUS
-// the XR-50's - morpheus_sdf.glsl; the sealed pod, the gear and the research materials are the family's.) HAS_FLEET_CABIN: the career types' and the XR-10's authored cabins
+// of its family but another aircraft's own. (The jet family's three: HAS_NOCTURNE the XR-30's own airframe, HAS_MORPHEUS
+// the XR-50's - morpheus_sdf.glsl - and HAS_PHANTASOS the XR-60's - xr60_sdf.glsl; the sealed pod, the gear and the
+// research materials are the family's.) HAS_FLEET_CABIN: the career types' and the XR-10's authored cabins
 // (cockpit_layout.glsl fleetCabin). MODEL_IS(n) in code: the player's aircraft is type n (gModelId; traffic is
 // -1), false as it compiles in another aircraft's own build.
 #ifdef AF_MODEL
@@ -77,6 +78,7 @@
 #define HAS_FLEET_CABIN (AF_MODEL < 10 || AF_MODEL == 13 || AF_MODEL == 14 || AF_MODEL == 15)
 #define HAS_NOCTURNE (AF_MODEL == 10)
 #define HAS_MORPHEUS (AF_MODEL == 16)
+#define HAS_PHANTASOS (AF_MODEL == 17)
 #define MODEL_IS(n) ((n) == AF_MODEL && gModelId == (n))
 #else
 #define HAS_DAWNLARK HAS_FLEET
@@ -96,6 +98,7 @@
 #define HAS_FLEET_CABIN HAS_FLEET
 #define HAS_NOCTURNE HAS_JET
 #define HAS_MORPHEUS HAS_JET
+#define HAS_PHANTASOS HAS_JET
 #define MODEL_IS(n) (gModelId == (n))
 #endif
 // HAS_FLOATS: a float plane's floats, struts and amphibious wheels (gear 5: docs/WINGS_OVER_WATER.md) - the Kittiwake's,
@@ -202,6 +205,14 @@ bool isReverie(){ return int(gM[0].z + 0.5) == 4 && abs(gM[22].x) < 0.001 && gM[
 #if HAS_MORPHEUS
 // the XR-50's ground station: its cockpit is the room it is flown from (morpheus_sdf.glsl mapMorpheusStation)
 bool morpheusStation(){ return int(gM[0].z + 0.5) == 7; }
+#endif
+#if HAS_PHANTASOS
+// the XR-60's operations pod: its cockpit is the capsule it is flown from (xr60_sdf.glsl mapXr60Station)
+bool phantasosStation(){ return int(gM[0].z + 0.5) == 8; }
+#endif
+#if HAS_MORPHEUS || HAS_PHANTASOS
+// either remotely piloted craft's station (the cockpit parts they share: the stick, the throttle, the pedals)
+bool remoteStation(){ int e = int(gM[0].z + 0.5); return e == 7 || e == 8; }
 #endif
 const float MT_CANT = 0.48;
 const float MT_FIN_X = 1.05;   // fin roots stay on the shoulders when the engine moves to the centerline

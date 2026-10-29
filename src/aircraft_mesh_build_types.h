@@ -22,7 +22,8 @@ enum PartType : int { PT_YOKE_SHAFT = 0, PT_YOKE_WHEEL = 1, PT_PEDAL = 2, PT_THR
 
           PT_JT_NOZZLE = 38, PT_JT_LEGM = 39, PT_JT_WHEELM = 40, PT_JT_LEGN = 41, PT_JT_WHEELN = 42, PT_JT_DOORM = 43, PT_JT_DOORN = 44,
           PT_WR_ACT = 45, PT_GALLEON_FAN = 46, PT_WR_KINETIC = 47, PT_WR_CHARGED = 48, PT_WR_PENETRATOR = 49, PT_WR_EMP = 50,
-          PT_MR_WING = 51, PT_MR_FLAPERON = 52, PT_MR_TAIL = 53, PT_MR_NOZZLE = 54, PT_MR_FANDOOR = 55, PT_MR_FAN = 56, PT_MR_FANBOT = 57 };
+          PT_MR_WING = 51, PT_MR_FLAPERON = 52, PT_MR_TAIL = 53, PT_MR_NOZZLE = 54, PT_MR_FANDOOR = 55, PT_MR_FAN = 56, PT_MR_FANBOT = 57,
+          PT_PX_TIP = 58, PT_PX_ELEVON = 59, PT_PX_FIN = 60, PT_PX_PETAL = 61, PT_PX_RING = 62 };
 struct PartInst { int type; float sx, sy; };
 inline constexpr int kMaxPartInst = 128;
 // Fixed bounds receive a two-cell margin. Survey bounds use the original 2 cm grid;

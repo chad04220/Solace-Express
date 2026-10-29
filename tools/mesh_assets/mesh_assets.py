@@ -43,7 +43,7 @@ MAX_PART_TYPE = _validator_constant("kMaxPartType")
 PROFILE = 1
 HEADER_BYTES = 192
 MAX_FILE_BYTES = 512 * 1024 * 1024
-MODEL_COUNT = 17
+MODEL_COUNT = 18
 MANIFEST_NAME = "manifest.json"
 REPORT_NAME = "bake-report.json"
 IMPLEMENTATION = "production-strict-fresh-v1"
@@ -146,7 +146,7 @@ def aircraft_roster(source_root):
         raise AssetError("Aircraft roster declaration changed; update exporter validator") from exc
     roster = re.findall(r'\{"([^"\n]+)",\s*"([^"\n]+)"', table)
     require(len(roster) == MODEL_COUNT and len({item[0] for item in roster}) == MODEL_COUNT,
-            "Expected exactly 16 unique aircraft; update bundle contract with roster changes")
+            "Expected exactly 18 unique aircraft; update bundle contract with roster changes")
     return roster
 
 

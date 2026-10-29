@@ -92,13 +92,14 @@ if a.shader_dir:
         'galleonNavFrame': (14,), 'galleonOverheadFrame': (14,), 'mapNewFleetFurnishings': (13, 14),
         'mapJet': (10,), 'mapJetCockpit': (10,), 'nocturnePanoramaBezel': (10,), 'jetScreen': (10,), 'jtNozzleShape': (10,),
         'mapMorpheus': (16,), 'mapMorpheusStation': (16,), 'morpheusHud': (16,), 'morpheusStationLight': (16,),   # (the XR-50's ground station)
+        'mapXr60': (17,), 'mapXr60Station': (17,), 'xr60Hud': (17,), 'xr60StationLight': (17,), 'stationHud': (16, 17),   # (the XR-60's operations pod; the symbology they share)
         'mapSomnus': (12,), 'mapSomnusCockpit': (12,), 'somnusScreen': (12,), 'shadeSomnusCockpit': (12,),
     }
-    shading = ('shadeFleetCabin', 'fuselagePaint', 'wavecrestCabinAlbedo', 'jetScreen', 'somnusScreen', 'shadeSomnusCockpit', 'morpheusHud', 'morpheusStationLight')
+    shading = ('shadeFleetCabin', 'fuselagePaint', 'wavecrestCabinAlbedo', 'jetScreen', 'somnusScreen', 'shadeSomnusCockpit', 'morpheusHud', 'morpheusStationLight', 'xr60Hud', 'xr60StationLight', 'stationHud')
     cabin = ('mapFleetPanel', 'cutwaterSeatPadded', 'cutwaterPowerFurniture', 'cutwaterYokeWheel', 'cutwaterDisplayRearSupports', 'scrubrunnerSeatPadded',
              'scrubrunnerPowerFurniture', 'scrubrunnerStickGrip', 'scrubrunnerRaisedPrimaryRisers', 'mapWavecrestCabinTrim', 'twinPowerBankField',
              'mapReverieCockpit', 'mapJetCockpit', 'nocturnePanoramaBezel', 'mapSomnusCockpit', 'thistledownStickShaft', 'thistledownStickGrip',
-             'thistledownStickPivot', 'galleonNavFrame', 'galleonOverheadFrame', 'mapNewFleetFurnishings', 'mapMorpheusStation')
+             'thistledownStickPivot', 'galleonNavFrame', 'galleonOverheadFrame', 'mapNewFleetFurnishings', 'mapMorpheusStation', 'mapXr60Station')
     for m in range(aircraft_count):
         for prog in (f'plane_mesh_af{m}.frag', f'hullbake_af{m}.frag', f'hullbake_out_af{m}.frag', f'objects_af{m}.frag', f'shadow_proxy_af{m}.frag'):
             src = (a.shader_dir / 'pruned' / prog).read_text()

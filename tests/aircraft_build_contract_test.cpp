@@ -65,7 +65,7 @@ int main() {
     check(stateHash(states) == gold.hash, "ordered hull-sweep states", gold.model);
   }
   // Unknown packed models still choose the legacy fleet shader fallback and emit no parts.
-  float custom[96]; memcpy(custom, buildGolden::kPacked[0], sizeof custom); custom[2] = 8.f;
+  float custom[96]; memcpy(custom, buildGolden::kPacked[0], sizeof custom); custom[2] = 9.f;
   PartInst unused[kMaxPartInst];
   check(familyOf(custom) == Family::Fleet && partList(custom, false, unused) == 0 && partList(custom, true, unused) == 0,
         "unknown-engine compatibility", -1);

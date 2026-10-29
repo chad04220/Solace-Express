@@ -34,7 +34,7 @@ inline std::string aircraftDefines(int model, const float packed[96]) {
 inline std::string worldLibAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kSceneIO + kViewUniforms + kSceneUniforms + kRoads + kPlaneCommon + kCockpitLayout + kPlaneParts + kCockpitFittings + kResearchCockpitLayout + kPlaneSDF + kPlaneTrace + kTerrainTrace +
          kMaterialCommon + kPlanet + kLightCommon + kClouds + kTerrainMaterial + kUfo + kDisplayText + kDisplays + kPrims + kPlaneScreens +
-         kFeeds + kPlaneFx + kSomnusWeaponSDF + kSomnusSDF + kMorpheusSDF + kSomnusStoreMaterial + kSomnusMaterial + kSomnusFx + kSomnusCockpitCommon + kSomnusCockpitSDF + kSomnusCockpitMaterial +
+         kFeeds + kPlaneFx + kSomnusWeaponSDF + kSomnusSDF + kMorpheusSDF + kXr60SDF + kSomnusStoreMaterial + kSomnusMaterial + kSomnusFx + kSomnusCockpitCommon + kSomnusCockpitSDF + kSomnusCockpitMaterial +
          kCockpitMaterial + kPlaneMaterial + kWater + kAfShMap + kPlaneLight;
 }
 // the GPS map's aerial imagery: the ground's material over the islands (GROUND_ROADS: the roads painted, roads.glsl)
@@ -44,7 +44,7 @@ inline std::string mapFSAssembly(const std::string& defines) { return worldLibAs
 inline std::string hullBakeFSAssembly(const std::string& defines) { return worldLibAssembly(defines + "#define PART_BAKE\n") + kHullBakeMain; }
 // The aircraft distance fields alone (tests/aircraft_visual_test.cpp adds its own main)
 inline std::string sdfAssembly(const std::string& defines) {
-  return std::string("#version 330 core\n") + defines + kCommonGLSL + kSceneIO + kViewUniforms + kSceneUniforms + kRoads + kPlaneCommon + kCockpitLayout + kPlaneParts + kCockpitFittings + kResearchCockpitLayout + kPlaneSDF + kSomnusWeaponSDF + kSomnusSDF + kMorpheusSDF + kSomnusCockpitCommon + kSomnusCockpitSDF;
+  return std::string("#version 330 core\n") + defines + kCommonGLSL + kSceneIO + kViewUniforms + kSceneUniforms + kRoads + kPlaneCommon + kCockpitLayout + kPlaneParts + kCockpitFittings + kResearchCockpitLayout + kPlaneSDF + kSomnusWeaponSDF + kSomnusSDF + kMorpheusSDF + kXr60SDF + kSomnusCockpitCommon + kSomnusCockpitSDF;
 }
 
 // ---- the scenery's instanced meshes (entity_render.cpp): a build for each class (ENT_CLASS, ent_common.glsl: the trees,
@@ -73,7 +73,7 @@ inline std::string waterFSAssembly(const std::string& defines) {
 inline std::string objectsFSAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kRoads + kPlaneCommon + kCockpitLayout + kPlaneParts + kCockpitFittings + kResearchCockpitLayout + kPlaneSDF + kPlaneTrace +
          kMaterialCommon + kPlanet + kLightCommon + kClouds + kUfo + kDisplayText + kDisplays + kPrims + kPlaneScreens +
-         kFeeds + kPlaneFx + kSomnusWeaponSDF + kSomnusSDF + kMorpheusSDF + kSomnusStoreMaterial + kSomnusMaterial + kSomnusFx + kSomnusCockpitCommon + kSomnusCockpitSDF + kSomnusCockpitMaterial +
+         kFeeds + kPlaneFx + kSomnusWeaponSDF + kSomnusSDF + kMorpheusSDF + kXr60SDF + kSomnusStoreMaterial + kSomnusMaterial + kSomnusFx + kSomnusCockpitCommon + kSomnusCockpitSDF + kSomnusCockpitMaterial +
          kCockpitMaterial + kPlaneMaterial + kAfShMap + kPlaneLight + kGBuffer + kGBWrite + kPlaneGB + kObjectsFS;
 }
 // the rigid parts' poses (plane_parts.glsl partPose), once a frame into a small texture the part draws read
@@ -106,19 +106,19 @@ inline std::string planeMeshDepthFSAssembly() {
 inline std::string planeMeshFSAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + "#define AF_MESH\n" + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kRoads + kWreckClip + kPlaneCommon + kCockpitLayout + kPlaneParts + kCockpitFittings + kResearchCockpitLayout + kPlaneSDF + kPlaneTrace +
          kMaterialCommon + kPlanet + kLightCommon + kClouds + kUfo + kDisplayText + kDisplays + kPrims + kPlaneScreens +
-         kFeeds + kPlaneFx + kSomnusWeaponSDF + kSomnusSDF + kMorpheusSDF + kSomnusStoreMaterial + kSomnusMaterial + kSomnusFx + kSomnusCockpitCommon + kCabinWindows + kSomnusCockpitSDF + kSomnusCockpitMaterial +
+         kFeeds + kPlaneFx + kSomnusWeaponSDF + kSomnusSDF + kMorpheusSDF + kXr60SDF + kSomnusStoreMaterial + kSomnusMaterial + kSomnusFx + kSomnusCockpitCommon + kCabinWindows + kSomnusCockpitSDF + kSomnusCockpitMaterial +
          kCockpitMaterial + kPlaneMaterial + kAfShMap + kPlaneLight + kGBuffer + kGBWrite + kPlaneGB + kPlaneMeshFS;
 }
 // the shadow proxy: the airframe fields' shadows on what is in the G-buffer, for the lighting pass
 inline std::string shadowProxyFSAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kRoads + kPlaneCommon + kCockpitLayout + kPlaneParts + kCockpitFittings + kResearchCockpitLayout + kPlaneSDF + kPlaneTrace +
-         kSomnusWeaponSDF + kSomnusSDF + kMorpheusSDF + kSomnusCockpitCommon + kSomnusCockpitSDF + kMaterialCommon + kPlanet + kLightCommon + kGBuffer + kAfShMap + kEnemyShadow + kShadowProxyFS;
+         kSomnusWeaponSDF + kSomnusSDF + kMorpheusSDF + kXr60SDF + kSomnusCockpitCommon + kSomnusCockpitSDF + kMaterialCommon + kPlanet + kLightCommon + kGBuffer + kAfShMap + kEnemyShadow + kShadowProxyFS;
 }
 // the effects pass: the effects over the lit frame (its cloak needs the airframe's field)
 inline std::string effectsFSAssembly(const std::string& defines) {
   return std::string("#version 330 core\n") + defines + kCommonGLSL + kNoiseTex + kViewUniforms + kSceneUniforms + kRoads + kPlaneCommon + kCockpitLayout + kPlaneParts + kCockpitFittings + kResearchCockpitLayout + kPlaneSDF + kPlaneTrace +
          kMaterialCommon + kPlanet + kLightCommon + kClouds + kUfo + kDisplayText + kDisplays + kPrims + kPlaneScreens +
-         kFeeds + kPlaneFx + kSomnusWeaponSDF + kSomnusSDF + kMorpheusSDF + kSomnusStoreMaterial + kSomnusMaterial + kSomnusFx + kSomnusCockpitCommon + kSomnusCockpitSDF + kSomnusCockpitMaterial +
+         kFeeds + kPlaneFx + kSomnusWeaponSDF + kSomnusSDF + kMorpheusSDF + kXr60SDF + kSomnusStoreMaterial + kSomnusMaterial + kSomnusFx + kSomnusCockpitCommon + kSomnusCockpitSDF + kSomnusCockpitMaterial +
          kGBuffer + kPropellerGLSL + kEffectsFS;
 }
 // the composite and the interface, each after the g-force lens they draw (g_lens.glsl: over the scene and the flight HUD)

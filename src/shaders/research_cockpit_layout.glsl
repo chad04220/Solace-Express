@@ -80,6 +80,20 @@ ResearchPanel morpheusPane(int i){
   p.page = i;
   return p;
 }
+// The XR-60's operations pod (xr60_sdf.glsl mapXr60Station): its monitors wrap round the pilot on the console's arc,
+// each pane facing the eye. 0 the main monitor ahead, 1 and 2 the left and right ones curved in beside it (52 deg off
+// the nose), 3 the chin monitor low in the console, 4 the telemetry band above (its own page). Windows as the XR-50's
+// are (plane_screens.glsl xr60Hud)
+ResearchPanel xr60Pane(int i){
+  ResearchPanel p;
+  float sx = i == 1 ? -1.0 : 1.0;
+  p.c = i == 0 ? vec3(0.0, 0.03, -0.72) : i <= 2 ? vec3(sx*0.59, 0.03, -0.46) : i == 3 ? vec3(0.0, -0.30, -0.47) : vec3(0.0, 0.42, -0.70);
+  p.n = normalize(-p.c);
+  p.h = i == 0 ? vec2(0.50, 0.28) : i <= 2 ? vec2(0.26, 0.20) : i == 3 ? vec2(0.20, 0.10) : vec2(0.50, 0.06);
+  p.corner = i == 0 ? 0.03 : i <= 2 ? 0.02 : i == 3 ? 0.015 : 0.01;
+  p.page = i;
+  return p;
+}
 // which pane a point of the bank is nearest (eye at the origin)
 int morpheusPaneIndex(vec3 q){
   float a = atan(q.x, -q.z), e = atan(q.y, sqrt(q.x*q.x + q.z*q.z));

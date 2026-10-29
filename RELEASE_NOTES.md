@@ -1,3 +1,25 @@
+## What's new in v4.5.0: the XR-60 Phantasos
+
+- **A sixth research craft, built from a field rather than from engines.** The XR-60 Phantasos (`docs/XR60.md`) is a
+  knife-edged, faceted lifting body with forward-swept blade wings whose outer tips fold down for the hover, twin
+  canted all-moving fins, a ventral keel that is its scramjet's duct, a faceted sensor crystal for a nose, and a ring
+  drive at its tail: six vectoring petals round a spinning ring, the body's cone inside it. Its seams glow cyan with
+  the drive and violet with the surge.
+- **Theoretical propulsion.** An annular plasma thruster gives its whole 2,100 kN from a standstill and in a vacuum
+  alike (it needs no air; in dense air at speed the inflow quenches it, and the keel's MHD-bypass scramjet carries it
+  on to Mach 12); a surge bank triples the ring for forty seconds and recharges; four flush field emitters hold it up
+  with no moving parts; a circulation field raises its blades' lift to seven times a plain wing's; a plasma sheath
+  halves the heating and the friction; field torque steers it where there is no air. Its fuel is metallic hydrogen.
+- **Three times the XR-50, measured on both in the same air** (`xr60_flight_test --report`): 21 times its weight in
+  thrust, 550 g at Mach 1.6, -500 g, 2,500 deg/s of roll, Mach 12.8 at 32 km, a hover that holds within a few
+  centimetres, and on the ring alone it leaves the atmosphere. A 2,000 g structure.
+- **An operations pod for a cockpit.** Its cockpit view (`C`) is the hexagonal capsule it is flown from: five
+  monitors wrapped round the pilot on a curved console, the camera ones windows onto the world with the remote
+  pilot's symbology in cyan and violet, a telemetry band with the surge bank, the sheath and the drive's mode.
+- **Flying it.** `F / V` hand the ring's stream to the emitters; a double press of `A` (or `X`) lights the surge; the
+  tip blades fold themselves; full aft stick through its stop goes post-stall. The research terminal's four cards:
+  the field hover, the Mach 12 corridor, the surge climb out of the atmosphere, and the loads.
+
 ## What's new in v4.4.4: the Scrubrunner's tail wheel on the runway
 
 - **The Scrubrunner's tail wheel rolls on the runway instead of through it.** The flight model rested the aircraft on a

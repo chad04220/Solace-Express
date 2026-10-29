@@ -3192,6 +3192,17 @@ void Game::drawHud(const FrameParams& fp) {
       tiles.push_back({"LEAD EDGE", fmt("%.0f C", skinC), plane.skinT > kMorpheusSkinWarn ? C_BAD : plane.skinT > kMorpheusSkinWarn - 250.f ? C_WARN : C_TEXT, clampf(skinK, 0.f, 1.f)});
       tiles.push_back({"WING", fmt("%.0f deg%s", plane.sweep / DEG, plane.hiLift > 0.5f ? " FLAP" : ""), C_TEXT, (plane.sweep - kMorpheusSweepMin) / (kMorpheusSweepMax - kMorpheusSweepMin)});
       tiles.push_back({"NOZZLES", plane.fanClutch > 0.05f ? fmt("%.0f deg FAN", plane.nzSwivel / DEG) : fmt("%.0f deg", plane.nzSwivel / DEG), plane.fanClutch > 0.05f ? AMB : C_TEXT, plane.nozzle});
+    } else if (sp.special == 4) {   // the XR-60: its drive's mode, its surge bank, its skin, its sheath and its emitters
+      const vec3 VIO(0.75f, 0.45f, 1.f), CYN(0.45f, 0.9f, 1.f);
+      const float rated = sp.engines * sp.power;
+      const char* mode = !plane.engineRunning ? "OFF" : plane.surgeN > 0.5f ? "SURGE" : plane.scramN > plane.ringN ? "SCRAMJET" : "RING";
+      tiles.push_back({"DRIVE", fmt("%s %.0f%%", mode, (plane.ringN + plane.scramN) / rated * 100.f), plane.surgeN > 0.5f ? VIO : plane.scramN > plane.ringN ? C_WARN : C_TEXT, clampf((plane.ringN + plane.scramN) / (3.f * rated), 0.f, 1.f)});
+      tiles.push_back({"SURGE", plane.surgeOn ? fmt("LIT %.0f s", plane.surgeBank * kXr60SurgeSeconds) : plane.surgeBank > 0.98f ? "READY" : fmt("%.0f%%", plane.surgeBank * 100.f),
+                       plane.surgeOn ? VIO : plane.surgeBank > 0.98f ? CYN : C_DIM, plane.surgeBank});
+      const float skinC = plane.skinT - 273.15f, skinK = (plane.skinT - 288.f) / (kXr60SkinLimit - 288.f);
+      tiles.push_back({"SKIN", fmt("%.0f C", skinC), plane.skinT > kXr60SkinWarn ? C_BAD : plane.skinT > kXr60SkinWarn - 350.f ? C_WARN : C_TEXT, clampf(skinK, 0.f, 1.f)});
+      tiles.push_back({"SHEATH", plane.sheath > 0.9f ? "UP" : plane.sheath > 0.05f ? fmt("%.0f%%", plane.sheath * 100.f) : "DOWN", plane.sheath > 0.9f ? CYN : C_WARN, plane.sheath});
+      tiles.push_back({"EMITTERS", plane.emitShare > 0.05f ? fmt("%.0f%%%s", plane.emitShare * 100.f, plane.tipFold > 0.5f ? " TIPS" : "") : plane.tipFold > 0.5f ? "OUT, TIPS DOWN" : "OUT", plane.emitShare > 0.05f ? CYN : C_TEXT, plane.nozzle});
     } else if (sp.special) tiles.push_back({"TVC", fmt("%+.0f deg", -clampf(plane.ctl.pitch + plane.ctl.trim * 0.3f, -1, 1) * 0.5f / DEG), C_TEXT, -1.f});
     else tiles.push_back({"FLAPS", fmt("%.0f%%", plane.flaps * 100), plane.flaps > 0.01f ? C_ACCENT : C_TEXT, plane.flaps});
     std::string gearS = !sp.retract ? "FIXED" : plane.gear > 0.99f ? "DOWN" : plane.gear < 0.01f ? "UP" : "TRANSIT";
@@ -3200,7 +3211,7 @@ void Game::drawHud(const FrameParams& fp) {
     int rows = ((int)tiles.size() + tileCols - 1) / tileCols;
     float bx = W - tileCols * tileW - (tileCols - 1) * tileGap - 14 * s, by = H - stripH - 10 * s - rows * tileH - (rows - 1) * tileGap;
     hudStrip(bx - 8 * s, by - 20 * s, tileCols * tileW + (tileCols - 1) * tileGap + 16 * s, rows * tileH + (rows - 1) * tileGap + 28 * s, 0.9f);
-    g_ren.text(bx, by - 15 * s, 9.5f * s, sp.special == 3 ? "XR-50 SYSTEMS" : sp.special == 2 ? "XR-40 SYSTEMS" : sp.special ? "XR-30 SYSTEMS" : "SYSTEMS", C_ACCENT, 0.9f, 0, false);
+    g_ren.text(bx, by - 15 * s, 9.5f * s, sp.special == 4 ? "XR-60 SYSTEMS" : sp.special == 3 ? "XR-50 SYSTEMS" : sp.special == 2 ? "XR-40 SYSTEMS" : sp.special ? "XR-30 SYSTEMS" : "SYSTEMS", C_ACCENT, 0.9f, 0, false);
     for (size_t i = 0; i < tiles.size(); i++) {
       float x = bx + (i % tileCols) * (tileW + tileGap), y = by + (i / tileCols) * (tileH + tileGap);
       g_ren.rect(x, y, tileW, tileH, vec3(0.0f, 0.02f, 0.04f), 0.55f, 3 * s);

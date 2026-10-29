@@ -713,6 +713,8 @@ private:
   void morpheusControls(float dt);   // the XR-50's: its rocket (game_morpheus.cpp)
   int morpheusMode = 0; float morpheusModeT = 0.f; bool morpheusHot = false, morpheusRocketOut = false;   // (what it last announced)
   float morpheusKeyTap = 9.f, morpheusKeyHeld = 0.f;   // the rocket's double press of A: since the last short tap, how long A has been held
+  void xr60Controls(float dt);   // the XR-60's: its surge (game_xr60.cpp)
+  int xr60Mode = 0; float xr60ModeT = 0.f; bool xr60Hot = false, xr60Spent = false;   // (what it last announced)
   void updateSomnus(float dt);
   void somnusVisual(FrameParams& fp);
   void buildFeedCameras(FrameParams& fp);
@@ -1011,7 +1013,7 @@ private:
   // (the XR-50's: past an angle of attack, on the scramjets past a Mach number, the rocket lit, back to wingborne flight -
   // the nozzles aft, the fan out - past an airspeed)
   enum ResStepKind { RS_MACH = 0, RS_ALT, RS_G, RS_NEGG, RS_ROLL, RS_SLOW, RS_STALL, RS_CLIMB, RS_HOVER, RS_VLAND, RS_CLOAK, RS_LASER, RS_BOMB, RS_LAND,
-                     RS_ALPHA, RS_SCRAM, RS_ROCKET, RS_CONVERT };
+                     RS_ALPHA, RS_SCRAM, RS_ROCKET, RS_CONVERT, RS_SURGE };
   struct ResStep { int kind; float v, hold; const char* label; };
   // (fuelKg: a card built on the fuel gauge launches with that much, the tanks otherwise full: since v4.1 they hold hours)
   struct ResCard { int craft; const char* id; const char* title; const char* brief; ResStep steps[5]; int n; float fuelKg = 0; };

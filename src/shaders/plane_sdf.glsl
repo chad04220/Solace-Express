@@ -676,6 +676,9 @@ vec2 jtGear(vec3 p, vec3 ap, vec2 res, float mainDepth, float mainBelow){
 #if HAS_MORPHEUS
   if (fair < fd && int(gM[0].z + 0.5) == 7) res.y = 150.0;   // (the XR-50's: its skin's own)
 #endif
+#if HAS_PHANTASOS
+  if (fair < fd && int(gM[0].z + 0.5) == 8) res.y = 176.0;   // (the XR-60's: its skin's own)
+#endif
   res = gearWell(ap, res, g.mc, g.mh, g.md, 0.03);
   res = gearWellP(p, res, g.nc, g.nh, g.nd, g.nb, g.np);
   if (gPartMode != -1) return res;
@@ -708,6 +711,9 @@ vec2 jtPartField(int k, vec3 l){
   bool wrd = int(gM[0].z + 0.5) == 6;   // (the doors in the skin's paint: the XR-40's, the XR-30's wing and body)
 #if HAS_MORPHEUS
   if (int(gM[0].z + 0.5) == 7 && (k == PT_JT_DOORM || k == PT_JT_DOORN)) return vec2(gearDoorV(l, k == PT_JT_DOORM ? jtGearOf().mh : jtGearOf().nh), 150.0);   // (the XR-50's)
+#endif
+#if HAS_PHANTASOS
+  if (int(gM[0].z + 0.5) == 8 && (k == PT_JT_DOORM || k == PT_JT_DOORN)) return vec2(gearDoorV(l, k == PT_JT_DOORM ? jtGearOf().mh : jtGearOf().nh), 176.0);   // (the XR-60's)
 #endif
   if (k == PT_JT_DOORM) return vec2(gearDoorV(l, jtGearOf().mh), wrd ? 80.0 : 31.0);
   if (k == PT_JT_DOORN) return vec2(gearDoorV(l, jtGearOf().nh), wrd ? 80.0 : 30.0);
@@ -780,6 +786,9 @@ vec2 mapSomnusCockpit(vec3 p);
 #if HAS_MORPHEUS
 vec2 mapMorpheus(vec3 p);   // (morpheus_sdf.glsl)
 #endif
+#if HAS_PHANTASOS
+vec2 mapXr60(vec3 p);   // (xr60_sdf.glsl)
+#endif
 vec2 mapPlaneBody(vec3 p);
 // light fixtures: a faired housing set into the airframe with a domed lens facing out along the light's axis
 vec2 mapPlane(vec3 p){
@@ -796,6 +805,10 @@ vec2 mapPlane(vec3 p){
 #if HAS_MORPHEUS
   // the XR-50's (aircraft.h kMorpheus*): its wingtips' lenses are its swing wings' own (morpheus_sdf.glsl mrWingField)
   if (engine == 7) { tip = vec3(1e3); fin = vec3(0.0, 0.93, -1.4); tail = vec3(0.0, 0.46, 9.25); land = vec3(-2.20, -0.10, -3.62); }
+#endif
+#if HAS_PHANTASOS
+  // the XR-60's (aircraft.h kXr60*): its tips' lenses are its tip blades' own (xr60_sdf.glsl pxPartField)
+  if (engine == 8) { tip = vec3(1e3); fin = vec3(0.0, 0.72, -1.6); tail = vec3(0.0, 1.30, 7.05); land = vec3(-0.70, -0.12, -4.6); }
 #endif
   // IDs 95..100 always mean port nav, starboard nav, tail, beacon, port/starboard landing.
   // Neither menu/flight order, current owner, flashing phase nor lamp state can change this shape.
@@ -959,6 +972,9 @@ vec2 mapPlaneBody(vec3 p){
 #if HAS_MORPHEUS
         || engJ == 7
 #endif
+#if HAS_PHANTASOS
+        || engJ == 8
+#endif
        )
 #endif
     {   // (a research jet's own build: nothing else follows - the light aircraft's body below is not in it)
@@ -968,6 +984,12 @@ vec2 mapPlaneBody(vec3 p){
         return gPS.w > 0.5 || !GEAR_FIELD ? rm : jtGear(p, vec3(abs(p.x), p.y, p.z), rm, 0.8, 0.06);
       }
 #endif
+#if HAS_PHANTASOS
+      if (engJ == 8) {   // the XR-60: its own airframe (xr60_sdf.glsl) on the research gear
+        vec2 rx = mapXr60(p);
+        return gPS.w > 0.5 || !GEAR_FIELD ? rx : jtGear(p, vec3(abs(p.x), p.y, p.z), rx, 0.8, 0.06);
+      }
+#endif
 #if HAS_JET && HAS_SOMNUS
       vec2 r = engJ == 5 ? mapJet(p) : mapSomnus(p);
 #elif HAS_NOCTURNE
@@ -975,7 +997,7 @@ vec2 mapPlaneBody(vec3 p){
 #elif HAS_SOMNUS
       vec2 r = mapSomnus(p);
 #else
-      vec2 r = vec2(1e9, 0.0);   // (the XR-50's own build: its airframe is above)
+      vec2 r = vec2(1e9, 0.0);   // (the XR-50's or the XR-60's own build: its airframe is above)
 #endif
       return gPS.w > 0.5 || !GEAR_FIELD ? r : jtGear(p, vec3(abs(p.x), p.y, p.z), r, engJ == 6 ? 0.7 : 0.8, engJ == 6 ? 0.03 : 0.06);
     }

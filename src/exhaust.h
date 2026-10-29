@@ -63,6 +63,13 @@ inline ExhaustVisual buildExhaustVisual(const Plane& p, const ModelDef& m) {
       rx = ry = .28f + .1f*clampf(thrust, 0.f, 1.f);
       // Differential thrust modulates emission without falsely enabling boost below actual reheat spool.
       intensity = clampf(thrust*1.3f, 0.f, 1.6f);
+    } else if (s.special == 4) {
+      // the XR-60: the ring's stream, out of its centre behind the drive's cone, vectored with the petals; its flame the
+      // drive's power, the surge over it
+      const float a = p.ringPitch, y = p.ringYaw;
+      pos = kXr60Ring + vec3(0, 0, 0.9f);
+      dir = vec3(sinf(y), sinf(a) * cosf(y), cosf(a) * cosf(y));
+      rx = ry = .95f;
     } else if (s.special == 3) {
       // the XR-50: each nozzle where it has swivelled (its 1.15 m from the swivel to the exit), along its vectored jet. Its
       // flame: reheat's (none with the nozzles swivelled down), or the ram and scram combustion's through the same exits
@@ -88,6 +95,7 @@ inline ExhaustVisual buildExhaustVisual(const Plane& p, const ModelDef& m) {
     out.exit[j][3] = clampf(rx, .05f, 2.f); out.axis[j][3] = clampf(ry, .05f, 2.f);
     out.power[j][0] = spool; out.power[j][1] = reheat; out.power[j][2] = intensity;
     out.power[j][3] = exhaustFinite(p.mach, 0.f, 5.f); out.engine[j] = i;
+    if (s.special == 4) out.power[j][1] = std::max(reheat, clampf(p.surgeN, 0.f, 1.f));   // (the XR-60's: the surge is its reheat)
     if (s.special == 3) {   // (the XR-50's flame: reheat only aft, or its ram and scram combustion's)
       const float tb = p.tbcc[0] + p.tbcc[1] + p.tbcc[2], ram = tb > 1.f ? p.tbcc[1] / tb : 0.f, scram = tb > 1.f ? p.tbcc[2] / tb : 0.f;
       out.power[j][1] = std::max(reheat * (1.f - smoothstepf(5.f * DEG, 20.f * DEG, p.nzSwivel)), std::max(0.85f * ram, 0.55f * scram) * clampf(spool / .85f, 0.f, 1.f));

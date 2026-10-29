@@ -33,6 +33,12 @@ const int PT_WR_KINETIC = 47, PT_WR_CHARGED = 48, PT_WR_PENETRATOR = 49, PT_WR_E
 const int PT_MR_WING = 51, PT_MR_FLAPERON = 52, PT_MR_TAIL = 53, PT_MR_NOZZLE = 54, PT_MR_FANDOOR = 55, PT_MR_FAN = 56, PT_MR_FANBOT = 57;
 bool partIsMorpheus(int k){ return k >= PT_MR_WING && k <= PT_MR_FANBOT; }
 #endif
+#if HAS_PHANTASOS
+// the XR-60's (xr60_sdf.glsl pxPartField, posed by pxPartPose): per side its blade wing's folding tip, its elevon and
+// its all-moving fin; the ring drive's six vectoring petals and its spinning ring
+const int PT_PX_TIP = 58, PT_PX_ELEVON = 59, PT_PX_FIN = 60, PT_PX_PETAL = 61, PT_PX_RING = 62;
+bool partIsPhantasos(int k){ return k >= PT_PX_TIP && k <= PT_PX_RING; }
+#endif
 bool partIsJet(int k){ return (k >= PT_JT_ELEVON && k <= PT_JT_RUDDER) || (k >= PT_JT_NOZZLE && k <= PT_JT_DOORN); }
 bool partIsSomnus(int k){ return (k >= PT_WR_PODF && k <= PT_WR_RUDV) || k == PT_WR_ACT || (k >= PT_WR_KINETIC && k <= PT_WR_EMP); }
 const vec3 WRP_POD[4] = vec3[4](vec3(-2.35, -0.08, -3.3), vec3(2.35, -0.08, -3.3), vec3(-2.75, 0.05, 3.45), vec3(2.75, 0.05, 3.45));   // (somnus_sdf.glsl WR_POD)
@@ -622,6 +628,10 @@ Pose partPoseCockpit(int k, vec2 sd){
   else if (morpheusStation() && k == PT_JET_STICK) { X.R = transpose(partRxy(cRoll*0.25)*partRyz(-cPitch*0.25)); X.T = E.xyz + vec3(0.42, -0.385, -0.40); }   // (the XR-50's station: on its desk)
   else if (morpheusStation() && k == PT_JET_THR) X.T = E.xyz + vec3(-0.42, -0.33, -0.40 + 0.12*(0.5 - cThr));
 #endif
+#if HAS_PHANTASOS
+  else if (phantasosStation() && k == PT_JET_STICK) { X.R = transpose(partRxy(cRoll*0.25)*partRyz(-cPitch*0.25)); X.T = E.xyz + vec3(0.40, -0.385, -0.42); }   // (the XR-60's pod: on its console)
+  else if (phantasosStation() && k == PT_JET_THR) X.T = E.xyz + vec3(-0.40, -0.33, -0.42 + 0.12*(0.5 - cThr));
+#endif
   else if (k == PT_JET_STICK) { X.R = transpose(partRxy(cRoll*0.25)*partRyz(-cPitch*0.25)); X.T = E.xyz + (isReverie()?vec3(.43,-.535,-.28):vec3(0.42, -0.375, -0.02)); }
   else if (k == PT_JET_THR) X.T = E.xyz + (isReverie()?vec3(-.43,-.505,-.28+0.12*(0.5-cThr)):vec3(-0.42, -0.34, -0.02 + 0.12*(0.5 - cThr)));
   else if (k == PT_WR_STICK) { X.R = transpose(partRxy(cRoll*0.25)*partRyz(-cPitch*0.25)); X.T = E.xyz + vec3(0.5, -0.41, -0.06); }
@@ -656,10 +666,64 @@ Pose partPoseCockpit(int k, vec2 sd){
 #if HAS_MORPHEUS
     if (morpheusStation()) X.T = E.xyz + vec3(sd.x*0.16, -1.10, -0.60 - sd.x*cYaw*0.05);   // (the XR-50's: under its station's desk)
 #endif
+#if HAS_PHANTASOS
+    if (phantasosStation()) X.T = E.xyz + vec3(sd.x*0.16, -1.08, -0.60 - sd.x*cYaw*0.05);   // (the XR-60's: under its pod's console)
+#endif
   }
 #endif
   return X;
 }
+#if HAS_PHANTASOS
+// ---- the XR-60 Phantasos (aircraft.h kXr60*): its blades' roots and dihedral, the tip blades' hinges, the fins' roots
+// and cant, the ring. Its state (game_frame.cpp fillPlaneVisual): gWr[0] the tip blades' fold, the emitters' glow, the
+// ring's spin and the drive's power; gWr[1] the ring's pitch and yaw vectoring, the surge and the scramjet's share;
+// gWr[2] the skin's glow, the sheath, the surge bank and the field torque's pitch; gWr[3] its yaw and roll
+const vec3 PXP_ROOT = vec3(1.15, -0.05, 1.6), PXP_HINGE = vec3(4.0, 0.35, 1.8), PXP_FINROOT = vec3(0.92, 0.50, 4.4), PXP_RING = vec3(0.0, 0.0, 7.0);
+const float PXP_DIH = 0.13962634, PXP_CANT = 0.61086524, PXP_FOLD = 1.22173048;   // (8 deg, 35 deg, 70 deg)
+// the inner blade's frame: its root at the flank, x along the span rising at the dihedral, z aft from the leading edge
+Pose pxRootPose(float side){ mat3 S = partMirror(side); Pose X; X.R = S*partRxy(PXP_DIH); X.T = S*PXP_ROOT; return X; }
+// the belly's height at body z, x across (the keel flat and the lower facet of the faceted section: xr60_sdf.glsl
+// pxSection), where the nose gear's well is cut (jtBelly)
+float pxBellyY(float z, float x){
+  vec3 sec = fusSection(z);
+  float w = max(sec.x, 0.01), h = max(sec.y, 0.01);
+  float k = clamp((abs(x) - 0.45*w)/max(0.55*w, 1e-3), 0.0, 1.0);
+  return sec.z - 0.72*h + k*0.67*h;
+}
+// the inner blade's upper skin at body x, z, where the mains lie folded (jtWingTop)
+float pxWingTop(float x, float z){
+  float s = clamp(abs(x) - PXP_ROOT.x, 0.0, 2.85), k = s/2.85;
+  return PXP_ROOT.y + s*tan(PXP_DIH) + 0.5*0.045*mix(4.6, 2.6, k)*0.9;
+}
+Pose pxPartPose(int k, vec2 sd){
+  float cPitch = gCtl.x, cRoll = gCtl.y, cYaw = gCtl.z;
+  mat3 S = partMirror(sd.x);
+  Pose X; X.R = mat3(1.0); X.T = vec3(0.0);
+  if (k == PT_PX_TIP) {   // the tip blade: folded down about its hinge's chord line (70 deg at the stop), mirrored left
+    X.R = S*partRxy(PXP_DIH - PXP_FOLD*clamp(gWr[0].x, 0.0, 1.0)); X.T = S*PXP_HINGE;
+    return X;
+  }
+  if (k == PT_PX_ELEVON) {   // hinged at 72% of the blade's chord: up and down with the pitch (stick back: trailing edge up), apart with the roll
+    mat3 Ar = mat3(1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0); vec3 a = vec3(0.0);   // (span, chord from the LE, thickness)
+    mat3 D; vec3 d; surfDefl(2.85, 4.6, 2.6, -1.1, 0.72, -cPitch*0.30 - cRoll*sd.x*0.30, 0.0, D, d);
+    return poseMul(pxRootPose(sd.x), surfPoseAffine(Ar, Ar, a, D, d));
+  }
+  if (k == PT_PX_FIN) {   // all-moving about its span: together for pitch, apart for yaw; canted 35 deg out
+    float C = cos(PXP_CANT), Sn = sin(PXP_CANT);
+    mat3 Rc = mat3(Sn, C, 0.0, -C, Sn, 0.0, 0.0, 0.0, 1.0);   // (its span up and out, its thickness across, its chord aft)
+    X.R = S*Rc*partRyz(-cPitch*0.30 + cYaw*sd.x*0.30); X.T = S*PXP_FINROOT;
+    return X;
+  }
+  if (k == PT_PX_PETAL) {   // petal k of six round the ring (from the right, 60 deg apart), tilted about its hinge with the vectoring
+    float th = 0.5235988 + 1.0471976*sd.x, ct = cos(th), st = sin(th);
+    float tilt = -(gWr[1].x*st + gWr[1].y*ct)*1.5;
+    X.R = partRxy(th)*partRxz(tilt); X.T = PXP_RING + vec3(ct, st, 0.0)*1.15;
+    return X;
+  }
+  if (k == PT_PX_RING) { X.R = partRxy(gWr[0].z); X.T = PXP_RING; return X; }   // (spinning about its axis)
+  return X;
+}
+#endif
 #if HAS_MORPHEUS
 // ---- the XR-50 Morpheus (aircraft.h kMorpheus*): its swing wings' pivots and their sweep range, the V-tail's roots and
 // cant, the nozzles' swivels, the lift fan's openings. Its state (game.cpp fillPlaneVisual): gWr[0] the wing's sweep, its
@@ -721,6 +785,9 @@ float jtBelly(float z, float x){
     float bot = yc - min((zc + 8.4)*0.12, 0.48) + max(zc - 5.0, 0.0)*0.06;
     return bot + max(abs(x) - W*0.42, 0.0)*(yc - bot)/max(W*0.58, 1e-3);
   }
+#if HAS_PHANTASOS
+  if (int(gM[0].z + 0.5) == 8) return pxBellyY(z, x);   // (the XR-60's faceted belly: its keel flat and lower facets)
+#endif
   vec3 s = fusSection(z); return s.z - s.y*sqrt(max(1.0 - x*x/(s.x*s.x), 0.0));
 }
 // the jet's wing's upper skin at span x, body z (sdPanel's frame and sizes: plane_sdf.glsl mapJet, somnus_sdf.glsl
@@ -728,6 +795,9 @@ float jtBelly(float z, float x){
 float jtWingTop(float x, float z){
 #if HAS_MORPHEUS
   if (int(gM[0].z + 0.5) == 7) return mrShoulderTop(x, z);   // (the XR-50's mains fold into its engine shoulders)
+#endif
+#if HAS_PHANTASOS
+  if (int(gM[0].z + 0.5) == 8) return pxWingTop(x, z);   // (the XR-60's into its inner blades)
 #endif
   bool wr = int(gM[0].z + 0.5) == 6;
   float s = wr ? x - 1.0 : x, c = wr ? z + 3.0 : z + 1.6;
@@ -838,6 +908,9 @@ Pose partPose(int k, vec2 sd){
 #if HAS_MORPHEUS
   if (partIsMorpheus(k)) return mrPartPose(k, sd);
 #endif
+#if HAS_PHANTASOS
+  if (partIsPhantasos(k)) return pxPartPose(k, sd);
+#endif
 #if HAS_RESEARCH
   if (partIsJet(k)) return jtPartPose(k, sd);
 #endif
@@ -855,6 +928,9 @@ vec2 wrPartField(int k, vec3 l);   // (somnus_sdf.glsl)
 vec2 jtPartField(int k, vec3 l);   // (plane_sdf.glsl)
 #if HAS_MORPHEUS
 vec2 mrPartField(int k, vec3 l);   // (morpheus_sdf.glsl)
+#endif
+#if HAS_PHANTASOS
+vec2 pxPartField(int k, vec3 l);   // (xr60_sdf.glsl)
 #endif
 #endif
 // each part's shape in its own frame: distance and material id (the cockpit's controls and the light aircraft's surfaces)
@@ -959,9 +1035,15 @@ vec2 partFieldCockpit(int k, vec3 l){
 #if HAS_MORPHEUS
     if (morpheusStation()) res.y = 169.0;   // (the XR-50's station: its stick, throttle and pedals in its metal)
 #endif
+#if HAS_PHANTASOS
+    if (phantasosStation()) res.y = 195.0;   // (the XR-60's pod: in its metal)
+#endif
   }
 #if HAS_MORPHEUS
   if (morpheusStation() && (k == PT_JET_STICK || k == PT_JET_THR)) res.y = 169.0;
+#endif
+#if HAS_PHANTASOS
+  if (phantasosStation() && (k == PT_JET_STICK || k == PT_JET_THR)) res.y = 195.0;
 #endif
   if(compactTwinPowerBank() && (k==PT_THR_LEVER || k==PT_FLAP_LEVER)){
     res=opU(res,vec2(sdCylX(l,.016,.010),60.0));
@@ -978,6 +1060,9 @@ vec2 partField(int k, vec3 l){
 #endif
 #if HAS_MORPHEUS
   if (partIsMorpheus(k)) return mrPartField(k, l);
+#endif
+#if HAS_PHANTASOS
+  if (partIsPhantasos(k)) return pxPartField(k, l);
 #endif
 #if HAS_RESEARCH
   if (partIsJet(k)) return jtPartField(k, l);

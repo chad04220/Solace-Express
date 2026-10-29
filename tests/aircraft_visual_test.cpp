@@ -193,6 +193,11 @@ int main(int argc,char**argv) {
       glUniform4f(loc("uPS"),retracted?0.f:trans?0.5f:1.f,defl?1.f:trans?0.5f:0.f,ctl*0.5f,inside?1.f:0.f);
       glUniform4f(loc("uCtl"),ctl,ctl,ctl,0.7f);
       float wr[28]={}; for(int i=0;i<4;i++) { wr[i]=tilt; wr[8+i]=0.7f; } wr[17]=defl?1.f:0.f; wr[18]=defl?1.f:0.f; wr[20]=wr[21]=wr[22]=ctl; wr[24]=1.f;
+      if(a==kPhantasos) {   // the XR-60's state (game_frame.cpp): its tips' fold, the emitters' glow, the ring's spin and power; the vectoring, the surge
+        for(float& v:wr) v=0.f;
+        wr[0]=hover||trans?1.f:0.f; wr[1]=hover?1.f:trans?0.5f:0.f; wr[2]=0.4f; wr[3]=0.7f;
+        wr[4]=defl?ctl*0.4f:0.f; wr[5]=defl?ctl*0.3f:0.f; wr[6]=0.f; wr[7]=0.f; wr[9]=1.f; wr[10]=1.f;
+      }
       if(a==kMorpheus) {   // the XR-50's state (game.cpp fillPlaneVisual): its wing's sweep (AVT_SWEEP, deg), flaps, the fan's doors; its nozzles
         for(float& v:wr) v=0.f;
         float sweep=getenv("AVT_SWEEP")?(float)atof(getenv("AVT_SWEEP"))*DEG:trans?42.f*DEG:16.f*DEG;

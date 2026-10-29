@@ -83,6 +83,17 @@ void fillPlaneVisual(PlaneVisual& pv, const Plane& p, float propAngle, bool insi
     // (outside, the surfaces as its fly-by-wire deflects them; in the cockpit the stick as the pilot holds it)
     if (!inside && p.flightTime > 0.f) { pv.Ctl[0] = p.surf.x; pv.Ctl[1] = p.surf.z; pv.Ctl[2] = p.surf.y; }
   }
+  if (s.special == 4) {
+    // the XR-60's state for its own build (xr60_sdf.glsl mapXr60, plane_parts.glsl pxPartPose read it as gWr): the tip
+    // blades' fold, the emitters' glow, the ring's spin and the drive's power; the ring's vectoring, the surge and the
+    // scramjet's share; the skin's glow (from 1,200 C), the sheath, the surge bank and the field torque
+    const float lit = p.engineRunning && p.fuel > 0.f ? 1.f : 0.f, tot = p.ringN + p.scramN + p.emitN[0] + p.emitN[1] + p.emitN[2] + p.emitN[3];
+    pv.wr[0][0] = p.tipFold; pv.wr[0][1] = p.emitShare * clampf(p.engineSpool * 3.f, 0.f, 1.f) * lit; pv.wr[0][2] = p.ringSpin; pv.wr[0][3] = p.engineSpool * lit;
+    pv.wr[1][0] = p.ringPitch; pv.wr[1][1] = p.ringYaw; pv.wr[1][2] = p.surgeN; pv.wr[1][3] = tot > 1.f ? p.scramN / tot : 0.f;
+    pv.wr[2][0] = clampf((p.skinT - 1473.f) / (kXr60SkinLimit - 1473.f), 0.f, 1.2f); pv.wr[2][1] = p.sheath; pv.wr[2][2] = p.surgeBank; pv.wr[2][3] = p.field.x;
+    pv.wr[3][0] = p.field.y; pv.wr[3][1] = p.field.z;
+    if (!inside && p.flightTime > 0.f) { pv.Ctl[0] = p.surf.x; pv.Ctl[1] = p.surf.z; pv.Ctl[2] = p.surf.y; }
+  }
 }
 
 FrameParams Game::buildFrame() {
@@ -220,7 +231,7 @@ FrameParams Game::buildFrame() {
     if (photo.on) { camPos = photo.pos; fwd = photoForward(); upRef = photoUp(); }   // (photo mode's free camera)
     if (dbgCam && dbgFollow) { dbgCamPos = plane.pos + dbgFollowOff; dbgCamLook = plane.pos; }
     if (dbgCam) { camPos = dbgCamPos; fwd = normalize(dbgCamLook - dbgCamPos); upRef = vec3(0, 1, 0); }
-    const bool station = camMode == 1 && plane.spec && plane.spec->special == 3;   // (the XR-50's ground station: the room never moves)
+    const bool station = camMode == 1 && plane.spec && plane.spec->special >= 3;   // (the XR-50's ground station, the XR-60's pod: the room never moves)
     if (screen == SCR_FLIGHT && !dbgCam && !photo.on && camMode != 3 && !station && set.camShake > 0.f) {   // (the shake: small turns of the view, 2-5 Hz)
       const float a = (shakeTrauma * shakeTrauma + shakeBuffet) * set.camShake * (camMode == 1 ? 0.7f : 1.f);
       if (a > 1e-4f) {
@@ -468,14 +479,14 @@ void Game::buildSprites(const FrameParams& fp, std::vector<SpriteVert>& alpha, s
     float navI = (0.6f + 2.5f * night) * (1.f - somnus.stealth) * glint;   // a cloaked XR-40 runs dark
     const ModelDef& md = kModels[typeOf(plane.spec)];
     bool jet = s.special != 0;   // the XR-30 is an SDF of its own: its lights don't follow the generic model layout
-    const bool xr50 = s.special == 3;
-    vec3 tip = xr50 ? morpheusWingTip(plane.sweep) : s.special == 2 ? kSomnusWingTip : jet ? kJetWingTip : modelWingTip(md);
+    const bool xr50 = s.special == 3, xr60 = s.special == 4;
+    vec3 tip = xr60 ? xr60TipLamp(plane.tipFold) : xr50 ? morpheusWingTip(plane.sweep) : s.special == 2 ? kSomnusWingTip : jet ? kJetWingTip : modelWingTip(md);
     vec3 lt = plane.pos + plane.q.rotate(vec3(-tip.x, tip.y, tip.z)), rtp = plane.pos + plane.q.rotate(tip);
     if (camMode != 1) {
       bill(add, lt, ls, vec3(1.f, 0.1f, 0.05f) * navI, 1, SPR_GLOW, 0.3f);
       bill(add, rtp, ls, vec3(0.1f, 1.f, 0.2f) * navI, 1, SPR_GLOW, 0.3f);
-      bill(add, plane.pos + plane.q.rotate(xr50 ? kMorpheusTail + vec3(0, 0, 0.07f) : s.special == 2 ? vec3(0, -0.1f, 7.93f) : jet ? vec3(0, 0.45f, 7.67f) : modelTailTip(md)), ls, vec3(1.f) * navI, 1, SPR_GLOW, 0.3f);
-      if (plane.engineRunning && somnus.stealth < 0.5f && fmodf(t, 1.0f) < 0.12f) bill(add, plane.pos + plane.q.rotate(xr50 ? kMorpheusBeacon + vec3(0, 0.07f, 0) : s.special == 2 ? vec3(0, 0.6f, 1.6f) : jet ? vec3(0, 0.74f, 1.6f) : modelFinTop(md) + vec3(0, 0.06f, 0)), ls * 1.6f, vec3(1.f, 0.05f, 0.02f) * (2.f + 3.f * night) * glint, 1, SPR_GLOW, 0.3f);
+      bill(add, plane.pos + plane.q.rotate(xr60 ? kXr60Tail + vec3(0, 0.07f, 0) : xr50 ? kMorpheusTail + vec3(0, 0, 0.07f) : s.special == 2 ? vec3(0, -0.1f, 7.93f) : jet ? vec3(0, 0.45f, 7.67f) : modelTailTip(md)), ls, vec3(1.f) * navI, 1, SPR_GLOW, 0.3f);
+      if (plane.engineRunning && somnus.stealth < 0.5f && fmodf(t, 1.0f) < 0.12f) bill(add, plane.pos + plane.q.rotate(xr60 ? kXr60Beacon + vec3(0, 0.07f, 0) : xr50 ? kMorpheusBeacon + vec3(0, 0.07f, 0) : s.special == 2 ? vec3(0, 0.6f, 1.6f) : jet ? vec3(0, 0.74f, 1.6f) : modelFinTop(md) + vec3(0, 0.06f, 0)), ls * 1.6f, vec3(1.f, 0.05f, 0.02f) * (2.f + 3.f * night) * glint, 1, SPR_GLOW, 0.3f);
       float st = fmodf(t, 1.3f);
       if (!plane.onGround && somnus.stealth < 0.5f && (st < 0.05f || (st > 0.12f && st < 0.16f))) { bill(add, lt, ls * 3.f, vec3(4.f) * glint, 1, SPR_GLOW, 0.3f); bill(add, rtp, ls * 3.f, vec3(4.f) * glint, 1, SPR_GLOW, 0.3f); }
     }

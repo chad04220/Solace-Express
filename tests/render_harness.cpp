@@ -642,7 +642,9 @@ void main(){
         }
         g_ren.resetTemporal();
         Game* g = new Game();
-        g->initHeadless(); g->debugScene(sc);
+        g->initHeadless();
+        if (getenv("NOTRAFFIC")) g->set.traffic = false;   // (as the single scenes: the player's aircraft alone, so a frame covers one type and its own build serves it)
+        g->debugScene(sc);
         const bool clean = getenv("HUDOFF") && atoi(getenv("HUDOFF"));   // (HUDOFF=1: no HUD, messages or hints - a clean picture)
         auto tidy = [&] { if (clean) GameTest::clean(*g); };
         tidy();

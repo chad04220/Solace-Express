@@ -75,6 +75,7 @@ Today:
 | 14 | `galleon_180` | Galleon 180 | `kGalleon`; conventional career/free-flight twin-underwing transport, largest fleet airframe |
 | 15 | `kittiwake_a9` | Kittiwake A9 | `kKittiwake`; career/free-flight single-turboprop amphibian on floats (`floats`, gear type 5: `docs/WINGS_OVER_WATER.md`) |
 | 16 | `xr50_morpheus` | XR-50 Morpheus | `kMorpheus`; research, Tier B (`special = 3`, engine code 7): swing wing, combined-cycle engines and a rocket, VTOL (`docs/XR50.md`) |
+| 17 | `xr60_phantasos` | XR-60 Phantasos | `kPhantasos`; research, Tier B (`special = 4`, engine code 8): a plasma ring drive, an MHD scramjet, field lift and torque, a surge (`docs/XR60.md`) |
 
 Rules and limits:
 
@@ -257,7 +258,9 @@ width, headrest, dome light, armrests, visor height and slope, overhead, vents).
   a scheduled swing wing, turbofan / ramjet / scramjet thrust from captured dynamic pressure, a rocket with its own
   oxidizer, a lift fan and swivelling nozzles, a blown wing, control allocation across surfaces, nozzles, fan and
   reaction jets, and leading-edge heating that can burn through; flown from a ground station, with a +/-600 g
-  structure). A new Tier B type with new physics
+  structure); 4, the XR-60 (`aircraft_xr60.cpp`: a plasma ring drive that needs no air, an MHD-bypass scramjet to
+  Mach 12, a surge bank, field emitters for the hover, a circulation field, a plasma sheath against the heat, field
+  torque where there is no air; flown from an operations pod, with a +/-2,000 g structure). A new Tier B type with new physics
   needs a new value and a new path. A conventional research type uses `special = 0` with `designMach`, `gPos`, `gNeg`
   (the XR-10 and XR-20).
 - **Learned performance.** At launch, `Plane::perf` flies short test sorties per type (stall speeds, best climb, idle
@@ -296,12 +299,12 @@ width, headrest, dome light, armrests, visor height and slope, overhead, vents).
 Read §7–§10 first: a Tier B shape must obey the material, part and bake rules as well.
 
 **Dispatch.** `mapPlaneBody` (`plane_sdf.glsl`) routes on the engine code in `gM[0].z`: 5 → `mapJet`, 6 →
-`mapSomnus`, 7 → `mapMorpheus` (`morpheus_sdf.glsl`), everything else → the packed model. A new Tier B type takes the
-next code (8) and a new branch. Research
+`mapSomnus`, 7 → `mapMorpheus` (`morpheus_sdf.glsl`), 8 → `mapXr60` (`xr60_sdf.glsl`), everything else → the packed
+model. A new Tier B type takes the next code (9) and a new branch. Research
 code sits behind `RESEARCH_ON`, which the `AF_LIGHT` builds compile out, so the light aircraft don't pay for it, and its
 call sites behind `#if HAS_JET` / `HAS_SOMNUS` (a new one gets its own), so no other aircraft's program holds it (§8).
-The XR-50 shares the jet family's build (`AF_JET`) with the XR-30, so within it `HAS_NOCTURNE` and `HAS_MORPHEUS`
-(`AF_MODEL` 10 and 16) keep each one's code out of the other's program.
+The XR-50 and the XR-60 share the jet family's build (`AF_JET`) with the XR-30, so within it `HAS_NOCTURNE`,
+`HAS_MORPHEUS` and `HAS_PHANTASOS` (`AF_MODEL` 10, 16 and 17) keep each one's code out of the others' programs.
 
 **Field rules.** These are what the mesh bake needs; break them and it makes holes, slivers or ragged edges:
 
@@ -367,6 +370,8 @@ Material ids (`plane_material.glsl`, `planeMaterialN`), as the field returns the
 | 120–124 | the Wavecrest's cabin trim (`gModelId == 8`) | its own block |
 | 150–159 | the XR-50's airframe: skin and tiles, carbon-carbon edges, canopy, nozzles, strips, ducts, rocket bell, hot sections, fan blades, tip lenses | its own block (`HAS_MORPHEUS`) |
 | 160–175 | the XR-50's ground station (its cockpit): monitor glass 160–164, walls, desk, housings, chair, metal, light panels, accent strips, floor, sign, rack lamps, keyboard | its own block (`HAS_MORPHEUS`); lit by `morpheusStationLight` |
+| 176–185 | the XR-60's airframe: obsidian skin with lit seams, knife edges, sensor crystal, ring metal, seams, petal faces, emitters, keel duct, plasma face, tip lenses | its own block (`HAS_PHANTASOS`) |
+| 186–199 | the XR-60's operations pod (its cockpit): monitor glass 186–189, telemetry band 190, walls, console, housings, chair, metal, light discs, violet strips, floor, crest and lamps | its own block (`HAS_PHANTASOS`); lit by `xr60StationLight` |
 
 Rules learned the hard way:
 
@@ -581,7 +586,8 @@ the other side, a hinged surface's deflection about its swept and tapered hinge,
 - **A bake plan per part.** Each family returns fixed bounds or a surveyed box and its existing lattice spacing.
   Fleet surfaces and gear remain fleet-owned; Nocturne owns its surfaces and nozzles; Somnus owns its pods, weapons,
   actuators and surfaces; Morpheus (the XR-50, parts 51–57) owns its swing wings, flaperons, V-tail halves, nozzles,
-  fan and fan doors, and uses the jet family's gear. The research craft share only their existing research-gear bounds. Cockpit controls
+  fan and fan doors, and uses the jet family's gear; Phantasos (the XR-60, parts 58–62) owns its folding tip blades,
+  elevons, fins, the ring's petals and the ring, on the same gear. The research craft share only their existing research-gear bounds. Cockpit controls
   keep their centered 1 cm survey. `aircraft_build_contract_test` freezes all 15 types' ordered part instances,
   bounds, lattice spacing and hull sweeps against the pre-refactor behavior.
   The applied interface passed 7,329 exact CPU/assembly checks and eight pixel/state/topology-identical native
@@ -718,7 +724,7 @@ cockpit muffling inside. A new type gets its sound from `engineType`, `engines`,
    - `gav_<i>_<yaw>_<pitch>_<dist>[_<gear>]`: parked on the runway, orbit view;
    - `ckv<i>_<yaw>_<pitch>_<hour>[_<roll>[_<flaps>]]`: the cockpit (`settle=30` lets the anti-aliasing settle);
    - `loadshot_<CODE>`, `loadshot_air_<i>`: the loading pictures (`settle=40`, 1920×1080);
-   - `research` (the XR-30 selected), `research10`, `research20`, `research40`: the research terminal.
+   - `research` (the XR-30 selected), `research10`, `research20`, `research40`, `research50`, `research60`: the research terminal.
    - `apv_<CODE>_<view>_<hour>`, `mountain`, `sunset`, `storm`: the world, for textures and the sea;
    - `wcam_<x>_<z>_<height>_<yaw>_<pitch>[_<hour>]`: a free camera anywhere (metres above the ground, yaw 0 north). The harness loads
      the scanned textures from `assets/materials` (`MATDIR=""` for the procedural ones, §7.4).

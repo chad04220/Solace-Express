@@ -90,7 +90,7 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
   if (mid == 11) { vec3 sc = fusSection(lp.z); vec3 rad = vec3(lp.x, lp.y - sc.z, 0.0); if (dot(ln, rad) > 0.55*length(rad) && lp.y > gM[22].y - 0.9) mid = 1; }
   m.metal = 0.0; m.emit = vec3(0.0); m.nrm = vec3(0,0,1);
   m.alb = gColBase; m.rough = 0.28;
-  interior = (mid >= 10 && mid <= 14) || (mid >= 40 && mid < 94) || (mid >= 160 && mid < 176);   // (94+: the light fixtures, outside; 160-175: the XR-50's station)
+  interior = (mid >= 10 && mid <= 14) || (mid >= 40 && mid < 94) || (mid >= 160 && mid < 176) || (mid >= 186 && mid < 200);   // (94+: the light fixtures, outside; 160-175: the XR-50's station, 186-199 the XR-60's pod)
   vec3 sec = fusSection(lp.z);
   vec4 WS = gM[23]; vec4 E = gM[22];
   int ck = int(gM[21].z + 0.5);
@@ -578,6 +578,161 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
     }
   }
 #endif
+#if HAS_PHANTASOS
+  else if (mid >= 176 && mid < 186) {   // the XR-60 Phantasos (xr60_sdf.glsl)
+    gPixM = t*uTanHalf*2.0/uRes.y; gPixG = gPixM/max(abs(dot(ln, transpose(uPlaneRot)*rd)), 0.2);
+    vec3 nT; vec4 tx;
+    // its state (game_frame.cpp): the drive's power, the surge, the emitters' glow, the skin's heat (gWr[2].x: 0 at
+    // 1,200 C, 1 at its 2,500 C limit), the sheath
+    float pw = clamp(gWr[0].w, 0.0, 1.0), srg = clamp(gWr[1].z, 0.0, 1.0), em = clamp(gWr[0].y, 0.0, 1.0), sh = clamp(gWr[2].y, 0.0, 1.0);
+    vec3 CY = vec3(0.25, 0.95, 1.0), VI = vec3(0.65, 0.30, 1.0);
+    vec3 plasma = mix(CY, VI, srg)*(0.15 + 1.6*pw + 2.5*srg);
+    float hk = clamp(gWr[2].x, 0.0, 1.25), TK = 1473.0 + hk*1300.0;
+    vec3 glow = mix(vec3(1.0, 0.12, 0.02), vec3(1.0, 0.85, 0.65), smoothstep(1600.0, 2700.0, TK))*pow(TK/2773.0, 4.0)*3.0*step(0.001, hk);
+    if (mid == 176) {   // the skin: black glass with a violet sheen, its facets' seams, the chines' lit seams
+      tx = triSample(lp, ln, M_PAINT, 0.6, nT);
+      m.alb = gColBase*(0.9 + 0.5*tx.r); m.rough = 0.22; m.metal = 0.45; m.nrm = mix(vec3(0.0, 0.0, 1.0), nT, 0.3);
+      m.alb += vec3(0.06, 0.02, 0.10)*pow(1.0 - abs(ln.y), 3.0);   // (the sheen: violet off the facets seen aslant)
+      m.alb *= 1.0 - 0.4*max(aaLines(lp.z/1.25, 0.005, gPixG/1.25), aaLines(atan(lp.y, lp.x)*1.9099, 0.012, gPixG*1.9099));   // (the panels' seams: rings and radial lines)
+      vec3 sec = fusSection(lp.z);
+      float w = max(sec.x, 0.01), h = max(sec.y, 0.01);
+      vec2 q = vec2(abs(lp.x), lp.y - sec.z);
+      float seam = min(min(length(q - vec2(w, -0.05*h)), length(q - vec2(0.78*w, 0.5*h))), length(q - vec2(0.45*w, -0.72*h)));
+      float lit = (1.0 - smoothstep(0.02, 0.045, seam))*step(-8.6, lp.z)*step(lp.z, 5.2);
+      lit = max(lit, (1.0 - smoothstep(0.015, 0.03, abs(lp.x)))*step(0.5, ln.y)*step(-5.4, lp.z)*step(lp.z, 4.6)*0.7);   // (along the spine)
+      m.emit = plasma*0.45*lit*(0.85 + 0.15*sin(uTime*3.0 + lp.z*1.5));
+      m.emit += vec3(0.4, 0.2, 1.0)*0.06*sh*pow(1.0 - abs(ln.y), 2.0);   // (the sheath's faint violet over the skin)
+      if (abs(lp.z + 8.0) < 0.05 && abs(ln.x) > 0.6 && abs(lp.y + 0.05) < 0.05) { m.alb = vec3(0.015); m.rough = 0.6; }   // the tip emitters' ports
+    }
+    else if (mid == 177) {   // the knife edges: a darker metal than the skin, glowing with the heat
+      tx = triSample(lp, ln, M_METAL, 0.5, nT);
+      m.alb = vec3(0.05, 0.05, 0.06)*(0.8 + 0.4*tx.r); m.rough = 0.4; m.metal = 0.6; m.nrm = mix(vec3(0.0, 0.0, 1.0), nT, 0.5);
+      m.emit = glow + plasma*0.08;
+    }
+    else if (mid == 178) {   // the sensor crystal: a cut gem, cyan inside, its facets glassy
+      m.alb = vec3(0.04, 0.08, 0.12); m.metal = 0.2; m.rough = 0.04;
+      float fac = step(0.5, fract((lp.x + lp.y)*9.0)) + step(0.5, fract((lp.z - lp.y)*7.0));
+      m.emit = CY*(0.35 + 0.25*fac)*(0.6 + 0.4*pw)*(0.9 + 0.1*sin(uTime*1.7));
+    }
+    else if (mid == 179) {   // the ring's and the struts' metal: dark titanium, heat-tinted toward the plasma
+      tx = triSample(lp, ln, M_METAL, 0.8, nT); m.alb = tx.rgb*vec3(0.2, 0.2, 0.23); m.metal = 0.8; m.rough = 0.38; m.nrm = nT;
+      float near = smoothstep(1.35, 1.05, length(lp.xy))*step(6.6, lp.z);
+      m.alb = mix(m.alb, vec3(0.22, 0.14, 0.30), 0.5*near); m.emit = plasma*0.06*near;
+    }
+    else if (mid == 180) { m.alb = vec3(0.05); m.rough = 0.2; m.emit = plasma*0.5; }   // a lit seam proper
+    else if (mid == 181) {   // a petal's inner face: the plasma's, white-hot with the drive
+      m.alb = vec3(0.03); m.rough = 0.5; m.metal = 0.3;
+      m.emit = plasma*(0.3 + 0.7*smoothstep(0.0, 0.9, lp.z - 6.6));
+    }
+    else if (mid == 182) {   // an emitter: rings of the field's light, lit as the lever brings them in
+      m.alb = vec3(0.02); m.rough = 0.3; m.metal = 0.2;
+      vec2 c = abs(lp.z) < 1.0 ? vec2(0.0) : lp.z < 0.0 ? vec2(1.25, -2.6) : vec2(1.45, 2.6);
+      float r = length(vec2(abs(lp.x), lp.z) - c);
+      float rings = 0.5 + 0.5*cos(r*60.0 - uTime*6.0*em);
+      m.emit = CY*(0.05 + 2.4*em*(0.4 + 0.6*rings)*(1.0 - smoothstep(0.34, 0.4, r)));
+    }
+    else if (mid == 183) {   // the keel duct's inside: dark, glowing deep in with the scramjet's combustion
+      m.alb = vec3(0.016, 0.016, 0.018); m.rough = 0.8; m.metal = 0.2;
+      float scr = clamp(gWr[1].w, 0.0, 1.0);
+      m.emit = vec3(1.0, 0.5, 0.15)*scr*2.0*smoothstep(-1.0, 3.0, lp.z);
+    }
+    else if (mid == 184) {   // the ring's plasma face: the stream itself, bright, its pattern turning with the ring
+      m.alb = vec3(0.02); m.rough = 0.3; m.metal = 0.0;
+      float a = atan(lp.y, lp.x) - gWr[0].z;
+      float swirl = 0.6 + 0.4*sin(a*6.0 + uTime*2.0);
+      m.emit = plasma*(0.5 + 1.2*swirl);
+    }
+    else {   // 185: a tip blade's lens - red to port, green to starboard (its blade carries it: plane_sdf.glsl's lamps leave it out)
+      int li = lp.x < 0.0 ? 0 : 1;
+      m.alb = li == 0 ? vec3(0.25, 0.02, 0.02) : vec3(0.02, 0.22, 0.06); m.metal = 0.0; m.rough = 0.04; m.nrm = vec3(0.0, 0.0, 1.0);
+      if (gOwn) m.emit = li < uLensN ? uLensC[li].rgb : vec3(0.0);
+    }
+  }
+  else if (mid >= 186 && mid < 200) {   // the XR-60's operations pod (xr60_sdf.glsl mapXr60Station)
+    gPixM = t*uTanHalf*2.0/uRes.y; gPixG = gPixM/max(abs(dot(ln, transpose(uPlaneRot)*rd)), 0.2);
+    vec3 nT; vec4 tx; vec3 qd = lp - E.xyz;
+    const vec3 VIO = vec3(0.60, 0.32, 1.0), CYN = vec3(0.3, 0.9, 1.0);
+    if (mid <= 189) { m.alb = vec3(0.004); m.rough = 0.05; m.metal = 0.0; }   // a camera monitor's dark glass (planeToGB draws it)
+    else if (mid == 190) {   // the telemetry band: the uplink's page - its bars, the load against the 2,000 g structure, the drive's mode, the surge bank
+      ResearchPanel P = xr60Pane(4);
+      vec3 l = researchPanelFrame(qd, P); vec2 u = l.xy;
+      float fp = gPixM; gAA = fp*0.6;
+      vec3 c = vec3(0.012, 0.01, 0.035);
+      float edge = smoothstep(0.0, 0.004, -researchPanelShape(u, P));
+      float on = txt(u - vec2(-0.48, 0.030), 0.016, ivec4(80, 72, 65, 78), ivec4(84, 65, 83, 79), 0);   // PHANTASO
+      on = max(on, txt(u - vec2(-0.332, 0.030), 0.016, ivec4(83, 32, 47, 47), ivec4(32, 82, 69, 77), 0));   // S // REM
+      on = max(on, txt(u - vec2(-0.184, 0.030), 0.016, ivec4(79, 84, 69, 32), ivec4(79, 80, 83, 0), 0));    // OTE OPS
+      c += CYN*1.4*on;
+      for (int k = 0; k < 5; k++) {   // the uplink's signal: five bars, one flickering
+        vec2 b = u - vec2(0.02 + float(k)*0.018, -0.02 + float(k)*0.004);
+        float lit = k < 4 ? 1.0 : step(0.3, fract(uTime*0.7));
+        c += CYN*1.2*lit*step(abs(b.x), 0.005)*step(abs(b.y), 0.012 + float(k)*0.004);
+      }
+      float gk = clamp(abs(uHud2.x)/2000.0, 0.0, 1.0);   // the airframe's load against its structure, a bar to the right
+      vec2 gb = u - vec2(0.22, 0.0);
+      float bar = step(abs(gb.y), 0.008)*step(-0.09, gb.x)*step(gb.x, -0.09 + 0.18*gk);
+      float box = hudBox(u, vec2(0.22, 0.0), vec2(0.092, 0.012), 0.0015);
+      c += mix(CYN, vec3(1.0, 0.2, 0.15), step(0.8, gk))*1.3*max(bar, box);
+      float bank = clamp(gWr[2].z, 0.0, 1.0);   // the surge bank, a bar at the right end, violet while the surge is lit
+      vec2 sb = u - vec2(0.40, 0.0);
+      float sbar = step(abs(sb.y), 0.008)*step(-0.06, sb.x)*step(sb.x, -0.06 + 0.12*bank);
+      c += mix(VIO, vec3(1.0, 0.95, 1.0), clamp(gWr[1].z, 0.0, 1.0))*1.3*max(sbar, hudBox(u, vec2(0.40, 0.0), vec2(0.062, 0.012), 0.0015));
+      float srg = gWr[1].z, scr = gWr[1].w;   // the drive's mode by its colour and name: RING, SCRAM, SURGE
+      vec3 mode = srg > 0.5 ? VIO : scr > 0.5 ? vec3(1.0, 0.66, 0.2) : CYN;
+      c += mode*1.3*step(length(u - vec2(-0.46, -0.03)), 0.009);
+      c += mode*1.2*txt(u - vec2(-0.44, -0.03), 0.014, srg > 0.5 ? ivec4(83, 85, 82, 71) : scr > 0.5 ? ivec4(83, 67, 82, 65) : ivec4(82, 73, 78, 71), srg > 0.5 ? ivec4(69, 0, 0, 0) : scr > 0.5 ? ivec4(77, 0, 0, 0) : ivec4(0), 0);
+      c += VIO*0.9*txt(u - vec2(-0.30, -0.03), 0.014, ivec4(83, 72, 69, 65), ivec4(84, 72, 0, 0), 0)*clamp(gWr[2].y, 0.0, 1.0);   // SHEATH, lit with it
+      m.alb = vec3(0.004); m.rough = 0.06; m.emit = c*edge; gDispPx = true;
+    }
+    else if (mid == 191) {   // the walls and the ceiling: dark composite panels in a hexagonal weave
+      tx = triSample(lp, ln, M_FABRIC, 0.8, nT); m.nrm = mix(vec3(0.0, 0.0, 1.0), nT, 0.5);
+      vec2 pq = abs(ln.y) > 0.7 ? qd.xz : abs(ln.x) > 0.7 ? qd.zy : qd.xy;
+      vec2 hq = pq/0.12; hq.x += 0.5*floor(hq.y);
+      float cell = length(fract(hq) - 0.5);
+      m.alb = vec3(0.035, 0.034, 0.05)*(0.75 + 0.5*tx.r)*(0.85 + 0.15*smoothstep(0.42, 0.48, cell)); m.rough = 0.85;
+      if (qd.y > 0.9) m.alb *= 1.5;   // (the ceiling a shade lighter)
+    }
+    else if (mid == 192) {   // the console: matte graphite, a brushed edge band along its lip
+      tx = triSample(lp, ln, M_PLASTIC, 0.5, nT); m.nrm = nT;
+      m.alb = vec3(0.045, 0.046, 0.055)*(0.85 + 0.3*tx.r); m.rough = 0.55; m.metal = 0.08;
+      if (abs(ln.y) < 0.5 && qd.y > -0.45) { m.alb = vec3(0.30, 0.30, 0.34); m.metal = 0.85; m.rough = 0.3; }
+    }
+    else if (mid == 193) { tx = triSample(lp, ln, M_PLASTIC, 0.3, nT); m.alb = vec3(0.016, 0.017, 0.022)*(0.8 + 0.4*tx.r); m.rough = 0.5; m.metal = 0.1; m.nrm = nT; }   // housings: matte black
+    else if (mid == 194) {   // the chair: a dark shell, violet piping round its back
+      tx = triSample(lp, ln, M_FABRIC, 0.15, nT); m.alb = tx.rgb*vec3(0.10, 0.10, 0.13); m.rough = 0.8; m.nrm = nT;
+      if (qd.z > 0.3 && abs(abs(qd.x) - 0.215) < 0.006) m.emit = VIO*0.06;
+    }
+    else if (mid == 195) { tx = triSample(lp, ln, M_METAL, 0.3, nT); m.alb = tx.rgb*vec3(0.26, 0.27, 0.31); m.metal = 0.85; m.rough = 0.36; m.nrm = nT; }   // brushed dark steel
+    else if (mid == 196) { m.alb = vec3(0.7, 0.7, 0.74); m.rough = 0.3; m.emit = ln.y < -0.5 ? vec3(0.88, 0.9, 1.0)*0.45 : vec3(0.0); }   // the ceiling's light discs
+    else if (mid == 197) { m.alb = vec3(0.05); m.emit = VIO*0.4*(0.9 + 0.1*sin(uTime*2.0)); }   // the violet strips
+    else if (mid == 198) {   // the floor: dark hexagonal tiles, 40 cm across
+      tx = triSample(lp, ln, M_FABRIC, 2.0, nT); m.nrm = mix(vec3(0.0, 0.0, 1.0), nT, 0.5);
+      vec2 hq = qd.xz/0.4; hq.x += 0.5*floor(hq.y);
+      float cell = length(fract(hq) - 0.5), alt = mod(floor(hq.x) + floor(hq.y), 2.0);
+      m.alb = vec3(0.03, 0.031, 0.04)*(0.8 + 0.4*tx.r)*(0.9 + 0.2*alt)*(1.0 - 0.4*smoothstep(0.44, 0.5, cell)); m.rough = 0.9;
+    }
+    else {   // 199: the crest over the bank ("XR-60 OPS"), and the core column's face: rows of status lamps
+      m.alb = vec3(0.012); m.rough = 0.3;
+      if (qd.z < -0.9) {
+        vec2 u = vec2(qd.x, qd.y - 0.66);
+        if (ln.z > 0.5) {
+          gAA = gPixM*0.6;
+          float on = txt(u - vec2(-0.156, 0.0), 0.03, ivec4(88, 82, 45, 54), ivec4(48, 32, 79, 80), 0);   // XR-60 OP
+          on = max(on, txt(u - vec2(0.122, 0.0), 0.03, ivec4(83, 0, 0, 0), ivec4(0), 0));   // S
+          m.emit = VIO*0.9*on;
+          m.emit += CYN*2.2*step(length(u - vec2(0.38, 0.0)), 0.014)*(0.75 + 0.25*sin(uTime*3.0));   // (the uplink's lamp)
+        }
+      } else {
+        vec2 r = vec2(qd.z - 0.62, qd.y + 0.45);
+        vec2 c2 = floor(r/vec2(0.03, 0.045) + 0.5), f2 = r - c2*vec2(0.03, 0.045);
+        float hk = hash2i(ivec2(c2) + ivec2(23, 5));
+        float led = step(length(f2), 0.004)*step(0.35, hk);
+        m.emit = led*(hk < 0.8 ? CYN : VIO)*(0.6 + 1.2*step(0.5, fract(uTime*(0.4 + hk) + hk*7.0)));
+        if (abs(f2.y + 0.02) < 0.002) m.alb = vec3(0.05);
+      }
+    }
+  }
+#endif
 #if HAS_FLEET
   else if (FLEET_ON && mid >= 60) {  // light-aircraft / airliner cockpit parts (PBR texture sets)
     vec3 nT; vec4 tx;
@@ -734,5 +889,5 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
 #endif
   n = applyTS(n, m.nrm, interior ? 0.35 : 0.12);
   int engM = int(gM[0].z + 0.5);
-  podMat = RESEARCH_ON && !trafHit && ((mid >= 40 && mid < 80) || (mid >= 160 && mid < 176)) && engM >= 5;   // research jets only: light aircraft use ids 60+ for their cockpits
+  podMat = RESEARCH_ON && !trafHit && ((mid >= 40 && mid < 80) || (mid >= 160 && mid < 176) || (mid >= 186 && mid < 200)) && engM >= 5;   // research jets only: light aircraft use ids 60+ for their cockpits
 }

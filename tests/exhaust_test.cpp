@@ -22,7 +22,7 @@ static void valid(const ExhaustVisual& e) {
   }
 }
 int main() {
-  auto expected = [](int m) { return m == kReverie ? 1 : m == kSomnus ? 4 : 2; };   // (the XR-50's rocket only while it burns)
+  auto expected = [](int m) { return m == kReverie || m == kPhantasos ? 1 : m == kSomnus ? 4 : 2; };   // (the XR-50's rocket only while it burns; the XR-60's one ring)
   for (int m = 0; m < kAircraftCount; ++m) {
     Plane p = running(m); ExhaustVisual e = build(p); valid(e);
     check(e.count == (isCareerAircraft(m) ? 0 : expected(m)), "fleet capability and exact 2/2/1/4/2 nozzle counts");

@@ -190,6 +190,18 @@ const ModelDef kModels[] = {
     4, .38f, 0,
     0, 0,0,0,0,0,
     vec3(0,.70f,-7.10f), 3, -8.3f,-7.2f,.55f,-6.3f },
+  // ---------------------------------------------------------------- XR-60 Phantasos (plasma-driven hypersonic research craft; its own SDF in the shader, engine code 8)
+  // A knife-edged faceted lifting body: the stations are its core (the belly the nose gear folds into, the sensor
+  // crystal's place; its eye is its operations pod's, xr60_sdf.glsl). The blade wings, their folding tips, the fins
+  // and the ring drive are mapXr60's; the wing row is the blade spread (the gear's bounds), the fin row one canted fin
+  { {{-9.60f,.02f,.02f,-.10f},{-8.40f,.30f,.18f,-.08f},{-6.60f,.62f,.36f,-.02f},{-4.40f,.88f,.52f,.04f},{-1.80f,1.05f,.62f,.04f},{1.60f,1.15f,.64f,.02f},{4.60f,1.05f,.70f,.02f},{7.00f,.80f,.80f,0.0f}}, .2f,
+    {6.20f,4.60f,1.20f,-2.40f,-.05f,1.60f,8.0f,.040f}, 0,0,0,0, 0,0,
+    {0,0,0,0,0,0,0}, 0,
+    {1.90f,2.60f,.90f,1.60f,.45f,4.40f},
+    8, 0,0,.60f,7.0f,.6f, 0,0,
+    4, .34f, 0,
+    0, 0,0,0,0,0,
+    vec3(0,.65f,-5.80f), 3, -7.6f,-6.6f,.50f,-5.8f },
 };
 // clang-format on
 static_assert(sizeof(kModels)/sizeof(kModels[0]) == kAircraftCount, "one authored model per aircraft roster entry");
@@ -376,6 +388,8 @@ int modelCockpitFocusTargets(int model,CockpitFocusTarget* out,int capacity){
     for(int side:{-1,1})add(E+vec3(side*.54f,-.39f,-.12f),vec3(0,1,0),vec2(.075f,.06f));
   }else if(model==kMorpheus){   // its ground station's side, chin and telemetry monitors (the main one is the view ahead: never magnified)
     for(int i=1;i<cockpitResearch::MS_PANES;i++){auto p=cockpitResearch::morpheusPane(i);add(E+p.c,p.n,p.h);}
+  }else if(model==kPhantasos){   // its pod's, the same way
+    for(int i=1;i<cockpitResearch::MS_PANES;i++){auto p=cockpitResearch::xr60Pane(i);add(E+p.c,p.n,p.h);}
   }else{
     for(int i=0;i<3;i++){auto p=cockpitResearch::somnusPanel(i);add(E+p.c,p.n,p.h);}
     for(int side:{-1,1})add(E+vec3(side*.575f,-.395f,-.36f),vec3(0,cosf(.55f),sinf(.55f)),vec2(.09f,.055f));

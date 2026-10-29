@@ -36,7 +36,7 @@ void curves() {
     const float idle=p.fuelFlowAt(0,0,1.225f), dry=p.fuelFlowAt(.85f,200,1.225f), max=p.fuelFlowAt(1,200,1.225f);
     check(idle>0 && dry>idle,"running jet has finite idle and greater powered burn");
     if(s.jetWetTsfc>0) check(max>dry*3,"reheat costs materially more than dry thrust");
-    check(p.fuelFlowAt(.7f,200,isaDensity(10000))<p.fuelFlowAt(.7f,200,1.225f),"same throttle burns less in thin air");
+    if(s.special!=4) check(p.fuelFlowAt(.7f,200,isaDensity(10000))<p.fuelFlowAt(.7f,200,1.225f),"same throttle burns less in thin air");   // (the XR-60's ring needs no air: the same burn anywhere)
     check(p.fuelFlowAt(.7f,200,1.225f,0)==0,"no live engines consume no fuel");
     p.fuel=s.maxFuel; p.engineRunning=false; check(p.fuelFlowKgS()==0,"stopped engines consume no fuel");
     p.engineRunning=true;p.fuel=0;check(p.fuelFlowKgS()==0,"empty tanks consume no fuel");
@@ -157,6 +157,9 @@ void realism() {
     else if(s.special==3) {   // (the XR-50's cruise is supersonic at sea level, where the inlets' ram rise feeds its reheat: 4 minutes. Standing, 8)
       const float reheat=s.maxFuel/p.fuelFlowAt(1.f,0.f,1.225f)/60.f;
       check(reheat>5.f && reheat<20.f && hours>2.f,"the XR-50: minutes on full reheat, hours at cruise");
+    } else if(s.special==4) {   // (the XR-60's ring: half an hour of full thrust, a day of cruise)
+      const float full=s.maxFuel/p.fuelFlowAt(1.f,0.f,1.225f)/60.f;
+      check(full>20.f && full<60.f && hours>5.f,"the XR-60: under an hour of full ring thrust, hours at cruise");
     } else if(isResearchAircraft(i)) {
       const float reheat=s.maxFuel/p.fuelFlowAt(1.f,s.cruise,1.225f)/60.f;
       check(reheat>5.f && reheat<20.f && hours>2.f,"a reheat research jet: minutes on full reheat, hours at cruise");

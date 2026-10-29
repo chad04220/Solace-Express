@@ -74,6 +74,14 @@ const ResCraftInfo kResCraft[] = {
    200.f, -200.f, 100.f, 160.f, -140.f, 7.1f, 0.11f,
    {"Flown from the ground station: C shows its monitors", "F / V: nozzles 0-95 deg; A A or X: the rocket (~150 s of LOX)", "The wing sweeps itself and is blown: 3x its lift",
     "Mach 7 needs 27 km: watch LEAD EDGE (1,650 C)", "Full aft stick past its stop: post-stall to 90 deg"}, "XR50"},
+  {kPhantasos, "NG-XR60-P  //  BLK 1", "XR-60", "PHANTASOS", R_SKY, {0.55f, 0.95f, 1.f}, "PLASMA-DRIVEN REMOTELY PILOTED HYPERSONIC RESEARCH MODEL",
+   {{"CONFIGURATION", "Faceted blade body, forward-swept folding tips, ring drive", -1}, {"PROPULSION", "2,100 kN plasma ring + MHD scramjet; x3 surge", 1.f},
+    {"THRUST / WEIGHT", "21 on the ring: three times the XR-50's", 1.f}, {"TOP SPEED", "Mach 12.8 at 32 km; needs no air", 1.f},
+    {"VTOL", "Field emitters 1,260 kN: no moving parts", 1.f}, {"ROLL RATE", "2,500 deg/s", 1.f},
+    {"AIRFRAME", "+2,000 / -2,000 g: no one aboard", 1.f}, {"ENDURANCE", "2,600 kg metallic H: 30 min full ring, a day at cruise", 0.9f}},
+   600.f, -600.f, 200.f, 560.f, -500.f, 12.8f, 0.04f,
+   {"Flown from its operations pod: C shows its monitors", "F / V: the emitters 0-100%; A A or X: the surge (40 s, recharges)", "The field lifts it, no moving parts; the tips fold themselves",
+    "Mach 12 needs 30 km: watch SKIN (2,500 C under the sheath)", "Full aft stick past its stop: post-stall to 90 deg"}, "XR60"},
 };
 const int kNumResCraft = sizeof(kResCraft) / sizeof(kResCraft[0]);
 int resCraftSlot(int idx) { for (int k = 0; k < kNumResCraft; k++) if (kResCraft[k].idx == idx) return k; return 1; }
@@ -154,6 +162,15 @@ void silhouette(int craft, float cx, float cy, float sc, vec3 c, float a, float 
     mirror(body, 11);
     g_ren.line(cx - 0.08f * sc, cy + 0.92f * sc, cx - 0.08f * sc, cy + 0.98f * sc, th, c, a);
     g_ren.line(cx + 0.08f * sc, cy + 0.92f * sc, cx + 0.08f * sc, cy + 0.98f * sc, th, c, a);
+  } else if (craft == kPhantasos) {   // the knife body, the forward-swept blades and their tips, the canted fins, the ring
+    static const float body[] = {0.f, -1.f, 0.02f, -0.72f, 0.09f, -0.32f, 0.13f, 0.1f, 0.13f, 0.55f, 0.11f, 0.84f, 0.07f, 0.9f, 0.f, 0.9f};
+    mirror(body, 8);
+    static const float wing[] = {0.13f, 0.55f, 0.45f, 0.26f, 0.66f, -0.02f, 0.72f, 0.02f, 0.60f, 0.27f, 0.45f, 0.45f, 0.14f, 0.70f};
+    mirror(wing, 7);
+    static const float fin[] = {0.08f, 0.68f, 0.20f, 0.77f, 0.20f, 0.88f, 0.09f, 0.90f};
+    mirror(fin, 4);
+    g_ren.rectOutline(cx - 0.14f * sc, cy + 0.80f * sc, 0.28f * sc, 0.28f * sc, c, a, 0.14f * sc, th);   // (the ring)
+    g_ren.rectOutline(cx - 0.05f * sc, cy - 0.60f * sc, 0.10f * sc, 0.16f * sc, c, a, 0.05f * sc, th);   // (the sensor crystal)
   } else if (craft == kMorpheus) {   // the waverider and its glove, the swing wings forward, the V-tail, the nozzles and the rocket
     static const float body[] = {0.f, -1.f, 0.042f, -0.678f, 0.095f, -0.473f, 0.289f, -0.052f, 0.289f, 0.517f, 0.209f, 0.592f, 0.114f, 0.972f, 0.f, 0.99f};
     mirror(body, 8);
@@ -224,6 +241,14 @@ const Game::ResCard Game::kResCards[] = {
    {{RS_ROCKET, 0, 5.f, "Rocket lit for 5 s"}, {RS_ALT, 80000.f, 0.f, "Climb through 80,000 m"}, {RS_LAND, 0, 0, "Land back at the range"}}, 3},
   {kMorpheus, "XR50-4", "NO ONE ABOARD", "Twice the XR-40, flown from the ground: 160 g, -80 g, a 760 deg/s roll - fast and low it has the lift for all of it. Then slow, the stick through its stop: 70 deg of angle of attack on the nozzles.",
    {{RS_G, 160.f, 0.f, "Pull 160 g"}, {RS_NEGG, -80.f, 0.f, "Push to -80 g"}, {RS_ROLL, 760.f, 0.f, "Roll at 760 deg/s"}, {RS_ALPHA, 70.f, 0.f, "70 deg angle of attack"}, {RS_LAND, 0, 0, "Land back at the range"}}, 5},
+  {kPhantasos, "XR60-1", "FIELD HOVER", "The lever down (F): the ring's stream goes to the emitters and the field holds it up with no moving parts. Hover for 10 s, then convert: emitters out (V), the blades carrying it past 250 kt. Back to the range and down on the field.",
+   {{RS_HOVER, 0, 10.f, "Hover for 10 s"}, {RS_CONVERT, 129.f, 0.f, "Wingborne past 250 kt, emitters out"}, {RS_VLAND, 0, 0, "Land on the field"}}, 3},
+  {kPhantasos, "XR60-2", "MACH 12 CORRIDOR", "The ring to Mach 2.5, then the keel's scramjet: climb as you accelerate and hold Mach 11 for 30 s. Below 30 km Mach 12 burns through the sheath - watch SKIN.",
+   {{RS_ALT, 28000.f, 0.f, "Climb through 28,000 m"}, {RS_SCRAM, 11.f, 30.f, "Mach 11 on the scramjet"}, {RS_LAND, 0, 0, "Land back at the range"}}, 3},
+  {kPhantasos, "XR60-3", "SURGE", "From the corridor pull up and light the surge (X): three times the ring for 40 s. The ring needs no air: climb through 120 km, then bring it back under the sheath.",
+   {{RS_SURGE, 0, 5.f, "Surge lit for 5 s"}, {RS_ALT, 120000.f, 0.f, "Climb through 120,000 m"}, {RS_LAND, 0, 0, "Land back at the range"}}, 3},
+  {kPhantasos, "XR60-4", "NOTHING MADE HERE", "Three times the XR-50, flown from the pod: 500 g, -400 g, a 2,000 deg/s roll - fast and low the field has the lift for all of it. Then slow, the stick through its stop: 70 deg of angle of attack on the ring.",
+   {{RS_G, 500.f, 0.f, "Pull 500 g"}, {RS_NEGG, -400.f, 0.f, "Push to -400 g"}, {RS_ROLL, 2000.f, 0.f, "Roll at 2,000 deg/s"}, {RS_ALPHA, 70.f, 0.f, "70 deg angle of attack"}, {RS_LAND, 0, 0, "Land back at the range"}}, 5},
 };
 const int Game::kNumResCards = sizeof(Game::kResCards) / sizeof(Game::kResCards[0]);
 
@@ -238,15 +263,18 @@ std::string Game::resStepText(const ResStep& st) const {
     case RS_SLOW: return fmt("%s / %s%s", fmtSpeed(plane.ias).c_str(), fmtSpeed(st.v).c_str(), h.c_str());
     case RS_STALL: return fmt("STALL WARN %.0f%%", plane.stallWarn * 100.f);
     case RS_CLIMB: return fmt("V/S %+.0f / %.0f m/s%s", plane.vel.y, st.v, h.c_str());
-    case RS_HOVER: return plane.spec->special == 3 ? fmt("NOZZLES %.0f deg  FAN %.0f%%  %.0f kt%s", plane.nzSwivel / DEG, plane.fanClutch * 100.f, length(plane.vel) * MS_TO_KT, h.c_str())
+    case RS_HOVER: return plane.spec->special == 4 ? fmt("EMITTERS %.0f%%  %.0f kt%s", plane.emitShare * 100.f, length(plane.vel) * MS_TO_KT, h.c_str())
+                        : plane.spec->special == 3 ? fmt("NOZZLES %.0f deg  FAN %.0f%%  %.0f kt%s", plane.nzSwivel / DEG, plane.fanClutch * 100.f, length(plane.vel) * MS_TO_KT, h.c_str())
                                                    : fmt("PODS %.0f deg  %.0f kt%s", plane.nozzle * 90.f, length(plane.vel) * MS_TO_KT, h.c_str());
-    case RS_VLAND: return plane.spec->special == 3 ? "NOZZLES DOWN, SETTLE" : "PODS DOWN, SETTLE";
+    case RS_VLAND: return plane.spec->special == 4 ? "EMITTERS IN, SETTLE" : plane.spec->special == 3 ? "NOZZLES DOWN, SETTLE" : "PODS DOWN, SETTLE";
     case RS_CLOAK: return fmt("CLOAK %.0f%%%s", somnus.stealth * 100.f, h.c_str());
     case RS_LASER: return fmt("BOLTS %d / %.0f", somnus.shots, st.v);
     case RS_BOMB: return fmt("BOMBS %d / %.0f", somnus.dropped, st.v);
     case RS_ALPHA: return fmt("ALPHA %.0f / %.0f deg", plane.alpha / DEG, st.v);
     case RS_SCRAM: { const float tb = plane.tbcc[0] + plane.tbcc[1] + plane.tbcc[2];
-      return fmt("MACH %.2f / %.2f  %s%s", plane.mach, st.v, tb > 1.f && plane.tbcc[2] > 0.5f * tb ? "SCRAM" : "NOT SCRAM", h.c_str()); }
+      const bool scram = plane.spec->special == 4 ? plane.scramN > plane.ringN : tb > 1.f && plane.tbcc[2] > 0.5f * tb;
+      return fmt("MACH %.2f / %.2f  %s%s", plane.mach, st.v, scram ? "SCRAM" : "NOT SCRAM", h.c_str()); }
+    case RS_SURGE: return fmt("SURGE %s  BANK %.0f%%%s", plane.surgeN > 0.5f ? "LIT" : "OFF", plane.surgeBank * 100.f, h.c_str());
     case RS_ROCKET: return fmt("ROCKET %s  %.0f kg LOX%s", plane.rocketN > 1.f ? "LIT" : "OFF", plane.oxidizer, h.c_str());
     case RS_CONVERT: return fmt("NOZZLES %.0f deg  %s / %s", plane.nzSwivel / DEG, fmtSpeed(plane.ias).c_str(), fmtSpeed(st.v).c_str());
     case RS_LAND: return std::string("LAND ") + g_world.airports[resAirport].code;
@@ -626,6 +654,8 @@ void Game::drawResearch(const FrameParams& fp) {
     float fl = kAircraft[RC.idx].fusLen * 0.5f;
     if (wr) calls = {{vec3(0, 0, -fl), "SENSOR NOSE  //  PASSIVE", -1}, {kSomnusPods[1], "POD 2  //  130 kN  0-90 DEG", 1},
                      {kSomnusPods[2], "POD 3  //  VECTORING VANES", -1}, {vec3(6.2f, -0.24f, 2.0f), "FACETED SKIN  //  CLOAK MESH", 1}};
+    else if (RC.idx == kPhantasos) calls = {{vec3(0, 0.25f, -fl + 3.3f), "SENSOR CRYSTAL  //  NEEDLE NOSE", -1}, {kXr60Tip, "BLADE TIP  //  FOLDS 70 DEG", 1},
+                  {vec3(0, -1.3f, 2.3f), "MHD SCRAMJET KEEL  //  MACH 12", -1}, {kXr60Ring + vec3(1.2f, 0.2f, 0), "RING DRIVE  //  2,100 kN  x3 SURGE", 1}};
     else if (RC.idx == kMorpheus) calls = {{vec3(0, 0.1f, -fl), "WAVERIDER  //  C-C EDGES 1,650 C", -1}, {morpheusWingTip(kMorpheusSweepMin), "SWING WING  //  16-68 DEG", 1},
                   {vec3(0, 0.84f, -5.f), "LIFT FAN  //  840 kN", -1}, {vec3(0.78f, -0.02f, 8.3f), "3D NOZZLE  //  95 DEG SWIVEL", 1}};
     else if (RC.idx == kResearchJet) calls = {{vec3(0, 0, -fl), "SYNTHETIC-VISION POD", -1}, {vec3(2.1f, 0.1f, -4.4f), "CANARD  //  ALL-MOVING", 1},
@@ -714,7 +744,7 @@ void Game::drawResearch(const FrameParams& fp) {
     {
       const float ch = 120 * s;
       float gx0 = px + 26 * s, gw = iw - 30 * s, gy0 = py, gh = ch;
-      float mMax = RC.idx == kVigil ? 1.6f : (RC.vMax > 4.5f ? 8.f : RC.vMax > 1.5f ? 4.f : 1.f), nTop = RC.nTop, nBot = RC.nBot, nStep = RC.nStep;   // each craft on its own scale (the XR-50's to Mach 8)
+      float mMax = RC.idx == kVigil ? 1.6f : (RC.vMax > 8.f ? 16.f : RC.vMax > 4.5f ? 8.f : RC.vMax > 1.5f ? 4.f : 1.f), nTop = RC.nTop, nBot = RC.nBot, nStep = RC.nStep;   // each craft on its own scale (the XR-50's to Mach 8, the XR-60's to 16)
       auto X = [&](float m) { return gx0 + m / mMax * gw; };
       auto Y = [&](float n) { return gy0 + (nTop - n) / (nTop - nBot) * gh; };
       for (int m = 0; m <= 4; m++) { float mm = m * mMax / 4.f; g_ren.rect(X(mm), gy0, 1, gh, R_DIM, 0.18f * e); g_ren.text(X(mm), gy0 + gh + 3 * s, 9 * s, RC.idx != kVigil && mMax > 1.5f ? fmt("M%.0f", mm) : fmt("M%.2f", mm), R_DIM, e, 1, false); }
