@@ -18,7 +18,13 @@
   pilot's symbology in cyan and violet, a telemetry band with the surge bank, the sheath and the drive's mode.
 - **Flying it.** `F / V` hand the ring's stream to the emitters; a double press of `A` (or `X`) lights the surge; the
   tip blades fold themselves; full aft stick through its stop goes post-stall. The research terminal's four cards:
-  the field hover, the Mach 12 corridor, the surge climb out of the atmosphere, and the loads.
+  the field hover, the Mach 12 corridor, the surge climb out of the atmosphere, and the loads. Nyx reads its cards,
+  its callouts (the surge, the drive's mode, the skin's heat, the emitters) and its name.
+- **An eleventh military sortie.** The board's last row is the Phantasos hypersonic pass: three airfields recorded
+  from 7,000 - 14,000 m at no less than 1,940 kt of ground speed, flown from the pod, extraction at 9,000 m.
+- **For the toolsmiths.** The render server honours `NOTRAFFIC` so a shot of one aircraft compiles that type's own
+  objects program (the shared every-aircraft build, which now carries three research craft's fields, is beyond
+  llvmpipe's compiler); the loading picture of the XR-60 is filmed closer and from below.
 
 ## What's new in v4.4.4: the Scrubrunner's tail wheel on the runway
 

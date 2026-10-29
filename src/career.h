@@ -9,10 +9,10 @@
 // C6: the freelance board posts medevacs (a patient who must be flown gently and fast), VIP charters (a live comfort
 // meter), night freight (both ends lit, the landing light on for the touchdown), low-visibility runs (cloud base and
 // visibility at minimums: be lined up when you break out, or go around) and surveys (a ring pattern at one altitude)
-enum ContractType { CT_LESSON = 0, CT_CARGO, CT_PAX, CT_MEDEVAC, CT_VIP, CT_TOUR, CT_FERRY, CT_NIGHT, CT_IFR, CT_SURVEY, CT_TRIAL, CT_MIL_RECON, CT_MIL_DEFENSE, CT_MIL_STRIKE, CT_MIL_LOCAL_SURVEY, CT_MIL_ROUTE_RECON, CT_MIL_HIGH_INTEL, CT_MIL_HOVER_SCAN, CT_MIL_INTERCEPT, CT_MIL_HEAVY_DEFENSE, CT_MIL_RELAY_STRIKE, CT_MIL_STRAT_RECON, CT_COUNT };
-inline const char* contractTypeName(int t) { static const char* n[] = {"Lesson", "Cargo", "Passengers", "Medevac", "VIP Charter", "Scenic Tour", "Free Flight", "Night Freight", "Low-Vis Run", "Survey", "Trial", "Military Recon", "Military Defense", "Military Strike", "Local Survey", "Route Recon", "High-Altitude Intel", "Hover Scan", "Interception", "Heavy Defense", "Relay Suppression", "Stratospheric Recon"}; return t >= 0 && t < CT_COUNT ? n[t] : "Unknown"; }
+enum ContractType { CT_LESSON = 0, CT_CARGO, CT_PAX, CT_MEDEVAC, CT_VIP, CT_TOUR, CT_FERRY, CT_NIGHT, CT_IFR, CT_SURVEY, CT_TRIAL, CT_MIL_RECON, CT_MIL_DEFENSE, CT_MIL_STRIKE, CT_MIL_LOCAL_SURVEY, CT_MIL_ROUTE_RECON, CT_MIL_HIGH_INTEL, CT_MIL_HOVER_SCAN, CT_MIL_INTERCEPT, CT_MIL_HEAVY_DEFENSE, CT_MIL_RELAY_STRIKE, CT_MIL_STRAT_RECON, CT_MIL_HYPER_RECON, CT_COUNT };
+inline const char* contractTypeName(int t) { static const char* n[] = {"Lesson", "Cargo", "Passengers", "Medevac", "VIP Charter", "Scenic Tour", "Free Flight", "Night Freight", "Low-Vis Run", "Survey", "Trial", "Military Recon", "Military Defense", "Military Strike", "Local Survey", "Route Recon", "High-Altitude Intel", "Hover Scan", "Interception", "Heavy Defense", "Relay Suppression", "Stratospheric Recon", "Hypersonic Recon"}; return t >= 0 && t < CT_COUNT ? n[t] : "Unknown"; }
 
-inline bool isMilitaryContract(int type) { return type >= CT_MIL_RECON && type <= CT_MIL_STRAT_RECON; }
+inline bool isMilitaryContract(int type) { return type >= CT_MIL_RECON && type <= CT_MIL_HYPER_RECON; }
 
 struct Waypoint { float x, z, alt; };  // alt = metres MSL (ring centre)
 

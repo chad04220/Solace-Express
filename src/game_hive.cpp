@@ -68,6 +68,7 @@ void Game::setupMilitaryEncounter() {
   vec3 origin=plane.pos; origin.y=std::max(origin.y,g_world.height(origin.x,origin.z)+650.f);
   if(mission->id==military::HighAltitudeIntel) origin.y=4500.f;
   if(mission->id==military::StratosphericRecon) origin.y=6500.f;
+  if(mission->id==military::HypersonicRecon) origin.y=9000.f;
   camPos+=origin-plane.pos; // Keep the flight camera with the supplied insertion altitude.
   plane.pos=origin;
   hive::MissionConfig m; m.extraction=origin; m.extractionRadius=300;

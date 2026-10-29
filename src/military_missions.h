@@ -8,7 +8,7 @@ namespace military {
 enum MissionId {
   LegacyRecon = 0, IslandDefense = 1, CommandStrike = 2,
   LocalSurvey = 3, RouteRecon = 4, HighAltitudeIntel = 5, HoverScan = 6,
-  Interception = 7, HeavyDefense = 8, RelaySuppression = 9, StratosphericRecon = 10
+  Interception = 7, HeavyDefense = 8, RelaySuppression = 9, StratosphericRecon = 10, HypersonicRecon = 11
 };
 struct MissionSpec {
   int id, contractType, aircraft;
@@ -58,12 +58,15 @@ inline constexpr MissionSpec kMissions[] = {
    "Heavy cannon / EMP stores", 2000, hive::MissionKind::Strike, hive::ForwardSet::Heavy, hive::BombSet::EMP, false},
   {StratosphericRecon, CT_MIL_STRAT_RECON, kMorpheus, "Morpheus supersonic sweep", "Supersonic wide-area reconnaissance",
    "Sweep three airfields in the XR-50 at Mach 2: record each from 5,000-8,000 m MSL at no less than 1,260 kt ground speed (650 m/s). Keep each site ahead, visible and within 10 km for two seconds - nose down a little to hold it in the sensor's view - then slow down for the extraction gate at 6,500 m.",
-   "Unarmed wide-area strategic sensors", 2600, hive::MissionKind::Recon, hive::ForwardSet::Pulse, hive::BombSet::Plasma, true, 10000, 2, 5000, 8000, 650}
+   "Unarmed wide-area strategic sensors", 2600, hive::MissionKind::Recon, hive::ForwardSet::Pulse, hive::BombSet::Plasma, true, 10000, 2, 5000, 8000, 650},
+  {HypersonicRecon, CT_MIL_HYPER_RECON, kPhantasos, "Phantasos hypersonic pass", "Hypersonic theatre reconnaissance",
+   "Fly the XR-60 from its operations pod: record three airfields from 7,000-14,000 m MSL at no less than 1,940 kt ground speed (1,000 m/s, Mach 3.4 up there). Keep each site ahead, visible and within 10 km for two seconds - nose down to hold it in the crystal's view - then slow down for the extraction gate at 9,000 m.",
+   "Unarmed hypersonic theatre sensors", 3400, hive::MissionKind::Recon, hive::ForwardSet::Pulse, hive::BombSet::Plasma, true, 10000, 2, 7000, 14000, 1000}
 };
 inline constexpr int kMissionCount = sizeof(kMissions) / sizeof(kMissions[0]);
 // This is both display and progression order. Never substitute numerical MissionId order.
 // The legacy trainer stays loadable/replayable but does not advance the XR board's progression.
-inline constexpr int kBoardMissionIds[] = {LocalSurvey, RouteRecon, HighAltitudeIntel, HoverScan, Interception, IslandDefense, HeavyDefense, RelaySuppression, CommandStrike, StratosphericRecon};
+inline constexpr int kBoardMissionIds[] = {LocalSurvey, RouteRecon, HighAltitudeIntel, HoverScan, Interception, IslandDefense, HeavyDefense, RelaySuppression, CommandStrike, StratosphericRecon, HypersonicRecon};
 inline constexpr int kBoardMissionCount = sizeof(kBoardMissionIds) / sizeof(kBoardMissionIds[0]);
 static_assert(kMissionCount < 32, "Persisted mission completion bits must fit uint32_t");
 inline constexpr uint32_t kKnownMissionMask = (uint32_t(1) << kMissionCount) - 1;
@@ -78,8 +81,8 @@ inline constexpr const MissionSpec* missionForContract(int type) {
   return m && m->contractType == type ? m : nullptr;
 }
 // Shared with the actual sensor path and headless tests. The hover site has one roof-relative envelope.
-// The high sorties measure ground speed (a climb or a dive doesn't count): the XR-30's and the XR-50's.
-inline constexpr bool groundSpeedSortie(int id) { return id == HighAltitudeIntel || id == StratosphericRecon; }
+// The high sorties measure ground speed (a climb or a dive doesn't count): the XR-30's, the XR-50's and the XR-60's.
+inline constexpr bool groundSpeedSortie(int id) { return id == HighAltitudeIntel || id == StratosphericRecon || id == HypersonicRecon; }
 inline bool sensorEnvelope(const MissionSpec& m, float altitudeMSL, float speed, float targetRoof = 0) {
   const float altitude = m.id == HoverScan ? altitudeMSL - targetRoof : altitudeMSL;
   return m.objective == hive::MissionKind::Recon && altitude >= m.minAltitude && altitude <= m.maxAltitude &&

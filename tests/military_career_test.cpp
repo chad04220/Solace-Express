@@ -94,7 +94,7 @@ int main() {
         !military::sensorEnvelope(hover, 1121, 5, 1000) && !military::sensorEnvelope(hover, 1060, 13, 1000), "Somnus hover sensor enforces roof-relative altitude and low speed");
   Career base = populated(); const std::string civil = civilianState(base);
   { // New careers reveal exactly one mission at a time in display order, not MissionId order.
-    const int expectedOrder[] = {3, 4, 5, 6, 7, 1, 8, 9, 2, 10};
+    const int expectedOrder[] = {3, 4, 5, 6, 7, 1, 8, 9, 2, 10, 11};
     Career c = base;
     check(!c.militaryMissionCompleted(-1) && !c.militaryMissionUnlocked(-1) &&
           !c.militaryMissionCompleted(military::kMissionCount) && !c.militaryMissionUnlocked(military::kMissionCount),
@@ -349,7 +349,7 @@ int main() {
   const std::string emptyRecord = "military 0 0 0 0 0 0 0 0 0 0 -1 -1";
   rejects(replaceLine(valid, "military ", emptyRecord + "\n" + emptyRecord), base, "duplicate military record rejected");
   const char* corrupt[] = {
-    "military -1 0 0 0 0 0 0 0 0 0 -1 -1", "military 11 0 0 0 0 0 0 0 0 0 -1 -1",
+    "military -1 0 0 0 0 0 0 0 0 0 -1 -1", "military 12 0 0 0 0 0 0 0 0 0 -1 -1",
     "military 0 -1 0 0 0 0 0 0 0 0 -1 -1", "military 0 0 1 0 0 0 0 0 0 0 -1 -1",
     "military 0 0 0 0 0 1 0 0 0 0 -1 -1", "military 0 0 0 0 0 0 nan 0 0 0 -1 -1",
     "military 0 0 0 0 0 0 inf 0 0 0 -1 -1", "military 0 0 0 0 0 0 -1 0 0 0 -1 -1",
