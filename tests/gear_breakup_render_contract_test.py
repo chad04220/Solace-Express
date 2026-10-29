@@ -20,7 +20,7 @@ fleet = read("src/aircraft_mesh_build_fleet.h")
 clip = read("src/shaders/wreck_clip.glsl")
 vs = read("src/shaders/plane_mesh_vs.glsl")
 shadow = read("src/raster_renderer.cpp")
-game = read("src/game.cpp")
+game = read("src/game.cpp") + read("src/game_frame.cpp") + read("src/game_effects.cpp")   # (render's wreck pose; buildFrame's wreck visual; breakUp)
 checks = 0
 def has(source, text):
     global checks

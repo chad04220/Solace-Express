@@ -46,7 +46,9 @@ set(CORE_ONLY_SOURCES
 set(CORE_SOURCES ${ENVIRONMENT_SOURCES} ${CORE_ONLY_SOURCES})
 set(GAME_ONLY_SOURCES
   src/aircraft_mesh_asset.cpp
-  src/joystick.cpp src/traffic.cpp src/game.cpp src/game_ui.cpp src/game_profile.cpp src/game_photo.cpp src/music.cpp src/steam.cpp src/game_research_ui.cpp src/game_military_ui.cpp src/game_somnus.cpp src/game_morpheus.cpp src/renderer.cpp src/png_write.cpp src/materials.cpp src/texture_compress.cpp src/raster_renderer.cpp src/prop_disc.cpp src/terrain_mesh.cpp src/aircraft_mesh.cpp src/entity_render.cpp src/aircraft_hull.cpp src/camera_feeds.cpp src/atc.cpp src/gl.cpp src/audio.cpp src/sky.cpp src/enemy_fleet.cpp src/enemy_mesh.cpp)
+  src/joystick.cpp src/traffic.cpp src/game.cpp src/game_input.cpp src/game_career_flow.cpp src/game_regions.cpp src/game_flight.cpp
+  src/game_weather.cpp src/game_loading.cpp src/game_cameras.cpp src/game_effects.cpp src/game_frame.cpp src/game_comms.cpp
+  src/game_debug_scenes.cpp src/game_hive.cpp src/game_ui.cpp src/game_profile.cpp src/game_photo.cpp src/music.cpp src/steam.cpp src/game_research_ui.cpp src/game_military_ui.cpp src/game_somnus.cpp src/game_morpheus.cpp src/renderer.cpp src/png_write.cpp src/materials.cpp src/texture_compress.cpp src/raster_renderer.cpp src/prop_disc.cpp src/terrain_mesh.cpp src/aircraft_mesh.cpp src/entity_render.cpp src/aircraft_hull.cpp src/camera_feeds.cpp src/atc.cpp src/gl.cpp src/audio.cpp src/sky.cpp src/enemy_fleet.cpp src/enemy_mesh.cpp)
 set(GAME_SOURCES ${CORE_SOURCES} src/entity_mesh.cpp src/bridge_mesh.cpp ${GAME_ONLY_SOURCES})
 add_library(env_objs OBJECT ${ENVIRONMENT_SOURCES})
 add_library(core_objs OBJECT ${CORE_ONLY_SOURCES})

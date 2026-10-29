@@ -377,7 +377,17 @@ src/
   aircraft_mesh*                    aircraft meshes baked from their shapes, cockpit parts, mesh cache
   shaders/*.glsl, shaders.h         GLSL modules embedded at build time; the programs built from them
   audio.*, music.*                  the procedural audio engine and the generative score
-  game*.cpp, game.h                 game flow, flight sessions, cameras, effects, HUD and menus
+  game.h, game_internal.h           the Game class; what its files share
+  game.cpp                          the launch, each frame's update and render
+  game_flight.cpp, game_weather.cpp the flight session; the clouds, sun and lightning in it
+  game_career_flow.cpp              commits, launches, job legs, Free Flight, trials
+  game_regions.cpp                  worlds loaded, charts slid, the real Earth installed and prefetched
+  game_loading.cpp                  the loading screen, prewarm, queued launches, the loading log
+  game_cameras.cpp, game_frame.cpp  the cameras and the preview stage; the frame handed to the renderer
+  game_effects.cpp, game_comms.cpp  exhausts, wreckage, particles, lights; the tower, comms, audio parameters
+  game_input.cpp, game_hive.cpp     bindings, input contexts, joysticks, settings files; the service sorties
+  game_ui.cpp, game_*_ui.cpp        the HUD and every menu's drawing
+  game_debug_scenes.cpp             the harnesses' and diagnostics.bat's scenes
   hive_*, military_missions.h       the military board and enemy combat
   platform_win32.cpp, *_win.cpp     the Windows window, input, joysticks, radio and crash reports
   steam.*                           Steamworks, loaded at runtime

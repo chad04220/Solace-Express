@@ -3,7 +3,9 @@ Dynamic combat and equipment behavior are covered by their CPU tests.
 """
 from pathlib import Path
 root=Path(__file__).resolve().parents[1]
-g=(root/'src/game.cpp').read_text()
+# (the Game class's own files, as game.cpp was split in v4.4.3: the flow, the hive sorties and the flight each in theirs)
+g=''.join((root/'src'/f).read_text() for f in ['game.cpp','game_input.cpp','game_career_flow.cpp','game_regions.cpp','game_flight.cpp',
+          'game_weather.cpp','game_loading.cpp','game_cameras.cpp','game_effects.cpp','game_frame.cpp','game_comms.cpp','game_debug_scenes.cpp','game_hive.cpp'])
 w=(root/'src/game_somnus.cpp').read_text()
 u=(root/'src/game_ui.cpp').read_text()
 r=(root/'src/game_research_ui.cpp').read_text()

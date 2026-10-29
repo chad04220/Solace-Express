@@ -289,10 +289,12 @@ class MeshToolTests(unittest.TestCase):
         # Source contract for the intentionally copied producer setup. A startup
         # rule edit must fail this test rather than silently changing fan AO.
         root = Path(__file__).resolve().parents[2]
-        game = re.sub(r"\s+", "", (root / "src/game.cpp").read_text())
-        export = re.sub(r"\s+", "", (root / "tools/mesh_assets/export_aircraft_meshes.cpp").read_text())
-        prewarm = game.split("voidGame::prewarm(", 1)[1].split("voidGame::menuBackgroundCamera(", 1)[0]
-        tour = game.split("voidGame::menuTour(", 1)[1].split("std::vector<std::pair<int,bool>>Game::prewarmItems(", 1)[0]
+        # (the game's sources: prewarm in game_loading.cpp, the menu tour in game_cameras.cpp, fillPlaneVisual in game_frame.cpp)
+        src = lambda name: re.sub(r"\s+", "", (root / "src" / name).read_text())
+        game = "".join(src(p.name) for p in sorted((root / "src").glob("game*.cpp")))
+        export = src("../tools/mesh_assets/export_aircraft_meshes.cpp")
+        prewarm = src("game_loading.cpp").split("voidGame::prewarm(", 1)[1].split("voidGame::loadLogBegin(", 1)[0]
+        tour = src("game_cameras.cpp").split("voidGame::menuTour(", 1)[1].split("structHangarStand{", 1)[0]
         self.assertIn("update(1.f/60.f);render();", prewarm)
         self.assertIn("realTime=3.f;frame();", prewarm)
         self.assertIn("fillPlaneVisual(fp.plane,demo,realTime*250.f,prewarmInside);", tour)
