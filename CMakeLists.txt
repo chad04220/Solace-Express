@@ -60,6 +60,15 @@ if(MSVC)
     target_compile_definitions(${t} PRIVATE _CRT_SECURE_NO_WARNINGS)
   endforeach()
 endif()
+# The main thread's stack: 8 MB on Windows as Linux gives it (MSVC's and MinGW's defaults are 1 and 2 MB). The gameplay
+# test's one long function holds several Games (37 KB each) and FrameParams (25 KB) in its frame at once, and v4.4.3's
+# MSVC build overflowed the megabyte once Game grew by the menus' and cameras' state: a stack overflow in wreck_pose
+# and a crash at entry in every gameplay_loop part, with the same code sound on Linux
+if(MSVC)
+  add_link_options(/STACK:8388608)
+elseif(MINGW)
+  add_link_options(-Wl,--stack,8388608)
+endif()
 set(ENV_OBJS $<TARGET_OBJECTS:env_objs>)
 set(CORE_OBJS ${ENV_OBJS} $<TARGET_OBJECTS:core_objs>)
 set(MESH_OBJS $<TARGET_OBJECTS:mesh_objs>)   # (the scenery's meshes: the game's and the environment tests')
