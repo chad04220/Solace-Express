@@ -80,7 +80,7 @@ void Game::loadFreeRegion(int index, GameScreen after) {
   atc.cancel(); commsPending.clear(); toasts.clear(); traffic.reset();
   hiveCombat.reset(1, combatWrap());
   g_audio.setParams(AudioParams{});
-  gpsMapValid = loadMap = loadBackdrop = false;
+  gpsMapValid = loading.map = loading.backdrop = false;
   menuPlanCache = menuPlan::Cache{}; quoteFlown.clear();
   focusList.clear(); focusPrev.clear();
   in.pressed[K_ESC] = in.pressed[K_ENTER] = in.pressed[' '] = false;
@@ -460,7 +460,7 @@ void Game::updateEarthFlight() {
   earthPrefetch.reset(); earthPrefetchId.clear();
   earthRetireJob = std::async(std::launch::async, [old = std::move(retired), gpu = std::move(retiredGpu)]() mutable { old.reset(); gpu = Renderer::WorldUploadData{}; });
   atc.cancel(); commsPending.clear(); traffic.reset(); hiveCombat.reset(1, combatWrap());
-  gpsMapValid = loadMap = loadBackdrop = false;
+  gpsMapValid = loading.map = loading.backdrop = false;
   wreck.clear(); debris.clear(); pops.clear(); particles.clear(); wakeRings.clear(); pits.clear();
   bursts.clear(); trail.clear(); cloudWake.clear(); tipTrail[0].clear(); tipTrail[1].clear();
   for (auto& smoke : pieceTrail) smoke.clear();
@@ -683,7 +683,7 @@ void Game::slideEarthChart(const regionTravel::Chart& chart) {
   earthRetireJob = std::async(std::launch::async, [old = std::move(retired), gpu = std::move(retiredGpu)]() mutable { old.reset(); gpu = Renderer::WorldUploadData{}; });
   atc.cancel(); commsPending.clear(); hiveCombat.reset(1, combatWrap());
   traffic.carry(*regionPoseChange, [&](int old, float* lift) { return carriedAirport(old, lift); });   // (where they were)
-  gpsMapValid = loadMap = loadBackdrop = false;
+  gpsMapValid = loading.map = loading.backdrop = false;
   wreck.clear(); debris.clear(); pops.clear(); particles.clear(); wakeRings.clear(); pits.clear();
   bursts.clear(); trail.clear(); cloudWake.clear(); tipTrail[0].clear(); tipTrail[1].clear();
   for (auto& smoke : pieceTrail) smoke.clear();

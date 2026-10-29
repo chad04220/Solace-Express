@@ -1,3 +1,14 @@
+## What's new in v4.4.3: under the hood
+
+A rework of the code's structure (`docs/CODE_REWORK_PLAN.md`), with nothing changed in what the player sees:
+- **A variable in your shell never changes the game.** The hundred development switches (`TOD`, `WX`, `HULLDBG`,
+  `REGION_*` and the rest, read from the environment by the harnesses and the diagnostics) are off in an ordinary
+  launch of the game; `--dev` on the command line turns them on.
+- **`game.cpp` is thirteen files.** The flight, the career's flow, the regions and the real Earth, the loading
+  screen, the cameras, effects, comms, input and the harness scenes each in their own, compiling in seconds instead of
+  the 80 the one file took.
+- **The loading screen's state is one struct**, reset in one place instead of four copies of fifteen assignments.
+
 ## What's new in v4.4.2: the flight opens sooner
 
 From the v4.4.1 diagnostics: an XR-40 sortie's loading screen took 12 s, eleven of them making the scenery about its

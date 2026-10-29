@@ -1,5 +1,6 @@
 // Somnium Volandi - OpenGL renderer: deferred rasterizer + sprites + post + UI
 #include "renderer.h"
+#include "dev_switches.h"
 #include "airport_layout.h"
 #include "hive_ordnance_sprites.h"
 #include "shader_prune.h"
@@ -35,7 +36,7 @@ Renderer g_ren;
 
 // Opt-in driver/JIT diagnosis. Linux RSS is sampled only when requested; ordinary rendering has no I/O.
 static void regionRenderMarker(const char* pass, const char* boundary) {
-  static const bool enabled = getenv("REGION_RENDER_DIAG") != nullptr;
+  static const bool enabled = dev::env("REGION_RENDER_DIAG") != nullptr;
   if (!enabled) return;
   long rssKiB = -1;
 #if defined(__linux__)
@@ -68,7 +69,7 @@ GLint U(GLuint prog, const char* name) {
 static GLuint compile(GLenum type, const std::string& src, std::string& err) {
   // (debug: NVFAIL - a fragment shader containing that text fails as NVIDIA's compiler does, unless it also contains
   // NVFAIL_OK's; to rehearse linkProgramCached's retries and the reduced builds on any driver)
-  static const char* nvFail = getenv("NVFAIL"); static const char* nvOk = getenv("NVFAIL_OK");
+  static const char* nvFail = dev::env("NVFAIL"); static const char* nvOk = dev::env("NVFAIL_OK");
   if (nvFail && type == GL_FRAGMENT_SHADER && src.find(nvFail) != std::string::npos && !(nvOk && src.find(nvOk) != std::string::npos)) {
     err += "Fragment info\n-------------\n(0) : fatal error C9999: simulated (NVFAIL)\n"; return 0;
   }
@@ -170,8 +171,8 @@ static GLuint linkOnce(const std::string& vsIn, const std::string& fsIn, std::st
       if (FILE* f = fopen((path + ".try").c_str(), "wb")) fclose(f);
     }
   }
-  static const bool timed = getenv("SHADERTIME") != nullptr;   // (debug: each program's compile and link time, and the start of its entry point)
-  if (const char* dd = getenv("SHADERDUMP")) {   // (debug: each program's sources, numbered, to time and cut down outside the game)
+  static const bool timed = dev::env("SHADERTIME") != nullptr;   // (debug: each program's compile and link time, and the start of its entry point)
+  if (const char* dd = dev::env("SHADERDUMP")) {   // (debug: each program's sources, numbered, to time and cut down outside the game)
     static int dumped = 0; char nm[512];
     for (int k = 0; k < 2; k++) {
       snprintf(nm, sizeof(nm), "%s/%02d.%s", dd, dumped, k ? "fs" : "vs");
@@ -495,7 +496,7 @@ void Renderer::genMaterials(const std::function<void(float, const std::string&)>
   // along the ground reads their finest levels on every pixel, anisotropically: uncompressed, 300 MiB of them cost the
   // v3.48.0 diagnostics' night scene (on a runway) 4 ms of texture traffic
   bool s3tc = false;
-  if (glGetStringi && glCompressedTexImage3D && !getenv("SOMNIUM_NO_BC")) {
+  if (glGetStringi && glCompressedTexImage3D && !dev::env("SOMNIUM_NO_BC")) {
     GLint ne = 0; glGetIntegerv(GL_NUM_EXTENSIONS, &ne);
     for (GLint i = 0; i < ne && !s3tc; i++) { const GLubyte* e = glGetStringi(GL_EXTENSIONS, (GLuint)i); s3tc = e && !strcmp((const char*)e, "GL_EXT_texture_compression_s3tc"); }
     for (int i = 0; i < 16 && glGetError() != 0; i++) {}
@@ -577,7 +578,7 @@ void Renderer::bindEnvironmentMaterials(GLuint p, int baseColourUnit, int baseNo
   if (colour < 0 && normal < 0 && enabled < 0) return;  // aircraft specializations have no extra samplers
   bool high = quality > 0 && !(dbgOff & 1024) && matEnvScanned == kEnvMatLayers && texEnvAlb && texEnvNrm;   // (dbgOff 1024: the 512 set, profiling)
   bool low = matEnvFallbackScanned == kEnvMatLayers && texEnvLowAlb && texEnvLowNrm;
-  bool use = envMaterialUnits && (high || low) && !getenv("NOENV");
+  bool use = envMaterialUnits && (high || low) && !dev::env("NOENV");
   glUniform1i(enabled, use ? 1 : 0);
   if (!envMaterialUnits) {  // no out-of-range bindings even on an unsupported context
     glUniform1i(colour, baseColourUnit); glUniform1i(normal, baseNormalUnit);
@@ -717,14 +718,14 @@ bool Renderer::compilePrograms(std::atomic<int>* done) {
   if (!progSprite || !progDown || !progUp || !progRayMask || !progRay || !progPost || !progTAA) { error = "Shader: " + error; return false; }
   {   // the programs built on the shared scene library (shaders.h worldLibAssembly), each with its own main: the GPS
     // aerial imagery, the terrain-shadow bake, the clouds, the hull and mesh bakes, the cockpit display atlases
-    std::string ms = worldLibAssembly(getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "");
+    std::string ms = worldLibAssembly(dev::env("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "");
     setCompileStage("the GPS map");
-    progMap = program(vsFS, mapFSAssembly(getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : ""), error); if (progMap) step();
+    progMap = program(vsFS, mapFSAssembly(dev::env("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : ""), error); if (progMap) step();
     setCompileStage("terrain shadows");
     { std::string e; progTShBake = program(vsFS, ms + kTShBakeMain, e); step(); }   // optional: without it the terrain casts no sun shadow
     setCompileStage("clouds");
     // (the clouds over the round world: ROUND_WORLD - planet.glsl - which the shared library's other programs leave out)
-    { std::string e; progClouds = program(vsFS, worldLibAssembly(std::string("#define ROUND_WORLD\n") + (getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "")) + kCloudMain, e); step(); }       // optional: without them no clouds
+    { std::string e; progClouds = program(vsFS, worldLibAssembly(std::string("#define ROUND_WORLD\n") + (dev::env("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "")) + kCloudMain, e); step(); }       // optional: without them no clouds
     { std::string e; progCloudComp = program(vsFS, kCloudCompFS, e); step(); }
     setCompileStage("cloud accumulation");
     { std::string e; progCloudAcc = program(vsFS, kCloudAccFS, e); step(); }   // optional: without it the march's own frame is used
@@ -1086,7 +1087,7 @@ void Renderer::uploadWorldData() {
     const int W = ROAD_DATA_W;
     if (!texData) glGenTextures(1, &texData); glBindTexture(GL_TEXTURE_2D, texData);
     regionWorldDataRows = int(d.size() / W);
-    if (getenv("REGION_RENDER_DIAG")) fprintf(stderr, "REGION_DATA active=%s rows=%d pot=%d\n", g_world.regionId.c_str(),
+    if (dev::env("REGION_RENDER_DIAG")) fprintf(stderr, "REGION_DATA active=%s rows=%d pot=%d\n", g_world.regionId.c_str(),
       regionWorldDataRows, int((regionWorldDataRows & (regionWorldDataRows - 1)) == 0));
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, W, regionWorldDataRows, 0, GL_RGBA, GL_FLOAT, d.data());
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -1180,7 +1181,7 @@ bool Renderer::beginWorldUpload(const World& world, WorldUploadData&& data) {
   auto& stage = worldStage;
   stage.data = std::move(data); stage.repeating = world.repeating; stage.active = true;
   regionStagedDataRows = int(stage.data.data.size() / ROAD_DATA_W);
-  if (getenv("REGION_RENDER_DIAG")) fprintf(stderr, "REGION_DATA staged=%s rows=%d pot=%d\n", world.regionId.c_str(),
+  if (dev::env("REGION_RENDER_DIAG")) fprintf(stderr, "REGION_DATA staged=%s rows=%d pot=%d\n", world.regionId.c_str(),
     regionStagedDataRows, int((regionStagedDataRows & (regionStagedDataRows - 1)) == 0));
   stage.farProxy.origin = stage.data.origin; stage.farProxy.regionId = stage.data.regionId;
   stage.farProxy.worldSeed = stage.data.worldSeed; stage.farProxy.generatorVersion = stage.data.generatorVersion;
@@ -1532,7 +1533,7 @@ static uint8_t foveaRate(float r, float f) {
 }
 void Renderer::initFoveation() {
   vrsAvailable = false;
-  if (getenv("SOMNIUM_NO_VRS") || !glGetIntegerv || !glGetStringi || !glBindShadingRateImageNV || !glShadingRateImagePaletteNV) return;
+  if (dev::env("SOMNIUM_NO_VRS") || !glGetIntegerv || !glGetStringi || !glBindShadingRateImageNV || !glShadingRateImagePaletteNV) return;
   bool ext = false;
   GLint ne = 0; glGetIntegerv(GL_NUM_EXTENSIONS, &ne);
   for (GLint i = 0; i < ne && !ext; i++) { const GLubyte* e = glGetStringi(GL_EXTENSIONS, (GLuint)i); ext = e && !strcmp((const char*)e, "GL_NV_shading_rate_image"); }
@@ -1732,7 +1733,7 @@ void Renderer::setRT(GLuint p, const FrameParams& fp) {
   // software drivers to JIT a different sampler variant midflight. Its contents are disabled below until ready.
   const GLuint terrainShadowTexture = tshFront >= 0 ? texTSh[tshFront] : (tshStreaming ? (texTSh[0] ? texTSh[0] : texTSh[1]) : 0);
   glActiveTexture(GL_TEXTURE0 + 18); glBindTexture(GL_TEXTURE_2D, terrainShadowTexture); glUniform1i(U(p, "uTSh"), 18);
-  static const bool tshOff = getenv("TSHOFF") != nullptr;   // (debug: compare with per-pixel shadow rays)
+  static const bool tshOff = dev::env("TSHOFF") != nullptr;   // (debug: compare with per-pixel shadow rays)
   glUniform1i(U(p, "uTShOn"), tshFront >= 0 && !tshOff ? 1 : 0);
   // (bound whenever any of its channels is in use: the hull channels are written whether or not the terrain envelope
   // was drawn this frame, and the terrain channel is only read under uEnvOn)
@@ -1937,7 +1938,7 @@ void Renderer::cloudPass(const FrameParams& fp) {
   if (!cloudSplit) return;
   // clouds at a quarter of the pixels, along the rays of the depths just traced
   // (the main view also writes each texel's cloud distance, for its accumulation below; a camera feed has none)
-  static const bool accOff = getenv("CLOUDACCOFF") != nullptr;   // (debug A/B: the march's own frame, as before)
+  static const bool accOff = dev::env("CLOUDACCOFF") != nullptr;   // (debug A/B: the march's own frame, as before)
   const bool acc = !feedPass && progCloudAcc && texCloudT && !accOff;
   glBindFramebuffer(GL_FRAMEBUFFER, fboCloud);
   GLenum cb[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
@@ -2261,7 +2262,7 @@ void Renderer::renderScene(const FrameParams& fpFlat, const std::vector<SpriteVe
   {   // ground depth first this frame: forced, or kept on or off by measurement (prepass_auto.h) once its program is
       // built, with a trial's frames tagged so their world-pass times come back to it. A trial is dropped if the
       // render scale or the foveation changes under it, or the view jumps (the same cut as TAA's below)
-    static const char* force = getenv("TERRPRE");
+    static const char* force = dev::env("TERRPRE");
     int tag = -1;
     if (force) prepassNow = force[0] != '0';
     else if (terrainPrepass) prepassNow = true;
@@ -2284,7 +2285,7 @@ void Renderer::renderScene(const FrameParams& fpFlat, const std::vector<SpriteVe
     jitX = (halton(hi, 2) - 0.5f) / rw; jitY = (halton(hi, 3) - 0.5f) / rh;
   }
   // ------------------------------------------------ environment entities: shadow cascades + G-buffer
-  static const bool cloudSplitOff = getenv("CLOUDSPLITOFF") != nullptr;   // (debug: no clouds)
+  static const bool cloudSplitOff = dev::env("CLOUDSPLITOFF") != nullptr;   // (debug: no clouds)
   cloudSplit = !fp.hangarPreview && !cloudSplitOff && progClouds && progCloudComp && fp.cloudCover >= 0.02f;
   GLenum bufs[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
   float cr[9] = {fp.camRight.x, fp.camRight.y, fp.camRight.z, fp.camUp.x, fp.camUp.y, fp.camUp.z, fp.camBack.x, fp.camBack.y, fp.camBack.z};   // (this frame's camera, for the TAA)

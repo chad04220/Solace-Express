@@ -676,7 +676,7 @@ private:
   bool launchCardPending() const { return pendingMilitaryLaunch.has_value() || pendingLaunch.has_value(); }
   // the loading screen is drawn and shown from inside a long bake while the flight's scene isn't ready: once its
   // backdrop (picture or aerial map) is in hand, so drawing it there neither decodes nor renders
-  bool loadingRedrawsInsideBakes() const { return screen == SCR_LOADING && !headless && loadReadyT < 0 && platformPresent && loadBackdrop; }
+  bool loadingRedrawsInsideBakes() const { return screen == SCR_LOADING && !headless && loading.readyT < 0 && platformPresent && loading.backdrop; }
   void cancelQueuedLaunch();
   Contract researchContract() const;     // a research flight's contract (launchResearch), for its card too
   Contract freeFlightContract() const;   // a Free Flight's (launchFreeFlight)
@@ -837,7 +837,16 @@ private:
   float ckZoom = 1.f, ckZoomT = 1.f;
   CockpitFocusZoom cockpitFocus;
   QualityGovernor autoRes;   // Auto resolution (quality_governor.h): starts at the full picture
-  float loadT = 0, loadReadyT = -1, loadShown = 0; int loadPend0 = 0, loadFrames = 0, loadStableFrames = 0, loadBakeSeen = 0, loadObservedFrame = -1; bool loadMap = false, loadBackdrop = false, loadViewsDrawn = false; int loadViewsStep = 0, loadWarmStep = 0, loadWarmAt = -1;   // pre-flight loading screen (loadViewsDrawn, loadViewsStep - the flight's views drawn so far: Game::render; loadWarmStep - the hive craft and stores warmed so far, one a frame: Game::hiveVisual)
+  // the pre-flight loading screen's state (game_loading.cpp): one struct, reset whole at every launch
+  struct LoadingState {
+    float t = 0, readyT = -1, shown = 0;           // seconds on it; when it became ready (-1 not yet); the bar as shown (never steps back)
+    int pend0 = 0, frames = 0, stableFrames = 0;   // the most scenery chunks it has waited on; scene frames drawn; stable frames seen in a row
+    int bakeSeen = 0, observedFrame = -1;          // the renderer's bake count when it last looked; the scene frame it last judged
+    bool map = false, backdrop = false;            // the aerial map and the backdrop picture in hand
+    bool viewsDrawn = false; int viewsStep = 0;    // the flight's views drawn once each (Game::render), and how many so far
+    int warmStep = 0, warmAt = -1;                 // the hive craft and stores warmed so far, one a frame (Game::hiveVisual), and the frame the last was
+    void reset(int bakeCount) { *this = LoadingState(); bakeSeen = bakeCount; }
+  } loading;
   bool gpsMapValid = false; vec2 gpsMapC; float gpsMapHalf = 0; int gpsMapN = 0;   // cached GPS aerial image
   bool uiHidden = false, bumperFired = false; float bumperHold = 0;   // LB + RB held 1 s: hide / show the flight UI
   // bound action state: keyboard key or gamepad button

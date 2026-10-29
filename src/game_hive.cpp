@@ -34,8 +34,7 @@ void Game::launchMilitary(int kind) {
   if (headless) { beginMilitaryLaunch(c); return; }
   pendingMilitaryLaunch = c;
   militaryLaunchFrameDrawn = militaryLaunchFramePresented = false;
-  loadT = 0; loadReadyT = -1; loadShown = 0; loadPend0 = 0; loadFrames = 0; loadViewsDrawn = false; loadViewsStep = 0; loadWarmStep = 0; loadWarmAt = -1;
-  loadStableFrames = 0; loadObservedFrame = -1; loadMap = loadBackdrop = false;
+  loading.reset(g_ren.bakeCount);
   screen = SCR_LOADING;
   in.pressed[K_ENTER] = in.pressed[' '] = false; in.mPressed[0] = false;
   in.buttonsPressed &= ~(PAD_A | PAD_START);

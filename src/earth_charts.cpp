@@ -1,5 +1,6 @@
 // Somnium Volandi - charts on the real Earth: the lattice, their names, the pack (earth_charts.h)
 #include "earth_charts.h"
+#include "dev_switches.h"
 #include "earth_fetch.h"
 #include <cctype>
 #include <cstdlib>
@@ -52,7 +53,7 @@ std::shared_ptr<earth::Pack> openSearch(std::string& error) {
   std::vector<std::string> dirs; std::string cache;
   { std::lock_guard<std::mutex> g(g_lock); dirs = g_search; cache = g_glo90Cache; }
   if (!earth::hasRangeFetch()) earth::setRangeFetch(earthFetch::fetchRange);   // (a streamed pack's pieces, fetched as wanted)
-  const char* env = getenv("EARTH_PACK");
+  const char* env = dev::env("EARTH_PACK");
   if (env && *env) dirs = {env};
   else dirs.push_back("earth");
   error.clear();

@@ -462,27 +462,27 @@ void Game::drawLoading() {
   const auto& preview = g_ren.loadingPreview();
   const bool retained = pendingService && !pic && preview.matches(flight.forceAircraft, flight.type-CT_MIL_RECON);
   if (retained) pic = preview.texture;
-  if (!military && !loadMap && !pic && !pending && g_ren.ok) {   // otherwise the aerial image of the airport, rendered once from the real terrain
-    loadMap = true; gpsMapValid = false;
+  if (!military && !loading.map && !pic && !pending && g_ren.ok) {   // otherwise the aerial image of the airport, rendered once from the real terrain
+    loading.map = true; gpsMapValid = false;
     g_ren.renderMap(ap.x, ap.z, 2400.f, 1536);
   }
   // (the backdrop in hand - the picture decoded, or the map rendered: the screen can now be drawn again from inside a
   // bake, which must neither decode nor render)
-  if (!pending) loadBackdrop = true;
-  float rt = loadReadyT >= 0 ? loadT - loadReadyT : 0.f;
+  if (!pending) loading.backdrop = true;
+  float rt = loading.readyT >= 0 ? loading.t - loading.readyT : 0.f;
   float cover = 1.f - smoothstepf(0.f, 1.4f, rt);   // the card fades out onto the live shot once the scenery is in
   if (cover > 0.001f && (!military || pic || pending)) {
     g_ren.rect(0, 0, W, H, vec3(0.01f, 0.02f, 0.035f), cover);
     if (pic) {   // slow push-in over the picture (cropped to fill the screen)
       const float imageAspect = retained ? float(preview.width) / preview.height : 16.f / 9.f;
-      float z = 1.f - 0.06f * (set.menuMotion ? std::min(loadT, 12.f) / 12.f : 0.f), asp = (W / H) / imageAspect;
+      float z = 1.f - 0.06f * (set.menuMotion ? std::min(loading.t, 12.f) / 12.f : 0.f), asp = (W / H) / imageAspect;
       float su = z * std::min(1.f, asp), sv = z * std::min(1.f, 1.f / asp);
       // Framebuffer copies start at GL's bottom edge; packaged pictures use top-to-bottom image rows.
       const float v0 = retained ? .5f + sv*.5f : .5f - sv*.5f, v1 = 1.f-v0;
       g_ren.image(pic, 0, 0, W, H, 0.5f - su * 0.5f, v0, 0.5f + su * 0.5f, v1, cover);
       g_ren.flushUIPublic();
     } else if (!military && g_ren.mapTex()) {   // slow push-in over the aerial image
-      float z = 0.62f - 0.05f * (set.menuMotion ? std::min(loadT, 12.f) / 12.f : 0.f);
+      float z = 0.62f - 0.05f * (set.menuMotion ? std::min(loading.t, 12.f) / 12.f : 0.f);
       float sv = z, su = z * W / H;
       if (su > 0.98f) { sv *= 0.98f / su; su = 0.98f; }
       g_ren.image(g_ren.mapTex(), 0, 0, W, H, 0.5f - su * 0.5f, 0.5f - sv * 0.5f, 0.5f + su * 0.5f, 0.5f + sv * 0.5f, cover);
@@ -519,29 +519,29 @@ void Game::drawLoading() {
   g_ren.text(weatherX,cy+29*s,fs(12,10),fitLoading(weather.describe(),cw*.40f,fs(12,10)),C_TEXT,1);
   // Separate measured stage bars reveal the work behind the overall percentage.
   const float scene=loadSetupDone();
-  const float chunks=loadPend0>0?clampf(1.f-float(std::max(0,g_ren.entPending))/loadPend0,0.f,1.f):scene;
-  const float lighting=loadFrames>=2&&!loadingShadowPending()?1.f:0.f;
-  const float checks=loadReadyT>=0?1.f:clampf(loadStableFrames/2.f,0.f,1.f);
+  const float chunks=loading.pend0>0?clampf(1.f-float(std::max(0,g_ren.entPending))/loading.pend0,0.f,1.f):scene;
+  const float lighting=loading.frames>=2&&!loadingShadowPending()?1.f:0.f;
+  const float checks=loading.readyT>=0?1.f:clampf(loading.stableFrames/2.f,0.f,1.f);
   const float fractions[]={scene,chunks,lighting,checks};
   const char* stages[]={"SCENE SETUP","NEARBY SCENERY","TERRAIN LIGHTING","READINESS CHECK"};
   for(int i=0;i<4;++i){const float xx=cx+cw*i/4,ww=cw/4-18*s,yy=cy+75*s;
     g_ren.text(xx,yy,fs(9,8),stages[i],dim,1,0,false);
-    g_ren.text(xx,yy+16*s,fs(10,9),fractions[i]>=1?"READY":pending?"WAITING":i==1?fmt("%d remaining",std::max(0,g_ren.entPending)):i==3?fmt("%d / 2 stable frames",std::min(2,loadStableFrames)):"IN PROGRESS",fractions[i]>=1?accent:C_TEXT,1,0,false);
+    g_ren.text(xx,yy+16*s,fs(10,9),fractions[i]>=1?"READY":pending?"WAITING":i==1?fmt("%d remaining",std::max(0,g_ren.entPending)):i==3?fmt("%d / 2 stable frames",std::min(2,loading.stableFrames)):"IN PROGRESS",fractions[i]>=1?accent:C_TEXT,1,0,false);
     svui::bar(g_ren,xx,yy+34*s,ww,3*s,fractions[i],accent);
   }
   // progress / ready prompt
   float by = cy+139*s, bw = cw, bh = 6*s;
-  if (loadReadyT < 0) {
+  if (loading.readyT < 0) {
     const int warmN = headless || pending ? 0 : loadWarmItems(), hiveN = warmN - (specIdx == kSomnus ? 1 : 0);
-    const std::string step = loadWarmStep < warmN ? (loadWarmStep < hiveN ? fmt("01 / 04  Preparing the hive craft  %d / %d", loadWarmStep + 1, hiveN) : std::string("01 / 04  Preparing the stores")) :
-      loadFrames < 2 ? "01 / 04  Preparing flight scene" : !loadViewsDrawn && !headless ? ((loadViewsStep == 0) == (camMode == 1) ? "01 / 04  Preparing the cockpit view" : "01 / 04  Preparing the outside view") : g_ren.entPending > 0 ? "02 / 04  Loading nearby scenery" : loadingShadowPending() ? "03 / 04  Preparing terrain shadows" : "04 / 04  Checking flight readiness";
+    const std::string step = loading.warmStep < warmN ? (loading.warmStep < hiveN ? fmt("01 / 04  Preparing the hive craft  %d / %d", loading.warmStep + 1, hiveN) : std::string("01 / 04  Preparing the stores")) :
+      loading.frames < 2 ? "01 / 04  Preparing flight scene" : !loading.viewsDrawn && !headless ? ((loading.viewsStep == 0) == (camMode == 1) ? "01 / 04  Preparing the cockpit view" : "01 / 04  Preparing the outside view") : g_ren.entPending > 0 ? "02 / 04  Loading nearby scenery" : loadingShadowPending() ? "03 / 04  Preparing terrain shadows" : "04 / 04  Checking flight readiness";
     g_ren.text(cx, by - 19 * s, fs(12,10), step, C_TEXT, 0.9f, 0, false);
-    g_ren.text(cx + bw, by - 19 * s, fs(12,10), fmt("%d%%", std::min(99, (int)(clampf(loadShown, 0.f, 1.f) * 100.f))), accent, 1, 2, false);
+    g_ren.text(cx + bw, by - 19 * s, fs(12,10), fmt("%d%%", std::min(99, (int)(clampf(loading.shown, 0.f, 1.f) * 100.f))), accent, 1, 2, false);
     g_ren.rect(cx, by, bw, bh, accent, 0.12f, 2 * s);
-    if (loadShown > 0.f) g_ren.rectGrad(cx, by, bw * loadShown, bh, accent * 0.7f, accent, 1, 2 * s);
-    const std::string detail=pendingService?"Preparing service assignment and supplied aircraft":queued?"Preparing the flight":fmt("Elapsed %.1f s  /  %d scene frames  /  ",loadT,loadFrames)+(g_ren.entPending>0?fmt("%d scenery chunks remaining",g_ren.entPending):loadingShadowPending()?"Terrain shadow pass running":"Verifying two stable rendered frames");
+    if (loading.shown > 0.f) g_ren.rectGrad(cx, by, bw * loading.shown, bh, accent * 0.7f, accent, 1, 2 * s);
+    const std::string detail=pendingService?"Preparing service assignment and supplied aircraft":queued?"Preparing the flight":fmt("Elapsed %.1f s  /  %d scene frames  /  ",loading.t,loading.frames)+(g_ren.entPending>0?fmt("%d scenery chunks remaining",g_ren.entPending):loadingShadowPending()?"Terrain shadow pass running":"Verifying two stable rendered frames");
     g_ren.text(cx, by + 13 * s, fs(10,9), fitLoading(detail,bw,fs(10,9)),dim,.9f,0,false);
-    float hx = cx + bw * loadShown;
+    float hx = cx + bw * loading.shown;
     g_ren.glow(hx - 4 * s, by - 2 * s, 8 * s, bh + 4 * s, accent, 0.5f + 0.3f * sinf(realTime * 6.f), 4 * s, 14 * s);
   } else {
     float pulse = 0.6f + 0.4f * sinf(realTime * 3.f);
@@ -571,9 +571,9 @@ void Game::drawLoading() {
     };
     const int n = (int)(sizeof tips / sizeof tips[0]);
     static int tip = -1; static float lastT = 1e9f;
-    if (loadT < lastT) tip = (tip + 1) % n;   // (a new load: its elapsed time starts again)
-    lastT = loadT;
-    const float ty = cy - 44 * s, a = clampf(loadT / 0.4f, 0.f, 1.f);   // (just above the flight's panel, over the picture)
+    if (loading.t < lastT) tip = (tip + 1) % n;   // (a new load: its elapsed time starts again)
+    lastT = loading.t;
+    const float ty = cy - 44 * s, a = clampf(loading.t / 0.4f, 0.f, 1.f);   // (just above the flight's panel, over the picture)
     const std::string t = fitLoading(tips[tip], cw - 90 * s, fs(13,11));
     g_ren.rect(cx - 18 * s, ty - 9 * s, g_ren.textWidth(t, fs(13,11)) + 86 * s, 32 * s, ink, 0.72f * a, 4 * s);
     g_ren.text(cx, ty, fs(11,10), "TIP", accent, a, 0, false);

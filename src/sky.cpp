@@ -1,6 +1,7 @@
 // Somnium Volandi - the sky's bodies (sky.h): the celestial sphere turning with the sun's path, the moon at its phase,
 // and the stars uploaded for the lighting pass's per-pixel lookup (light_fs.glsl starLight).
 #include "sky.h"
+#include "dev_switches.h"
 #include "renderer.h"
 #include "star_catalog.h"
 #include <cmath>
@@ -14,7 +15,7 @@ vec3 sunDirectionAt(float tod) {
 }
 
 float moonAgeToday() {
-  if (const char* e = getenv("MOONAGE")) return fmodf(std::max(0.f, (float)atof(e)), 29.530589f);
+  if (const char* e = dev::env("MOONAGE")) return fmodf(std::max(0.f, (float)atof(e)), 29.530589f);
   // days since the new moon of 2000 January 6, 18:14 UTC, round the synodic month
   const double days = ((double)std::time(nullptr) - 947182440.0) / 86400.0, month = 29.530588853;
   const double age = fmod(days, month);

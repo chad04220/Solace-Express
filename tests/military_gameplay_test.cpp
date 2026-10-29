@@ -96,7 +96,7 @@ struct GameTest {
       g.launchMilitary(military::LocalSurvey);
       check(g.screen==SCR_LOADING && g.pendingMilitaryLaunch && !g.militaryFlight &&
         !g.career.attemptOpen && g.plane.spec==oldSpec && length(g.plane.pos-oldPos)==0 &&
-        !g.combatCollisionWarm && g.loadFrames==0 && g.loadReadyT<0 && snapshot(g.career)==before,
+        !g.combatCollisionWarm && g.loading.frames==0 && g.loading.readyT<0 && snapshot(g.career)==before,
         "interactive Deploy changes to loading immediately without saving, resetting the aircraft or preparing the mission");
       check(!g.in.pressed[K_ENTER] && !g.in.pressed[' '] && !g.in.mPressed[0] && !(g.in.buttonsPressed&(PAD_A|PAD_START)),
         "queued Deploy consumes mouse, keyboard and controller activation edges");
@@ -110,7 +110,7 @@ struct GameTest {
       const bool rendered=g.militaryLaunchFrameDrawn;
       g.updateLoading(dt);
       check(rendered && g.pendingMilitaryLaunch && !g.militaryLaunchFramePresented &&
-        g.loadImg.empty() && !g.loadMap && g.loadFrames==0 && g.loadReadyT<0 &&
+        g.loadImg.empty() && !g.loading.map && g.loading.frames==0 && g.loading.readyT<0 &&
         g_ren.bakeCount==oldBakes && g_ren.entChunks==oldChunks && g_ren.gpuFrameSerial==oldSceneSerial &&
         g_ren.loadingPreview().texture==oldPreview.texture && g_ren.loadingPreview().ready==oldPreview.ready &&
         !g.combatCollisionWarm && snapshot(g.career)==before,
@@ -118,8 +118,8 @@ struct GameTest {
       g.framePresented();g.updateLoading(dt);
       check(!g.pendingMilitaryLaunch && g.screen==SCR_LOADING && g.militaryFlight &&
         g.specIdx==kVigil && g.career.attempt==attempt+1 && g.career.military.activeAttempt==g.career.attempt &&
-        g.hiveCombat.mission.config.objectiveCount==2 && !g.combatCollisionWarm && g.loadFrames==0 &&
-        g.loadReadyT<0 && g.loadShown==0 && snapshot(g.career,true)==civil,
+        g.hiveCombat.mission.config.objectiveCount==2 && !g.combatCollisionWarm && g.loading.frames==0 &&
+        g.loading.readyT<0 && g.loading.shown==0 && snapshot(g.career,true)==civil,
         "only the update after presentation saves one loaner attempt and initializes the real mission while keeping readiness locked");
       const uint32_t token=g.career.military.activeAttempt;
       g.launchMilitary(military::LocalSurvey);g.framePresented();
@@ -175,18 +175,18 @@ struct GameTest {
       g.in.pressed[K_ENTER]=true;g.in.buttonsPressed=PAD_START;
       g.launchResearch();
       check(g.screen==SCR_LOADING && g.pendingLaunch && g.pendingLaunch->kind==Game::LAUNCH_RESEARCH && !g.researchFlight &&
-        length(g.plane.pos-oldPos)==0 && g.loadFrames==0 && !g.in.pressed[K_ENTER] && !(g.in.buttonsPressed&PAD_START),
+        length(g.plane.pos-oldPos)==0 && g.loading.frames==0 && !g.in.pressed[K_ENTER] && !(g.in.buttonsPressed&PAD_START),
         "Initiate changes to the loading card at once, consuming its press, with nothing of the flight set up");
       g.launchResearch();g.framePresented();g.updateLoading(10.f);
       check(g.pendingLaunch && !g.researchFlight && !g.launchFramePresented,
         "a second press, elapsed time and a presentation without the card drawn start nothing");
       g.render();const bool drawn=g.launchFrameDrawn;g.updateLoading(dt);
-      check(drawn && g.pendingLaunch && !g.researchFlight && g.loadImg.empty() && !g.loadMap && g.loadFrames==0 &&
+      check(drawn && g.pendingLaunch && !g.researchFlight && g.loadImg.empty() && !g.loading.map && g.loading.frames==0 &&
         g_ren.entChunks==oldChunks && g_ren.bakeCount==oldBakes && g_ren.gpuFrameSerial==oldSceneSerial,
         "the drawn card decodes no picture, renders no scene and bakes nothing before it is presented");
       g.framePresented();g.updateLoading(dt);
       check(!g.pendingLaunch && g.researchFlight && g.screen==SCR_LOADING && g.specIdx==kSomnus && !g.plane.onGround &&
-        g.loadFrames==0 && g.loadReadyT<0,
+        g.loading.frames==0 && g.loading.readyT<0,
         "after presentation the research flight is set up, behind the card, its first scene still to come");
     }
     // The loading screen is drawn and shown from inside the scene's bakes once its backdrop is in hand: with the
@@ -201,14 +201,14 @@ struct GameTest {
       check(g.researchFlight && g.screen==SCR_LOADING && !g.loadingRedrawsInsideBakes(),
         "set up, the loading screen isn't drawn from inside a bake before its backdrop is in hand");
       g.render();
-      check(g.loadBackdrop && g.loadingRedrawsInsideBakes() && (pictures ? !g.loadImg.empty() && !g.loadMap : true),
+      check(g.loading.backdrop && g.loadingRedrawsInsideBakes() && (pictures ? !g.loadImg.empty() && !g.loading.map : true),
         std::string("after the set-up frame the loading screen can be shown from inside a bake (")+(pictures?"the field's picture":"no picture")+")");
     }
     {   // a flight set up without the card (restarted in place): its loading screen alone first all the same
       auto q=make();Game& g=*q;g.headless=false;g.platformPresent=[]{};g.assetDir=SOMNIUM_ASSETS;
       g.startFlight(g_story[0],1,Career::SRC_OWNED);
-      const int frames=g.loadFrames;g.render();
-      check(g.screen==SCR_LOADING && g.loadFrames==frames && g.loadBackdrop && g.loadingRedrawsInsideBakes(),
+      const int frames=g.loading.frames;g.render();
+      check(g.screen==SCR_LOADING && g.loading.frames==frames && g.loading.backdrop && g.loadingRedrawsInsideBakes(),
         "a loading screen not queued draws itself alone before the scene's first frame");
     }
     for(bool pad:{false,true}) {   // Back on the card: back where it was launched from, nothing set up
@@ -283,7 +283,7 @@ struct GameTest {
         "available mission cannot direct-start without a committed service token");
       g.contract=g.career.militaryContract(military::RouteRecon);g.specIdx=g.contract.forceAircraft;
       g.source=Career::SRC_MILITARY;g.militaryFlight=true;g.screen=SCR_LOADING;
-      g.loadReadyT=0;g.loadT=3;g.loadShown=1;g.in.pressed[K_ENTER]=true;g.in.buttonsPressed=PAD_A;g.in.mPressed[0]=true;
+      g.loading.readyT=0;g.loading.t=3;g.loading.shown=1;g.in.pressed[K_ENTER]=true;g.in.buttonsPressed=PAD_A;g.in.mPressed[0]=true;
       g.updateLoading(dt);
       check(g.screen==SCR_HUB && g.hubList==2 && !g.militaryFlight && g.source==Career::SRC_NONE &&
         !g.in.pressed[K_ENTER] && !g.in.mPressed[0] && !(g.in.buttonsPressed&PAD_A) && snapshot(g.career)==before,
@@ -554,19 +554,19 @@ struct GameTest {
       };
       g_ren.entPending=9;
       for(int n=0;n<80;++n) { g.in.pressed[K_ENTER]=g.in.pressed[' ']=g.in.mPressed[0]=true;g.in.buttonsPressed=PAD_A;g.update(dt);g.in.endFrame(); }
-      check(g.screen==SCR_LOADING && g.loadReadyT<0 && g.loadShown<1 && frozen(),
+      check(g.screen==SCR_LOADING && g.loading.readyT<0 && g.loading.shown<1 && frozen(),
         "elapsed loading time and launch spam cannot start simulation or certify unrendered work");
-      g.loadFrames=2;g.update(dt);g.in.endFrame();
-      check(g.loadReadyT<0 && frozen(),"completed scene frame with pending scenery stays behind loading screen");
-      g_ren.entPending=0; ++g_ren.bakeCount; ++g.loadFrames;g.update(dt);g.in.endFrame();
-      check(g.loadReadyT<0 && g.loadStableFrames==0 && frozen(),"a new mesh bake invalidates loading stability");
-      ++g.loadFrames;g.update(dt);g.in.endFrame();
-      const int firstStable=g.loadStableFrames;
+      g.loading.frames=2;g.update(dt);g.in.endFrame();
+      check(g.loading.readyT<0 && frozen(),"completed scene frame with pending scenery stays behind loading screen");
+      g_ren.entPending=0; ++g_ren.bakeCount; ++g.loading.frames;g.update(dt);g.in.endFrame();
+      check(g.loading.readyT<0 && g.loading.stableFrames==0 && frozen(),"a new mesh bake invalidates loading stability");
+      ++g.loading.frames;g.update(dt);g.in.endFrame();
+      const int firstStable=g.loading.stableFrames;
       for(int n=0;n<40;++n) {g.update(dt);g.in.endFrame();}
-      check(g.loadReadyT<0 && firstStable==1 && g.loadStableFrames==1 && frozen(),
+      check(g.loading.readyT<0 && firstStable==1 && g.loading.stableFrames==1 && frozen(),
         "repeated updates of one renderer frame cannot fabricate a second completed frame");
-      ++g.loadFrames;g.update(dt);g.in.endFrame();
-      check(g.loadReadyT>=0 && g.loadShown==1 && g.screen==SCR_LOADING && frozen(),
+      ++g.loading.frames;g.update(dt);g.in.endFrame();
+      check(g.loading.readyT>=0 && g.loading.shown==1 && g.screen==SCR_LOADING && frozen(),
         "two distinct stable scene frames unlock briefing confirmation without advancing flight");
       for(int n=0;n<40;++n) {g.update(dt);g.in.endFrame();}
       check(g.screen==SCR_LOADING && frozen(),"prepared military scene waits for an explicit launch confirmation");

@@ -1,6 +1,7 @@
 // Somnium Volandi - environment entity rendering: chunk streaming, culling, LOD selection, instanced G-buffer and
 // sun shadow-cascade passes. The lighting pass lights the G-buffer.
 #include "renderer.h"
+#include "dev_switches.h"
 #include "entity_shaders.h"
 #include "entity_lod.h"
 #include "entity_bounds.h"
@@ -626,7 +627,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
   glDisable(GL_DEPTH_TEST);
   glBindVertexArray(0);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
-  static const bool dbg = getenv("ENTDBG") != nullptr;
+  static const bool dbg = dev::env("ENTDBG") != nullptr;
   if (dbg && !feedPass) {
     int nSh[2] = {0, 0};
     for (int c = 0; c < 2; c++) for (auto& d : draws[1 + c]) nSh[c] += d.count;

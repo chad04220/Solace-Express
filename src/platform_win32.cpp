@@ -6,6 +6,7 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#include "dev_switches.h"
 #include <mmsystem.h>
 #include <mmdeviceapi.h>
 #include <audioclient.h>
@@ -631,6 +632,9 @@ static bool toolLaunch(const std::string& cmdLine) {
 int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
   {
     std::string cl = GetCommandLineA();
+    // the development switches (dev_switches.h): on for a tool's run (diagnostics.bat), the launch's helper
+    // processes and --dev; off in a player's ordinary launch, so nothing in their shell changes the game
+    dev::enable(toolLaunch(cl) || cl.find("--dev") != std::string::npos || cl.find("--build-") != std::string::npos);
     size_t k = cl.find("--build-shader-cache \"");
     if (k != std::string::npos) {
       size_t b = k + 22, e = cl.find('"', b);
@@ -1620,7 +1624,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         g->saveDir = game.saveDir; g->diskless = true;
         g->initHeadless(); g->voicesOff = true; g->iconTex = iconTex; g->debugScene(sc);
         g_ren.setRenderScale(1.f);   // explicit benchmark invariant; does not change saved settings
-        fprintf(bf, "\nScene %s; requested WX=%s\n", sc.c_str(), getenv("WX") ? getenv("WX") : "(scene/default)");
+        fprintf(bf, "\nScene %s; requested WX=%s\n", sc.c_str(), dev::env("WX") ? dev::env("WX") : "(scene/default)");
         printWeather(g, "preset");
         g_ren.entSync = false;
         // warm until the scene is built: at least 40 frames, then until 20 frames in a row bake nothing and stream

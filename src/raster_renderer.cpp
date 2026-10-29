@@ -3,6 +3,7 @@
 // terrain-shadow bake, the display atlases, the cloud pass, and everything after the lit frame (TAA, sprites, bloom,
 // light shafts, post). See docs/RENDERER_REBUILD.md.
 #include "renderer.h"
+#include "dev_switches.h"
 #include "shaders.h"
 #include <algorithm>
 #include <numeric>
@@ -98,7 +99,7 @@ GLuint Renderer::afPassProgram(int pass, int model, bool research) {
     }
     if (a.pass[pass]) return a.pass[pass];
   }
-  static const bool all = getenv("AF_ALL") != nullptr;   // (debug: every aircraft build always)
+  static const bool all = dev::env("AF_ALL") != nullptr;   // (debug: every aircraft build always)
   const int v = research || all ? 0 : 1;
   if (!afSharedTried[pass][v]) { afSharedTried[pass][v] = true; afShared[pass][v] = linkAfPass(pass, v ? "#define AF_LIGHT\n" : "", v ? "light aircraft build" : "every aircraft"); }
   return afShared[pass][v];
@@ -162,7 +163,7 @@ void Renderer::rasterWorld(const FrameParams& fp) {
   // the player's baked mesh opens the G-buffer's depth (drawEntities, right after the clear): see rasterObjects
   earlyMesh = nullptr;
   updatePartPoses(fp);   // (the rigid parts' poses for this view)
-  static const bool noEarly = getenv("NOEARLY") != nullptr;   // (debug A/B: the mesh's depth only in the objects pass, as before)
+  static const bool noEarly = dev::env("NOEARLY") != nullptr;   // (debug A/B: the mesh's depth only in the objects pass, as before)
   if (!noEarly && planeMeshWanted(fp) && fp.pano <= 0.f) {
     auto pm = planeMeshes.find(hullKey(fp, fp.plane.PS[3] > 0.5f ? 1 : 0));
     if (pm != planeMeshes.end() && pm->second.ok && pm->second.idx) earlyMesh = &pm->second;
@@ -200,7 +201,7 @@ void Renderer::rasterObjects(const FrameParams& fp) {
   // (with the mesh the hull is the moving parts' only: no near segment even with the eye inside it - a ray starting inside
   // reads 0 and marches from the eye - and the march ends where the ray leaves the moving volume: the cabin's
   // panel, roof and seats are the mesh's, and the yoke's pixels alone march, as deep as the yoke's hull)
-  static const bool oldNear = getenv("OLDNEAR") != nullptr;   // (debug A/B: the 1.2 m near march with the eye inside the moving hull, no exit)
+  static const bool oldNear = dev::env("OLDNEAR") != nullptr;   // (debug A/B: the 1.2 m near march with the eye inside the moving hull, no exit)
   if (meshOn) { if (oldNear) drawHull(fp, slot, pm->second.movKey, pm->second.eyeInMov ? -1.f : 0.f); else drawHull(fp, slot, pm->second.movKey, 0.f, true); }
   else if (hullUse && hulls.count(hullK)) drawHull(fp, slot, hullK);
   // the traffic: the same light aircraft, each with its model's mesh when one is baked (then its hull is the moving
@@ -265,17 +266,17 @@ void Renderer::rasterObjects(const FrameParams& fp) {
   }
   // (only the UFO or the debris to march: the build without any airframe in it - on the owner's GPU the airframes'
   // code alone made the UFO's march more than twice as slow)
-  static const bool objFull = getenv("OBJFULL") != nullptr;   // (debug: always the full build)
+  static const bool objFull = dev::env("OBJFULL") != nullptr;   // (debug: always the full build)
   GLuint prog = progObjectsNoAf;
   if (afMarch || objFull) {   // (the aircraft it marches: the player's, and the traffic with something to march)
     int model = -2; bool research = false;
     if (fp.plane.on && fp.wreck.pieces == 0) afCover(model, research, fp.plane.M, fp.plane.model);
     for (int k = 0; k < trafN; k++) if (trafMarch & (1 << k)) afCover(model, research, fp.traffic[k].t, -1);
-    static const bool regionRenderDiag = getenv("REGION_RENDER_DIAG") != nullptr;
+    static const bool regionRenderDiag = dev::env("REGION_RENDER_DIAG") != nullptr;
     if (regionRenderDiag) {
       fprintf(stderr, "REGION_RENDER_DIAG aircraft selection frame=%d model=%d research=%d player_on=%d player_model=%d player_own=%d trafN=%d trafMarch=0x%x AF_ALL=%d\n",
         frameNo, model, int(research), int(fp.plane.on), fp.plane.model,
-        fp.plane.on ? afModelOf(fp.plane.M, fp.plane.model) : -2, trafN, unsigned(trafMarch), getenv("AF_ALL") != nullptr);
+        fp.plane.on ? afModelOf(fp.plane.M, fp.plane.model) : -2, trafN, unsigned(trafMarch), dev::env("AF_ALL") != nullptr);
       for (int k = 0; k < trafN; ++k)
         fprintf(stderr, "REGION_RENDER_DIAG aircraft traffic=%d marched=%d own=%d packed_engine=%.9g packed_variant=%.9g\n",
           k, int((trafMarch & (1 << k)) != 0), afModelOf(fp.traffic[k].t, -1), double(fp.traffic[k].t[2]), double(fp.traffic[k].t[79]));
@@ -284,7 +285,7 @@ void Renderer::rasterObjects(const FrameParams& fp) {
     prog = afPassProgram(kAfObjects, model, research);
   }
   if (!prog) prog = progObjectsNoAf;   // (no build with the airframes: the UFO and the debris still)
-  static const bool objDbg = getenv("OBJDBG") != nullptr;   // (debug: why the march runs)
+  static const bool objDbg = dev::env("OBJDBG") != nullptr;   // (debug: why the march runs)
   if (objDbg) { int nm = 0; for (int k = 0; k < trafN; k++) nm += (trafMarch >> k) & 1; printf("objects: march %d (plane on %d mesh %d hull %d wreck %d; traffic %d of %d; ufo %d debris %d)\n", (int)marchAny, (int)fp.plane.on, (int)meshOn, (int)hullOn, fp.wreck.pieces, nm, trafN, (int)fp.ufoOn, fp.wreck.debris); }
   setRT(prog, fp);
   glUniform1i(U(prog, "uTrafMarch"), trafMarch);
@@ -293,7 +294,7 @@ void Renderer::rasterObjects(const FrameParams& fp) {
   glUniform1i(U(prog, "uMeshOn"), meshOn ? 1 : 0);
   glActiveTexture(GL_TEXTURE0 + 28); glBindTexture(GL_TEXTURE_2D, sceneZ ? texDepthCopy : 0); glUniform1i(U(prog, "uSceneZ"), 28); glUniform1i(U(prog, "uSceneZOn"), sceneZ ? 1 : 0);
   glBindVertexArray(vaoEmpty);
-  static const bool noMarch = getenv("NOMARCH") != nullptr;   // (debug: the objects pass without its full-screen march, to time the mesh draws alone)
+  static const bool noMarch = dev::env("NOMARCH") != nullptr;   // (debug: the objects pass without its full-screen march, to time the mesh draws alone)
   if (!noMarch && marchAny && !(dbgOff & kProbeMarch)) glDrawArrays(GL_TRIANGLES, 0, 3);
   }
   glActiveTexture(GL_TEXTURE0);
@@ -306,7 +307,7 @@ void Renderer::rasterObjects(const FrameParams& fp) {
     else if (!wm && fp.plane.on && fp.wreck.pieces > 0 && fp.pano <= 0.f && meshProgramFor(fp.plane.M, fp.plane.model)) {
       const uint64_t k0 = hullKey(fp, 0);
       if (!planeMeshes.count(k0)) bakePlaneMesh(fp, 0, k0);
-      if (getenv("WRECKDBG")) { auto it = planeMeshes.find(k0); printf("wreck: baked its mesh (%s, %d indices)\n", it != planeMeshes.end() && it->second.ok ? "ok" : "failed", it != planeMeshes.end() ? it->second.idx : -1); }
+      if (dev::env("WRECKDBG")) { auto it = planeMeshes.find(k0); printf("wreck: baked its mesh (%s, %d indices)\n", it != planeMeshes.end() && it->second.ok ? "ok" : "failed", it != planeMeshes.end() ? it->second.idx : -1); }
     }
     else if (fp.warmCockpit >= 0 && slot == 0 && meshUse) {   // the loading screen, its view's body in hand: the cockpit's next, one step a frame
       FrameParams in = fp; in.plane.PS[3] = 1.f;   // (the first look inside then draws at once: before, it loaded the body and measured the
@@ -343,7 +344,7 @@ void Renderer::ensureShadowMaps() {
 // ground up instead of marching its field per pixel (the proxy's largest cost at a busy airport)
 void Renderer::rasterTrafficShadowMaps(const FrameParams& fp) {
   trafShOn = 0;
-  static const bool off = getenv("SHMAPOFF") != nullptr;
+  static const bool off = dev::env("SHMAPOFF") != nullptr;
   const int n = std::min(fp.trafficN, kMaxTrafficDrawn);
   if (off || !progShMap || n == 0 || fp.sunDir.y <= -0.05f || meshOff || fp.pano > 0.f) return;
   vec3 d = normalize(fp.sunDir), up = fabsf(d.y) < 0.99f ? vec3(0, 1, 0) : vec3(0, 0, 1);
@@ -390,7 +391,7 @@ void Renderer::rasterTrafficShadowMaps(const FrameParams& fp) {
 }
 void Renderer::rasterShadowMaps(const FrameParams& fp) {
   shOn = 0; shMovOn = false; shCabOn = false;
-  static const bool off = getenv("SHMAPOFF") != nullptr;   // (debug / the analysis: the per-pixel march as before)
+  static const bool off = dev::env("SHMAPOFF") != nullptr;   // (debug / the analysis: the per-pixel march as before)
   // (a broken-up aircraft: its pieces near the one the camera follows, each from the airframe's mesh - wreck_clip.glsl)
   const PlaneMesh* wm = off || !progShMapWreck ? nullptr : wreckMesh(fp);
   if (off || !progShMap || (!planeMeshWanted(fp) && !wm)) return;
@@ -580,7 +581,7 @@ void Renderer::rasterShadowMaps(const FrameParams& fp) {
 // traffic aircraft's near enough to shadow the ground the proxy shades, without a map. Else the proxy's small build
 // runs, with no field in it: on the owner's GPU the march's code alone made every pixel of the pass slower.
 bool Renderer::proxyNeedsMarch(const FrameParams& fp) const {
-  static const bool all = getenv("PROXYMARCH") != nullptr;   // (debug: always the full proxy)
+  static const bool all = dev::env("PROXYMARCH") != nullptr;   // (debug: always the full proxy)
   if (all || !progShProxyMaps) return true;
   const bool sun = fp.sunDir.y > -0.05f;
   if (fp.plane.on && fp.wreck.pieces == 0) {   // (a wreck's pieces shadow from the maps alone: rasterShadowMaps)
@@ -626,7 +627,7 @@ void Renderer::rasterShadowProxy(const FrameParams& fp) {
   glBindVertexArray(vaoEmpty);
   glDrawArrays(GL_TRIANGLES, 0, 3);
   glActiveTexture(GL_TEXTURE0);
-  static const char* dump = getenv("PROXYDUMP");   // (debug: the proxy as an image - R sun, G/B/A the first three shadowed lights)
+  static const char* dump = dev::env("PROXYDUMP");   // (debug: the proxy as an image - R sun, G/B/A the first three shadowed lights)
   if (dump) {
     std::vector<unsigned char> px((size_t)rw * rh * 4);
     glReadBuffer(GL_COLOR_ATTACHMENT0); glReadPixels(0, 0, rw, rh, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
@@ -642,7 +643,7 @@ void Renderer::rasterShadowProxy(const FrameParams& fp) {
 // The effects over the lit, clouded frame (kEffectsFS): written into the TAA history texture the resolve is about
 // to overwrite anyway (the frame can't be read and written at once), then copied back
 void Renderer::rasterEffects(const FrameParams& fp) {
-  static const bool off = getenv("RASTERNOFX") != nullptr; if (off) return;   // (debug)
+  static const bool off = dev::env("RASTERNOFX") != nullptr; if (off) return;   // (debug)
   const auto& p = fp.plane;
   const bool intact = p.on && fp.wreck.pieces == 0, cockpit = p.PS[3] > 0.5f;
   const int engine = intact ? (int)(p.M[2] + 0.5f) : 0;
@@ -688,7 +689,7 @@ void Renderer::rasterEffects(const FrameParams& fp) {
 // False (the effects march instead) when the view isn't outside, or the mesh or the program isn't there.
 bool Renderer::rasterCloak(const FrameParams& fp) {
   const PlaneVisual& pv = fp.plane;
-  static const bool off = getenv("CLOAKMARCH") != nullptr;   // (debug A/B: the march, as before)
+  static const bool off = dev::env("CLOAKMARCH") != nullptr;   // (debug A/B: the march, as before)
   if (off || !pv.on || fp.wreck.pieces > 0 || pv.PS[3] > 0.5f || pv.wr[4][3] <= 0.001f || fp.pano > 0.f || meshOff) return false;
   auto it = planeMeshes.find(hullKey(fp, 0));
   if (it == planeMeshes.end() || !it->second.ok || !it->second.idx) return false;

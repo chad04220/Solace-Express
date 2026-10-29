@@ -1,6 +1,7 @@
 // Somnium Volandi - XR-40 Somnus systems: the cloak, the retracting laser turrets, the bomb bay and the dark-energy
 // weapons out in the world (laser bolts, plasma bombs, detonations and their glassed craters)
 #include "game.h"
+#include "dev_switches.h"
 #include "entities.h"
 #include "hive_world_collision.h"
 
@@ -428,7 +429,7 @@ void Game::somnusVisual(FrameParams& fp) {
     if (plane.onGround && !plane.engineRunning) for (int i = 0; i < 4; i++) pv.wr[0][i] = plane.nozzle * 0.5f * PI;
     pv.wr[4][0] = fmodf(plane.fanAngle, 6.2832f * 8.f); pv.wr[4][1] = W.bay; pv.wr[4][2] = W.lasers; pv.wr[4][3] = W.stealth;
     pv.wr[5][0] = plane.surf.x; pv.wr[5][1] = plane.surf.y; pv.wr[5][2] = plane.surf.z; pv.wr[5][3] = W.laserGlow;
-    if (const char* e = getenv("WRSURF")) pv.wr[5][1] = (float)atof(e);   // (render checks: hold a ruddervator deflection)
+    if (const char* e = dev::env("WRSURF")) pv.wr[5][1] = (float)atof(e);   // (render checks: hold a ruddervator deflection)
     pv.wr[6][0] = W.bombLoaded; pv.wr[6][1] = W.front; pv.wr[6][2] = W.armed ? 1.f : 0.f; pv.wr[6][3]=(float)combatLoadout.forward;
   }
   FxVisual& fx = fp.fx;
@@ -501,7 +502,7 @@ int Game::loadWarmItems() const {
 // the loading screen's scene setup, 0..1: two scene frames, the warm-up items (hiveVisual), the flight's two views (render)
 float Game::loadSetupDone() const {
   const int warm=headless?0:loadWarmItems(), views=headless||!plane.spec||crashed?0:2;
-  const int done=std::min(loadFrames,2)+std::min(loadWarmStep,warm)+(loadViewsDrawn?views:std::min(loadViewsStep,views));
+  const int done=std::min(loading.frames,2)+std::min(loading.warmStep,warm)+(loading.viewsDrawn?views:std::min(loading.viewsStep,views));
   return clampf(done/float(2+warm+views),0.f,1.f);
 }
 
@@ -514,11 +515,11 @@ void Game::hiveVisual(FrameParams& fp) {
     // One item a frame, the loading screen drawn and shown between them and from inside each bake (all of them on
     // the first frame held the research launch's loading screen still for seconds)
     // (a hive craft the launch's prewarm already built or read takes no frame of its own)
-    while(!headless && hive && loadWarmStep<kEnemyCraftTypes && loadWarmStep<loadWarmItems() && g_ren.enemyTypeWarm(loadWarmStep)) ++loadWarmStep;
-    if(!headless && loadWarmAt!=loadFrames && loadWarmStep<loadWarmItems()) {
-      loadWarmAt=loadFrames;
-      if(hive && loadWarmStep<kEnemyCraftTypes) g_ren.warmEnemyType(loadWarmStep); else g_ren.warmSomnusStores(fp);
-      ++loadWarmStep;
+    while(!headless && hive && loading.warmStep<kEnemyCraftTypes && loading.warmStep<loadWarmItems() && g_ren.enemyTypeWarm(loading.warmStep)) ++loading.warmStep;
+    if(!headless && loading.warmAt!=loading.frames && loading.warmStep<loadWarmItems()) {
+      loading.warmAt=loading.frames;
+      if(hive && loading.warmStep<kEnemyCraftTypes) g_ren.warmEnemyType(loading.warmStep); else g_ren.warmSomnusStores(fp);
+      ++loading.warmStep;
     }
     return;
   }

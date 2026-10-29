@@ -1,5 +1,6 @@
 // Somnium Volandi - hand-designed archipelago "The Solace Islands"
 #include "world.h"
+#include "dev_switches.h"
 #include "world_load_progress.h"
 #include "procedural_regions.h"
 #include "earth_charts.h"
@@ -408,7 +409,7 @@ void World::buildConfigured(const std::string& cachePath, const std::string& sta
   // background for Earth free flight must not move it
   const bool reports = this == &g_world;
   // (EARTH_TIMING=1: each stage's time on stderr - the real Earth's charts' budget)
-  static const bool timing = getenv("EARTH_TIMING") != nullptr;
+  static const bool timing = dev::env("EARTH_TIMING") != nullptr;
   auto stageClock = std::chrono::steady_clock::now();
   auto loadStage = [reports, &stageClock](float done, const char* next) {
     if (timing) { const auto now = std::chrono::steady_clock::now(); fprintf(stderr, "  %6.2f s  then %s\n", std::chrono::duration<double>(now - stageClock).count(), next); stageClock = now; }

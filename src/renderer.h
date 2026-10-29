@@ -1,6 +1,7 @@
 // Somnium Volandi - renderer interface
 #pragma once
 #include "png_write.h"
+#include "dev_switches.h"
 #include "aircraft_mesh_asset.h"
 #include "benchmark_metrics.h"
 #include <array>
@@ -201,7 +202,7 @@ public:
   float foveation = 0.f;
   bool beginFoveation();   // the rate image bound and on for the main view's world draws; false: full rate
   void endFoveation();
-  bool screenWindows = getenv("SCREENFEEDS") == nullptr;   // the research craft's displays are windows (no camera feeds but the bomb camera's; SCREENFEEDS=1 brings the cameras back)
+  bool screenWindows = dev::env("SCREENFEEDS") == nullptr;   // the research craft's displays are windows (no camera feeds but the bomb camera's; SCREENFEEDS=1 brings the cameras back)
   int bakeCount = 0;   // airframe meshes and hulls baked or loaded so far (the research terminal's warm-up waits for a frame that bakes nothing)
   // Read-only distributed bodies are preferred to the writable, driver-local cache.
   std::string prebuiltAircraftDir = "assets/aircraft";
@@ -450,7 +451,7 @@ public:
   GLuint stampQ[kStampRing][kPasses + 1] = {}; bool stampUsed[kStampRing] = {}; int stampQi = 0;
   int stampTag[kStampRing] = {}; unsigned stampTrial[kStampRing] = {};   // (the frame's part in a prepass trial)
   void stamp(int i) { if (glErrCheck) reportGLError(i); if (syncTiming) syncStamp(i); else if (stampQ[stampQi][i]) glQueryCounter(stampQ[stampQi][i], GL_TIMESTAMP); }
-  bool glErrCheck = getenv("GLERR") != nullptr;   // debug: print any GL error raised by the passes before each timestamp
+  bool glErrCheck = dev::env("GLERR") != nullptr;   // debug: print any GL error raised by the passes before each timestamp
   void reportGLError(int stampIdx);
   void syncStamp(int i);
 private:
@@ -701,8 +702,8 @@ private:
 public:
   void setOffscreen(bool on);
   bool hullBaked(const FrameParams& fp) const;   // the hull this frame wants is ready (or none is wanted)
-  bool hullOff = getenv("HULLOFF") != nullptr;           // debug: no hulls (every aircraft march starts from the camera)
-  bool meshOff = getenv("MESHOFF") != nullptr;           // debug: no aircraft meshes on the raster path (the whole airframe marches)
+  bool hullOff = dev::env("HULLOFF") != nullptr;           // debug: no hulls (every aircraft march starts from the camera)
+  bool meshOff = dev::env("MESHOFF") != nullptr;           // debug: no aircraft meshes on the raster path (the whole airframe marches)
   bool tshPending() const { return tshBaking || tshFront < 0; }
   // Optional/unused sun shadows must not block a loading screen forever.
   bool tshRequiredPending(float sunHeight) const { return progTShBake != 0 && sunHeight >= 0.02f && tshPending(); }

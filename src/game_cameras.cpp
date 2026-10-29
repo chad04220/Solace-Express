@@ -1,5 +1,6 @@
 // Somnium Volandi - the cameras: in flight, the menu tour, the preview stage and every menu's view of it
 #include "road_traffic.h"
+#include "dev_switches.h"
 #include "volcano_effects.h"
 #include "game.h"
 #include "earth_charts.h"
@@ -263,7 +264,7 @@ void Game::menuBackgroundCamera(FrameParams& fp) {
     else { MenuPreviewView v; v.yaw = (prewarmStage - 2) * 0.5f * PI; stageFlyingCamera(fp, v, kResearchJet, g_ren.W * 0.5f, g_ren.H * 0.5f, g_ren.H * 0.3f, false); }
     return;
   }
-  if (screen == SCR_MENU && !getenv("MENUORBIT")) { menuTour(fp); return; }
+  if (screen == SCR_MENU && !dev::env("MENUORBIT")) { menuTour(fp); return; }
   if (screen == SCR_RESEARCH) { researchPreviewCamera(fp); return; }
   if (screen == SCR_HUB && hubTab == TAB_CONTRACTS && hubList == 2) { militaryPreviewCamera(fp); return; }
   if (screen == SCR_FREE_FLIGHT || (screen == SCR_HUB && hubTab == TAB_HANGAR)) {

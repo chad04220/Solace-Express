@@ -10,6 +10,7 @@
 // airframe, in any of the sampled states, may reach into it: its centre distance is under its half diagonal (with
 // room for the distance field's slack) plus the furthest a part moves between two sampled states.
 #include "renderer.h"
+#include "dev_switches.h"
 #include "models.h"
 #include "hull_mesh.h"
 #include "shaders.h"
@@ -87,7 +88,7 @@ bool Renderer::sharedBakePrograms(GLuint out[2]) {
     sharedBakeTried = true;
     setCompileStage("aircraft bake (every aircraft)");
     GLuint pair[2]; std::string e;
-    if (!linkBakePair(kFullscreenVS, hullBakeFSAssembly(getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : ""), pair, e, nullptr, &sharedBakeFullQuality))
+    if (!linkBakePair(kFullscreenVS, hullBakeFSAssembly(dev::env("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : ""), pair, e, nullptr, &sharedBakeFullQuality))
       shaderNote("Aircraft bake unavailable; using the distance-field renderer.\n" + e);
     progHullBake = pair[0]; progHullBakeNormal = pair[1];
     setCompileStage("");
@@ -307,7 +308,7 @@ void Renderer::bakeHull(const FrameParams& fp, int slot, uint64_t key) {
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   H.verts = (int)tri.size() / 3; H.key = key;
   H.ok = true;
-  if (getenv("HULLDBG")) printf("hull %s: %d states, %d+%d+%d points, %zu refined, %d triangles%s\n", inside ? "cockpit" : "outside", ns,
+  if (dev::env("HULLDBG")) printf("hull %s: %d states, %d+%d+%d points, %zu refined, %d triangles%s\n", inside ? "cockpit" : "outside", ns,
                                 n0 * n0 * n0, (int)c1.size(), (int)refine.size() * 64, refine.size(), H.verts / 3, inside ? fmt(" (airframe %.3f m from the eye)", dEye).c_str() : "");
 }
 
@@ -337,7 +338,7 @@ void Renderer::drawTrafficHulls(const FrameParams& fp, const PlaneMesh* const* m
     if (meshes && meshes[k] && it != hulls.end() && it->second.ok && !it->second.verts) { hm[k] = nullptr; continue; }
     if (it == hulls.end() || !it->second.ok || !it->second.verts) {
       static int warned = 0;
-      if (getenv("HULLDBG") && warned++ < 3) printf("traffic hulls: aircraft %d of %d has none (type %.0f)\n", k, n, fp.traffic[k].t[2]);
+      if (dev::env("HULLDBG") && warned++ < 3) printf("traffic hulls: aircraft %d of %d has none (type %.0f)\n", k, n, fp.traffic[k].t[2]);
       return;
     }
     hm[k] = &it->second;
@@ -474,7 +475,7 @@ void Renderer::drawHull(const FrameParams& fp, int slot, uint64_t key, float nea
   glBindVertexArray(0);
   glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
   glDisable(GL_DEPTH_TEST);
-  static const char* vis = getenv("HULLVIS");   // (debug: the hull channel as an image - grey by distance, red inside, black missed)
+  static const char* vis = dev::env("HULLVIS");   // (debug: the hull channel as an image - grey by distance, red inside, black missed)
   if (vis) {
     std::vector<float> px((size_t)rw * rh * 2);
     glReadBuffer(GL_COLOR_ATTACHMENT0); glReadPixels(0, 0, rw, rh, GL_RG, GL_FLOAT, px.data());

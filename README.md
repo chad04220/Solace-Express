@@ -321,6 +321,10 @@ Menus work with the mouse or a gamepad (the left stick moves a cursor, **A** cli
 There are no third-party dependencies to install: the game uses only what Windows provides (Win32, OpenGL, WinMM,
 XInput, DirectInput and Media Foundation).
 
+The development switches (environment variables such as `HULLDBG`, `TOD`, `WX`, `REGION_AIRPORT`: `src/dev_switches.h`)
+are read by the tests, the harnesses and `diagnostics.bat`'s tool modes, and by the game only when `--dev` is on its
+command line: a variable in a player's shell never changes the game.
+
 **Visual Studio 2022 or newer (MSVC):**
 
 ```

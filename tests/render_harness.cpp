@@ -171,8 +171,8 @@ struct GameTest {
     if (game.career.board.empty()) { c.from = game.career.location; c.to = (c.from + 1) % (int)g_world.airports.size(); c.title = "Test"; }
     game.startFlight(c, 1, Career::SRC_RENT);
     int frames = 0, pend0 = -1; const int b0 = g_ren.bakeBuilt;
-    while (game.screen == SCR_LOADING && game.loadReadyT < 0 && frames < 2000) { game.update(1.f / 30.f); game.render(); if (pend0 < 0) pend0 = g_ren.entPending; frames++; }
-    printf("loading from %s: first frame pending %d, ready after %d frames (%.1f s of game time), meshes built %d\n", g_world.airports[c.from].code, pend0, frames, game.loadT, g_ren.bakeBuilt - b0);
+    while (game.screen == SCR_LOADING && game.loading.readyT < 0 && frames < 2000) { game.update(1.f / 30.f); game.render(); if (pend0 < 0) pend0 = g_ren.entPending; frames++; }
+    printf("loading from %s: first frame pending %d, ready after %d frames (%.1f s of game time), meshes built %d\n", g_world.airports[c.from].code, pend0, frames, game.loading.t, g_ren.bakeBuilt - b0);
     return 0;
   }
   // A session through the menus and into flight, every frame timed (the seamlessness check): the launch's prewarm, then
@@ -272,7 +272,7 @@ struct GameTest {
       begin("research: terminal"); frames(60);
       begin("research: initiate, loading screen");
       game.launchResearch(); stillWorst = 0;
-      for (int i = 0; i < 6000 && game.screen == SCR_LOADING && game.loadReadyT < 0; i++) frame("loading");
+      for (int i = 0; i < 6000 && game.screen == SCR_LOADING && game.loading.readyT < 0; i++) frame("loading");
       frames(30, "establishing shot");
       game.in.pressed[K_ENTER] = true; frame("into the flight");
       printf("loading: the screen held still at most %.0f ms\n", stillWorst);
@@ -314,7 +314,7 @@ struct GameTest {
     game.freeCraft = 0; game.freeAirborne = true;
     game.freeAirport = std::max(0, g_world.findAirport(pack ? "KMVY" : "CAP"));
     game.launchFreeFlight();
-    for (int i = 0; i < 6000 && game.screen == SCR_LOADING && game.loadReadyT < 0; i++) frame("loading");
+    for (int i = 0; i < 6000 && game.screen == SCR_LOADING && game.loading.readyT < 0; i++) frame("loading");
     frames(30, "establishing shot");
     game.in.pressed[K_ENTER] = true; frame("into the flight");
     if (game.screen != SCR_FLIGHT) { printf("not in flight (screen %d)\n", (int)game.screen); return 1; }

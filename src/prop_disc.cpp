@@ -1,11 +1,12 @@
 // Traffic and detached propellers over the lit frame: at most two small, depth-tested rectangles per aircraft.
 #include "renderer.h"
+#include "dev_switches.h"
 #include "prop_disc.h"
 #include "models.h"
 #include "aircraft.h"
 
 void Renderer::rasterTrafficProps(const FrameParams& fp) {
-  static const bool off = getenv("TRAFFICPROPOFF") != nullptr;
+  static const bool off = dev::env("TRAFFICPROPOFF") != nullptr;
   // The existing wreck hull path is perspective-only (wreckMesh); do not leave
   // floating prop discs in a panoramic feed where that hull is not drawn.
   const bool wreckProps = fp.plane.on && fp.wreck.pieces > 0 && fp.plane.propCount > 0 && fp.pano <= 0.f;

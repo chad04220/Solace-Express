@@ -8,6 +8,7 @@
 // beside it. The fragment shader writes the ground material into the G-buffer. The sea is a radial grid at y = 0
 // that rides along with the camera.
 #include "renderer.h"
+#include "dev_switches.h"
 #include "shaders.h"
 #include "procedural_regions.h"
 #include "earth_charts.h"
@@ -758,10 +759,10 @@ void Renderer::selectTerrainChunks(const FrameParams& fp) {
     for (size_t i = 0; i < n; i++) std::copy_n(&v[order[i].second * 4], 4, &sorted[i * 4]);
     v.swap(sorted);
   };
-  static const bool unsorted = getenv("TERRUNSORTED") != nullptr;   // (debug: the old order, to compare)
+  static const bool unsorted = dev::env("TERRUNSORTED") != nullptr;   // (debug: the old order, to compare)
   if (!unsorted) { nearestFirst(terrInst); nearestFirst(terrInstCoarse); }
   terrChunks = (int)terrInst.size() / 4; terrChunksCoarse = (int)terrInstCoarse.size() / 4;
-  static const bool chunkDbg = getenv("CHUNKDBG") != nullptr;   // (debug: the chunks drawn, and how many copies of the islands they span)
+  static const bool chunkDbg = dev::env("CHUNKDBG") != nullptr;   // (debug: the chunks drawn, and how many copies of the islands they span)
   if (chunkDbg) printf("terrain: %d chunks + %d coarse, copies out to %d, reach %.0f km (camera %.0f m up)\n", terrChunks, terrChunksCoarse, K, reach * 0.001f, cam.y);
 }
 

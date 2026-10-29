@@ -1,5 +1,6 @@
 // Somnium Volandi - effects: jet exhausts, lights, the UFO, lightning strikes, crash wreckage, particles
 #include "road_traffic.h"
+#include "dev_switches.h"
 #include "volcano_effects.h"
 #include "game.h"
 #include "earth_charts.h"
@@ -407,7 +408,7 @@ float Game::partImpact(vec3 p, vec3 v, float E, float fire, bool water) {
           vec3(0.3f, 0.24f, 0.17f) * k, 0.95f, SPR_SMOKE, 0.6f, -9.f);
   }
   // the dust: a skirt rolling out low over the ground, and a cloud rising over the pit that drifts off on the wind
-  if (getenv("WRECKDBG")) printf("impact at %.1f s: %.0f kJ, crater %.1f m%s\n", crashTimer, E * 1e-3f, R, fire > 0.3f ? ", burning" : "");
+  if (dev::env("WRECKDBG")) printf("impact at %.1f s: %.0f kJ, crater %.1f m%s\n", crashTimer, E * 1e-3f, R, fire > 0.3f ? ", burning" : "");
   const int nd = (int)clampf(6.f + R * 5.f, 6.f, 60.f);
   for (int i = 0; i < nd; i++) {
     const float a = r.range(0.f, 6.2832f);

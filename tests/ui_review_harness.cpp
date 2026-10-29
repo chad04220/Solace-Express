@@ -305,10 +305,10 @@ struct GameTest {
     require(!g_ren.tshRequiredPending(1.f),"missing optional shadow shader does not block readiness");
     require(!g_ren.tshRequiredPending(-.1f),"night shadow does not block readiness");
     g_ren.entPending=0;
-    g.in=Input{};g.loadFrames=2;g.loadObservedFrame=-1;g.loadStableFrames=0;g.loadReadyT=-1;g.loadShown=0;g.loadBakeSeen=g_ren.bakeCount;
+    g.in=Input{};g.loading.frames=2;g.loading.observedFrame=-1;g.loading.stableFrames=0;g.loading.readyT=-1;g.loading.shown=0;g.loading.bakeSeen=g_ren.bakeCount;
     for(int i=0;i<30;i++)g.updateLoading(1.f/30);
-    require(g.loadReadyT<0&&g.loadStableFrames==1&&g.loadShown<1,"repeated updates without a rendered frame cannot complete loading");
-    g.loadFrames=3;g.updateLoading(1.f/30);require(g.loadReadyT>=0&&g.loadShown==1,"distinct stable completed frame permits readiness");
+    require(g.loading.readyT<0&&g.loading.stableFrames==1&&g.loading.shown<1,"repeated updates without a rendered frame cannot complete loading");
+    g.loading.frames=3;g.updateLoading(1.f/30);require(g.loading.readyT>=0&&g.loading.shown==1,"distinct stable completed frame permits readiness");
     g_ren.entPending=oldPending;
     printf("PASS loading requires distinct completed frames; absent optional shadow shader cannot deadlock\n");
   }
@@ -480,10 +480,10 @@ struct GameTest {
     if(sc=="settings"||sc=="controls"){g.screen=SCR_HUB;g.hubTab=TAB_SETTINGS;g.settingsPage=sc=="controls"?1:0;}
     if(sc.rfind("loading",0)==0){
       g.contract=g_story[0];g.plane.spec=&kAircraft[0];g.wx=g.contract.wx;
-      g.loadT=5;g.loadShown=.57f;g.loadMap=true;g.screen=SCR_LOADING;
-      g.loadFrames=2;g.loadPend0=80;g.loadStableFrames=0;g_ren.entPending=32;g.loadShown=.64f;
-      sscanf(sc.c_str(),"loading_%f_%f",&g.loadShown,&g.loadT);
-      if(sc.find("ready")!=std::string::npos){g.loadReadyT=g.loadT;g.loadShown=1;g.loadStableFrames=2;g_ren.entPending=0;}
+      g.loading.t=5;g.loading.shown=.57f;g.loading.map=true;g.screen=SCR_LOADING;
+      g.loading.frames=2;g.loading.pend0=80;g.loading.stableFrames=0;g_ren.entPending=32;g.loading.shown=.64f;
+      sscanf(sc.c_str(),"loading_%f_%f",&g.loading.shown,&g.loading.t);
+      if(sc.find("ready")!=std::string::npos){g.loading.readyT=g.loading.t;g.loading.shown=1;g.loading.stableFrames=2;g_ren.entPending=0;}
       // No map shader is initialized in UI-only mode. Real packaged photographs remain available.
     }
   }
@@ -508,7 +508,7 @@ struct GameTest {
   static void checkImmediateLaunch(const Game& g) {
     if(g.screen!=SCR_LOADING || !g.pendingMilitaryLaunch || !g.militaryLaunchFrameDrawn ||
         g.militaryLaunchFramePresented || g.career.attemptOpen || g.career.military.activeAttempt ||
-        g.militaryFlight || g.loadFrames!=0 || g.loadReadyT>=0) {
+        g.militaryFlight || g.loading.frames!=0 || g.loading.readyT>=0) {
       fprintf(stderr,"FAIL: Deploy must replace its own menu frame with the loading card before any save/mission setup\n");exit(3);
     }
     const auto& c=*g.pendingMilitaryLaunch;const auto& preview=g_ren.loadingPreview();

@@ -11,6 +11,7 @@
 // for the whole airframe; everywhere else the mesh is the airframe and no pixel marches. Meshes are cached on disk by
 // model, view and shader fingerprint.
 #include "renderer.h"
+#include "dev_switches.h"
 #include "models.h"
 #include "shaders.h"
 #include "hull_mesh.h"
@@ -112,7 +113,7 @@ void Renderer::afPack(int m, float M[96]) {
 std::string Renderer::afName(int m) { return std::string(kAircraft[afTypeOf(m)].name) + (m >= kAircraftCount ? " on floats" : ""); }
 int Renderer::afModelOf(const float* M, int model) {
   static_assert(kAfModels == 2 * kAircraftCount, "one own build for each type in the roster, and one for each on floats");
-  static const bool all = getenv("AF_ALL") != nullptr;   // (debug: every aircraft drawn and baked with the shared builds)
+  static const bool all = dev::env("AF_ALL") != nullptr;   // (debug: every aircraft drawn and baked with the shared builds)
   if (all) return -1;
   if (!afKeysSet) {
     for (int m = 0; m < kAfModels; m++) { float P[96]; if (afExists(m)) { afPack(m, P); afKeys[m] = trafficModelKey(P); } else afKeys[m] = 0; }
@@ -147,7 +148,7 @@ GLuint Renderer::afMeshProgram(int model) {
 // an aircraft's own builder for one of its bodies: the outside's has no cabin code (AF_OUTSIDE)
 static std::string bakeDefines(int model, int slot) {
   float M[96]; Renderer::afPack(model, M);
-  return aircraftDefines(Renderer::afTypeOf(model), M) + (slot == 0 ? "#define AF_OUTSIDE\n" : "") + (getenv("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "");
+  return aircraftDefines(Renderer::afTypeOf(model), M) + (slot == 0 ? "#define AF_OUTSIDE\n" : "") + (dev::env("CLIPDBG") ? "#define WR_CLIPDEBUG\n" : "");
 }
 bool Renderer::afBakePrograms(int model, int slot, GLuint out[2]) {
   AfOwn& a = afOwn[model];
@@ -209,7 +210,7 @@ bool Renderer::exportPrebuiltAircraft(const FrameParams& fp, int slot, const std
   if (slot < 0 || slot > 1 || fp.plane.model < 0 || fp.plane.model >= kAfModels || !fp.plane.on || fp.wreck.pieces || quality < 0) {
     exportError = "export requires a canonical intact aircraft and view"; return false;
   }
-  if (getenv("AF_ALL") || getenv("CLIPDBG")) { exportError = "debug/shared geometry cannot be exported as canonical"; return false; }
+  if (dev::env("AF_ALL") || dev::env("CLIPDBG")) { exportError = "debug/shared geometry cannot be exported as canonical"; return false; }
   float M[96]; packModelOf(fp.plane.model, M);
   if (std::memcmp(M, fp.plane.M, sizeof M)) { exportError = "custom model parameters cannot be exported as canonical"; return false; }
   std::error_code ec;
@@ -251,7 +252,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
   const int own = afModelOf(M, pv.model);
   float canonicalM[96]; if (own >= 0) afPack(own, canonicalM);
   const bool canonical = own >= 0 && pv.model == own && std::memcmp(M, canonicalM, sizeof canonicalM) == 0;
-  if (!aircraftExportCapture && !prebuiltAircraftDir.empty() && canonical && !getenv("AF_ALL") && !getenv("CLIPDBG")) {
+  if (!aircraftExportCapture && !prebuiltAircraftDir.empty() && canonical && !dev::env("AF_ALL") && !dev::env("CLIPDBG")) {
     aircraftAsset::MeshData data; std::string assetError;
     const aircraftAsset::Identity id = prebuiltAircraftIdentity(own, slot);
     const std::string assetPath = (std::filesystem::path(prebuiltAircraftDir) / aircraftAsset::filename(id)).string();
@@ -259,7 +260,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
       vb.swap(data.vertices); ib.swap(data.indices); hullTri.swap(data.hull); partBlob.swap(data.parts); fineStart = data.fineStart;
       prebuiltMeshHits++;
       if (onBodyLoaded) onBodyLoaded(true);
-      if (getenv("HULLDBG")) printf("mesh %s: packaged full-quality asset (%zu vertices)\n", inside ? "cockpit" : "outside", vb.size() / 8);
+      if (dev::env("HULLDBG")) printf("mesh %s: packaged full-quality asset (%zu vertices)\n", inside ? "cockpit" : "outside", vb.size() / 8);
       bakeLog("loaded packaged aircraft mesh " + aircraftAsset::filename(id));
     } else {
       prebuiltMeshMisses++;
@@ -288,7 +289,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
       ok = ok && aircraftMesh::valid(vb, ib) && aircraftMesh::validBlob(partBlob);
       for (float x : hullTri) ok = ok && aircraftMesh::finite(x);
       if (!ok) { vb.clear(); ib.clear(); hullTri.clear(); partBlob.clear(); fineStart = 0; std::error_code ec; std::filesystem::remove(path, ec); }
-      else { meshCacheHits++; if (onBodyLoaded) onBodyLoaded(false); if (getenv("HULLDBG")) printf("mesh %s: from the cache (%zu vertices)\n", inside ? "cockpit" : "outside", vb.size() / 8); }
+      else { meshCacheHits++; if (onBodyLoaded) onBodyLoaded(false); if (dev::env("HULLDBG")) printf("mesh %s: from the cache (%zu vertices)\n", inside ? "cockpit" : "outside", vb.size() / 8); }
     }
   }
   const auto tBake = std::chrono::steady_clock::now();
@@ -488,7 +489,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
       phase("  eval");
       if (iso != 0.f) for (float& x : cv) x -= iso;
       std::vector<int> cubeV(cells.size() * nOwn, -1);   // each slot's cubes -> vertex (local)
-      const bool reportToggle = sub == aircraftMesh::kNocturneToggleSub && getenv("HULLDBG");
+      const bool reportToggle = sub == aircraftMesh::kNocturneToggleSub && dev::env("HULLDBG");
       const size_t toggleLatticeBytes = reportToggle ? cpts.capacity()*sizeof(vec3) + cv.capacity()*sizeof(float) + cubeV.capacity()*sizeof(int)
           + (slotOf.keys.capacity()+rim.keys.capacity())*sizeof(int64_t)
           + (slotOf.vals.capacity()+rim.vals.capacity()+cc.capacity())*sizeof(int) : 0;
@@ -590,7 +591,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
             toggleLatticeBytes, togglePeakBytes);
       }
       phase("  pull");
-      if (getenv("HULLDBG")) {   // how far off the surface the vertices still sit
+      if (dev::env("HULLDBG")) {   // how far off the surface the vertices still sit
         int n2mm = 0, n5mm = 0; float mx = 0.f;
         for (size_t q = 0; q < vpos.size(); q++) { float a = fabsf(d4[q * 4] - iso); mx = std::max(mx, a); if (a > 0.002f) n2mm++; if (a > 0.005f) n5mm++; }
         printf("mesh %s (lattice %.2f cm): %zu vertices off the surface: %d > 2 mm, %d > 5 mm, max %.1f mm\n", inside ? "cockpit" : "outside", h * 100.f, vpos.size(), n2mm, n5mm, mx * 1000.f);
@@ -649,7 +650,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     if (!toggleCells.empty()) {
       const size_t samplesBefore = nLattice, verticesBefore = vb.size()/8, indicesBefore = ib.size();
       nets(toggleCells, aircraftMesh::kNocturneToggleSub, 0.f, 0.f);
-      if (getenv("HULLDBG")) printf("mesh Nocturne toggles: %zu core cells, %zu overlap cells, %zu samples, %zu raw vertices, %zu raw triangles; lattice 3.90625 mm\n",
+      if (dev::env("HULLDBG")) printf("mesh Nocturne toggles: %zu core cells, %zu overlap cells, %zu samples, %zu raw vertices, %zu raw triangles; lattice 3.90625 mm\n",
           toggleSet.size(), toggleCells.size()-toggleSet.size(), nLattice-samplesBefore, vb.size()/8-verticesBefore, (ib.size()-indicesBefore)/3);
       phase("toggle detail nets");
     }
@@ -879,7 +880,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
             || !aircraftMesh::repairNormals(pvb, pib) || !aircraftMesh::valid(pvb, pib)) {
           partsValid = false; break;   // join the outstanding workers before rejecting this bake
         }
-        if (getenv("HULLDBG")) printf("mesh part %d: %d x %d x %d lattice, %zu vertices, %zu triangles\n", type, nx, ny, nz, vp.size(), pib.size() / 3);
+        if (dev::env("HULLDBG")) printf("mesh part %d: %d x %d x %d lattice, %zu vertices, %zu triangles\n", type, nx, ny, nz, vp.size(), pib.size() / 3);
         // simplified as the airframe is (the cockpit's controls to 0.3 mm, the exterior's parts to 0.8 mm)
         partOut.push_back(std::make_unique<PartOut>(PartOut{type, std::move(pvb), std::move(pib), 0, pl[pi].sx, pl[pi].sy}));
         PartOut* po = partOut.back().get(); po->raw = po->ib.size() / 3;
@@ -906,7 +907,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
     // existing vertex-log depth cannot place the roof beyond it in front. No shader/depth change.
     if (inside && pv.model == kVigil && int(M[21*4+2] + .5f) == 2) {
       const size_t added = aircraftMesh::boundOverheadEdges(vb, ib, fineStart, M + 22*4);
-      if (getenv("HULLDBG")) printf("mesh Vigil overhead: added %zu local triangles\n", added);
+      if (dev::env("HULLDBG")) printf("mesh Vigil overhead: added %zu local triangles\n", added);
     }
     // A small set of conventional cabin triangles survived extraction with a
     // winding opposite all three agreeing field normals. Keep intentional
@@ -918,7 +919,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
         for (auto& th : partSimp) th.join();
         fprintf(stderr, "Rejected invalid cabin orientation input; using SDF fallback\n"); return;
       }
-      if (getenv("HULLDBG")) printf("mesh cockpit winding: %zu repaired, %zu opposite-face pairs preserved\n", stats.flipped, stats.pairedSkipped);
+      if (dev::env("HULLDBG")) printf("mesh cockpit winding: %zu repaired, %zu opposite-face pairs preserved\n", stats.flipped, stats.pairedSkipped);
     }
     // ---- the cabin's flat faces, flat: a vertex at the foot of a rounded edge carries the bend's turned normal, and
     // across the simplified mesh's large flat triangles it smeared a band of the bend over the face - on the XR-40's
@@ -967,7 +968,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
         }
         nFlat++;
       }
-      if (getenv("HULLDBG")) printf("mesh cockpit: %d of %zu triangles flat-shaded\n", nFlat, nt);
+      if (dev::env("HULLDBG")) printf("mesh cockpit: %d of %zu triangles flat-shaded\n", nFlat, nt);
     }
     aircraftMesh::compact(vb, ib);
     for (auto& th : partSimp) th.join();
@@ -1005,15 +1006,15 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
         po->vb.insert(po->vb.end(), v, v + 8);
         nCr++;
       }
-      if (getenv("HULLDBG")) printf("mesh part %d: %d corners on creases\n", po->type, nCr);
+      if (dev::env("HULLDBG")) printf("mesh part %d: %d corners on creases\n", po->type, nCr);
       if (int(pv.M[2]+.5f)==6 && !somnusLoadout::roundSurfaces(po->type).empty()) {
         aircraftMesh::PlanarRepairStats flatStats;
         if (!aircraftMesh::repairVerifiedPlanarNormals(po->vb,po->ib,cn,flatStats)) {
           fprintf(stderr,"Rejected invalid Somnus planar-part input; using SDF fallback\n"); return;
         }
-        if(getenv("HULLDBG"))printf("Somnus part %d: %zu verified planar faces repaired\n",po->type,flatStats.repaired);
+        if(dev::env("HULLDBG"))printf("Somnus part %d: %zu verified planar faces repaired\n",po->type,flatStats.repaired);
         const auto repaired=somnusLoadout::repairRoundNormals(po->type,po->vb,po->ib);
-        if(getenv("HULLDBG"))printf("Somnus part %d: %zu verified round faces repaired\n",po->type,repaired);
+        if(dev::env("HULLDBG"))printf("Somnus part %d: %zu verified round faces repaired\n",po->type,repaired);
       }
       // Skerry's thin control surfaces have proven planar faces whose edge
       // corner normals smeared across long triangles. Reuse the existing inset
@@ -1023,7 +1024,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
         if (!aircraftMesh::repairVerifiedPlanarNormals(po->vb, po->ib, cn, stats)) {
           fprintf(stderr, "Rejected invalid planar-part input; using SDF fallback\n"); return;
         }
-        if (getenv("HULLDBG")) printf("mesh part %d planar: %zu repaired, %zu vertices added, triangles unchanged\n", po->type, stats.repaired, stats.addedVertices);
+        if (dev::env("HULLDBG")) printf("mesh part %d planar: %zu repaired, %zu vertices added, triangles unchanged\n", po->type, stats.repaired, stats.addedVertices);
       }
     }
     hullBakePart = -1;
@@ -1032,10 +1033,10 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
       size_t at = partBlob.size(); partBlob.resize(at + po->vb.size());
       memcpy(&partBlob[at], po->vb.data(), po->vb.size() * sizeof(float));
       partBlob.insert(partBlob.end(), po->ib.begin(), po->ib.end());
-      if (getenv("HULLDBG")) printf("mesh part %d simplified: %zu -> %zu triangles\n", po->type, po->raw, po->ib.size() / 3);
+      if (dev::env("HULLDBG")) printf("mesh part %d simplified: %zu -> %zu triangles\n", po->type, po->raw, po->ib.size() / 3);
     }
-    if (getenv("HULLDBG")) printf("mesh %s simplified: %zu -> %zu triangles\n", inside ? "cockpit" : "outside", rawTris, ib.size() / 3);
-    if (getenv("HULLDBG")) {
+    if (dev::env("HULLDBG")) printf("mesh %s simplified: %zu -> %zu triangles\n", inside ? "cockpit" : "outside", rawTris, ib.size() / 3);
+    if (dev::env("HULLDBG")) {
       int nmov = 0; for (uint8_t m : moving) nmov += m;
       printf("mesh %s: %d states, %zu band cells (%d moving, %d thin), %zu lattice samples, %zu vertices, %zu triangles, moving hull %zu triangles\n",
              inside ? "cockpit" : "outside", ns, cand.size(), nmov, nThin, nLattice, vb.size() / 8, ib.size() / 3, hullTri.size() / 9);
@@ -1049,14 +1050,14 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
       PM.ok = false; return;
     }
     phase("finish");
-    if (getenv("HULLDBG")) printf("phases:%s\n", phaseLog.c_str());
+    if (dev::env("HULLDBG")) printf("phases:%s\n", phaseLog.c_str());
     {   // (where it went: compile.log)
       const double all = std::chrono::duration<double>(std::chrono::steady_clock::now() - tBake).count();
       const int own = afModelOf(M, pv.model);
       char line[320]; snprintf(line, sizeof line, "baked %s's %s body in %.1f s: its builder's programs %.1f s, the field %.1f s (%.1f M points), the frames shown %.1f s, the meshing %.1f s",
                                own >= 0 ? afName(own).c_str() : "an aircraft", inside ? "cockpit" : "outside", all, progS, bakeEvalS, bakeEvalPts * 1e-6, bakeYieldS, all - progS - bakeEvalS - bakeYieldS);
       bakeLog(line);
-      if (getenv("HULLDBG")) printf("%s\n", line);
+      if (dev::env("HULLDBG")) printf("%s\n", line);
     }
     if (aircraftExportCapture) {
       // Capture every final array before any upload or loss of the moving-hull eye flag. The format validator
@@ -1087,7 +1088,7 @@ void Renderer::bakePlaneMesh(const FrameParams& fp, int slot, uint64_t key) {
   // tips/spinners. Nominal flight-model dimensions can differ (notably XR-40).
   // Cockpit geometry is never a source of aircraft size annotations.
   PM.previewBounds = inside ? AircraftPreviewBounds{} : aircraftPreviewBounds(vb);
-  if (getenv("HULLDBG") && PM.previewBounds.valid) {
+  if (dev::env("HULLDBG") && PM.previewBounds.valid) {
     const auto& b = PM.previewBounds;
     printf("preview dimensions model=%d: rigid exterior span=%.3f m length=%.3f m, x=[%.3f,%.3f] z=[%.3f,%.3f]\n",
       fp.plane.model, b.right.x-b.left.x, b.tail.z-b.nose.z, b.left.x,b.right.x,b.nose.z,b.tail.z);
@@ -1231,7 +1232,7 @@ void Renderer::computePartPoses(const FrameParams& fp, const PlaneMesh* player, 
 // the bound program (its other uniforms and the depth state the caller's); nothing when the poses are not this mesh's
 void Renderer::drawPlaneParts(const PlaneMesh& pm, GLuint prog, int trafK) {
   if (trafK < -1 || trafK >= kMaxTrafficDrawn) return;
-  static const bool noParts = getenv("WRECKNOPARTS") != nullptr; if (noParts && meshPiece >= 0) return;   // (debug)
+  static const bool noParts = dev::env("WRECKNOPARTS") != nullptr; if (noParts && meshPiece >= 0) return;   // (debug)
   const PoseOwner& O = poseOwner[trafK + 1];
   if (O.pm != &pm || !O.n) return;
   glActiveTexture(GL_TEXTURE0 + 30); glBindTexture(GL_TEXTURE_2D, texPartPose); glUniform1i(U(prog, "uPartPose"), 30);
@@ -1244,7 +1245,7 @@ void Renderer::drawPlaneParts(const PlaneMesh& pm, GLuint prog, int trafK) {
       glUniform1i(U(prog, "uPartType"), type);
       if (wreckDraw == 2) glUniform3f(U(prog, "uPartC"), P->c.x, P->c.y, P->c.z);
       glBindVertexArray(P->vao);
-      static const bool single = getenv("PARTNOINST") != nullptr;   // deterministic A/B of identical poses and order
+      static const bool single = dev::env("PARTNOINST") != nullptr;   // deterministic A/B of identical poses and order
       if (single) for (int k = i; k < end; k++) { glUniform1i(U(prog, "uPartInst"), k); glDrawElements(GL_TRIANGLES, P->idx, GL_UNSIGNED_INT, nullptr); }
       else glDrawElementsInstanced(GL_TRIANGLES, P->idx, GL_UNSIGNED_INT, nullptr, end - i);
     }
@@ -1310,7 +1311,7 @@ void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const f
   if (!pm.ok || !pm.idx) return;
   // depth first, with nothing shaded: the skin's far side, the far wing and the cabin's hidden surfaces never run the
   // material shader (already done when the frame began with it)
-  static const bool noPre = getenv("MESHNOPRE") != nullptr;   // (debug: no depth pre-pass)
+  static const bool noPre = dev::env("MESHNOPRE") != nullptr;   // (debug: no depth pre-pass)
   if (!noPre && !depthDone) drawPlaneMeshDepth(fp, pm, rot, pos, trafK);
   mat4 vp = viewProjRel(fp, 0.01f, 2000.f);
   const vec3 rp = pos - fp.camPos;
@@ -1358,7 +1359,7 @@ void Renderer::drawPlaneMesh(const FrameParams& fp, const PlaneMesh& pm, const f
 // them all; an update that changes an aircraft builds that aircraft's again) - for the loading bar's pacing and wording
 void Renderer::checkMeshCache() {
   meshCached = false;
-  if (!prebuiltAircraftDir.empty() && !getenv("AF_ALL") && !getenv("CLIPDBG")) {
+  if (!prebuiltAircraftDir.empty() && !dev::env("AF_ALL") && !dev::env("CLIPDBG")) {
     for (int model = 0; model < kAircraftCount; model++) for (int slot = 0; slot < 2; slot++) {
       std::error_code ec;
       if (std::filesystem::is_regular_file(std::filesystem::path(prebuiltAircraftDir) / prebuiltAircraftFilename(model, slot), ec)) {
@@ -1450,7 +1451,7 @@ void Renderer::splitWreck(const FrameParams& fp, const PlaneMesh& pm) {
   glBindVertexArray(0);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   wreckSplit.key = pm.key; wreckSplit.layout = layout;
-  if (getenv("WRECKDBG")) { printf("wreck: %zu triangles over %d pieces:", ib.size() / 3, n); for (int i = 0; i < n; i++) printf(" %d", wreckSplit.count[i] / 3); printf("\n"); }
+  if (dev::env("WRECKDBG")) { printf("wreck: %zu triangles over %d pieces:", ib.size() / 3, n); for (int i = 0; i < n; i++) printf(" %d", wreckSplit.count[i] / 3); printf("\n"); }
 }
 
 void Renderer::setWreckBoxes(GLuint p, const WreckVisual& wv) {
@@ -1513,7 +1514,7 @@ bool Renderer::wreckVisible(const FrameParams& fp, int i) const {
 void Renderer::drawWreck(const FrameParams& fp, const PlaneMesh& pm) {
   splitWreck(fp, pm);
   int drawn = 0;
-  static const int maxDraw = getenv("WRECKMAX") ? atoi(getenv("WRECKMAX")) : 99;   // (debug: the cost of each piece's draws)
+  static const int maxDraw = dev::env("WRECKMAX") ? atoi(dev::env("WRECKMAX")) : 99;   // (debug: the cost of each piece's draws)
   wreckDraw = 1;   // (each piece's own triangles)
   for (int i = 0; i < fp.wreck.pieces; i++) {
     if (!wreckVisible(fp, i) || drawn >= maxDraw) continue;
@@ -1525,6 +1526,6 @@ void Renderer::drawWreck(const FrameParams& fp, const PlaneMesh& pm) {
   wreckDraw = 2;   // (then the rigid parts, every piece's in one draw for each kind of part)
   drawPlaneMesh(fp, pm, fp.plane.rot, fp.plane.pos, -1);
   wreckDraw = 0;
-  static const bool dbg = getenv("WRECKDBG") != nullptr;
+  static const bool dbg = dev::env("WRECKDBG") != nullptr;
   if (dbg) { static int frame = 0; if (frame++ % 30 == 0) printf("wreck: %d of %d pieces drawn\n", drawn, fp.wreck.pieces); }
 }

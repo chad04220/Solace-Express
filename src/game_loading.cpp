@@ -46,7 +46,7 @@ void Game::updateLoading(float dt) {
       in.pressed[K_ESC] = false; in.buttonsPressed &= ~PAD_B;   // (the menu returned to doesn't take it as its own Back)
       return;
     }
-    loadT += dt;
+    loading.t += dt;
     if (!launchFramePresented) return;
     PendingLaunch L = std::move(*pendingLaunch);
     pendingLaunch.reset();
@@ -64,7 +64,7 @@ void Game::updateLoading(float dt) {
   }
   if (pendingMilitaryLaunch) {
     if (in.pressed[K_ESC] || (in.buttonsPressed & PAD_B)) { returnToMilitary(); return; }
-    loadT += dt;
+    loading.t += dt;
     if (!militaryLaunchFramePresented) return;
     const Contract c = *pendingMilitaryLaunch;
     pendingMilitaryLaunch.reset();
@@ -84,34 +84,34 @@ void Game::updateLoading(float dt) {
   }
   if (militaryFlight && (in.pressed[K_ESC] || (in.buttonsPressed & PAD_B))) { returnToMilitary(); return; }
   warmCombatCollision();
-  loadT += dt;
+  loading.t += dt;
   if (!headless) g_ren.prepareTerrainDepth();   // (ground depth first's program, for its trials in flight: renderer.h)
   if (!headless && earthFlight) g_ren.prepareTerrainDither();   // (the ground's program for the Earth regions' far blends)
-  if (loadReadyT < 0) {
+  if (loading.readyT < 0) {
     dbgCam = false;
     updateCamera(dt);   // stream around the camera the flight will open with
     g_ren.entBudgetMs = 14.f;
-    const SceneWork work = sceneWork(loadBakeSeen);
-    loadPend0 = std::max(loadPend0, work.pending);
+    const SceneWork work = sceneWork(loading.bakeSeen);
+    loading.pend0 = std::max(loading.pend0, work.pending);
     // Observe completed scene frames; elapsed time alone is not evidence that any work finished.
-    if (loadFrames != loadObservedFrame) {
-      const bool viewsIn = headless || loadViewsDrawn || crashed || !plane.spec;   // (the flight's views each drawn once: render)
-      if (loadFrames >= 2 && work.ready() && viewsIn) ++loadStableFrames;
-      else loadStableFrames = 0;
-      loadObservedFrame = loadFrames;
+    if (loading.frames != loading.observedFrame) {
+      const bool viewsIn = headless || loading.viewsDrawn || crashed || !plane.spec;   // (the flight's views each drawn once: render)
+      if (loading.frames >= 2 && work.ready() && viewsIn) ++loading.stableFrames;
+      else loading.stableFrames = 0;
+      loading.observedFrame = loading.frames;
     }
-    const float completed = sceneProgress(loadSetupDone(), loadFrames >= 2 ? work.pending : std::max(1, loadPend0), loadPend0, loadFrames >= 2 && !work.shadow, std::min(loadStableFrames / 2.f, 1.f));
-    loadShown = std::max(loadShown, std::min(completed, 0.99f));
-    if (loadStableFrames >= 2) { loadReadyT = loadT; loadShown = 1.f; g_ren.entBudgetMs = 2.5f; }
+    const float completed = sceneProgress(loadSetupDone(), loading.frames >= 2 ? work.pending : std::max(1, loading.pend0), loading.pend0, loading.frames >= 2 && !work.shadow, std::min(loading.stableFrames / 2.f, 1.f));
+    loading.shown = std::max(loading.shown, std::min(completed, 0.99f));
+    if (loading.stableFrames >= 2) { loading.readyT = loading.t; loading.shown = 1.f; g_ren.entBudgetMs = 2.5f; }
     // a research sortie: the preview has already streamed its airport, so the flight opens at once (no establishing shot)
-    if (loadReadyT >= 0 && researchFlight && !headless) {
+    if (loading.readyT >= 0 && researchFlight && !headless) {
       screen = SCR_FLIGHT; dbgCam = false;
       if (!resAirborne) { camQ = plane.q; camPos = plane.pos + plane.q.rotate(vec3(0, 3, 15)); }
       return;
     }
   } else {
     // establishing shot: a slow orbit round the aircraft on the ground, or a camera flying alongside in the air
-    float t = loadT - loadReadyT, size = std::max(plane.spec->span, plane.spec->fusLen);
+    float t = loading.t - loading.readyT, size = std::max(plane.spec->span, plane.spec->fusLen);
     dbgCam = true; dbgFollow = false;
     if (plane.onGround) {
       float a = plane.heading() * DEG + 2.2f + t * 0.07f, R = size * 1.9f + 10.f;
@@ -281,7 +281,7 @@ void Game::loadLogTick() {
   const double ms = std::chrono::duration<double, std::milli>(now - loadLogLast).count();
   loadLogLast = now;
   if (screen == SCR_LOADING && loadLog.size() < 4000) {
-    LoadLogFrame L{ms, launchCardPending(), launchSetUpShown, loadFrames, std::max(0, g_ren.entPending), loadViewsStep, loadingShadowPending(), loadWarmStep, loadShownInside};
+    LoadLogFrame L{ms, launchCardPending(), launchSetUpShown, loading.frames, std::max(0, g_ren.entPending), loading.viewsStep, loadingShadowPending(), loading.warmStep, loadShownInside};
     L.upd = lastUpdate.total; L.rnd = lastRenderMs; L.baked = lastRenderBaked; L.compiled = lastRenderCompiled; L.compileMs = lastRenderCompileMs;
     for (const auto& p : lastUpdate.parts) if (p.second >= 20.0) L.parts += fmt("%s%s %.0f", L.parts.empty() ? "" : ", ", p.first, p.second);
     loadLog.push_back(std::move(L));
@@ -290,7 +290,7 @@ void Game::loadLogTick() {
   }
   loadLogging = false;
   if (!loadLog.empty()) {   // (the last frame of it - the flight's first - with what its update and render did, as any frame's)
-    LoadLogFrame L{ms, false, false, loadFrames, std::max(0, g_ren.entPending), loadViewsStep, false, loadWarmStep, loadShownInside};
+    LoadLogFrame L{ms, false, false, loading.frames, std::max(0, g_ren.entPending), loading.viewsStep, false, loading.warmStep, loadShownInside};
     L.upd = lastUpdate.total; L.rnd = lastRenderMs; L.baked = lastRenderBaked; L.compiled = lastRenderCompiled; L.compileMs = lastRenderCompileMs;
     for (const auto& p : lastUpdate.parts) if (p.second >= 20.0) L.parts += fmt("%s%s %.0f", L.parts.empty() ? "" : ", ", p.first, p.second);
     loadLog.push_back(std::move(L));
@@ -327,8 +327,7 @@ bool Game::queueLaunch(const Contract& card, int spec, LaunchKind kind, std::fun
   PendingLaunch L; L.card = card; L.spec = spec; L.kind = kind; L.from = screen; L.paused = paused; L.begin = std::move(begin);
   pendingLaunch = std::move(L);
   launchFrameDrawn = launchFramePresented = false;
-  loadT = 0; loadReadyT = -1; loadShown = 0; loadPend0 = 0; loadFrames = 0; loadViewsDrawn = false; loadViewsStep = 0; loadWarmStep = 0; loadWarmAt = -1;
-  loadStableFrames = 0; loadObservedFrame = -1; loadMap = loadBackdrop = false; launchSetUpShown = false;
+  loading.reset(g_ren.bakeCount); launchSetUpShown = false;
   screen = SCR_LOADING;
   in.pressed[K_ENTER] = in.pressed[' '] = false; in.mPressed[0] = false;
   in.buttonsPressed &= ~(PAD_A | PAD_START);

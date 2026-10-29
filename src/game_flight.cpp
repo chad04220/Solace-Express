@@ -318,7 +318,7 @@ void Game::startFlight(const Contract& c, int spec, Career::Source src, const Ca
   // the player sees a loading screen while the scenery around the start is generated (tests fly straight away)
   screen = headless ? SCR_FLIGHT : SCR_LOADING;
   if (!loadLogging) loadLogBegin();
-  loadT = 0; loadReadyT = -1; loadShown = 0; loadPend0 = 0; loadFrames = 0; loadViewsDrawn = false; loadViewsStep = 0; loadWarmStep = 0; loadWarmAt = -1; loadStableFrames = 0; loadBakeSeen = g_ren.bakeCount; loadObservedFrame = -1; loadMap = loadBackdrop = false; dbgCam = dbgFollow = false; benchPin = false;
+  loading.reset(g_ren.bakeCount); dbgCam = dbgFollow = false; benchPin = false;
   atc.cancel(); atcF = AtcFlight(); hintsVoiced.clear(); commsPending.clear(); lessonVoiceWarned = false;   // (the last flight's calls go before this one's announcements)
   // (a hazard call is said only while the hazard holds: a "PULL UP" queued behind the tower played at 1,958 m, climbing -
   // the review of v3.44.0, AUD-3)

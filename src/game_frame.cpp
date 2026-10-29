@@ -1,5 +1,6 @@
 // Somnium Volandi - the frame assembled for the renderer: FrameParams and the sprites
 #include "road_traffic.h"
+#include "dev_switches.h"
 #include "volcano_effects.h"
 #include "game.h"
 #include "earth_charts.h"
@@ -128,7 +129,7 @@ FrameParams Game::buildFrame() {
   // was there, and each segment's strength (opening in a moment, filling in over a minute, faded at the oldest end;
   // none across a gap)
   fp.wakeN = 0;
-  static const bool wakeOff = getenv("WAKEOFF") != nullptr;   // (debug A/B: no wake through the cloud)
+  static const bool wakeOff = dev::env("WAKEOFF") != nullptr;   // (debug A/B: no wake through the cloud)
   if (flying && !wakeOff && !cloudWake.empty() && wx.cloudCover >= 0.02f) {
     std::vector<WakePt> pts = cloudWake;
     if (!wakeGap && !crashed) { const WakePt L = pts.back(); const vec3 hp = plane.pos + vec3(cloudOff.x, 0, cloudOff.y); pts.push_back(wakeHere(hp, false, L.odo + length(hp - L.c))); }
@@ -166,7 +167,7 @@ FrameParams Game::buildFrame() {
       float* q = fp.wakeE[fp.wakeEN++]; q[0] = j.r.x; q[1] = j.r.y; q[2] = j.hot ? -j.R : j.R; q[3] = j.swirl;
     }
     fp.wakeA[0] = wk.gamPair; fp.wakeA[1] = wk.b0; fp.wakeA[2] = 7.f * std::max(wk.span, 1.f) / std::max(wk.V, 20.f); fp.wakeA[3] = 0.f;
-    static const bool wakeDbg = getenv("WAKEDBG") != nullptr;   // (debug: the wake handed to the cloud pass)
+    static const bool wakeDbg = dev::env("WAKEDBG") != nullptr;   // (debug: the wake handed to the cloud pass)
     if (wakeDbg) {
       printf("wake: %d points, sphere r %.0f\n", n, fp.wakeB[3]);
       for (int i = 0; i < n; i++) printf("  %2d: %+7.0f %+6.0f %+7.0f from the aircraft, r %4.1f, K %.2f, sunk %4.1f, age %4.1f, density %.2f\n", i, fp.wake[i][0] - plane.pos.x, fp.wake[i][1] - plane.pos.y, fp.wake[i][2] - plane.pos.z, fp.wake[i][3], fp.wakeP[i][0], fp.wakeP[i][1], fp.wakeP[i][3], wxfield::cloudDensity(wx, vec3(fp.wake[i][0], fp.wake[i][1], fp.wake[i][2]), true));

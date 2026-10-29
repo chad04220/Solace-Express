@@ -1,5 +1,6 @@
 // Somnium Volandi - development scenes for the harnesses and diagnostics.bat (Game::debugScene)
 #include "road_traffic.h"
+#include "dev_switches.h"
 #include "volcano_effects.h"
 #include "game.h"
 #include "earth_charts.h"
@@ -49,7 +50,7 @@ void Game::debugScene(const std::string& name) {
     }
     if (!regionError.empty()) throw std::runtime_error(regionError);
     freeCraft = 0; freeAirport = 0; freeAirborne = true;
-    if (const char* code = getenv("REGION_AIRPORT")) freeAirport = std::max(0, g_world.findAirport(code));   // (REGION_AIRPORT=<code>: start there)
+    if (const char* code = dev::env("REGION_AIRPORT")) freeAirport = std::max(0, g_world.findAirport(code));   // (REGION_AIRPORT=<code>: start there)
     launchFreeFlight();
     camMode = 2; camYaw = .65f; camPitch = .2f; camZoom = 3.f; hudOn = false;
     if (ocean) {
@@ -60,23 +61,23 @@ void Game::debugScene(const std::string& name) {
       plane.vel = plane.forward() * plane.spec->cruise;
       camYaw = -.5f * PI; camPitch = .15f;
     }
-    if (getenv("REGION_ALT")) plane.pos.y = std::max(plane.pos.y, (float)atof(getenv("REGION_ALT")));
-    if (getenv("REGION_TOD")) timeOfDay = (float)atof(getenv("REGION_TOD"));   // (REGION_TOD=<hours>: the time of day there)
-    if (getenv("REGION_STYLE")) g_world.buildingStyle = atoi(getenv("REGION_STYLE"));   // (REGION_STYLE=<n>: its houses built another way)
+    if (dev::env("REGION_ALT")) plane.pos.y = std::max(plane.pos.y, (float)atof(dev::env("REGION_ALT")));
+    if (dev::env("REGION_TOD")) timeOfDay = (float)atof(dev::env("REGION_TOD"));   // (REGION_TOD=<hours>: the time of day there)
+    if (dev::env("REGION_STYLE")) g_world.buildingStyle = atoi(dev::env("REGION_STYLE"));   // (REGION_STYLE=<n>: its houses built another way)
     for (int i = 0; i < 8; ++i) updateCamera(.1f);
     // REGION_VIEW="x,y,z,lookx,looky,lookz": a fixed camera over the region (its overview, for a review shot)
-    if (const char* view = getenv("REGION_VIEW")) {
+    if (const char* view = dev::env("REGION_VIEW")) {
       vec3 p, l;
       if (sscanf(view, "%f,%f,%f,%f,%f,%f", &p.x, &p.y, &p.z, &l.x, &l.y, &l.z) == 6) { dbgCam = true; dbgFollow = false; dbgCamPos = p; dbgCamLook = l; }
     }
     // REGION_APV=<view>: an airport detail view of REGION_AIRPORT's field (airportView)
-    if (const char* apv = getenv("REGION_APV"); apv && getenv("REGION_AIRPORT")) {
+    if (const char* apv = dev::env("REGION_APV"); apv && dev::env("REGION_AIRPORT")) {
       airportView(freeAirport, atoi(apv), dbgCamPos, dbgCamLook); dbgCam = true; dbgFollow = false;
     }
     // REGION_GPS=<range m>: the GPS open over the region (its airports and landmarks)
-    if (const char* gps = getenv("REGION_GPS")) { showMap = true; uiAnim[0x6e61u] = 1.f; gpsRangeTarget = gpsRange = std::max(2000.f, (float)atof(gps)); }
+    if (const char* gps = dev::env("REGION_GPS")) { showMap = true; uiAnim[0x6e61u] = 1.f; gpsRangeTarget = gpsRange = std::max(2000.f, (float)atof(gps)); }
     toasts.clear(); botControl = true;
-    if (getenv("REGION_HUB")) {   // REGION_HUB=1: the career's hub in the region (a CPL career travelled there, its board drawn)
+    if (dev::env("REGION_HUB")) {   // REGION_HUB=1: the career's hub in the region (a CPL career travelled there, its board drawn)
       endFlight(false, "Region hub", OUT_ABANDONED);
       career = Career{}; career.license = LIC_CPL; career.money = 25000; career.storyIndex = 12;
       career.region = descriptor->id; career.location = procedural::mainAirport(descriptor->id); career.refreshBoard();
@@ -106,17 +107,17 @@ void Game::debugScene(const std::string& name) {
     float yawD = 0, pitD = 10, thrP = -1, nozP = 0, zoom = 0.55f, tod = -1; sscanf(name.c_str() + 4, "%f_%f_%f_%f_%f_%f", &yawD, &pitD, &thrP, &nozP, &zoom, &tod);
     if (tod >= 0) resTime = tod;
     resAirborne = true; realTime = 20; launchResearch(); wx.cloudCover = 0.3f;
-    if (getenv("JCLOUD")) { wx.cloudCover = (float)atof(getenv("JCLOUD")); wx.cloudBase = plane.pos.y + 250.f; }   // cloud checks
+    if (dev::env("JCLOUD")) { wx.cloudCover = (float)atof(dev::env("JCLOUD")); wx.cloudBase = plane.pos.y + 250.f; }   // cloud checks
     if (thrP >= 0) {   // optional throttle (and nozzle) percent: let the exhaust plumes and sparks develop
       plane.ctl.throttle = thrP / 100.f; plane.engineSpool = thrP / 100.f; plane.ctl.flaps = plane.flaps = plane.nozzle = nozP / 100.f;
       for (int i = 0; i < 30; i++) { realTime += 1 / 60.f; update(1 / 60.f); plane.engineSpool = thrP / 100.f; }
     }
-    if (getenv("JMACH")) {   // flying at a forced Mach number (vapour cone checks)
-      float M = (float)atof(getenv("JMACH"));
+    if (dev::env("JMACH")) {   // flying at a forced Mach number (vapour cone checks)
+      float M = (float)atof(dev::env("JMACH"));
       for (int i = 0; i < 10; i++) { plane.vel = plane.forward() * (M * 330.f); realTime += 1 / 60.f; update(1 / 60.f); }
       plane.vel = plane.forward() * (M * 330.f); plane.mach = M;
     }
-    if (getenv("WRSPARKS")) { int n = 0; for (auto& q : particles) if (q.kind == SPR_SPARK && n < 16) { vec3 b = plane.q.conj().rotate(q.p - plane.pos), v = plane.q.conj().rotate(q.v - plane.vel); printf("spark body (%.1f, %.1f, %.1f) rel v (%.0f, %.0f, %.0f) age %.2f\n", b.x, b.y, b.z, v.x, v.y, v.z, q.maxLife - q.life); n++; } }
+    if (dev::env("WRSPARKS")) { int n = 0; for (auto& q : particles) if (q.kind == SPR_SPARK && n < 16) { vec3 b = plane.q.conj().rotate(q.p - plane.pos), v = plane.q.conj().rotate(q.v - plane.vel); printf("spark body (%.1f, %.1f, %.1f) rel v (%.0f, %.0f, %.0f) age %.2f\n", b.x, b.y, b.z, v.x, v.y, v.z, q.maxLife - q.life); n++; } }
     camMode = 2; camYaw = yawD * DEG; camPitch = pitD * DEG; camZoom = zoom; hudOn = false;
     for (int i = 0; i < 5; i++) updateCamera(0.1f);
     toasts.clear(); return;
@@ -186,7 +187,7 @@ void Game::debugScene(const std::string& name) {
     const int siteWas = resAirport, wxWas = resWx;
     if (site >= 0) resAirport = std::min(site, (int)g_world.airports.size() - 1);
     if (wxSel >= 0) resWx = std::min(wxSel, 2);
-    resCraft = kSomnus; realTime = 20; resAirborne = mode != 2; resTime = getenv("TOD") ? (float)atof(getenv("TOD")) : hour >= 0.f ? hour : 12.f; launchResearch();
+    resCraft = kSomnus; realTime = 20; resAirborne = mode != 2; resTime = dev::env("TOD") ? (float)atof(dev::env("TOD")) : hour >= 0.f ? hour : 12.f; launchResearch();
     resAirport = siteWas; resWx = wxWas;   // (the research menu's own choices: this scene's are for this flight only)
     // (over town 1: 3 km short of the town's centre, 450 m over it, heading across it at 200 m/s. 2: the same flight
     // over its centre, held there - flying on, going nowhere - a scene that holds still, for timing the worst of it: in
@@ -209,15 +210,15 @@ void Game::debugScene(const std::string& name) {
     if (mode == 1) { plane.ctl.flaps = 1; flapNotch = 1; plane.flaps = plane.nozzle = 1; plane.vel = vec3(); plane.ctl.throttle = 0.66f; plane.engineRunning = true; plane.engineSpool = 0.66f; }
     else if (mode != 2) { plane.apEngage(Plane::AP_HOLD, -1, wx); }
     if (mode == 3 || mode == 4) somnus.cloakOn = true;
-    if (getenv("WRCLOUD")) { wx.cloudCover = (float)atof(getenv("WRCLOUD")); wx.cloudBase = plane.pos.y - 60.f; }   // craft inside the cloud deck
+    if (dev::env("WRCLOUD")) { wx.cloudCover = (float)atof(dev::env("WRCLOUD")); wx.cloudBase = plane.pos.y - 60.f; }   // craft inside the cloud deck
     if (mode == 5 || mode == 6) { somnus.armed = true; }
-    if (getenv("WRTHR")) { plane.ctl.throttle = (float)atof(getenv("WRTHR")); plane.apSpeed = 900.f; }
-    if (getenv("WRSPD")) { plane.vel = plane.forward() * (float)atof(getenv("WRSPD")); plane.apSpeed = (float)atof(getenv("WRSPD")); }
+    if (dev::env("WRTHR")) { plane.ctl.throttle = (float)atof(dev::env("WRTHR")); plane.apSpeed = 900.f; }
+    if (dev::env("WRSPD")) { plane.vel = plane.forward() * (float)atof(dev::env("WRSPD")); plane.apSpeed = (float)atof(dev::env("WRSPD")); }
     if (mode == 5) somnus.bayHold = 100.f;
     // 9: cockpit looking down while a bomb falls (secs after release); 10: the same, secs after it goes off
-    bool bombCk = mode == 9 || mode == 10 || (mode == 8 && getenv("WRBOMB"));
+    bool bombCk = mode == 9 || mode == 10 || (mode == 8 && dev::env("WRBOMB"));
     if (mode == 7 || bombCk) { somnus.bombQueue = 1; somnus.armed = bombCk; }
-    if (getenv("WRUFO")) { startUfo(); ufo.side = (float)atof(getenv("WRUFO")); }   // UFO alongside (side -1 / 1)
+    if (dev::env("WRUFO")) { startUfo(); ufo.side = (float)atof(dev::env("WRUFO")); }   // UFO alongside (side -1 / 1)
     float firstDrop = 0; vec3 blastAt;
     int frames = (int)((mode == 3 ? 0.55f : mode == 7 || mode == 10 ? 60.f : mode == 9 ? 30.f : secs) * 60.f);
     float dropT = -1, boomAt = -1;
@@ -230,7 +231,7 @@ void Game::debugScene(const std::string& name) {
       }
       realTime += 1 / 60.f; update(1 / 60.f);
       if (mode == 6) somnus.wantFire = true;   // trigger held
-      if (getenv("WRTHR")) { plane.ctl.throttle = (float)atof(getenv("WRTHR")); plane.engineSpool = std::max(plane.engineSpool, plane.ctl.throttle * 0.98f); }
+      if (dev::env("WRTHR")) { plane.ctl.throttle = (float)atof(dev::env("WRTHR")); plane.engineSpool = std::max(plane.engineSpool, plane.ctl.throttle * 0.98f); }
       if (mode == 7 && !somnus.blasts.empty() && firstDrop == 0) { firstDrop = realTime; blastAt = somnus.blasts[0].p; }
       if (mode == 7 && firstDrop > 0 && realTime - firstDrop > secs) break;
     }
@@ -250,7 +251,7 @@ void Game::debugScene(const std::string& name) {
       }
       printf("wr: speed %.0f m/s, %d young bolts: streak tails off the firing line by <= %.2f m, along-error <= %.2f m\n", length(plane.vel), n, worstOff, worstAlong);
     }
-    if (getenv("WRSPARKS")) { int n = 0; for (auto& q : particles) if (q.kind == SPR_SPARK && n < 12) { vec3 b = plane.q.conj().rotate(q.p - plane.pos); printf("spark body (%.1f, %.1f, %.1f) life %.2f\n", b.x, b.y, b.z, q.life); n++; } }
+    if (dev::env("WRSPARKS")) { int n = 0; for (auto& q : particles) if (q.kind == SPR_SPARK && n < 12) { vec3 b = plane.q.conj().rotate(q.p - plane.pos); printf("spark body (%.1f, %.1f, %.1f) life %.2f\n", b.x, b.y, b.z, q.life); n++; } }
     if (ufo.on) { vec3 r = plane.q.conj().rotate(ufo.pos - plane.pos); printf("wr: ufo t %.1f at craft-frame (%.0f, %.0f, %.0f) m\n", ufo.t, r.x, r.y, r.z); }
     toasts.clear(); hint.clear();
     for (auto& b : somnus.blasts) printf("wr: blast age %.2f R %.0f at %.0f %.0f %.0f particles %d\n", b.age, b.R, b.p.x, b.p.y, b.p.z, (int)particles.size());
@@ -314,12 +315,12 @@ void Game::debugScene(const std::string& name) {
   if (name == "jet") { c = g_story[g_story.size() - 4]; spec = 6; }
   if (name == "night") { c = g_story[11]; c.wx.timeOfDay = 21.5f; spec = 1; }
   if (name == "snow") { c = g_story[20]; spec = 2; }
-  if (const char* sp = getenv("SPEC")) {   // (SPEC=<career or research aircraft>: that one flies the scene)
+  if (const char* sp = dev::env("SPEC")) {   // (SPEC=<career or research aircraft>: that one flies the scene)
     for (int t : kCareerAircraft) if (t == atoi(sp)) spec = t;
     for (int t : kResearchAircraft) if (t == atoi(sp)) spec = t;
   }
   startFlight(c, spec, Career::SRC_OWNED);
-  if (const char* w = !s_wxScene.empty() ? s_wxScene.c_str() : getenv("WX")) {   // weather checks: WX="cover,base m,precip,storm,wind kt,from deg,gust kt,turbulence,time of day"
+  if (const char* w = !s_wxScene.empty() ? s_wxScene.c_str() : dev::env("WX")) {   // weather checks: WX="cover,base m,precip,storm,wind kt,from deg,gust kt,turbulence,time of day"
     float v[9] = {wx.cloudCover, wx.cloudBase, (float)wx.precip, wx.storm ? 1.f : 0.f, wx.windSpeed * MS_TO_KT, wx.windFrom, wx.gust * MS_TO_KT, wx.turbulence, wx.timeOfDay};
     sscanf(w, "%f,%f,%f,%f,%f,%f,%f,%f,%f", &v[0], &v[1], &v[2], &v[3], &v[4], &v[5], &v[6], &v[7], &v[8]);
     wx.cloudCover = v[0]; wx.cloudBase = v[1]; wx.precip = (int)v[2]; wx.storm = v[3] > 0.5f; wx.windSpeed = v[4] / MS_TO_KT; wx.windFrom = v[5];
@@ -365,7 +366,7 @@ void Game::debugScene(const std::string& name) {
       printf("lasertest: %d destroyed, %d scorch pits, %d bolts in flight\n", somnus.wrecked, (int)somnus.scorch.size(), (int)somnus.bolts.size());
       vec3 f = q.rotate(vec3(0, 0, -1)); vec3 tgt = pos + f * (70.f / std::max(-f.y, 0.2f));
       hudOn = false; dbgCam = true; dbgFollow = false; toasts.clear(); hint.clear();
-      float cd = getenv("LTDIST") ? (float)atof(getenv("LTDIST")) : 1.f;
+      float cd = dev::env("LTDIST") ? (float)atof(dev::env("LTDIST")) : 1.f;
       dbgCamLook = tgt; dbgCamPos = tgt + vec3(70.f, 45.f, 40.f) * cd;
       for (int i = 0; i < 5; i++) updateCamera(0.1f);
       return;
@@ -462,25 +463,25 @@ void Game::debugScene(const std::string& name) {
     if (name == "storm") { p = vec3(10000, 700, 10000); hdg = 120; }
     if (name == "snow") { p = vec3(20000, 600, -24000); hdg = 80; }
     if (name == "at") {   // AT="x,z,height above the ground,heading": anywhere (CAMPITCH tilts the chase camera down, degrees)
-      float x = 0, z = 0, agl = 300, h = 0; if (getenv("AT")) sscanf(getenv("AT"), "%f,%f,%f,%f", &x, &z, &agl, &h);
+      float x = 0, z = 0, agl = 300, h = 0; if (dev::env("AT")) sscanf(dev::env("AT"), "%f,%f,%f,%f", &x, &z, &agl, &h);
       p = vec3(x, std::max(g_world.height(x, z), 0.f) + agl, z); hdg = h;
     }
-    if (name == "seam" || name == "seamgps") { p = vec3(WRAP_HALF - 1500.f, getenv("SEAMALT") ? (float)atof(getenv("SEAMALT")) : 1500.f, 4000.f); hdg = getenv("SEAMHDG") ? (float)atof(getenv("SEAMHDG")) : 90.f; }   // (out east of the islands, past where the map used to wrap: the open ocean ahead)
+    if (name == "seam" || name == "seamgps") { p = vec3(WRAP_HALF - 1500.f, dev::env("SEAMALT") ? (float)atof(dev::env("SEAMALT")) : 1500.f, 4000.f); hdg = dev::env("SEAMHDG") ? (float)atof(dev::env("SEAMHDG")) : 90.f; }   // (out east of the islands, past where the map used to wrap: the open ocean ahead)
     plane.reset(&kAircraft[spec], p, hdg, kAircraft[spec].maxFuel, 100, true, kAircraft[spec].cruise);
     takeoffAnnounced = true;
     camQ = plane.q;
     if (name == "cockpit") camMode = 1;
-    if (name == "storm" && getenv("STRIKE")) {   // STRIKE=<metres ahead>,<degrees off the nose>,<seconds into it at the shot>: a stroke to the ground
-      float R = 1500.f, off = 0.f, at = 0.06f; sscanf(getenv("STRIKE"), "%f,%f,%f", &R, &off, &at);
+    if (name == "storm" && dev::env("STRIKE")) {   // STRIKE=<metres ahead>,<degrees off the nose>,<seconds into it at the shot>: a stroke to the ground
+      float R = 1500.f, off = 0.f, at = 0.06f; sscanf(dev::env("STRIKE"), "%f,%f,%f", &R, &off, &at);
       const float a = (hdg + off) * DEG;
       const vec3 foot = p + vec3(sinf(a) * R, 0.f, -cosf(a) * R);
       makeStrike(vec3(foot.x + 150.f, std::max(wx.cloudBase, 300.f), foot.z - 80.f), vec3(foot.x, std::max(g_world.height(foot.x, foot.z), 0.f), foot.z), true, 7);
       strikes.back().t = at - 0.1f;   // (the shot's three frames, a 30th of a second apart, on)
       nextLightning = 1e9f;
     }
-    if (name == "hud" && getenv("TDSTAMP")) { tdStampT = realTime - 0.6f; tdStampFpm = (float)atof(getenv("TDSTAMP")); }   // (TDSTAMP=fpm: the touchdown stamp)
+    if (name == "hud" && dev::env("TDSTAMP")) { tdStampT = realTime - 0.6f; tdStampFpm = (float)atof(dev::env("TDSTAMP")); }   // (TDSTAMP=fpm: the touchdown stamp)
     if (name == "hud") {   // HUDDEMO=1: every warning, a tower call, failures and messages lit, to look at the layout
-      if (getenv("HUDDEMO")) {
+      if (dev::env("HUDDEMO")) {
         hudDemo = true;
         atcF.lastCall = "Ambler Alfa Bravo, runway 05, wind 040 at 8, cleared to land."; atcF.lastApt = contract.to; atcF.lastT = flightClock - 42.f;
         plane.fail.engineHealth[0] = 0.4f; plane.fail.alternator = true; plane.fail.battery = 0.6f; plane.fail.ice = 0.3f;
@@ -493,31 +494,31 @@ void Game::debugScene(const std::string& name) {
   }
   if (name == "rings" || name == "ringburst") {
     // (RINGWP: the gates already flown through; RINGDIST, RINGUP: the start that far before the next, that high above its centre)
-    if (getenv("RINGWP")) wpIndex = std::min(std::max(atoi(getenv("RINGWP")), 0), std::max((int)contract.wps.size() - 1, 0));
+    if (dev::env("RINGWP")) wpIndex = std::min(std::max(atoi(dev::env("RINGWP")), 0), std::max((int)contract.wps.size() - 1, 0));
     vec3 c, ax, ay; ringGeom(wpIndex, c, ax, ay);
     vec3 nd = normalize(cross(vec3(0, 1, 0), ax));
     float dist = name == "rings" ? 420.f : 160.f;
-    if (getenv("RINGDIST")) dist = (float)atof(getenv("RINGDIST"));
+    if (dev::env("RINGDIST")) dist = (float)atof(dev::env("RINGDIST"));
     float hdg = atan2f(nd.x, -nd.z) / DEG;
-    plane.reset(&kAircraft[0], c - nd * dist - vec3(0, getenv("RINGUP") ? -(float)atof(getenv("RINGUP")) : 12.f, 0), hdg, kAircraft[0].maxFuel, 100, true, kAircraft[0].cruise);
+    plane.reset(&kAircraft[0], c - nd * dist - vec3(0, dev::env("RINGUP") ? -(float)atof(dev::env("RINGUP")) : 12.f, 0), hdg, kAircraft[0].maxFuel, 100, true, kAircraft[0].cruise);
     takeoffAnnounced = true; camQ = plane.q; hint.clear(); toasts.clear(); botControl = true;
-    if (getenv("RINGCOCKPIT")) camMode = 1;
+    if (dev::env("RINGCOCKPIT")) camMode = 1;
     plane.ctl = Controls(); plane.ctl.throttle = 0.7f;
-    if (getenv("SIGHT")) { sightReq = atoi(getenv("SIGHT")); sightAsked = true; sightDone = false; }   // (SIGHT=<site>: the passengers' request on the HUD)
-    if (getenv("GHOST")) {   // (a gate run's ghost alongside: the best run 80 m ahead and 30 m to the right)
+    if (dev::env("SIGHT")) { sightReq = atoi(dev::env("SIGHT")); sightAsked = true; sightDone = false; }   // (SIGHT=<site>: the passengers' request on the HUD)
+    if (dev::env("GHOST")) {   // (a gate run's ghost alongside: the best run 80 m ahead and 30 m to the right)
       contract.type = CT_TRIAL; trialT0 = flightClock; trialT1 = -1.f; ghostBest.clear();
       const vec3 rt = normalize(cross(nd, vec3(0, 1, 0)));
       for (int i = 0; i < 400; i++) ghostBest.push_back(plane.pos + nd * (80.f + i * kGhostDt * kAircraft[0].cruise * 1.05f) + rt * 30.f);
     }
     for (int i = 0; i < 30; i++) updateCamera(0.1f);
     for (int i = 0; i < (name == "rings" ? 60 : 42); i++) { realTime += 1 / 30.f; update(1 / 30.f); }
-    if (getenv("PHOTO")) {   // (PHOTO=<look 0-4>: photo mode over the scene; PHOTOFRAME=<0-3>; PHOTOPANEL=0: without its panel; PHOTOSHOT=<folder>: the shot taken, saved there)
+    if (dev::env("PHOTO")) {   // (PHOTO=<look 0-4>: photo mode over the scene; PHOTOFRAME=<0-3>; PHOTOPANEL=0: without its panel; PHOTOSHOT=<folder>: the shot taken, saved there)
       botControl = false; enterPhoto(); botControl = true;
-      photoLook(atoi(getenv("PHOTO")));
-      if (getenv("PHOTOFRAME")) photo.frame = atoi(getenv("PHOTOFRAME"));
-      if (getenv("PHOTOPANEL")) photo.panel = atoi(getenv("PHOTOPANEL")) != 0;
-      if (getenv("PHOTOSHOT")) { photoDir = getenv("PHOTOSHOT"); photo.capture = 1; }
-      if (getenv("PHOTOPAD")) in.pad = true;   // (PHOTOPAD: the panel's controller prompts)
+      photoLook(atoi(dev::env("PHOTO")));
+      if (dev::env("PHOTOFRAME")) photo.frame = atoi(dev::env("PHOTOFRAME"));
+      if (dev::env("PHOTOPANEL")) photo.panel = atoi(dev::env("PHOTOPANEL")) != 0;
+      if (dev::env("PHOTOSHOT")) { photoDir = dev::env("PHOTOSHOT"); photo.capture = 1; }
+      if (dev::env("PHOTOPAD")) in.pad = true;   // (PHOTOPAD: the panel's controller prompts)
     }
     return;
   }
@@ -525,10 +526,10 @@ void Game::debugScene(const std::string& name) {
     bool cessna = name.size() > 8 && name[8] == 'c';   // airbreakc<s>: a light aircraft pushed over hard in a dive instead
     float after = name.size() > 8 + cessna ? atof(name.c_str() + 8 + cessna) : 3.f;
     resAirborne = true; realTime = 20; launchResearch(); hudOn = false;
-    const int bt = getenv("BRKTYPE") ? atoi(getenv("BRKTYPE")) : 1;   // (debug: the type that breaks up, for airbreakc)
+    const int bt = dev::env("BRKTYPE") ? atoi(dev::env("BRKTYPE")) : 1;   // (debug: the type that breaks up, for airbreakc)
     if (cessna) { plane.reset(&kAircraft[bt], plane.pos, 90, kAircraft[bt].maxFuel, 100, true, kAircraft[bt].cruise); researchFlight = false; }
-    const float agl = getenv("BRKALT") ? (float)atof(getenv("BRKALT")) : 2500.f;   // (debug: a lower break-up, its pieces down in seconds)
-    plane.pos.y = std::max(getenv("BRKALT") ? 0.f : plane.pos.y, std::max(g_world.height(plane.pos.x, plane.pos.z), 0.f) + agl);
+    const float agl = dev::env("BRKALT") ? (float)atof(dev::env("BRKALT")) : 2500.f;   // (debug: a lower break-up, its pieces down in seconds)
+    plane.pos.y = std::max(dev::env("BRKALT") ? 0.f : plane.pos.y, std::max(g_world.height(plane.pos.x, plane.pos.z), 0.f) + agl);
     plane.vel = plane.forward() * (cessna ? 95.f : 620.f); plane.ctl.throttle = 1; plane.engineSpool = 1; botControl = true; plane.ctl.pitch = cessna ? -1.f : 1.f;
     camMode = 2; camYaw = 0.9f; camPitch = 0.25f; camZoom = 1.2f;
     float tb = -1, tEnd = -1;
@@ -541,7 +542,7 @@ void Game::debugScene(const std::string& name) {
       if (crashed && crashTimer >= after) break;
     }
     if (!crashed) printf("airbreak: FAIL - no break-up\n");
-    if (getenv("BRKZOOM")) camZoom = (float)atof(getenv("BRKZOOM"));   // (debug: closer in)
+    if (dev::env("BRKZOOM")) camZoom = (float)atof(dev::env("BRKZOOM"));   // (debug: closer in)
     for (int i = 0; i < 5; i++) updateCamera(1 / 60.f);
     toasts.clear(); return;
   }
@@ -561,7 +562,7 @@ void Game::debugScene(const std::string& name) {
     plane.pos.y = std::max(g_world.height(plane.pos.x, plane.pos.z), 0.f) + 180.f;
     plane.q = quat::axisAngle(plane.right(), -50.f * DEG) * plane.q;
     plane.vel = plane.forward() * (isResearchAircraft(idx) ? 250.f : kAircraft[idx].cruise); plane.ctl.throttle = 1; botControl = true; plane.ctl.pitch = 0.f;
-    camMode = 2; camYaw = 0.9f; camPitch = 0.3f; camZoom = getenv("BRKZOOM") ? (float)atof(getenv("BRKZOOM")) : 1.8f;
+    camMode = 2; camYaw = 0.9f; camPitch = 0.3f; camZoom = dev::env("BRKZOOM") ? (float)atof(dev::env("BRKZOOM")) : 1.8f;
     float tb = -1, vHit = 0;
     for (int i = 0; i < 60 * 60; i++) {
       if (!crashed) vHit = length(plane.vel);
@@ -570,7 +571,7 @@ void Game::debugScene(const std::string& name) {
       if (crashed && crashTimer >= after) break;
     }
     if (!crashed) printf("crash: FAIL - never hit\n");
-    if (getenv("WRECKDBG"))   // each piece where it ended: down or not, at rest, how far it dug in, its lowest corner against the ground there
+    if (dev::env("WRECKDBG"))   // each piece where it ended: down or not, at rest, how far it dug in, its lowest corner against the ground there
       for (const WreckPiece& w : wreck) {
         float low = 1e9f, gnd = 0.f;
         const vec3 lo = w.body.lo - w.body.cg, hi = w.body.hi - w.body.cg;
@@ -593,7 +594,7 @@ void Game::debugScene(const std::string& name) {
     if (at != std::string::npos && sscanf(name.c_str() + at + 1, "%f,%f", &ax, &az) == 2) { plane.pos = vec3(ax, std::max(g_world.height(ax, az), 0.f) + 600.f, az); camQ = plane.q; }
     camMode = 1; hint.clear(); toasts.clear();
     for (int i = 0; i < 4; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
-    if (const char* cs = getenv("CKCTL")) {   // (debug: the controls held at pitch,roll,yaw,throttle - yokes, pedals and levers at their stops,
+    if (const char* cs = dev::env("CKCTL")) {   // (debug: the controls held at pitch,roll,yaw,throttle - yokes, pedals and levers at their stops,
       // the aircraft held where it was while they get there: flown, full aft stick at cruise breaks a jet up)
       float cp = 0, cr = 0, cy = 0, ct = 0.7f; sscanf(cs, "%f,%f,%f,%f", &cp, &cr, &cy, &ct);
       botControl = true;
@@ -606,7 +607,7 @@ void Game::debugScene(const std::string& name) {
       gTunnel = 0;
     }
     lookYaw = ly * DEG; lookPitch = lpch * DEG; camYaw = lookYaw; camPitch = lookPitch + 0.12f;
-    if (!getenv("CKCTL")) { plane.ctl.roll = roll; botControl = roll != 0.f || fl != 0.f; }   // (a held roll input: the yokes turn)
+    if (!dev::env("CKCTL")) { plane.ctl.roll = roll; botControl = roll != 0.f || fl != 0.f; }   // (a held roll input: the yokes turn)
     if (fl != 0.f) { plane.ctl.flaps = fl; plane.flaps = fl; }
     toasts.clear(); hint.clear(); return;
   }
@@ -625,13 +626,13 @@ void Game::debugScene(const std::string& name) {
   }
   if (name.compare(0, 3, "trf") == 0) {   // AI traffic: trf<seconds>_<view> at Solace Capital; view 0 = airport overview, k = chase craft k-1
     float secs = 60; int view = 0; sscanf(name.c_str() + 3, "%f_%d", &secs, &view);
-    set.traffic = getenv("NOTRF") == nullptr;
+    set.traffic = dev::env("NOTRF") == nullptr;
     int ai = g_world.findAirport("CAP"); const Airport& a = g_world.airports[ai];
     float h = a.heading * DEG, sn = sinf(h), cs = cosf(h), side = aptSide(a, ai);
     auto W = [&](float u, float v) { return vec3(a.x + u * sn + v * cs, 0, a.z - u * cs + v * sn); };
     vec3 pp = W(a.length * 0.47f, side * (a.width * 0.5f + 130.f)); pp.y = g_world.height(pp.x, pp.z) + 1.5f;
     plane.reset(&kAircraft[1], pp, a.heading, kAircraft[1].maxFuel, 100, false, 0);
-    takeoffAnnounced = true; camQ = plane.q; hint.clear(); timeOfDay = getenv("TOD") ? (float)atof(getenv("TOD")) : 15.f;
+    takeoffAnnounced = true; camQ = plane.q; hint.clear(); timeOfDay = dev::env("TOD") ? (float)atof(dev::env("TOD")) : 15.f;
     for (float tt = 0; tt < secs; tt += 1 / 20.f) { realTime += 1 / 20.f; update(1 / 20.f); }
     const char* st[] = {"PARKED", "TAXI_OUT", "HOLD", "LINEUP", "TAKEOFF", "CLIMB", "CIRCUIT", "FINAL", "ROLLOUT", "TAXI_IN", "FLY"};
     const char* rl[] = {"airport", "cruiser", "formation", "stunt", "escort"};
@@ -687,7 +688,7 @@ void Game::debugScene(const std::string& name) {
   if (name.compare(0, 3, "esc") == 0) {   // display pair at t seconds: esc<t>_<view>_<aircraft> (0 chase, 1 cockpit, 2 side camera)
     float tt = 20; int view = 0, sp = 1; sscanf(name.c_str() + 3, "%f_%d_%d", &tt, &view, &sp);
     plane.reset(&kAircraft[sp], vec3(-4000, 900, 9000), 40, kAircraft[sp].maxFuel, 100, true, kAircraft[sp].cruise);
-    takeoffAnnounced = true; camQ = plane.q; hint.clear(); timeOfDay = getenv("TOD") ? (float)atof(getenv("TOD")) : 14.f;
+    takeoffAnnounced = true; camQ = plane.q; hint.clear(); timeOfDay = dev::env("TOD") ? (float)atof(dev::env("TOD")) : 14.f;
     plane.engineRunning = true; plane.engineSpool = 0.7f;
     plane.apEngage(Plane::AP_HOLD, -1, wx);
     traffic.spawnEscort(plane.pos, plane.vel);
@@ -707,7 +708,7 @@ void Game::debugScene(const std::string& name) {
   if (name.compare(0, 3, "ufo") == 0) {   // UFO encounter at t seconds: ufo<t>_<view> (0 chase-style, 1 cockpit, 2 close-up of the hatch)
     float tt = 12; int view = 0; sscanf(name.c_str() + 3, "%f_%d", &tt, &view);
     plane.reset(&kAircraft[1], vec3(-4000, 700, 9000), 40, kAircraft[1].maxFuel, 100, true, kAircraft[1].cruise);
-    takeoffAnnounced = true; camQ = plane.q; hint.clear(); timeOfDay = getenv("TOD") ? (float)atof(getenv("TOD")) : 14.f;
+    takeoffAnnounced = true; camQ = plane.q; hint.clear(); timeOfDay = dev::env("TOD") ? (float)atof(dev::env("TOD")) : 14.f;
     botControl = true; plane.ctl.throttle = 0.75f;
     startUfo(); ufo.side = 1.f;
     for (float x = 0; x < tt; x += 1 / 30.f) { realTime += 1 / 30.f; update(1 / 30.f); }
@@ -759,7 +760,7 @@ void Game::debugScene(const std::string& name) {
     sscanf(name.c_str() + 4, "%d_%f_%f_%f_%f_%f", &sp, &yawD, &pitD, &dist, &gearAt, &lift);
     sp = std::clamp(sp, 0, kAircraftCount - 1);
     Contract c; c.from = g_world.findAirport("CAP"); c.to = g_world.findAirport("MDB"); c.title = "Aircraft check";
-    c.wx = Weather(); c.wx.timeOfDay = getenv("TOD") ? (float)atof(getenv("TOD")) : 14.5f; c.wx.cloudCover = 0.2f; c.wx.visibility = 60000;
+    c.wx = Weather(); c.wx.timeOfDay = dev::env("TOD") ? (float)atof(dev::env("TOD")) : 14.5f; c.wx.cloudCover = 0.2f; c.wx.visibility = 60000;
     realTime = 20;
     if (kAircraft[sp].special) { resCraft = sp; resAirport = c.from; resAirborne = false; resTime = c.wx.timeOfDay; resWx = 0; resCard = -1; launchResearch(); camMode = 0; }   // (the research craft as their flights show them; from outside: their flights start in the cockpit, and its cabin alone was drawn)
     else startFlight(c, sp, Career::SRC_OWNED);
@@ -769,14 +770,14 @@ void Game::debugScene(const std::string& name) {
     vec3 off = (plane.forward() * cosf(y) + plane.right() * sinf(y)) * (dist * cosf(pt)) + vec3(0, dist * sinf(pt), 0);
     dbgCam = true; dbgFollow = true; dbgFollowOff = off; dbgCamPos = plane.pos + off; dbgCamLook = plane.pos;
     toasts.clear(); hint.clear(); uiHidden = true; hudOn = false;
-    camMode = getenv("GAVOUT") ? 0 : 1;   // (the cabin model shows the interior through the windows; GAVOUT: the outside model)
-    if (const char* cs = getenv("GAVCTL")) {   // (debug: the controls held at pitch,roll,yaw,flaps - the surfaces' directions)
+    camMode = dev::env("GAVOUT") ? 0 : 1;   // (the cabin model shows the interior through the windows; GAVOUT: the outside model)
+    if (const char* cs = dev::env("GAVCTL")) {   // (debug: the controls held at pitch,roll,yaw,flaps - the surfaces' directions)
       float cp = 0, cr = 0, cy = 0, cf = 0; sscanf(cs, "%f,%f,%f,%f", &cp, &cr, &cy, &cf);
       botControl = true; plane.ctl.pitch = cp; plane.ctl.roll = cr; plane.ctl.yaw = cy; plane.ctl.flaps = cf; plane.flaps = cf;
-      const int n = getenv("GAVCTLN") ? atoi(getenv("GAVCTLN")) : 60;   // (the settle time: the controls' smoothing)
+      const int n = dev::env("GAVCTLN") ? atoi(dev::env("GAVCTLN")) : 60;   // (the settle time: the controls' smoothing)
       for (int i = 0; i < n; i++) { realTime += 1 / 30.f; update(1 / 30.f); }
     }
-    if (const char* th = getenv("GAVTHR")) {   // (debug: the engines running at this throttle - reheat from 0.85 on the jets that have it)
+    if (const char* th = dev::env("GAVTHR")) {   // (debug: the engines running at this throttle - reheat from 0.85 on the jets that have it)
       const float t = clampf((float)atof(th), 0.f, 1.f);
       botControl = true; plane.engineRunning = true; plane.ctl.throttle = t; plane.engineSpool = t; plane.ctl.brake = 1;
       plane.rpm = plane.spec->engineType == ENG_JET ? 24.f + 76.f * t : plane.spec->maxRpm * 0.9f; plane.n1 = 24.f + 76.f * t;
@@ -864,8 +865,8 @@ void Game::debugScene(const std::string& name) {
   if (name == "loading" || name == "loadingready" || name == "loadingair") {   // the pre-flight loading screen: card / live shot
     if (name == "loadingair") { resAirborne = true; resCraft = kResearchJet; launchResearch(); }
     else { Contract c = career.board.empty() ? Contract() : career.board[0]; if (career.board.empty()) { c.from = 0; c.to = 1; c.title = "Lesson 1: Takeoff and Climb"; } startFlight(c, 0, Career::SRC_OWNED); }
-    screen = SCR_LOADING; loadT = 0; loadReadyT = -1; loadMap = loadBackdrop = false; toasts.clear(); hint.clear();
-    if (name != "loading") { loadT = 3.f; loadReadyT = 0.f; loadShown = 1.f; }
+    screen = SCR_LOADING; loading.reset(g_ren.bakeCount); toasts.clear(); hint.clear();
+    if (name != "loading") { loading.t = 3.f; loading.readyT = 0.f; loading.shown = 1.f; }
     return;
   }
   if (name == "seacrash") {  // ditches into deep sea: the wreck must float briefly, then sink to the seabed
@@ -905,7 +906,7 @@ void Game::debugScene(const std::string& name) {
   if (name == "top") { camMode = 2; camYaw = 0.3f; camPitch = 1.35f; camZoom = 4.f; }
   if (name == "orbit") { camMode = 2; camYaw = 2.3f; camPitch = 0.25f; camZoom = 0.6f; timeOfDay = 9.0f; }
   for (int i = 0; i < 30; i++) updateCamera(0.1f);
-  if (name == "hud" && getenv("PADPROMPTS")) { in.pad = true; padActive = true; }   // (PADPROMPTS: the hints as a controller shows them)
+  if (name == "hud" && dev::env("PADPROMPTS")) { in.pad = true; padActive = true; }   // (PADPROMPTS: the hints as a controller shows them)
   if (name == "hud") hint = contract.hints.size() ? expandHint(contract.hints[2], padPrompts(), true) : "";
   if (name == "gps" || name == "pause" || name == "minimap") {
     plane.reset(&kAircraft[1], vec3(-4000, 600, 9000), 40, kAircraft[1].maxFuel, 100, true, kAircraft[1].cruise);
@@ -916,10 +917,10 @@ void Game::debugScene(const std::string& name) {
     if (name == "minimap") showMinimap = true;
     for (int i = 0; i < 30; i++) updateCamera(0.1f);
   }
-  if (name == "at" && getenv("CAMPITCH")) { camPitch = (float)atof(getenv("CAMPITCH")) * DEG; camZoom = 2.5f; for (int i = 0; i < 30; i++) updateCamera(0.1f); }
-  if (name == "at" && getenv("CAMYAW")) {   // CAMYAW=<deg>: the orbit camera that far round from dead astern (CAMZOOM: its distance)
-    camMode = 2; camYaw = (float)atof(getenv("CAMYAW")) * DEG; camPitch = getenv("CAMPITCH") ? (float)atof(getenv("CAMPITCH")) * DEG : .12f;
-    camZoom = getenv("CAMZOOM") ? (float)atof(getenv("CAMZOOM")) : .5f; for (int i = 0; i < 30; i++) updateCamera(0.1f);
+  if (name == "at" && dev::env("CAMPITCH")) { camPitch = (float)atof(dev::env("CAMPITCH")) * DEG; camZoom = 2.5f; for (int i = 0; i < 30; i++) updateCamera(0.1f); }
+  if (name == "at" && dev::env("CAMYAW")) {   // CAMYAW=<deg>: the orbit camera that far round from dead astern (CAMZOOM: its distance)
+    camMode = 2; camYaw = (float)atof(dev::env("CAMYAW")) * DEG; camPitch = dev::env("CAMPITCH") ? (float)atof(dev::env("CAMPITCH")) * DEG : .12f;
+    camZoom = dev::env("CAMZOOM") ? (float)atof(dev::env("CAMZOOM")) : .5f; for (int i = 0; i < 30; i++) updateCamera(0.1f);
   }
   if (name == "seamgps") { showMap = true; uiAnim[0x6e61u] = 1.f; gpsRangeTarget = gpsRange = 25000.f; }
   if (name == "longhaul" || name == "longhaulgps") {   // a long haul under way: an ATP's Emissary 20 km out of Port Verde

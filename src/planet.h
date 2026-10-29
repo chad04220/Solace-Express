@@ -5,6 +5,7 @@
 // matched by planet.glsl). This visual sphere is not a claim of native orbital/ECEF flight dynamics.
 #pragma once
 #include "common.h"
+#include "dev_switches.h"
 #include <cmath>
 #include <cstdlib>
 
@@ -12,7 +13,7 @@ static const float PLANET_RADIUS = 6371000.f;   // the planet's radius (m): the 
 
 // the radius drawn (m; 0: the flat world) - PLANET_RADIUS, or PLANETR's (to compare sizes)
 inline float planetRadius() {
-  static const float r = getenv("PLANETR") ? std::max(0.f, (float)atof(getenv("PLANETR"))) : PLANET_RADIUS;
+  static const float r = dev::env("PLANETR") ? std::max(0.f, (float)atof(dev::env("PLANETR"))) : PLANET_RADIUS;
   return r;
 }
 // sin x / x (kPlanet planetSinc: its series where x is small)

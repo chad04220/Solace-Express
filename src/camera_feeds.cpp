@@ -1,5 +1,6 @@
 // Somnium Volandi - camera feeds: the research jets' cockpit cameras drawn into the feed atlas (see feed_cameras.h)
 #include "renderer.h"
+#include "dev_switches.h"
 #include <algorithm>
 #include <cstdio>
 #include <cmath>
@@ -56,7 +57,7 @@ void Renderer::measureFeedMounts(const FrameParams& fp) {
   for (int j = 0; j < NY; j++) for (int s = 0; s < NZ; s++)
     if (d[n0 + (size_t)j * NZ + s] < 0.f && s * nstep > best) { best = s * nstep; fm.nose = vec3(0.f, -1.2f + j * 0.1f, -(s + 1) * nstep); }
   fm.ok = true;
-  static const bool dbg = getenv("FEEDDBG") != nullptr;
+  static const bool dbg = dev::env("FEEDDBG") != nullptr;
   if (dbg) { printf("feed mounts (rig %d):", rig); for (int i = 0; i < n; i++) printf(" %.2f", fm.skin[i]); printf("  nose %.2f %.2f\n", fm.nose.y, fm.nose.z); }
 }
 
@@ -82,7 +83,7 @@ void Renderer::renderFeeds(const FrameParams& fp, const std::function<void(GLuin
   // the side, aft, overhead and floor panels at 0.45 (three quarters of that on the lowest quality). The displays
   // are small on the screen and sample the atlas bilinearly; at full density the XR-40's twelve panels added four to
   // six main views' worth of pixels to every frame (49 ms of its 100 ms cockpit frame on the owner's GPU).
-  static const float kFront = getenv("FEEDK0") ? (float)atof(getenv("FEEDK0")) : 0.6f, kSide = getenv("FEEDK") ? (float)atof(getenv("FEEDK")) : 0.45f;
+  static const float kFront = dev::env("FEEDK0") ? (float)atof(dev::env("FEEDK0")) : 0.6f, kSide = dev::env("FEEDK") ? (float)atof(dev::env("FEEDK")) : 0.45f;
   const float qk = quality <= 0 ? 0.75f : 1.f;
   auto scaleOf = [&](int k) { return (k == 0 || k == kFeedBombSlot ? kFront : kSide) * qk; };
   int targetW = kFeedMaxW, targetH = kFeedMaxH;
@@ -133,7 +134,7 @@ void Renderer::renderFeeds(const FrameParams& fp, const std::function<void(GLuin
     }
   }
   // which cameras this frame
-  static const int perFrame = getenv("FEEDS") ? std::max(1, atoi(getenv("FEEDS"))) : kMaxFeeds;   // (FEEDS: a cap, for testing)
+  static const int perFrame = dev::env("FEEDS") ? std::max(1, atoi(dev::env("FEEDS"))) : kMaxFeeds;   // (FEEDS: a cap, for testing)
   const float ty = tanf(fp.fovY * 0.5f), tx = ty * W / std::max(H, 1);
   auto inView = [&](const FeedCamera& c) {   // its display's bounding sphere against the view frustum
     vec3 d = c.screen - fp.camPos;
@@ -151,7 +152,7 @@ void Renderer::renderFeeds(const FrameParams& fp, const std::function<void(GLuin
   // picture that has none yet next, then the rest in turn by age, within a pixel budget (about half a 1080p view)
   auto rank = [&](int k) { return k == kFeedBombSlot ? 1 << 30 : k == 0 ? (1 << 30) - 1 : !feedValid[k] ? (1 << 29) + feedAge[k] : feedAge[k]; };
   std::stable_sort(cand.begin(), cand.end(), [&](int a, int b) { return rank(a) > rank(b); });
-  static const long budgetPx = getenv("FEEDPX") ? atol(getenv("FEEDPX")) : 1000000;
+  static const long budgetPx = dev::env("FEEDPX") ? atol(dev::env("FEEDPX")) : 1000000;
   std::vector<int> todo; long spent = 0;
   for (int k : cand) {
     long px = (long)feedTileWH[k][0] * feedTileWH[k][1];
@@ -191,7 +192,7 @@ void Renderer::renderFeeds(const FrameParams& fp, const std::function<void(GLuin
   }
   feedPass = false;
   swapView(feedView);
-  static const char* dump = getenv("FEEDDUMP");   // (debug: write the atlas as it stands after this frame's feeds)
+  static const char* dump = dev::env("FEEDDUMP");   // (debug: write the atlas as it stands after this frame's feeds)
   if (dump) {
     std::vector<float> px((size_t)feedAtlasW * feedAtlasH * 4);
     glBindFramebuffer(GL_FRAMEBUFFER, fboFeed); glReadBuffer(GL_COLOR_ATTACHMENT0);

@@ -1,5 +1,6 @@
 // Native enemy-only rigid meshes. No player packed model or cockpit/gear variants.
 #include "renderer.h"
+#include "dev_switches.h"
 #include "shaders.h"
 #include "enemy_surface_mesh.h"
 #include "enemy_mesh_cache.h"
@@ -109,7 +110,7 @@ void Renderer::rasterEnemyShadowMaps(const FrameParams& fp){
  enemyShOn=0;
  // Build before any feed/main G-buffer pass changes its state. One shared mesh per type.
  for(int k=0;k<std::clamp(fp.enemyN,0,kMaxEnemyCraft);k++)if(enemyCraftValid(fp.enemies[k]))ensureEnemyMesh(int(fp.enemies[k].type));
- if(!progShMap||fp.sunDir.y<=-.05f||getenv("SHMAPOFF"))return;
+ if(!progShMap||fp.sunDir.y<=-.05f||dev::env("SHMAPOFF"))return;
  bool bound=false;vec3 d=normalize(fp.sunDir),up=fabsf(d.y)<.99f?vec3(0,1,0):vec3(0,0,1);
  for(int k=0;k<std::clamp(fp.enemyN,0,kMaxEnemyCraft);k++){
   const auto& c=fp.enemies[k];if(!enemyCraftValid(c))continue;
@@ -188,7 +189,7 @@ void Renderer::prepareReleasedStores(const FrameParams& fp){
 }
 void Renderer::rasterReleasedStoreShadows(const FrameParams& fp){
  storeShOn=0;std::fill(storeShFade,storeShFade+8,0.f);
- if(!storeMeshOn||!progShMap||fp.sunDir.y<=-.05f||getenv("SHMAPOFF"))return;
+ if(!storeMeshOn||!progShMap||fp.sunDir.y<=-.05f||dev::env("SHMAPOFF"))return;
  ensureShadowMaps();glBindFramebuffer(GL_FRAMEBUFFER,fboShMap);
  glFramebufferTextureLayer(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,0,0,0);GLenum none=GL_NONE;glDrawBuffers(1,&none);
  glViewport(0,0,kShMapRes,kShMapRes);glDisable(GL_BLEND);glDisable(GL_CULL_FACE);glEnable(GL_DEPTH_TEST);glDepthFunc(GL_LESS);glDepthMask(GL_TRUE);glColorMask(GL_FALSE,GL_FALSE,GL_FALSE,GL_FALSE);

@@ -619,7 +619,7 @@ update is most of the step's time. A build, in `bakePlaneMesh`:
    that the objects pass marches inside; anything not a part is marched there every frame, so keep it rare.
 7. **Cached** as `mesh_<key>_<stamp>.bin` in the cache folder, validated on read (counts must add up to the file).
 
-`HULLDBG=1` prints each bake: states, how far vertices sit off the surface, and every part's lattice, vertex and
+`HULLDBG=1` (a development switch: the harnesses and tools read them; the game itself only with `--dev` on its command line, `dev_switches.h`) prints each bake: states, how far vertices sit off the surface, and every part's lattice, vertex and
 triangle counts. A slow or huge bake usually means a thin feature, a knife edge or a part box far bigger than its part.
 
 ---

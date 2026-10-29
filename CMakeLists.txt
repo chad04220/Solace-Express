@@ -40,7 +40,7 @@ add_custom_target(aircraft_geometry_gen DEPENDS ${AIRCRAFT_GEOMETRY_GEN})
 # renderer, the UI, the audio): each compiled once, as object libraries, for every program that links them besides the
 # game itself, which keeps its own build (on MSVC it links the static runtime, with its own flags). Before this every
 # test compiled the shared sources itself: the islands' five 39 times over (the review of v3.44.0, ENG-1).
-set(ENVIRONMENT_SOURCES src/geo.cpp src/earth_data.cpp src/earth_charts.cpp src/earth_far.cpp src/earth_fetch.cpp src/earth_install.cpp src/world_earth.cpp src/region_travel.cpp src/procedural_regions.cpp src/distant_regions.cpp src/regional_surface.cpp src/world.cpp src/road_network.cpp src/bridges.cpp src/settlements.cpp src/road_furniture.cpp src/landmarks.cpp src/road_traffic.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp)
+set(ENVIRONMENT_SOURCES src/dev_switches.cpp src/geo.cpp src/earth_data.cpp src/earth_charts.cpp src/earth_far.cpp src/earth_fetch.cpp src/earth_install.cpp src/world_earth.cpp src/region_travel.cpp src/procedural_regions.cpp src/distant_regions.cpp src/regional_surface.cpp src/world.cpp src/road_network.cpp src/bridges.cpp src/settlements.cpp src/road_furniture.cpp src/landmarks.cpp src/road_traffic.cpp src/scenery.cpp src/entities.cpp src/airport_scenery.cpp)
 set(CORE_ONLY_SOURCES
   src/aircraft.cpp src/airframe_fit.cpp src/aircraft_perf.cpp src/aircraft_stunt.cpp src/aircraft_morpheus.cpp src/aero.cpp src/aero_strips.cpp src/aero_wake.cpp src/breakup.cpp src/models.cpp src/career.cpp src/profile.cpp src/weather.cpp src/hive_combat.cpp src/hive_loadout.cpp src/hive_world_collision.cpp)
 set(CORE_SOURCES ${ENVIRONMENT_SOURCES} ${CORE_ONLY_SOURCES})

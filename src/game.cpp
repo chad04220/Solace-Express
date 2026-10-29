@@ -287,7 +287,7 @@ void Game::render() {
   if (screen == SCR_LOADING && launchSetUpShown) { launchSetUpShown = false; renderLaunchCard(); return; }
   // (a flight set up without the card - restarted in place, a tool's: its loading screen alone first too, so its
   // backdrop is in hand before the scene's first frame, the one most likely to bake, can show it from inside a bake)
-  if (screen == SCR_LOADING && !loadBackdrop && !headless) { renderLaunchCard(); return; }
+  if (screen == SCR_LOADING && !loading.backdrop && !headless) { renderLaunchCard(); return; }
   // every menu draws its scene live (the main menu's tour, the hub's airport, the research terminal's preview): the
   // scenery a flight opens with streams in while the player chooses. vid: a full-screen picture instead of the scene
   // (the research terminal's boot screen)
@@ -337,7 +337,7 @@ void Game::render() {
       static auto last = std::chrono::steady_clock::now();
       auto now = std::chrono::steady_clock::now();
       const float dt = std::min(0.1f, std::chrono::duration<float>(now - last).count()); last = now;
-      realTime += dt; loadT += dt;
+      realTime += dt; loading.t += dt;
       g_ren.clearScreen();
       g_ren.uiBegin(); drawLoading(); g_ren.uiEnd();
       platformPresent(); ++loadShownInside;
@@ -349,13 +349,13 @@ void Game::render() {
     // and out, and in the XR-40 a store of each kind and a young blast - before it opens. Building a body or linking a
     // program isn't all of it: drivers finish a program on its first draw. The first look inside the XR-40 took 90 s
     // on the software renderer, each look after it under one; its first bomb seen from outside as long.
-    if (screen == SCR_LOADING && !headless && loadReadyT < 0 && loadFrames >= 2 && loadWarmStep >= loadWarmItems() && !loadViewsDrawn && plane.spec && !crashed) {
+    if (screen == SCR_LOADING && !headless && loading.readyT < 0 && loading.frames >= 2 && loading.warmStep >= loadWarmItems() && !loading.viewsDrawn && plane.spec && !crashed) {
       const int cm = camMode, baked = g_ren.bakeCount; const vec3 cp = camPos;
       const float size = std::max(plane.spec->span, plane.spec->fusLen);
       // (one a frame, the loading screen drawn and shown between them; the view the flight opens with last: the frame
       // after cuts from the other)
       const int order[2] = {cm == 1 ? 1 : 0, cm == 1 ? 0 : 1};
-      for (int view : {order[std::min(loadViewsStep, 1)]}) {
+      for (int view : {order[std::min(loading.viewsStep, 1)]}) {
         camMode = view;
         camPos = view == 1 ? plane.pos + plane.q.rotate(kModels[typeOf(plane.spec)].eye)
                            : cm != 1 ? cp : plane.pos + plane.q.rotate(vec3(0, size * 0.3f, size * 1.4f));
@@ -380,8 +380,8 @@ void Game::render() {
       }
       camMode = cm; camPos = cp;
       g_ren.dropHistory();
-      if (g_ren.bakeCount == baked) loadViewsStep++;   // (a body built at its end was not drawn yet: again, next frame)
-      loadViewsDrawn = loadViewsStep >= 2;
+      if (g_ren.bakeCount == baked) loading.viewsStep++;   // (a body built at its end was not drawn yet: again, next frame)
+      loading.viewsDrawn = loading.viewsStep >= 2;
     }
     fp = buildFrame();
     std::vector<SpriteVert> a, b;
@@ -395,7 +395,7 @@ void Game::render() {
     // panels can cover it, so Deploy can show the same aircraft instantly without another render/decode.
     if (screen == SCR_HUB && hubTab == TAB_CONTRACTS && hubList == 2)
       g_ren.retainLoadingPreview(fp, militarySelection);
-    if (screen == SCR_LOADING && loadReadyT < 0) ++loadFrames;
+    if (screen == SCR_LOADING && loading.readyT < 0) ++loading.frames;
   } else g_ren.clearScreen();
   if(screen==SCR_RESEARCH){g_ren.onMeshProgress=nullptr;g_ren.onMeshBatch=nullptr;}
   if (screen == SCR_LOADING) g_ren.bakeYield = nullptr;   // (only this frame's scene: an update never draws the loading screen)

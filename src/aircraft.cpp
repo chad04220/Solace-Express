@@ -1,5 +1,6 @@
 // Somnium Volandi - aircraft roster and 6-DOF flight model
 #include "aircraft.h"
+#include "dev_switches.h"
 #include "aero.h"
 #include "entities.h"
 #include "scenery.h"
@@ -455,7 +456,7 @@ void Plane::step(float dt, const Weather& wx, float time) {
       float tw = 0.f;
       if (dist > 800.f && apStopNeed(a, apRev, wx, &tw) > a.length && tw > 0.f) {
         apStage = APS_GOAROUND; apStageT = 0; apWindEvent = 1;
-        if (getenv("APDBG")) printf("  go-around at %.0f m: %.1f m/s behind, too long to stop on %.0f m\n", dist, tw, a.length);
+        if (dev::env("APDBG")) printf("  go-around at %.0f m: %.1f m/s behind, too long to stop on %.0f m\n", dist, tw, a.length);
       }
     }
     if (apWindEvent == 1 && apStage == APS_NAV) { apEngage(AP_APPR, apAirport, wx); apWindEvent = 2; }
@@ -1223,7 +1224,7 @@ bool Plane::apTowerGoAround() {
   if (!apOn || apAirport < 0 || onGround || apMode == AP_STUNT) return false;
   if (apStage == APS_GOAROUND) return true;
   if (apStage == APS_ROLLOUT || apStage == APS_DOCK || !apEnv.canGoAround) return false;
-  if (getenv("APDBG")) printf("  go-around: the tower's (runway occupied)\n");
+  if (dev::env("APDBG")) printf("  go-around: the tower's (runway occupied)\n");
   apStage = APS_GOAROUND; apStageT = 0;
   return true;
 }
@@ -1606,8 +1607,8 @@ float Plane::apPlan(int airport, bool rev, const Weather& wx, bool commit) {
   float score = hw * 40.f - bestCost - (F0 - F) * 0.3f - length(bestC - P) * 0.02f - blocked - dive * 15.f
               - (atanf(gs) / DEG - 3.f) * 150.f - (stopShort > 0.f ? 20000.f + stopShort * 20.f : 0.f) - (highAt2k > 0.f ? 20000.f + highAt2k * 20.f : 0.f) - (turnHigh > 0.f ? 20000.f + turnHigh * 20.f : 0.f)
               - (surfBad ? 40000.f : 0.f) - (offChart > 0.f ? 20000.f + offChart * 20.f : 0.f);
-  if (getenv("APDBG")) printf("apPlan %s rev %d: intercept alt %.0f m above the field, glidepath at the gate %.0f m; ", a.code, (int)rev, intAlt - a.elev, iafAlt - a.elev);
-  if (getenv("APDBG")) printf("apPlan %s rev %d: F %.0f gs %.2f deg blocked %.0f wind %+.1f cost %.0f landing %.0f of %.0f m, %.0f m high at 2 km, score %.0f %s (hold %.0f m above the field, leg %.0f m)\n", a.code, (int)rev, F, atanf(gs) / DEG, blocked, hw, bestCost, ldgNeed, a.length, highAt2k, score, apPlanWhy.c_str(), bestAlt - a.elev, legOut);
+  if (dev::env("APDBG")) printf("apPlan %s rev %d: intercept alt %.0f m above the field, glidepath at the gate %.0f m; ", a.code, (int)rev, intAlt - a.elev, iafAlt - a.elev);
+  if (dev::env("APDBG")) printf("apPlan %s rev %d: F %.0f gs %.2f deg blocked %.0f wind %+.1f cost %.0f landing %.0f of %.0f m, %.0f m high at 2 km, score %.0f %s (hold %.0f m above the field, leg %.0f m)\n", a.code, (int)rev, F, atanf(gs) / DEG, blocked, hw, bestCost, ldgNeed, a.length, highAt2k, score, apPlanWhy.c_str(), bestAlt - a.elev, legOut);
   if (commit) {
     apRev = rev; apFinalLen = F; apGs = gs; apHoldC = bestC; apHoldC.y = 0; apHoldR = R; apHoldAlt = bestAlt; apIntAlt = intAlt;
     apLd = ld; apTd = td;
@@ -1853,7 +1854,7 @@ void Plane::apGuidance(float dt) {
         apSpeed = std::max(apSpeed, vref * 1.7f);
         if (dist < 4000.f && dist > 1800.f && hab > 80.f && fabsf(cross) < 60.f && ias > vref * 1.35f) {
           apStage = APS_BLEED; apStageT = 0; apBleedPhase = 0; apBled = true;
-          if (getenv("APDBG")) printf("  belly-up at %.0f m: %.0f m up, ias %.1f (vref %.1f)\n", dist, hab, ias, vref);
+          if (dev::env("APDBG")) printf("  belly-up at %.0f m: %.0f m up, ias %.1f (vref %.1f)\n", dist, hab, ias, vref);
           break;
         }
       }
@@ -1868,7 +1869,7 @@ void Plane::apGuidance(float dt) {
         for (vec3 c : {vec3(-g.track, -gh, g.mainZ), vec3(g.track, -gh, g.mainZ), vec3(0, -gh, g.noseZ)})
           contactCross = std::max(contactCross, fabsf(predictedCross + dot(q.rotate(c), rr)));
         if (contactCross > a.width * 0.5f) {
-          if (getenv("APDBG")) printf("  go-around at %.0f m: lateral capture cross %.1f, drift %.1f m/s, predicted contact %.1f, runway %.0f m\n", dist, cross, dot(vel, rr), contactCross, a.width);
+          if (dev::env("APDBG")) printf("  go-around at %.0f m: lateral capture cross %.1f, drift %.1f m/s, predicted contact %.1f, runway %.0f m\n", dist, cross, dot(vel, rr), contactCross, a.width);
           apStage = APS_GOAROUND; apStageT = 0;
           apStatus = fmt("GO AROUND  %s  LATERAL CAPTURE", a.code);
           break;
@@ -1876,7 +1877,7 @@ void Plane::apGuidance(float dt) {
       }
       // (no go-around when it can't climb away - an engine out, overloaded, iced: it lands from what it has)
       if (E.canGoAround && dist < 2000.f && dist > 250.f && (fabsf(cross) > std::min(80.f, std::max(a.width * 0.5f, 12.f) + dist * 0.03f) || err > 40.f || (err < -80.f && apBleedT > 12.f))) {   // (high just after the belly-up: it comes down steeply)
-        if (getenv("APDBG")) printf("  go-around at %.0f m: cross %.0f, %.0f m %s the glidepath\n", dist, cross, fabsf(err), err > 0.f ? "below" : "above");
+        if (dev::env("APDBG")) printf("  go-around at %.0f m: cross %.0f, %.0f m %s the glidepath\n", dist, cross, fabsf(err), err > 0.f ? "below" : "above");
         apStage = APS_GOAROUND; apStageT = 0;
       }
       {   // (inside the gate the planned corridor is clear, and the glidepath may pass a slope near the field closely: one
@@ -1884,7 +1885,7 @@ void Plane::apGuidance(float dt) {
         vec3 ahead = pos + vec3(ld.x, 0, ld.z) * 800.f;
         float g = dist > F ? hiAhead : g_world.height(ahead.x, ahead.z);
         if (E.canGoAround && dist > 1200.f && pos.y < g + 40.f) {
-          if (getenv("APDBG")) printf("  go-around at %.0f m: ground ahead (%.0f m below, %.0f m above the field)\n", dist, pos.y - g, pos.y - a.elev);
+          if (dev::env("APDBG")) printf("  go-around at %.0f m: ground ahead (%.0f m below, %.0f m above the field)\n", dist, pos.y - g, pos.y - a.elev);
           apStage = APS_GOAROUND; apStageT = 0; } }
       // what can hold itself up on its thrust (the XR-40) comes to a hover over the touchdown point instead of a fast
       // landing roll (after its belly-up, if it does one), starting to slow where it can stop at a gentle 2 m/s^2 - the
@@ -2536,7 +2537,7 @@ void Plane::apControl(float dt) {
   // the turn rate that lies in the pitch axis), tracked with stick scaled by this airframe's learned pitch power
   float qT = G0 * (nzT - cosf(g) * cb) / spd;
   static thread_local float dbgT = 0; dbgT += dt;   // (per thread: the background quote flies the same autopilot - the review of v3.44.0, RND-8)
-  if (getenv("APDBG2") && apMode == AP_APPR && apStage == APS_FINAL && dbgT > 0.5f) { dbgT = 0;
+  if (dev::env("APDBG2") && apMode == AP_APPR && apStage == APS_FINAL && dbgT > 0.5f) { dbgT = 0;
     printf("    fin vsT %5.1f vs %5.1f  gT %5.2f g %5.2f eD %+.3f gI %+.3f  nzT %.2f nz %.2f  pitch %5.1f  ias %5.1f/%5.1f est %5.1f  thr %.2f thrI %.2f flaps %.2f\n",
            vsT, vel.y, gT / DEG, g / DEG, eD, apGamI, nzT, gLoad, pitchDeg(), ias, apSpeed, apSpdEst, ctl.throttle, apThrI, flaps); }
   apRates(qT, pT, rollCap, nzMin, nzMax, dt);
