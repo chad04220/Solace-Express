@@ -22,6 +22,10 @@ A rework of the code's structure (`docs/CODE_REWORK_PLAN.md`), with nothing chan
   prefetch joined after its result was no longer wanted used to swallow whatever it threw; fourteen such places go
   through one `jobs::drain` that logs a failure and stays quiet about a cancellation.
 - A `.clang-format` for the project's style, applied to the lines a change touches.
+- **The scenery streamer is its own part of the renderer.** What chunks the view wants, what the worker threads
+  finished, what is built on the spot and what is prefetched ahead were 90 lines inside the 540-line scenery draw;
+  they are `SceneryStreamer`, which the loading screens and the tools set and wait on by name. The first of the
+  renderer's parts to stand on its own (`docs/CODE_REWORK_PLAN.md` 2.6); the rest follow the same way.
 
 ## What's new in v4.4.2: the flight opens sooner
 

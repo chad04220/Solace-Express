@@ -89,7 +89,7 @@ int main(int argc,char**argv){
   struct stat executable{};if(stat("/proc/self/exe",&executable)!=0){perror("executable stamp");return 1;}
   const std::string worldStamp="living-islands-"+std::to_string((long long)executable.st_size)+"-"+std::to_string((long long)executable.st_mtime);
   g_world.build(cache+"/world.bin",worldStamp);
-  g_shaderCacheDir=cache;g_ren.matDir="assets/materials";g_ren.renderScale=1;g_ren.quality=1;g_ren.entSync=true;
+  g_shaderCacheDir=cache;g_ren.matDir="assets/materials";g_ren.renderScale=1;g_ren.quality=1;g_ren.stream.sync=true;
   if(!g_ren.init(W,H,[](float p,const std::string&s){printf("INIT %.1f%% %s\n",p*100,s.c_str());})){fprintf(stderr,"init failed: %s\n",g_ren.error.c_str());return 1;}
   if(!g_shaderNotes.empty())printf("SHADER NOTES: %s\n",g_shaderNotes.c_str());
   const int envMaps=EnvMaterialCount<Renderer>::get(g_ren),envFallback=EnvFallbackCount<Renderer>::get(g_ren);printf("MATERIALS: %d base scanned layers; %d high-resolution environment layers; %d natural-colour 512px fallback layers; directory %s\n",g_ren.matScanned,envMaps,envFallback,g_ren.matDir.c_str());
@@ -119,8 +119,8 @@ int main(int argc,char**argv){
 #endif
     for(int f=0;f<frames;f++){
       auto t=std::chrono::steady_clock::now();g_ren.renderScene(fp,alpha,add);glFinish();const GLenum glError=glGetError();if(glError){fprintf(stderr,"GL error 0x%x in %s frame %d\n",glError,s.name.c_str(),f);return 3;}double ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-t).count();
-      csv<<s.name<<','<<f<<','<<ms<<','<<reviewEntityInstances[0]<<','<<reviewEntityTriangles[0]<<','<<reviewEntityDrawCalls[0]<<','<<reviewEntityTriangles[1]+reviewEntityTriangles[2]<<','<<reviewEntityUploadBytes<<','<<g_ren.entChunks<<','<<g_ren.entPending<<','<<W<<','<<H<<",1,1\n";csv.flush();
-      printf("FRAME %s %d %.1f ms; %llu instances; %llu triangles; %llu draws; %d pending\n",s.name.c_str(),f,ms,reviewEntityInstances[0],reviewEntityTriangles[0],reviewEntityDrawCalls[0],g_ren.entPending);
+      csv<<s.name<<','<<f<<','<<ms<<','<<reviewEntityInstances[0]<<','<<reviewEntityTriangles[0]<<','<<reviewEntityDrawCalls[0]<<','<<reviewEntityTriangles[1]+reviewEntityTriangles[2]<<','<<reviewEntityUploadBytes<<','<<g_ren.stream.chunks<<','<<g_ren.stream.pending<<','<<W<<','<<H<<",1,1\n";csv.flush();
+      printf("FRAME %s %d %.1f ms; %llu instances; %llu triangles; %llu draws; %d pending\n",s.name.c_str(),f,ms,reviewEntityInstances[0],reviewEntityTriangles[0],reviewEntityDrawCalls[0],g_ren.stream.pending);
     }
     std::string path=out+"/"+s.name+".png";if(!g_ren.screenshotPNG(path.c_str()))return 1;printf("WROTE %s\n",path.c_str());
   }

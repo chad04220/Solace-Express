@@ -89,7 +89,7 @@ struct GameTest {
       const std::string before=snapshot(g.career),civil=snapshot(g.career,true);
       const uint32_t attempt=g.career.attempt;
       const auto* oldSpec=g.plane.spec;const vec3 oldPos=g.plane.pos;
-      const int oldBakes=g_ren.bakeCount,oldChunks=g_ren.entChunks;
+      const int oldBakes=g_ren.bakeCount,oldChunks=g_ren.stream.chunks;
       const auto oldSceneSerial=g_ren.gpuFrameSerial;
       const auto oldPreview=g_ren.loadingPreview();
       g.in.pressed[K_ENTER]=g.in.pressed[' ']=g.in.mPressed[0]=true;g.in.buttonsPressed=PAD_A|PAD_START;
@@ -111,7 +111,7 @@ struct GameTest {
       g.updateLoading(dt);
       check(rendered && g.pendingMilitaryLaunch && !g.militaryLaunchFramePresented &&
         g.loadImg.empty() && !g.loading.map && g.loading.frames==0 && g.loading.readyT<0 &&
-        g_ren.bakeCount==oldBakes && g_ren.entChunks==oldChunks && g_ren.gpuFrameSerial==oldSceneSerial &&
+        g_ren.bakeCount==oldBakes && g_ren.stream.chunks==oldChunks && g_ren.gpuFrameSerial==oldSceneSerial &&
         g_ren.loadingPreview().texture==oldPreview.texture && g_ren.loadingPreview().ready==oldPreview.ready &&
         !g.combatCollisionWarm && snapshot(g.career)==before,
         "submitted loading card skips image decode, scene rendering, collision setup and saves until it is presented");
@@ -170,7 +170,7 @@ struct GameTest {
     {
       auto q=make();Game& g=*q;g.headless=false;g.screen=SCR_RESEARCH;
       g.resCraft=kSomnus;g.resCard=-1;g.resAirborne=true;g.resAirport=g.career.location;
-      const vec3 oldPos=g.plane.pos;const int oldChunks=g_ren.entChunks,oldBakes=g_ren.bakeCount;
+      const vec3 oldPos=g.plane.pos;const int oldChunks=g_ren.stream.chunks,oldBakes=g_ren.bakeCount;
       const auto oldSceneSerial=g_ren.gpuFrameSerial;
       g.in.pressed[K_ENTER]=true;g.in.buttonsPressed=PAD_START;
       g.launchResearch();
@@ -182,7 +182,7 @@ struct GameTest {
         "a second press, elapsed time and a presentation without the card drawn start nothing");
       g.render();const bool drawn=g.launchFrameDrawn;g.updateLoading(dt);
       check(drawn && g.pendingLaunch && !g.researchFlight && g.loadImg.empty() && !g.loading.map && g.loading.frames==0 &&
-        g_ren.entChunks==oldChunks && g_ren.bakeCount==oldBakes && g_ren.gpuFrameSerial==oldSceneSerial,
+        g_ren.stream.chunks==oldChunks && g_ren.bakeCount==oldBakes && g_ren.gpuFrameSerial==oldSceneSerial,
         "the drawn card decodes no picture, renders no scene and bakes nothing before it is presented");
       g.framePresented();g.updateLoading(dt);
       check(!g.pendingLaunch && g.researchFlight && g.screen==SCR_LOADING && g.specIdx==kSomnus && !g.plane.onGround &&
@@ -540,7 +540,7 @@ struct GameTest {
     // initialized, and a timer or repeated launch input must never stand in for completed scenery frames.
     {
       auto q=make(military::CommandStrike); Game& g=*q; g.launchMilitary(2); g.screen=SCR_LOADING;
-      const int oldPending=g_ren.entPending, oldBake=g_ren.bakeCount;
+      const int oldPending=g_ren.stream.pending, oldBake=g_ren.bakeCount;
       const vec3 position=g.plane.pos; const float fuel=g.plane.fuel, clock=g.flightClock;
       const float combatClock=g.hiveCombat.simulatedSeconds(), missionClock=g.hiveCombat.mission.elapsed;
       const auto actors=g.hiveCombat.actors; const int rounds=g.combatLoadout.rounds;
@@ -552,13 +552,13 @@ struct GameTest {
           length(g.hiveCombat.actors[i].position-actors[i].position)==0 && g.hiveCombat.actors[i].timer==actors[i].timer;
         return same;
       };
-      g_ren.entPending=9;
+      g_ren.stream.pending=9;
       for(int n=0;n<80;++n) { g.in.pressed[K_ENTER]=g.in.pressed[' ']=g.in.mPressed[0]=true;g.in.buttonsPressed=PAD_A;g.update(dt);g.in.endFrame(); }
       check(g.screen==SCR_LOADING && g.loading.readyT<0 && g.loading.shown<1 && frozen(),
         "elapsed loading time and launch spam cannot start simulation or certify unrendered work");
       g.loading.frames=2;g.update(dt);g.in.endFrame();
       check(g.loading.readyT<0 && frozen(),"completed scene frame with pending scenery stays behind loading screen");
-      g_ren.entPending=0; ++g_ren.bakeCount; ++g.loading.frames;g.update(dt);g.in.endFrame();
+      g_ren.stream.pending=0; ++g_ren.bakeCount; ++g.loading.frames;g.update(dt);g.in.endFrame();
       check(g.loading.readyT<0 && g.loading.stableFrames==0 && frozen(),"a new mesh bake invalidates loading stability");
       ++g.loading.frames;g.update(dt);g.in.endFrame();
       const int firstStable=g.loading.stableFrames;
@@ -576,7 +576,7 @@ struct GameTest {
       g.in.endFrame();g.update(dt);g.in.endFrame();
       check(g.flightClock>clock && g.hiveCombat.simulatedSeconds()>combatClock,"simulation begins only on the next actual flight update");
       g.endFlight(false,"Loading barrier test",OUT_ABANDONED);
-      g_ren.entPending=oldPending;g_ren.bakeCount=oldBake;
+      g_ren.stream.pending=oldPending;g_ren.bakeCount=oldBake;
     }
 
     // Back must finish one navigation only, and an unsaved cancellation must block the next launch.

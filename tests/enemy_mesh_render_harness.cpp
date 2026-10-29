@@ -34,7 +34,7 @@ int main(int argc,char**argv) {
   printf("GL %s / native %dx%d\n",glGetString(GL_RENDERER),W,H);
   buildTestWorld();
   g_shaderCacheDir=std::string(argv[2])+"/cache";std::filesystem::create_directories(g_shaderCacheDir);
-  g_ren.matDir="assets/materials";g_ren.renderScale=1;g_ren.quality=2;g_ren.entSync=true;
+  g_ren.matDir="assets/materials";g_ren.renderScale=1;g_ren.quality=2;g_ren.stream.sync=true;
   if(!g_ren.init(W,H,[](float p,const std::string&s){printf("INIT %.1f%% %s\n",p*100,s.c_str());})){
     fprintf(stderr,"Renderer init failed: %s\n",g_ren.error.c_str());return 1;
   }

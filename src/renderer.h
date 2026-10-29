@@ -20,6 +20,7 @@
 #include <future>
 #include <deque>
 #include "entity_mesh.h"
+#include "scenery_streamer.h"
 #include "bridge_mesh.h"
 namespace earth { class Pack; }   // (earth_data.h: the far terrain's pack, Renderer::earthHorizon)
 #include "ground_vehicle.h"
@@ -395,11 +396,10 @@ public:
   std::function<void(int,int,const std::string&)> onMeshBatch; // actual GPU field bands in the current evaluation
   std::function<void(float,int,int)> onMaterialProgress; // worker-safe observation of completed base material layers
   void checkMeshCache();
-  // environment entities: entSync generates every chunk in range before drawing (headless captures)
-  bool entSync = false;
-  int entDrawn = 0, entChunks = 0;
-  int entPending = 0;            // scenery chunks still to generate around the camera (after this frame)
-  float entBudgetMs = 2.5f;      // per-frame scenery generation budget for chunks beyond 700 m (raised on loading screens)   // instances drawn / chunks generated (F3 readout)
+  // environment entities: the streamer brings the chunks in (scenery_streamer.h: its sync, budget and pending count
+  // are what the loading screens and the tools set and wait on); drawEntities draws them
+  SceneryStreamer stream;
+  int entDrawn = 0;                  // instances drawn (F3 readout)
   float entCpuMs = 0;                // CPU time of the entity pass (streaming + culling + submission)
 
 private:
@@ -495,7 +495,6 @@ private:
   EntMeshRange entRange[EK_COUNT];
   std::vector<Ent> entStage;
   uint64_t groundShadowKey[2] = {};   // the driven vehicles each cascade last drew (a change re-renders it)
-  int entFrame = 0, entGenCount = 0;
   bool initEntities();
   // ---- terrain envelope mesh (world.cpp's cell maxima, built in renderer.cpp): where each pixel's exact terrain march starts
   GLuint fboEnv = 0, texEnv = 0, texEnvDepth = 0;   // the hull passes' target (createHullTarget)

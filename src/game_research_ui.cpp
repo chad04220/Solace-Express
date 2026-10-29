@@ -436,9 +436,9 @@ void Game::drawResearch(const FrameParams& fp) {
       else if (item < nViews) {
         const AircraftSpec& c = kAircraft[resWarmCraft >= 0 ? resWarmCraft : kResCraft[item / 2].idx];
         what = "AIRFRAME SHELLS"; detail = fmt("%s  //  %s  //  %d OF %d", upper(c.name).c_str(), resWarmCk ? "COCKPIT" : "EXTERIOR", item + 1, nViews);
-      } else if (g_ren.entPending > 0) {
+      } else if (g_ren.stream.pending > 0) {
         const Airport& ap = g_world.airports[resAirport];
-        what = "STREAMING THE SITE"; detail = fmt("%s %s  //  %d SCENERY CHUNKS REMAINING", ap.code, upper(ap.name).c_str(), g_ren.entPending);
+        what = "STREAMING THE SITE"; detail = fmt("%s %s  //  %d SCENERY CHUNKS REMAINING", ap.code, upper(ap.name).c_str(), g_ren.stream.pending);
       } else if (loadingShadowPending()) { what = "TERRAIN LIGHTING"; detail = "BAKING THE SITE'S TERRAIN SHADOW"; }
       else { what = "SYSTEMS CHECK"; detail = "VERIFYING THE SITE BEFORE ACCESS"; }
       const bool ready = !resWarm && p >= 1.f;

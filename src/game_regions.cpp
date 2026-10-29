@@ -185,7 +185,7 @@ void Game::finishRegionLoad() {
   wreck.clear(); debris.clear(); pops.clear(); particles.clear(); wakeRings.clear(); pits.clear();
   bursts.clear(); trail.clear(); cloudWake.clear(); tipTrail[0].clear(); tipTrail[1].clear();
   for (auto& smoke : pieceTrail) smoke.clear();
-  g_ren.entBudgetMs = 2.5f;
+  g_ren.stream.budgetMs = 2.5f;
   const bool launchAfterPreparation = freeLaunchPending && !regionCancel;
   freeLaunchPending = false;
   if (regionCancel && !loadingRegion.authored) {   // (a generated region given up: back to the islands)

@@ -362,7 +362,7 @@ void Game::returnToMilitary() {
   tipOn = airBreak = false; trailT = 0; wakeGap = true; wakeOdo = 0;
   craterR = craterD = 0; boomT = -1; g_groundPits.clear(); g_scenery.craters.clear(); g_scenery.resetDamage();
   traffic.reset(); atc.cancel(); commsPending.clear(); toasts.clear();
-  g_ren.entBudgetMs = 2.5f;
+  g_ren.stream.budgetMs = 2.5f;
   source = Career::SRC_NONE; screen = SCR_HUB; hubTab = TAB_CONTRACTS; hubList = 2;
   in.pressed[K_ESC] = in.pressed[K_ENTER] = in.pressed[' '] = false;
   in.mPressed[0] = false; in.buttonsPressed &= ~(PAD_A | PAD_B | PAD_START);

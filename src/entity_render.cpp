@@ -1,5 +1,5 @@
-// Somnium Volandi - environment entity rendering: chunk streaming, culling, LOD selection, instanced G-buffer and
-// sun shadow-cascade passes. The lighting pass lights the G-buffer.
+// Somnium Volandi - environment entity rendering: culling, LOD selection, instanced G-buffer and sun shadow-cascade
+// passes, after the streamer (scenery_streamer.h) has brought the chunks in. The lighting pass lights the G-buffer.
 #include "renderer.h"
 #include "dev_switches.h"
 #include "entity_shaders.h"
@@ -16,8 +16,7 @@ std::vector<EntChunkBoundsCache> entityChunkBounds;
 
 void Renderer::resetWorldEntities(bool rebuildBridges) {
   entityChunkBounds.assign(size_t(Scenery::NC) * Scenery::NC, EntChunkBoundsCache{});
-  entStage.clear(); entDrawn = entChunks = entPending = 0;
-  entFrame = entGenCount = 0;
+  entStage.clear(); entDrawn = 0; stream.reset();
   groundShadowKey[0] = groundShadowKey[1] = 0;
   shGen[0] = shGen[1] = -1;
   shAge[0] = shAge[1] = 0;
@@ -100,7 +99,6 @@ void Renderer::drawEntities(const FrameParams& fp) {
   auto tStart = std::chrono::steady_clock::now();
   // a camera feed (camera_feeds.cpp): only its G-buffer, at the shortest draw distances; streaming, the shadow
   // cascades and the statistics stay the main view's
-  if (!feedPass) entFrame++;
   const EntRanges R = entRangesFor(quality, feedPass);
   const EntRanges shadowRanges = entBaseRangesFor(quality);
   const float farAll = std::max(R.big, R.build) + 300.f, farDetail = std::max(std::max(R.tree, R.rock), R.bush) + 300.f;
@@ -108,7 +106,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
   const int rad = (int)ceilf(farAll / Scenery::CH) + 1;
   // the islands and, near the map's seam, their copies across it (the map repeats: world.h WRAP_HALF): each one's
   // chunks are the islands' own, looked up from where the camera is relative to that copy and drawn moved by its offset
-  struct Copy { float ox, oz; };
+  using Copy = SceneryStreamer::Copy;
   std::vector<Copy> copies;
   const int copiesEachSide = g_world.repeating ? 1 : 0;
   for (int kz = -copiesEachSide; kz <= copiesEachSide; kz++) for (int kx = -copiesEachSide; kx <= copiesEachSide; kx++) {
@@ -122,30 +120,10 @@ void Renderer::drawEntities(const FrameParams& fp) {
   const vec3 Lsun = normalize(fp.sunDir);
   const float shReach = sqrtf(std::max(1.f - Lsun.y * Lsun.y, 0.f)) / std::max(Lsun.y, 0.15f);   // shadow length per metre of height
   auto chunkShPad = [&](const Scenery::Chunk* ch) { return ch ? ch->hmax * shReach + ch->reach + 60.f : 300.f; };
-  // ------------------------------------------------ streaming: queue missing chunks by distance, generate within a time budget
-  struct Need { float d; int cx, cz, level; };
+  // ------------------------------------------------ streaming (scenery_streamer.h): the chunks missing about the camera,
+  // nearest first; a new chunk inside a shadow cascade's area makes that cascade re-render
   if (!feedPass) {
-    std::vector<Need> need;
-    for (const Copy& cp : copies) {
-      const vec3 camL = cam - vec3(cp.ox, 0.f, cp.oz);   // (the camera as that copy of the islands sees it)
-      const int lcx = Scenery::chunkOf(camL.x), lcz = Scenery::chunkOf(camL.z);
-      for (int dz = -rad; dz <= rad; dz++)
-        for (int dx = -rad; dx <= rad; dx++) {
-          int cx = lcx + dx, cz = lcz + dz;
-          if (cx < 0 || cz < 0 || cx >= Scenery::NC || cz >= Scenery::NC) continue;
-          float x0 = Scenery::chunkX0(cx), z0 = Scenery::chunkX0(cz);
-          float ex = std::max(std::max(x0 - camL.x, camL.x - x0 - Scenery::CH), 0.f), ez = std::max(std::max(z0 - camL.z, camL.z - z0 - Scenery::CH), 0.f);
-          float d = sqrtf(ex * ex + ez * ez);
-          int want = d < farDetail ? 2 : d < farAll ? 1 : 0;
-          if (!want) continue;
-          Scenery::Chunk* c = g_scenery.get(cx, cz);
-          if (c) c->lastUse = entFrame;
-          if (!c || c->level < want) need.push_back({d, cx, cz, want});
-        }
-    }
-    // a new chunk inside a shadow cascade's area makes that cascade re-render
-    auto added = [&](int cx, int cz) {
-      entGenCount++;
+    auto arrived = [&](int cx, int cz) {
       for (int c = 0; c < 2; c++) {
         // only where its shadows can show: the shader fades each cascade out at kShFade1 of its radius, plus room for
         // tall casters just outside. (A wider test re-rendered the far 4096^2 map nearly every frame in flight, since
@@ -158,59 +136,7 @@ void Renderer::drawEntities(const FrameParams& fp) {
         }
       }
     };
-    // chunks the worker threads finished since last frame
-    std::vector<int> got;
-    g_scenery.pump(got);
-    for (int idx : got) {
-      int cx = idx % Scenery::NC, cz = idx / Scenery::NC;
-      g_scenery.get(cx, cz)->lastUse = entFrame;
-      added(cx, cz);
-    }
-    if (!got.empty())   // drop the ones that just arrived from the list
-      need.erase(std::remove_if(need.begin(), need.end(), [](const Need& n) { Scenery::Chunk* c = g_scenery.get(n.cx, n.cz); return c && c->level >= n.level; }), need.end());
-    entPending = (int)need.size();
-    if (!need.empty()) {
-      std::sort(need.begin(), need.end(), [](const Need& a, const Need& b) { return a.d < b.d; });
-      auto t0 = std::chrono::steady_clock::now();
-      for (const Need& n : need) {
-        // close chunks are generated here and now so they are never missing; the rest go to the worker threads
-        // (or, without workers, are generated here within the frame's time budget). A loading screen (its budget
-        // raised: Game::updateLoading) builds on here too once the queue is full, in the time this thread would
-        // spend waiting for the display
-        bool now = entSync || n.d <= 700.f;
-        if (!now && g_scenery.request(n.cx, n.cz, n.level)) continue;
-        if (!now && g_scenery.workers() > 0 && entBudgetMs < 10.f) break;   // queue full: ask again next frame
-        double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
-        if (!now && ms > entBudgetMs) break;
-        g_scenery.ensure(n.cx, n.cz, n.level)->lastUse = entFrame;
-        entPending--;
-        added(n.cx, n.cz);
-      }
-    }
-    // the next place the camera will cut to (the menu tour): its chunks go to the worker threads now, and are kept. First
-    // the near part of each place it may cut to (the tour's next, prefetchNearR's), what the cut's first frame would
-    // otherwise build itself (the 700 m above), then the rest of the tour's next, once the queue has room
-    auto prefetch = [&](vec3 pc, float within) {
-      const int pcx = Scenery::chunkOf(pc.x), pcz = Scenery::chunkOf(pc.z), prad = std::min(rad, (int)ceilf(within / Scenery::CH) + 1);   // (all of it, as the view there will want it: the flight's loading screen waits for every chunk)
-      for (int dz = -prad; dz <= prad; dz++)
-        for (int dx = -prad; dx <= prad; dx++) {
-          int cx = pcx + dx, cz = pcz + dz;
-          if (cx < 0 || cz < 0 || cx >= Scenery::NC || cz >= Scenery::NC) continue;
-          float x0 = Scenery::chunkX0(cx), z0 = Scenery::chunkX0(cz);
-          float ex = std::max(std::max(x0 - pc.x, pc.x - x0 - Scenery::CH), 0.f), ez = std::max(std::max(z0 - pc.z, pc.z - z0 - Scenery::CH), 0.f);
-          float d = sqrtf(ex * ex + ez * ez);
-          int want = d < farDetail ? 2 : d < farAll ? 1 : 0;
-          if (!want || d > within) continue;
-          Scenery::Chunk* c = g_scenery.get(cx, cz);
-          if (c) { c->lastUse = entFrame; if (c->level >= want) continue; }
-          if (!g_scenery.request(cx, cz, want)) return false;   // queue full: more next frame
-        }
-      return true;
-    };
-    if (fp.prefetchOn && g_scenery.workers() > 0 && (fp.prefetchNearR <= 0.f || prefetch(fp.prefetchNearPos, fp.prefetchNearR)) &&
-        prefetch(fp.prefetchPos, 1000.f)) prefetch(fp.prefetchPos, farAll);
-    if (entFrame % 240 == 0) g_scenery.trim(cam, farDetail + 1200.f, farAll + 2500.f, entFrame);
-    entChunks = (int)g_scenery.generated();
+    stream.update({cam, farDetail, farAll, rad, &copies}, {fp.prefetchOn, fp.prefetchPos, fp.prefetchNearR, fp.prefetchNearPos}, arrived);
   }
 
   double tStream = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tStart).count();

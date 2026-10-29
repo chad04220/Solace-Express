@@ -33,7 +33,7 @@ bool Game::loadingShadowPending() const {
 }
 Game::SceneWork Game::sceneWork(int& bakeSeen) const {
   SceneWork w;
-  w.pending = std::max(0, g_ren.entPending);
+  w.pending = std::max(0, g_ren.stream.pending);
   w.shadow = loadingShadowPending();
   w.baked = bakeSeen != g_ren.bakeCount; bakeSeen = g_ren.bakeCount;
   return w;
@@ -90,7 +90,7 @@ void Game::updateLoading(float dt) {
   if (loading.readyT < 0) {
     dbgCam = false;
     updateCamera(dt);   // stream around the camera the flight will open with
-    g_ren.entBudgetMs = 14.f;
+    g_ren.stream.budgetMs = 14.f;
     const SceneWork work = sceneWork(loading.bakeSeen);
     loading.pend0 = std::max(loading.pend0, work.pending);
     // Observe completed scene frames; elapsed time alone is not evidence that any work finished.
@@ -102,7 +102,7 @@ void Game::updateLoading(float dt) {
     }
     const float completed = sceneProgress(loadSetupDone(), loading.frames >= 2 ? work.pending : std::max(1, loading.pend0), loading.pend0, loading.frames >= 2 && !work.shadow, std::min(loading.stableFrames / 2.f, 1.f));
     loading.shown = std::max(loading.shown, std::min(completed, 0.99f));
-    if (loading.stableFrames >= 2) { loading.readyT = loading.t; loading.shown = 1.f; g_ren.entBudgetMs = 2.5f; }
+    if (loading.stableFrames >= 2) { loading.readyT = loading.t; loading.shown = 1.f; g_ren.stream.budgetMs = 2.5f; }
     // a research sortie: the preview has already streamed its airport, so the flight opens at once (no establishing shot)
     if (loading.readyT >= 0 && researchFlight && !headless) {
       screen = SCR_FLIGHT; dbgCam = false;
@@ -131,7 +131,7 @@ void Game::updateLoading(float dt) {
     }
   }
   if (in.pressed[K_ESC] || (in.buttonsPressed & PAD_B)) {   // back out to where the flight was chosen
-    dbgCam = false; g_ren.entBudgetMs = 2.5f;
+    dbgCam = false; g_ren.stream.budgetMs = 2.5f;
     if (freeFlight) { returnToFreeFlight(); return; }
     if (militaryFlight) { returnToMilitary(); return; }
     // a career flight that never left the loading screen: its attempt closes and its job waits at its stop, as after
@@ -162,27 +162,27 @@ std::string Game::prewarmLabel(int craft, bool inside, int stage) {
 }
 void Game::prewarm(const std::function<void(float, const std::string&)>& progress, bool allCraft, LoadPacer* pace, int menuStep, const std::vector<int>* itemSteps, int stageStep) {
   if (screen != SCR_MENU) return;
-  bool sync = g_ren.entSync;
+  bool sync = g_ren.stream.sync;
   // (offscreen only for these frames: the intro may draw through the same UI path in between)
   auto frame = [&] { g_ren.setOffscreen(true); update(1.f / 60.f); render(); glFinish(); g_ren.setOffscreen(false); };
   // the tour's first place: every scenery chunk in range, the shadow maps and the terrain shadow
-  g_ren.entSync = true;
+  g_ren.stream.sync = true;
   realTime = 3.f;
   if (pace && menuStep >= 0) pace->begin(menuStep);
   progress(pace ? pace->fraction() : 0.f, "Loading the menu's scenery and its terrain shadow");
   int firstPending = 0;
   for (int i = 0; !quit; i++) {
     realTime = 3.f; frame();
-    firstPending = std::max(firstPending, g_ren.entPending);
-    const bool ready = i >= 2 && g_ren.entPending == 0 && !loadingShadowPending();
+    firstPending = std::max(firstPending, g_ren.stream.pending);
+    const bool ready = i >= 2 && g_ren.stream.pending == 0 && !loadingShadowPending();
     if (pace) {
-      const float chunks = firstPending > 0 ? 1.f - float(g_ren.entPending) / firstPending : (i >= 2 ? 1.f : 0.f);
+      const float chunks = firstPending > 0 ? 1.f - float(g_ren.stream.pending) / firstPending : (i >= 2 ? 1.f : 0.f);
       pace->setSub(ready ? 1.f : std::min(0.95f, 0.8f * chunks + (loadingShadowPending() ? 0.f : 0.15f)));
-      progress(pace->fraction(), fmt("Preparing menu scenery  (%d chunks remaining)%s", g_ren.entPending, loadingShadowPending() ? " / baking terrain lighting" : ""));
+      progress(pace->fraction(), fmt("Preparing menu scenery  (%d chunks remaining)%s", g_ren.stream.pending, loadingShadowPending() ? " / baking terrain lighting" : ""));
     }
     if (ready) break;
   }
-  g_ren.entSync = sync;
+  g_ren.stream.sync = sync;
   // every light aircraft's body (outside, and the cockpit's when that is in use; with allCraft the research jets' too):
   // a frame that wants one bakes it, or loads it from the cache
   const std::vector<std::pair<int, bool>> todo = prewarmItems(allCraft);
@@ -214,23 +214,23 @@ void Game::prewarm(const std::function<void(float, const std::string&)>& progres
   // and kept, so the hangar, Free Flight, the research terminal and the service board open on it with nothing to build
   if (previewStage().ok) {
     if (pace && stageStep >= 0) pace->begin(stageStep);
-    g_ren.entSync = true;
+    g_ren.stream.sync = true;
     int pend0 = 0; const int quarters = 5;
     for (prewarmStage = 1; prewarmStage <= quarters && !quit; prewarmStage++) {
       for (int i = 0; !quit; i++) {
         realTime = 3.f; frame();
-        pend0 = std::max(pend0, g_ren.entPending);
-        const bool ready = i >= 1 && g_ren.entPending == 0 && (prewarmStage > 1 || !loadingShadowPending());
+        pend0 = std::max(pend0, g_ren.stream.pending);
+        const bool ready = i >= 1 && g_ren.stream.pending == 0 && (prewarmStage > 1 || !loadingShadowPending());
         if (pace) {
-          const float chunks = pend0 > 0 ? 1.f - float(g_ren.entPending) / pend0 : (i >= 1 ? 1.f : 0.f);
+          const float chunks = pend0 > 0 ? 1.f - float(g_ren.stream.pending) / pend0 : (i >= 1 ? 1.f : 0.f);
           pace->setSub(std::min(0.98f, (prewarmStage - 1 + (ready ? 1.f : 0.8f * chunks)) / quarters));
-          progress(pace->fraction(), fmt("Preparing the preview stage  (%d chunks remaining)%s", g_ren.entPending, prewarmStage == 1 && loadingShadowPending() ? " / baking its terrain lighting" : ""));
+          progress(pace->fraction(), fmt("Preparing the preview stage  (%d chunks remaining)%s", g_ren.stream.pending, prewarmStage == 1 && loadingShadowPending() ? " / baking its terrain lighting" : ""));
         }
         if (ready) break;
       }
     }
     prewarmStage = 0;
-    g_ren.entSync = sync;
+    g_ren.stream.sync = sync;
     if (pace) pace->setSub(1.f);
   }
   // the hive's craft (the XR-40's research sorties and Defense Command fly against them): built once after an update,
@@ -281,7 +281,7 @@ void Game::loadLogTick() {
   const double ms = std::chrono::duration<double, std::milli>(now - loadLogLast).count();
   loadLogLast = now;
   if (screen == SCR_LOADING && loadLog.size() < 4000) {
-    LoadLogFrame L{ms, launchCardPending(), launchSetUpShown, loading.frames, std::max(0, g_ren.entPending), loading.viewsStep, loadingShadowPending(), loading.warmStep, loadShownInside};
+    LoadLogFrame L{ms, launchCardPending(), launchSetUpShown, loading.frames, std::max(0, g_ren.stream.pending), loading.viewsStep, loadingShadowPending(), loading.warmStep, loadShownInside};
     L.upd = lastUpdate.total; L.rnd = lastRenderMs; L.baked = lastRenderBaked; L.compiled = lastRenderCompiled; L.compileMs = lastRenderCompileMs;
     for (const auto& p : lastUpdate.parts) if (p.second >= 20.0) L.parts += fmt("%s%s %.0f", L.parts.empty() ? "" : ", ", p.first, p.second);
     loadLog.push_back(std::move(L));
@@ -290,7 +290,7 @@ void Game::loadLogTick() {
   }
   loadLogging = false;
   if (!loadLog.empty()) {   // (the last frame of it - the flight's first - with what its update and render did, as any frame's)
-    LoadLogFrame L{ms, false, false, loading.frames, std::max(0, g_ren.entPending), loading.viewsStep, false, loading.warmStep, loadShownInside};
+    LoadLogFrame L{ms, false, false, loading.frames, std::max(0, g_ren.stream.pending), loading.viewsStep, false, loading.warmStep, loadShownInside};
     L.upd = lastUpdate.total; L.rnd = lastRenderMs; L.baked = lastRenderBaked; L.compiled = lastRenderCompiled; L.compileMs = lastRenderCompileMs;
     for (const auto& p : lastUpdate.parts) if (p.second >= 20.0) L.parts += fmt("%s%s %.0f", L.parts.empty() ? "" : ", ", p.first, p.second);
     loadLog.push_back(std::move(L));

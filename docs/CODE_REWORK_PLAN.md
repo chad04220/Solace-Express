@@ -173,3 +173,22 @@ Replace the five `catch (...) {}` around futures in `game.cpp` with a catch that
 
 None of it changes what the player sees. The tests, the Windows build and `diagnostics.bat`'s outputs are the
 acceptance test for every step.
+
+## 5. What was done (v4.4.3)
+
+Every section above is done, in seven commits, each validated against the whole suite and the Windows build:
+
+| Section | Done | Where |
+|---|---|---|
+| 2.3 `LoadingState` | one struct, `reset(bakeCount)` in one place | `game.h`, `game_loading.cpp` |
+| 2.4 switches behind a gate | `dev::env`, off in a player's launch, on for tools, tests and `--dev` | `dev_switches.{h,cpp}`, `platform_win32.cpp` |
+| 2.2 statics into `Game` | `MenuState menu` (fifty-odd fields, reset with the career), `CameraState cams` | `game.h`, `game_ui.cpp`, `game_cameras.cpp` |
+| 2.1 split `game.cpp` | thirteen files (`game_input`, `game_career_flow`, `game_regions`, `game_flight`, `game_weather`, `game_loading`, `game_cameras`, `game_effects`, `game_frame`, `game_comms`, `game_debug_scenes`, `game_hive`); `game_internal.h` for what they share. `game.cpp` compiled in 80 s; the slowest piece now takes 7.5 s | `src/game_*.cpp` |
+| 2.7 test scaffolding | `tests/test_main.h` (`TestRun`, `TimeBudget` judged against this machine), `tests/gl_headless.h`; the three longest tests `LABELS nightly`, skipped by the push runs. The CMake `sv_test` function was dropped: only 17 plain triplets exist, not worth a layer | `tests/`, `CMakeLists.txt`, `build.yml` |
+| 2.5 `WinMain` | the six tools as functions of a `ToolHost`, one dispatch; `WinMain` 1,869 lines to 1,216 | `tool_modes_win32.{h,cpp}` |
+| 2.9 silent catches | `jobs::drain`: cancellation silent, failures to `startup.log`; fourteen sites | `jobs.h` |
+| 2.8 style | `.clang-format`, for the lines a change touches | `.clang-format` |
+| 2.6 renderer subsystems | the scenery streamer first: `SceneryStreamer` (`Renderer::stream`), its sync, budget and pending count what the loading screens and tools set and wait on; `drawEntities` draws what it brought in | `scenery_streamer.{h,cpp}`, `entity_render.cpp` |
+
+Still open under 2.6, gradually: the aircraft baker, the shadow maps and proxies, the post-processing chain, the
+shader cache, each the same way (a struct held by `Renderer`, its fields moved with it, the callers renamed once).

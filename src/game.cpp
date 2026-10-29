@@ -195,7 +195,7 @@ void Game::update(float dt) {
     resWork = 0.f; resPend0 = 0;
   }
   if (screen == SCR_RESEARCH && resWarm) {   // warming: each craft drawn once over the preview stage, outside and from the cockpit (the launch built their bodies: these frames verify them resident, and bake what a tool's run has not); done when a frame bakes nothing and nothing is pending (sceneWork)
-    g_ren.entBudgetMs = 14.f;
+    g_ren.stream.budgetMs = 14.f;
     const SceneWork work = sceneWork(resBakeSeen);
     // how much of it is done, for the boot screen's bar and its scans (sceneProgress, as the flight's loading screen):
     // the craft views drawn (render() has drawn resWarmFrames frames, the first the boot screen alone, then one view
@@ -206,7 +206,7 @@ void Game::update(float dt) {
     if (site) resPend0 = std::max(resPend0, work.pending);
     const float views = clampf((f - 1.f) / nViews, 0.f, 1.f);
     resWork = std::max(resWork, sceneProgress(views, site ? work.pending : std::max(1, resPend0), resPend0, site && !work.shadow, f > nViews && work.ready() ? 1.f : 0.f));
-    if (resWarmFrames > nViews && work.ready()) { resWarm = false; resWarmCraft = -1; resWarmCk = false; g_ren.entBudgetMs = 2.5f; resWork = 1.f; }
+    if (resWarmFrames > nViews && work.ready()) { resWarm = false; resWarmCraft = -1; resWarmCk = false; g_ren.stream.budgetMs = 2.5f; resWork = 1.f; }
   }
   if (screen == SCR_FLIGHT && (actKeyP(ACT_RADIO) || actJoyP(ACT_RADIO) || (!paused && actPadP(ACT_RADIO)))) showRadio = !showRadio;
   { PartTimer pt(*this, "radio"); radio.poll(); }
@@ -313,7 +313,7 @@ void Game::render() {
     resLoadTask.clear();resTaskDone=resTaskUnits=0;
     g_ren.onMeshProgress=[this](float f,const std::string& task){
       const float views=clampf((std::max(0,resWarmFrames-2)+f)/(4.f*resCraftCount()+3.f),0.f,1.f);
-      resWork=std::max(resWork,sceneProgress(views,resPend0>0?std::max(0,g_ren.entPending):1,resPend0,resWarmFrames>=2&&!loadingShadowPending(),0.f));
+      resWork=std::max(resWork,sceneProgress(views,resPend0>0?std::max(0,g_ren.stream.pending):1,resPend0,resWarmFrames>=2&&!loadingShadowPending(),0.f));
       resLoadTask=task;resTaskDone=resTaskUnits=1;
     };
     g_ren.onMeshBatch=[this](int done,int total,const std::string& task){resLoadTask=task;resTaskDone=done;resTaskUnits=total;};
@@ -451,7 +451,7 @@ void Game::render() {
     std::string t = fmt("%.0f fps  %.1f ms   GPU %s   res %.0f%% (%dx%d)", 1.f / std::max(fpsAvg, 1e-4f), fpsAvg * 1000.f,
                         g_ren.gpuMs > 0 ? fmt("%.1f ms", g_ren.gpuMs).c_str() : "n/a", g_ren.renderScale * 100.f,
                         (int)(g_ren.W * g_ren.renderScale), (int)(g_ren.H * g_ren.renderScale));
-    t += fmt("   worst %.1f ms   target %d fps   scenery %d drawn, %d chunks, %.1f ms CPU", maxFrameMs, effectiveHz(), g_ren.entDrawn, g_ren.entChunks, g_ren.entCpuMs);
+    t += fmt("   worst %.1f ms   target %d fps   scenery %d drawn, %d chunks, %.1f ms CPU", maxFrameMs, effectiveHz(), g_ren.entDrawn, g_ren.stream.chunks, g_ren.entCpuMs);
     t += fmt("   particles %d  debris %d  wreck %d  traffic %d  comms %d", (int)particles.size(), (int)debris.size(), (int)wreck.size(), (int)traffic.craft.size(), (int)atc.history.size());
     const float* pm = g_ren.passMs;
     std::string t2 = fmt("GPU ms:  world %.1f   displays %.1f   feeds %.1f   objects %.1f   shadow proxy %.1f   lighting+clouds %.1f   TAA %.1f   sprites %.1f   bloom %.1f   shafts %.1f   composite %.1f",

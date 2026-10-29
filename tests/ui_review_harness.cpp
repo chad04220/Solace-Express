@@ -39,7 +39,7 @@ struct GameTest {
     auto start=procedural::find(id);require(start.has_value(),"seamless fixture needs a canonical region ID or solace");
     g.cacheDir=getenv("SHADERCACHE")?getenv("SHADERCACHE"):"";g.buildStamp="seamless-egl-v1";
     g.debugScene("region-"+id);g.freeCraft=kGalleon;g.freeAirport=0;g.freeAirborne=true;g.launchFreeFlight();
-    g.set.traffic=airTrafficEnabled();g_ren.entSync=false;g_ren.profileRegionRender=true;g.hudOn=false;g.set.fov=40;g.toasts.clear();
+    g.set.traffic=airTrafficEnabled();g_ren.stream.sync=false;g_ren.profileRegionRender=true;g.hudOn=false;g.set.fov=40;g.toasts.clear();
     // Clear diagnostic weather only; ordinary Free Flight defaults are unchanged.
     g.wx.visibility=150000.f;g.wx.cloudCover=0;g.wx.precip=0;g.wx.storm=false;
     g.wxStart=g.contract.wx=g.contract.wxEnd=g.wx;g.contract.wxShift=false;
@@ -183,7 +183,7 @@ struct GameTest {
     g.plane.apEngage(Plane::AP_HOLD,-1,g.wx);g.plane.apAlt=g.plane.pos.y;
     g.wx.visibility=200000.f;g.wx.cloudCover=0;g.wx.precip=0;g.wx.storm=false;
     g.wxStart=g.contract.wx=g.contract.wxEnd=g.wx;g.contract.wxShift=false;
-    g_ren.entSync=false;g_ren.profileRegionRender=true;
+    g_ren.stream.sync=false;g_ren.profileRegionRender=true;
     auto view=[&](int direction){const float angle=direction*PI*.5f;
       g.dbgCamPos=vec3(0,altitude,0);
       g.dbgCamLook=g.dbgCamPos+vec3(sinf(angle)*cosf(pitch),-sinf(pitch),-cosf(angle)*cosf(pitch))*180000.f;};
@@ -301,15 +301,15 @@ struct GameTest {
   }
   static void checkLoading(Game& g) {
     auto require=[](bool ok,const char* why){if(!ok){fprintf(stderr,"FAIL: %s\n",why);exit(3);}};
-    const auto oldPending=g_ren.entPending;
+    const auto oldPending=g_ren.stream.pending;
     require(!g_ren.tshRequiredPending(1.f),"missing optional shadow shader does not block readiness");
     require(!g_ren.tshRequiredPending(-.1f),"night shadow does not block readiness");
-    g_ren.entPending=0;
+    g_ren.stream.pending=0;
     g.in=Input{};g.loading.frames=2;g.loading.observedFrame=-1;g.loading.stableFrames=0;g.loading.readyT=-1;g.loading.shown=0;g.loading.bakeSeen=g_ren.bakeCount;
     for(int i=0;i<30;i++)g.updateLoading(1.f/30);
     require(g.loading.readyT<0&&g.loading.stableFrames==1&&g.loading.shown<1,"repeated updates without a rendered frame cannot complete loading");
     g.loading.frames=3;g.updateLoading(1.f/30);require(g.loading.readyT>=0&&g.loading.shown==1,"distinct stable completed frame permits readiness");
-    g_ren.entPending=oldPending;
+    g_ren.stream.pending=oldPending;
     printf("PASS loading requires distinct completed frames; absent optional shadow shader cannot deadlock\n");
   }
   static void checkHangarFraming(Game& g) {
@@ -481,9 +481,9 @@ struct GameTest {
     if(sc.rfind("loading",0)==0){
       g.contract=g_story[0];g.plane.spec=&kAircraft[0];g.wx=g.contract.wx;
       g.loading.t=5;g.loading.shown=.57f;g.loading.map=true;g.screen=SCR_LOADING;
-      g.loading.frames=2;g.loading.pend0=80;g.loading.stableFrames=0;g_ren.entPending=32;g.loading.shown=.64f;
+      g.loading.frames=2;g.loading.pend0=80;g.loading.stableFrames=0;g_ren.stream.pending=32;g.loading.shown=.64f;
       sscanf(sc.c_str(),"loading_%f_%f",&g.loading.shown,&g.loading.t);
-      if(sc.find("ready")!=std::string::npos){g.loading.readyT=g.loading.t;g.loading.shown=1;g.loading.stableFrames=2;g_ren.entPending=0;}
+      if(sc.find("ready")!=std::string::npos){g.loading.readyT=g.loading.t;g.loading.shown=1;g.loading.stableFrames=2;g_ren.stream.pending=0;}
       // No map shader is initialized in UI-only mode. Real packaged photographs remain available.
     }
   }
@@ -565,7 +565,7 @@ int main(int argc,char**argv){
   const std::string cache=getenv("SHADERCACHE")?getenv("SHADERCACHE"):"";
   if(!cache.empty())std::filesystem::create_directories(cache);
   g_world.build(cache.empty()?"":cache+"/world.bin","ui-review-world-v1");buildStory();
-  g_shaderCacheDir=cache;g_ren.matDir="assets/materials";g_ren.renderScale=1;g_ren.quality=1;g_ren.entSync=true;
+  g_shaderCacheDir=cache;g_ren.matDir="assets/materials";g_ren.renderScale=1;g_ren.quality=1;g_ren.stream.sync=true;
   if(!(full?g_ren.init(W,H,[](float p,const std::string& stage){printf("INIT %.1f%% %s\n",p*100,stage.c_str());}):g_ren.initUI(W,H))){fprintf(stderr,"renderer init: %s\n",g_ren.error.c_str());return 1;}
   if(!g_shaderNotes.empty())printf("PRODUCTION SHADER NOTES: %s\n",g_shaderNotes.c_str());
   g_ren.bakeYield=[](){static auto last=std::chrono::steady_clock::now();auto now=std::chrono::steady_clock::now();if(std::chrono::duration<double>(now-last).count()>10){puts("Production mesh bake batch completed; continuing");last=now;}};

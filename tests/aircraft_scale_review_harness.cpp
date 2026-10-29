@@ -51,7 +51,7 @@ int main(int argc,char**argv) {
   puts("STAGED SCALE DIAGNOSTIC: exact current flyable Dawnlark, unit-scale production house and sedan placed on a real flat apron. Placement is a test fixture, not a generated town. Every production startup program is built; exact per-aircraft production programs are compiled on demand. Not hardware performance evidence.");
   const std::string cache=getenv("SHADERCACHE")?getenv("SHADERCACHE"):out+"/cache";std::filesystem::create_directories(cache);
   struct stat st{};stat("/proc/self/exe",&st);g_world.build(cache+"/world.bin","scale-review-"+std::to_string((long long)st.st_mtime));
-  g_shaderCacheDir=cache;g_ren.matDir="assets/materials";g_ren.quality=1;g_ren.renderScale=1;g_ren.entSync=true;
+  g_shaderCacheDir=cache;g_ren.matDir="assets/materials";g_ren.quality=1;g_ren.renderScale=1;g_ren.stream.sync=true;
   // CAP apron, away from its normal buildings. Every model remains at its authored metre scale.
   const vec3 origin(-577.f,20.f,-4413.f);
   const Ent house{origin.x+13,origin.y,origin.z+12,PI,1,1,1,.37f};insertSpecimen(EK_HOUSE,house);
@@ -69,7 +69,7 @@ int main(int argc,char**argv) {
   fp.cloudCover=.15f;fp.cloudBase=1500;fp.fogB=.00002f;fp.time=20;fp.wind=fp.windSock=vec3(2,0,4);fp.exposure=1;fp.vignette=.15f;GameTest::light(fp);
   {std::ofstream m(out+"/aircraft.csv");m<<"scene,model,span_m,fuselage_length_m,position_x,position_y,position_z,camera_x,camera_y,camera_z\n";m<<"apron,"<<fp.plane.model<<','<<a.span<<','<<a.fusLen<<','<<fp.plane.pos.x<<','<<fp.plane.pos.y<<','<<fp.plane.pos.z<<','<<fp.camPos.x<<','<<fp.camPos.y<<','<<fp.camPos.z<<'\n';}
   printf("ACTUAL FLEET model=%d span=%.3f fuselage=%.3f position %.3f %.3f %.3f; no scale matrix\n",fp.plane.model,a.span,a.fusLen,fp.plane.pos.x,fp.plane.pos.y,fp.plane.pos.z);
-  for(int i=0;i<frames;i++){auto t=std::chrono::steady_clock::now();g_ren.renderScene(fp,{},{});glFinish();const GLenum err=glGetError();if(err){fprintf(stderr,"GL error %x\n",err);return 3;}printf("FRAME %d %.1fms entity instances=%d pending=%d\n",i,std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-t).count(),g_ren.entDrawn,g_ren.entPending);}
+  for(int i=0;i<frames;i++){auto t=std::chrono::steady_clock::now();g_ren.renderScene(fp,{},{});glFinish();const GLenum err=glGetError();if(err){fprintf(stderr,"GL error %x\n",err);return 3;}printf("FRAME %d %.1fms entity instances=%d pending=%d\n",i,std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-t).count(),g_ren.entDrawn,g_ren.stream.pending);}
   if(!g_ren.screenshotPNG((out+"/dawnlark_house_car.png").c_str()))return 1;
   // A second explicitly staged view puts the same unscaled production airframe in
   // the real volcano scene. It is an airborne spatial reference, not a physics test.
@@ -78,7 +78,7 @@ int main(int argc,char**argv) {
   {std::ofstream m(out+"/aircraft.csv",std::ios::app);m<<"volcano,"<<fp.plane.model<<','<<a.span<<','<<a.fusLen<<','<<fp.plane.pos.x<<','<<fp.plane.pos.y<<','<<fp.plane.pos.z<<','<<fp.camPos.x<<','<<fp.camPos.y<<','<<fp.camPos.z<<'\n';}
   std::vector<SpriteVert>alpha,add;volcano::append(fp,g_ren.quality,alpha,add);
   printf("VOLCANO SCALE: unscaled Dawnlark camera distance %.3fm; vent distance %.3fm; bowl wall radius340m, changed terrain disk radius520m. Airframe is staged airborne, not a flight-simulation replay.\n",length(fp.plane.pos-fp.camPos),length(bowl-fp.camPos));
-  for(int i=0;i<frames;i++){g_ren.renderScene(fp,alpha,add);glFinish();if(glGetError())return 3;printf("VOLCANO SCALE FRAME %d pending=%d\n",i,g_ren.entPending);}
+  for(int i=0;i<frames;i++){g_ren.renderScene(fp,alpha,add);glFinish();if(glGetError())return 3;printf("VOLCANO SCALE FRAME %d pending=%d\n",i,g_ren.stream.pending);}
   if(!g_ren.screenshotPNG((out+"/dawnlark_volcano_scale.png").c_str()))return 1;
   return 0;
 }

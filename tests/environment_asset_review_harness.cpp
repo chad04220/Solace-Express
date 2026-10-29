@@ -104,7 +104,7 @@ int main(int argc,char**argv){
   printf("GL: %s; native1920x1080 quality%d scale1 debug_mask%d\n%s\n",glGetString(GL_RENDERER),reviewQuality(),reviewDebug(),reviewStartupMode());
   puts("ISOLATED STAGED ASSET REVIEW: unit-scale production meshes on a real flat apron. Nearby scenery cleared only in this test process. No forced LOD or geometry replacement. Not an ordinary generated-town arrangement or hardware benchmark.");
   const std::string cache=getenv("SHADERCACHE")?getenv("SHADERCACHE"):out+"/cache";std::filesystem::create_directories(cache);struct stat st{};stat("/proc/self/exe",&st);
-  g_world.build(cache+"/world.bin","asset-review-"+std::to_string((long long)st.st_mtime));g_shaderCacheDir=cache;g_ren.matDir="assets/materials";g_ren.renderScale=1;g_ren.quality=reviewQuality();g_ren.entSync=true;
+  g_world.build(cache+"/world.bin","asset-review-"+std::to_string((long long)st.st_mtime));g_shaderCacheDir=cache;g_ren.matDir="assets/materials";g_ren.renderScale=1;g_ren.quality=reviewQuality();g_ren.stream.sync=true;
   std::vector<EVert>verts;EntMeshRange ranges[EK_COUNT];buildEntityMeshes(verts,ranges);
   std::ofstream mesh(out+"/mesh_inventory.csv");mesh<<"kind,name,lod,triangles,vertices,bytes\n";for(int k=0;k<EK_COUNT;k++)for(int l=0;l<ENT_LODS;l++)mesh<<k<<','<<kEntInfo[k].name<<','<<l<<','<<ranges[k].count[l]/3<<','<<ranges[k].count[l]<<','<<ranges[k].count[l]*sizeof(EVert)<<'\n';mesh.close();
   if(!g_ren.init(1920,1080,[](float p,const std::string&s){printf("INIT %.1f%% %s\n",p*100,s.c_str());})){fprintf(stderr,"init failed %s\n",g_ren.error.c_str());return 1;}
@@ -172,14 +172,14 @@ int main(int argc,char**argv){
           fp.camBack=normalize(fp.camPos-currentTarget);fp.camRight=normalize(cross(vec3(0,1,0),fp.camBack));fp.camUp=cross(fp.camBack,fp.camRight);
         }
         simulationTime+=fp.dt;
-        auto start=std::chrono::steady_clock::now();g_ren.renderScene(fp,{},{});glFinish();if(glGetError())return 3;double ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start).count();csv<<name<<','<<kind<<','<<f<<','<<ms<<','<<reviewEntityInstances[0]<<','<<reviewEntityTriangles[0]<<','<<reviewEntityDrawCalls[0]<<','<<g_ren.entPending<<",1920,1080,1,"<<reviewQuality()<<','<<reviewEntityTriangles[1]<<','<<reviewEntityTriangles[2]<<','<<reviewEntityUploadBytes<<'\n';csv.flush();
+        auto start=std::chrono::steady_clock::now();g_ren.renderScene(fp,{},{});glFinish();if(glGetError())return 3;double ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start).count();csv<<name<<','<<kind<<','<<f<<','<<ms<<','<<reviewEntityInstances[0]<<','<<reviewEntityTriangles[0]<<','<<reviewEntityDrawCalls[0]<<','<<g_ren.stream.pending<<",1920,1080,1,"<<reviewQuality()<<','<<reviewEntityTriangles[1]<<','<<reviewEntityTriangles[2]<<','<<reviewEntityUploadBytes<<'\n';csv.flush();
         if(coverage.is_open()) {
           const auto& d=g_environmentReviewShadowState;if(!d.valid){fputs("Coverage state not recorded\n",stderr);return 8;}
           coverage<<name<<','<<f<<','<<simulationTime<<','<<fp.dt<<','<<fp.camPos.x<<','<<fp.camPos.y<<','<<fp.camPos.z<<','<<currentTarget.x<<','<<currentTarget.y<<','<<currentTarget.z
             <<','<<d.committedRadius<<','<<d.radii[0]<<','<<d.radii[1]<<','<<d.fadeScale<<','<<d.phase<<','<<d.tier<<','<<d.filteredSpeed<<','<<d.agl<<','<<d.nearFade[0]<<','<<d.nearFade[1]
             <<','<<d.centers[0]<<','<<d.centers[1]<<','<<d.centers[2]<<','<<d.centers[3]<<','<<d.nearDirty<<','<<d.farDirty<<','<<d.radiusChanged<<','<<d.shadowResolution
             <<','<<reviewEntityTriangles[1]<<','<<reviewEntityTriangles[2]<<','<<reviewEntityInstances[1]<<','<<reviewEntityInstances[2]<<','<<reviewEntityDrawCalls[1]<<','<<reviewEntityDrawCalls[2]
-            <<','<<reviewEntityTriangles[0]<<','<<reviewEntityInstances[0]<<','<<g_ren.entPending<<','<<ms<<'\n';coverage.flush();
+            <<','<<reviewEntityTriangles[0]<<','<<reviewEntityInstances[0]<<','<<g_ren.stream.pending<<','<<ms<<'\n';coverage.flush();
         }
         if(!replay.empty()&&replay[f].capture){std::ostringstream key;key<<name<<"_frame_"<<std::setw(3)<<std::setfill('0')<<f;if(!g_ren.screenshotPNG((out+"/"+key.str()+".png").c_str()))return 1;printf("REPLAY_KEYFRAME %s frame%d\n",key.str().c_str(),f);}
       }

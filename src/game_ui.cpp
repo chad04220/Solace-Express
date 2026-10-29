@@ -519,14 +519,14 @@ void Game::drawLoading() {
   g_ren.text(weatherX,cy+29*s,fs(12,10),fitLoading(weather.describe(),cw*.40f,fs(12,10)),C_TEXT,1);
   // Separate measured stage bars reveal the work behind the overall percentage.
   const float scene=loadSetupDone();
-  const float chunks=loading.pend0>0?clampf(1.f-float(std::max(0,g_ren.entPending))/loading.pend0,0.f,1.f):scene;
+  const float chunks=loading.pend0>0?clampf(1.f-float(std::max(0,g_ren.stream.pending))/loading.pend0,0.f,1.f):scene;
   const float lighting=loading.frames>=2&&!loadingShadowPending()?1.f:0.f;
   const float checks=loading.readyT>=0?1.f:clampf(loading.stableFrames/2.f,0.f,1.f);
   const float fractions[]={scene,chunks,lighting,checks};
   const char* stages[]={"SCENE SETUP","NEARBY SCENERY","TERRAIN LIGHTING","READINESS CHECK"};
   for(int i=0;i<4;++i){const float xx=cx+cw*i/4,ww=cw/4-18*s,yy=cy+75*s;
     g_ren.text(xx,yy,fs(9,8),stages[i],dim,1,0,false);
-    g_ren.text(xx,yy+16*s,fs(10,9),fractions[i]>=1?"READY":pending?"WAITING":i==1?fmt("%d remaining",std::max(0,g_ren.entPending)):i==3?fmt("%d / 2 stable frames",std::min(2,loading.stableFrames)):"IN PROGRESS",fractions[i]>=1?accent:C_TEXT,1,0,false);
+    g_ren.text(xx,yy+16*s,fs(10,9),fractions[i]>=1?"READY":pending?"WAITING":i==1?fmt("%d remaining",std::max(0,g_ren.stream.pending)):i==3?fmt("%d / 2 stable frames",std::min(2,loading.stableFrames)):"IN PROGRESS",fractions[i]>=1?accent:C_TEXT,1,0,false);
     svui::bar(g_ren,xx,yy+34*s,ww,3*s,fractions[i],accent);
   }
   // progress / ready prompt
@@ -534,12 +534,12 @@ void Game::drawLoading() {
   if (loading.readyT < 0) {
     const int warmN = headless || pending ? 0 : loadWarmItems(), hiveN = warmN - (specIdx == kSomnus ? 1 : 0);
     const std::string step = loading.warmStep < warmN ? (loading.warmStep < hiveN ? fmt("01 / 04  Preparing the hive craft  %d / %d", loading.warmStep + 1, hiveN) : std::string("01 / 04  Preparing the stores")) :
-      loading.frames < 2 ? "01 / 04  Preparing flight scene" : !loading.viewsDrawn && !headless ? ((loading.viewsStep == 0) == (camMode == 1) ? "01 / 04  Preparing the cockpit view" : "01 / 04  Preparing the outside view") : g_ren.entPending > 0 ? "02 / 04  Loading nearby scenery" : loadingShadowPending() ? "03 / 04  Preparing terrain shadows" : "04 / 04  Checking flight readiness";
+      loading.frames < 2 ? "01 / 04  Preparing flight scene" : !loading.viewsDrawn && !headless ? ((loading.viewsStep == 0) == (camMode == 1) ? "01 / 04  Preparing the cockpit view" : "01 / 04  Preparing the outside view") : g_ren.stream.pending > 0 ? "02 / 04  Loading nearby scenery" : loadingShadowPending() ? "03 / 04  Preparing terrain shadows" : "04 / 04  Checking flight readiness";
     g_ren.text(cx, by - 19 * s, fs(12,10), step, C_TEXT, 0.9f, 0, false);
     g_ren.text(cx + bw, by - 19 * s, fs(12,10), fmt("%d%%", std::min(99, (int)(clampf(loading.shown, 0.f, 1.f) * 100.f))), accent, 1, 2, false);
     g_ren.rect(cx, by, bw, bh, accent, 0.12f, 2 * s);
     if (loading.shown > 0.f) g_ren.rectGrad(cx, by, bw * loading.shown, bh, accent * 0.7f, accent, 1, 2 * s);
-    const std::string detail=pendingService?"Preparing service assignment and supplied aircraft":queued?"Preparing the flight":fmt("Elapsed %.1f s  /  %d scene frames  /  ",loading.t,loading.frames)+(g_ren.entPending>0?fmt("%d scenery chunks remaining",g_ren.entPending):loadingShadowPending()?"Terrain shadow pass running":"Verifying two stable rendered frames");
+    const std::string detail=pendingService?"Preparing service assignment and supplied aircraft":queued?"Preparing the flight":fmt("Elapsed %.1f s  /  %d scene frames  /  ",loading.t,loading.frames)+(g_ren.stream.pending>0?fmt("%d scenery chunks remaining",g_ren.stream.pending):loadingShadowPending()?"Terrain shadow pass running":"Verifying two stable rendered frames");
     g_ren.text(cx, by + 13 * s, fs(10,9), fitLoading(detail,bw,fs(10,9)),dim,.9f,0,false);
     float hx = cx + bw * loading.shown;
     g_ren.glow(hx - 4 * s, by - 2 * s, 8 * s, bh + 4 * s, accent, 0.5f + 0.3f * sinf(realTime * 6.f), 4 * s, 14 * s);

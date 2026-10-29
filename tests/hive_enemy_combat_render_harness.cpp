@@ -121,7 +121,7 @@ int main(int argc,char**argv){
  std::filesystem::create_directories(argv[1]);if(!initGL(W,H))return 1;
  buildTestWorld();buildStory();g_audio.init(48000);
  g_shaderCacheDir=std::string(argv[1])+"/cache";std::filesystem::create_directories(g_shaderCacheDir);
- g_ren.matDir="assets/materials";g_ren.renderScale=1;g_ren.quality=2;g_ren.entSync=true;
+ g_ren.matDir="assets/materials";g_ren.renderScale=1;g_ren.quality=2;g_ren.stream.sync=true;
  if(!g_ren.init(W,H,[](float p,const std::string&s){printf("INIT %.1f%% %s\n",p*100,s.c_str());}))return 1;
  g_ren.bakeYield=[](){};const int result=GameTest::run(argv[1],type);
  if(!g_shaderNotes.empty())fprintf(stderr,"SHADER NOTES %s\n",g_shaderNotes.c_str());return result;

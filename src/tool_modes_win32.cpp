@@ -68,11 +68,11 @@ static int analyzeTool(const std::string& cl, ToolHost& host) {
     RECT rc; GetClientRect(host.hwnd, &rc);
     if (rc.right != g_ren.W || rc.bottom != g_ren.H) g_ren.resize(rc.right, rc.bottom);
     SetWindowTextA(host.hwnd, ("Somnium Volandi - analysing " + sc).c_str());
-    g_ren.entSync = true;
+    g_ren.stream.sync = true;
     Game* g = new Game();
     g->saveDir = host.game.saveDir; g->diskless = true;
     g->initHeadless(); g->voicesOff = true; g->iconTex = host.iconTex; g->debugScene(sc);
-    g_ren.entSync = false;
+    g_ren.stream.sync = false;
     auto frames = [&](int n) { for (int i = 0; i < n; i++) { g->update(1.f / 60.f); g->render(); SwapBuffers(host.hdc); } };
     auto timed = [&](int n) { frames(8); glFinish(); LARGE_INTEGER t0, t1; QueryPerformanceCounter(&t0); frames(n); glFinish(); QueryPerformanceCounter(&t1); return qpcMs(t0, t1) / n; };
     // the probe of the own airframe's shading (5., below) builds a program of its own the first time it is asked
@@ -140,7 +140,7 @@ static int analyzeTool(const std::string& cl, ToolHost& host) {
               tu + tr + tw, 1000.0 / (tu + tr + tw), tu, tr, tw);
       fprintf(af, "  -> %s\n", tw > tu + tr ? "GPU-bound: the CPU finishes long before the GPU" : "CPU-bound or balanced: the CPU side takes as long as the GPU");
       fprintf(af, "Scenery: %d instances drawn from %d chunks, %.2f ms CPU to gather   Render resolution %dx%d\n",
-              g_ren.entDrawn, g_ren.entChunks, g_ren.entCpuMs, (int)(g_ren.W * g_ren.renderScale), (int)(g_ren.H * g_ren.renderScale));
+              g_ren.entDrawn, g_ren.stream.chunks, g_ren.entCpuMs, (int)(g_ren.W * g_ren.renderScale), (int)(g_ren.H * g_ren.renderScale));
     }
     // 2. exact per-pass GPU times
     double passSum[Renderer::kPasses] = {};
@@ -276,7 +276,7 @@ static int profileTool(const std::string& cl, ToolHost& host) {
     {Renderer::kDbgDetail, "ground detail layers"}, {Renderer::kDbgAniso, "anisotropic filtering"},
   };
   if (pf) fprintf(pf, "GPU: %s\nRender %dx%d, quality %d. Each line: frame time with that feature off, and what it saves.\n", host.gpu.c_str(), g_ren.W, g_ren.H, g_ren.quality);
-  g_ren.entSync = true;
+  g_ren.stream.sync = true;
   for (size_t a = 0, b; (b = list.find(',', a)) != std::string::npos; a = b + 1) {
     std::string sc = list.substr(a, b - a);
     if (sc.empty()) continue;
@@ -290,7 +290,7 @@ static int profileTool(const std::string& cl, ToolHost& host) {
       Game* g = new Game();
       g->saveDir = host.game.saveDir; g->diskless = true;
       g->initHeadless(); g->voicesOff = true; g->iconTex = host.iconTex; g->debugScene(sc);
-      g_ren.entSync = false; g_ren.dbgOff = F.bit;
+      g_ren.stream.sync = false; g_ren.dbgOff = F.bit;
       for (int i = 0; i < 30; i++) { g->update(1.f / 60.f); g->render(); SwapBuffers(host.hdc); }
       glFinish();
       LARGE_INTEGER f0, f1; QueryPerformanceCounter(&f0);
@@ -304,7 +304,7 @@ static int profileTool(const std::string& cl, ToolHost& host) {
         else fprintf(pf, "  %-26s %7.2f ms   saves %6.2f ms\n", F.name, ms, base - ms);
         fflush(pf);
       }
-      g_ren.dbgOff = 0; g_ren.entSync = true;
+      g_ren.dbgOff = 0; g_ren.stream.sync = true;
       delete g;
     }
   }
@@ -472,7 +472,7 @@ static int benchTool(const std::string& cl, ToolHost& host) {
     for (int i : kCareerAircraft) { if (Plane::perfLearned(&kAircraft[i])) learned++; else missing += std::string(missing.empty() ? "" : ", ") + kAircraft[i].name; }
     fprintf(bf, "career aircraft performance learned before the scenes: %d of %d%s%s\n\n", learned, kNumAircraft, missing.empty() ? "" : "; not: ", missing.c_str());
   }
-  g_ren.entSync = true;
+  g_ren.stream.sync = true;
   g_ren.syncTiming = false;   // normal async GPU queries; never serialized per-pass debug timing
   bool allValid = true;
   for (const std::string& sc : scenes) {
@@ -490,14 +490,14 @@ static int benchTool(const std::string& cl, ToolHost& host) {
     g_ren.setRenderScale(1.f);   // explicit benchmark invariant; does not change saved settings
     fprintf(bf, "\nScene %s; requested WX=%s\n", sc.c_str(), dev::env("WX") ? dev::env("WX") : "(scene/default)");
     printWeather(g, "preset");
-    g_ren.entSync = false;
+    g_ren.stream.sync = false;
     // warm until the scene is built: at least 40 frames, then until 20 frames in a row bake nothing and stream
     // nothing (a body, the scenery, the terrain shadow), at most 1200
     int warm = 0, quiet = 0; const int bakes0 = g_ren.bakeCount;
     for (; warm < 1200 && quiet < 20 && !host.game.quit; warm++) {
       const int bc = g_ren.bakeCount;
       g->update(1.f / 60.f); g->render(); SwapBuffers(host.hdc); pump();
-      const bool busy = g_ren.bakeCount != bc || g_ren.entPending > 0 || g_ren.tshPending();
+      const bool busy = g_ren.bakeCount != bc || g_ren.stream.pending > 0 || g_ren.tshPending();
       quiet = warm >= 39 && !busy ? quiet + 1 : 0;
     }
     const int warmBakes = g_ren.bakeCount - bakes0;
@@ -528,7 +528,7 @@ static int benchTool(const std::string& cl, ToolHost& host) {
       pump();
       RECT client; GetClientRect(host.hwnd, &client);
       s.native1080 = client.right == 1920 && client.bottom == 1080 && g_ren.W == s.width && g_ren.H == s.height && s.width == 1920 && s.height == 1080 && fabsf(s.scale - 1.f) < 1e-6f;
-      s.pending = g_ren.entPending; s.terrainPending = g_ren.tshPending() ? 1 : 0; s.bakes = g_ren.bakeCount;
+      s.pending = g_ren.stream.pending; s.terrainPending = g_ren.tshPending() ? 1 : 0; s.bakes = g_ren.bakeCount;
       s.renderFrame = g_ren.gpuFrameSerial; s.sceneStatus = g->benchmarkSceneStatus();
       const auto& gpuSample = g_ren.gpuSample;
       if (gpuSample.id != seenGpu) {
@@ -581,7 +581,7 @@ static int benchTool(const std::string& cl, ToolHost& host) {
       fprintf(bf, "%-22s (warmed %d frames until built; %d bodies built during it)\n", "", warm, warmBakes);
       fflush(bf);
     }
-    g_ren.entSync = true;
+    g_ren.stream.sync = true;
     delete g;
     if (host.game.quit) break;
   }
@@ -610,7 +610,7 @@ static int loadshotsTool(const std::string& cl, ToolHost& host) {
     RECT rc; GetClientRect(host.hwnd, &rc);
     if (rc.right != g_ren.W || rc.bottom != g_ren.H) g_ren.resize(rc.right, rc.bottom);
     SetWindowTextA(host.hwnd, ("Somnium Volandi - rendering loading pictures " + std::to_string(++done) + " / " + std::to_string(jobs.size()) + ": " + J.second).c_str());
-    g_ren.entSync = true;
+    g_ren.stream.sync = true;
     Game* g = new Game();
     g->saveDir = host.game.saveDir; g->diskless = true; g->assetDir = host.game.assetDir;
     g->initHeadless(); g->voicesOff = true; g->iconTex = host.iconTex; g->debugScene(J.first);
@@ -655,7 +655,7 @@ static int shotsTool(const std::string& cl, ToolHost& host) {
   std::string dir(exe, n); dir = dir.substr(0, dir.find_last_of("\\/")) + "\\shots";
   CreateDirectoryA(dir.c_str(), nullptr);
   { BodyLoad r; host.buildBodies(r); }
-  g_ren.entSync = true;
+  g_ren.stream.sync = true;
   for (size_t a = 0, b; (b = list.find(',', a)) != std::string::npos; a = b + 1) {
     std::string sc = list.substr(a, b - a);
     if (sc.empty()) continue;

@@ -39,7 +39,7 @@ struct GameTest {
   static int researchWarm(Game& game) {   // the research terminal opened from the menu after the launch's prewarm: its warm-up, its bar and the boot sequence, frame by frame on the real clock
     game.debugScene("menu");
     if (getenv("PREWARM")) game.prewarm([](float, const std::string&) {}, true);   // (as the launch does; without it the warm-up bakes the research craft itself)
-    g_ren.entSync = false;   // (the scenery streams over frames, as in the game)
+    g_ren.stream.sync = false;   // (the scenery streams over frames, as in the game)
     for (int i = 0; i < 3; i++) { game.update(1.f / 30.f); game.render(); }
     game.in.down['U'] = game.in.down['I'] = true; game.in.pressed['U'] = true;
     const float shots[] = {1.0f, 2.2f, 3.3f, 3.85f};
@@ -51,7 +51,7 @@ struct GameTest {
       game.update(dt); game.render(); game.in.endFrame(); game.in.down['U'] = game.in.down['I'] = false;
       const float bar = std::min(1.f, std::max(0.f, (game.resSeq - Game::kResScan0) / (Game::kResScan1 - Game::kResScan0)));
       printf("frame %4d  %6.2f s  views %2d  pending %4d of %4d  work %5.1f%%  seq %5.2f  bar %5.1f%%%s\n", f, std::chrono::duration<float>(now - t0).count(), game.resWarmFrames,
-             g_ren.entPending, game.resPend0, game.resWork * 100.f, game.resSeq, bar * 100.f, game.resWarm ? "" : "  (ready)");
+             g_ren.stream.pending, game.resPend0, game.resWork * 100.f, game.resSeq, bar * 100.f, game.resWarm ? "" : "  (ready)");
       if (shot < 4 && game.resSeq >= shots[shot]) { char b[128]; snprintf(b, sizeof b, "/tmp/claude-0/sp/reswarm_%d.ppm", shot++); glFinish(); g_ren.screenshot(b); }
     }
     return 0;
@@ -61,7 +61,7 @@ struct GameTest {
   static int researchSwitch(Game& game) {
     game.debugScene("menu");
     if (getenv("PREWARM")) game.prewarm([](float, const std::string&) {}, true);
-    g_ren.entSync = false;
+    g_ren.stream.sync = false;
     for (int i = 0; i < 3; i++) { game.update(1.f / 30.f); game.render(); }
     game.in.down['U'] = game.in.down['I'] = true; game.in.pressed['U'] = true;
     auto last = std::chrono::steady_clock::now();
@@ -100,7 +100,7 @@ struct GameTest {
   // render timed, and the slow ones named by what they did (programs compiled, bodies baked or loaded, scenery gathered)
   static int somnusHitch(Game& game) {
     for (int i : kCareerAircraft) Plane::perf(&kAircraft[i]);   // (as Game::init learns them: the traffic reads them)
-    game.headless = false; g_ren.entSync = false;   // (the launch as the game runs it: its loading screen, and its warm-ups)
+    game.headless = false; g_ren.stream.sync = false;   // (the launch as the game runs it: its loading screen, and its warm-ups)
     game.resCraft = getenv("HITCHCRAFT") ? atoi(getenv("HITCHCRAFT")) : kSomnus; game.resCard = getenv("HITCHCARD") ? atoi(getenv("HITCHCARD")) : -1;   // (HITCHCRAFT: another research craft) game.resAirborne = true; game.resAirport = 0; game.realTime = 20;
     game.launchResearch();
     int lf = 0; const int b0 = g_ren.bakeCount, m0 = g_shaderCacheMisses;
@@ -162,16 +162,16 @@ struct GameTest {
   static size_t wreckCount(const Game& g) { return g.wreck.size(); }
   static size_t debrisCount(const Game& g) { return g.debris.size(); }
   static int hubFly(Game& game) {   // the hub at the player's airport for HUBFRAMES frames, then a job from there: what the loading screen still has to do
-    g_ren.entSync = false;
+    g_ren.stream.sync = false;
     game.headless = false; game.screen = SCR_HUB;
     const int hf = getenv("HUBFRAMES") ? atoi(getenv("HUBFRAMES")) : 120;
     for (int i = 0; i < hf; i++) { game.update(1.f / 30.f); game.render(); }
-    printf("hub at %s: %d frames, scenery pending %d, chunks %d\n", g_world.airports[game.career.location].code, hf, g_ren.entPending, (int)g_ren.entChunks);
+    printf("hub at %s: %d frames, scenery pending %d, chunks %d\n", g_world.airports[game.career.location].code, hf, g_ren.stream.pending, (int)g_ren.stream.chunks);
     Contract c = game.career.board.empty() ? Contract() : game.career.board[0];
     if (game.career.board.empty()) { c.from = game.career.location; c.to = (c.from + 1) % (int)g_world.airports.size(); c.title = "Test"; }
     game.startFlight(c, 1, Career::SRC_RENT);
     int frames = 0, pend0 = -1; const int b0 = g_ren.bakeBuilt;
-    while (game.screen == SCR_LOADING && game.loading.readyT < 0 && frames < 2000) { game.update(1.f / 30.f); game.render(); if (pend0 < 0) pend0 = g_ren.entPending; frames++; }
+    while (game.screen == SCR_LOADING && game.loading.readyT < 0 && frames < 2000) { game.update(1.f / 30.f); game.render(); if (pend0 < 0) pend0 = g_ren.stream.pending; frames++; }
     printf("loading from %s: first frame pending %d, ready after %d frames (%.1f s of game time), meshes built %d\n", g_world.airports[c.from].code, pend0, frames, game.loading.t, g_ren.bakeBuilt - b0);
     return 0;
   }
@@ -193,7 +193,7 @@ struct GameTest {
       return resident * (double)sysconf(_SC_PAGESIZE) / 1048576.0;
     };
     for (int i : kCareerAircraft) Plane::perf(&kAircraft[i]);
-    game.headless = false; g_ren.entSync = false; game.profile.welcomed = true;
+    game.headless = false; g_ren.stream.sync = false; game.profile.welcomed = true;
     // the release's layout: the loading screens' pictures beside the game (assets/loading here). Without them every
     // launch took the aerial map instead, and the loading screen drawn from inside a bake - which waited for the map -
     // was never seen as the islands' flights, which all have a picture, run it (SEAMLESS_PICTURES=0: the map)
@@ -206,9 +206,9 @@ struct GameTest {
       game.debugScene("menu");
       game.set.traffic = false;
       auto offscreen = [&] { g_ren.setOffscreen(true); game.update(1.f / 60.f); game.render(); glFinish(); g_ren.setOffscreen(false); };
-      g_ren.entSync = true;
-      for (int i = 0; i < 400; i++) { game.realTime = 3.f; offscreen(); if (i >= 2 && g_ren.entPending == 0 && !game.loadingShadowPending()) break; }
-      g_ren.entSync = false;
+      g_ren.stream.sync = true;
+      for (int i = 0; i < 400; i++) { game.realTime = 3.f; offscreen(); if (i >= 2 && g_ren.stream.pending == 0 && !game.loadingShadowPending()) break; }
+      g_ren.stream.sync = false;
       std::vector<int> crafts{0, 1};
       if (getenv("SEAMLESS_RESEARCH") && atoi(getenv("SEAMLESS_RESEARCH"))) crafts.push_back(kSomnus);   // (the craft the research flight flies, warmed as the launch warms it)
       for (int craft : crafts) for (bool inside : {false, true}) { game.prewarmCraft = craft; game.prewarmInside = inside; game.realTime = 3.f; offscreen(); }
@@ -598,7 +598,7 @@ void main(){
   g_ren.matDir = getenv("MATDIR") ? getenv("MATDIR") : "assets/materials";   // (MATDIR="": the procedural layers)
   if (!g_ren.init(W, H)) { printf("init failed: %s\n%s", g_ren.error.c_str(), g_shaderNotes.c_str()); return 1; }
   if (!g_shaderNotes.empty()) printf("shader notes:\n%s", g_shaderNotes.c_str());   // (programs rejected and what built instead: NVFAIL)
-  g_ren.entSync = !getenv("ENTSTREAM");   // captures generate every scenery chunk in range up front
+  g_ren.stream.sync = !getenv("ENTSTREAM");   // captures generate every scenery chunk in range up front
   printf("renderer ok (shader cache: %d loaded, %d compiled, %.0f s)\n", g_shaderCacheHits.load(), g_shaderCacheMisses.load(),
          std::chrono::duration<double>(std::chrono::steady_clock::now() - tInit).count());
   printf("ground photographs: %s\n", g_ren.matEnvScanned ? (g_ren.envMatCompressed ? "2K, block-compressed (BC3)" : "2K, uncompressed") : g_ren.matEnvFallbackScanned ? "512" : "none");
@@ -677,7 +677,7 @@ void main(){
     for (size_t a = 0, b; (b = list.find(',', a)) != std::string::npos; a = b + 1) {
       std::string sc = list.substr(a, b - a);
       if (sc.empty()) continue;
-      if (getenv("ENTSYNC")) g_ren.entSync = true;   // deterministic scenery (for exact image comparisons)
+      if (getenv("ENTSYNC")) g_ren.stream.sync = true;   // deterministic scenery (for exact image comparisons)
       // scene~hulloff / scene~envoff: that shot only with the switch on, so an A/B pair shares one shader compile
       std::string base = sc.substr(0, sc.find('~'));
       const bool hullOff0 = g_ren.hullOff;
@@ -726,9 +726,9 @@ void main(){
     game.prewarm([&](float f, const std::string& what) {
       printf("prewarm %3.0f%%  %s  (%.1f s)\n", f * 100.f, what.c_str(), std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count()); fflush(stdout);
     });
-    printf("prewarm: entities pending %d, hull ready %d\n", g_ren.entPending, 1);
+    printf("prewarm: entities pending %d, hull ready %d\n", g_ren.stream.pending, 1);
     for (int i = 0; i < 70; i++) { game.update(1.f / 60.f); game.render(); }   // into the first shot, past its fade-in
-    printf("menu: entities pending %d\n", g_ren.entPending);
+    printf("menu: entities pending %d\n", g_ren.stream.pending);
     g_ren.screenshot("/tmp/claude-0/sp/shot_prewarm.ppm"); printf("wrote shot_prewarm\n");
     return 0;
   }
@@ -787,7 +787,7 @@ void main(){
     g_ren.syncTiming = false;
     glFinish();
     if (wall) { printf("passes (wall ms):"); const char* nm[] = {"world", "displays", "feeds", "objects", "proxy", "lighting", "taa", "sprites", "bloom", "shafts", "composite"}; for (int p = 0; p < Renderer::kPasses; p++) printf(" %s %.0f", nm[p], wsum[p] / frames); printf("\n"); }
-    printf("bench: %.1f ms/frame  (scenery: %d instances, %d chunks, %.2f ms CPU)\n", std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() / frames, g_ren.entDrawn, g_ren.entChunks, g_ren.entCpuMs);
+    printf("bench: %.1f ms/frame  (scenery: %d instances, %d chunks, %.2f ms CPU)\n", std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() / frames, g_ren.entDrawn, g_ren.stream.chunks, g_ren.entCpuMs);
     if (getenv("PREPASSAUTO")) { const PrepassAuto& pa = g_ren.prepassAuto; printf("ground depth first: %s, %d trials, %d switches, last trial %.1f ms kept vs %.1f ms other\n", pa.on ? "on" : "off", pa.trials, pa.switches, pa.lastKept, pa.lastOther); }
     { const float* pm = g_ren.passMs; printf("passes (GPU ms, smoothed): world %.1f  displays %.1f  feeds %.1f  objects %.1f  shadow proxy %.1f  lighting %.1f  taa %.1f  sprites %.1f  bloom %.1f  shafts %.1f  composite %.1f\n", pm[0], pm[1], pm[2], pm[3], pm[4], pm[5], pm[6], pm[7], pm[8], pm[9], pm[10]); }
   }
