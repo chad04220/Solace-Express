@@ -119,8 +119,7 @@ int Game::hubField() const { return g_world.regionId == career.region && career.
 vec3 Game::hubOrbitAt(vec3 centre) const { const float t = realTime * kHubOrbitRate; return centre + vec3(cosf(t) * kHubOrbitR, 0, sinf(t) * kHubOrbitR); }
 
 void Game::menuTour(FrameParams& fp) {
-  static Plane demo;
-  static int lastCraft = -1;
+  Plane& demo = cams.tourDemo; int& lastCraft = cams.tourCraft;
   MenuShot S = menuShot(realTime);
   if (prewarmCraft >= 0) S.craft = prewarmCraft;
   float u = realTime - floorf(realTime / kMenuShotLen) * kMenuShotLen;
@@ -234,8 +233,8 @@ static HangarStand hangarStandAt(int ai, const AircraftSpec& s) {
 // The preview stage (Game::previewStage): the stand at the hub's field that clears the largest craft in the roster, so
 // it is the same place for every craft; a field with none, the nearest with one. Kept until the world or the field changes
 Game::PreviewStage Game::previewStage() const {
-  static int lastAi = -2; static std::string lastRegion; static size_t lastN = 0; static vec3 lastPos;
-  static PreviewStage stage;
+  CameraState::PreviewCache& C = cams.previewCache;
+  int& lastAi = C.ai; std::string& lastRegion = C.region; size_t& lastN = C.n; vec3& lastPos = C.pos; PreviewStage& stage = C.stage;
   if (g_world.airports.empty()) return PreviewStage{};
   const int home = hubField();
   const int ai = home >= 0 ? home : std::max(0, g_world.findAirport("CAP"));
@@ -274,8 +273,7 @@ void Game::menuBackgroundCamera(FrameParams& fp) {
     return;
   }
   // An Ambler circles over the islands while the camera chases it in a slow arc
-  static Plane demo;
-  static bool initd = false;
+  Plane& demo = cams.amblerDemo; bool& initd = cams.amblerInit;
   if (!initd) { demo.reset(&kAircraft[screen == SCR_MENU ? 1 : 0], vec3(0, 600, 0), 0, 50, 100, true, 60); initd = true; }
   const int ap = hubField();
   vec3 centre = screen == SCR_MENU || ap < 0 ? vec3(-6000, 0, 11000) : g_world.airports[ap].pos();
@@ -313,7 +311,7 @@ void Game::hangarPreviewCamera(FrameParams& fp) {
   const int craft = prewarmStage > 0 ? 0 : screen == SCR_FREE_FLIGHT ? validCareerSelection(freeCraft) : std::clamp(selHangar, 0, kAircraftCount - 1);
   hangarView.select(craft, screen == SCR_FREE_FLIGHT);
   const AircraftSpec& sp = kAircraft[craft];
-  static Plane demo;
+  Plane& demo = cams.hangarDemo;
   if (demo.spec != &sp) demo.reset(&sp, vec3(0), 0, sp.maxFuel, 85, false, 0);
   if (!hangarResearchLocked(craft)) {   // the preview stage: the same stand for the hangar's aircraft and Free Flight's
     const PreviewStage st = previewStage();
@@ -514,13 +512,13 @@ void Game::militaryLoadingCamera(FrameParams& fp) {
 void Game::stageFlyingCamera(FrameParams& fp, MenuPreviewView& view, int craft, float cx, float cy, float pixels, bool cockpit) {
   const PreviewStage st = previewStage();
   const AircraftSpec& sp = kAircraft[std::clamp(craft, 0, kAircraftCount - 1)];
-  static Plane demo;
+  Plane& demo = cams.stageDemo;
   if (demo.spec != &sp) demo.reset(&sp, vec3(0, 600, 0), 0, 50, 85, true, 150);
   const vec3 centre = st.ok ? st.ground : g_world.airports.empty() ? vec3(0) : g_world.airports[std::clamp(st.airport, 0, (int)g_world.airports.size() - 1)].pos();
   const float R = kStageCircuitR, v = clampf(0.3f * sp.cruise, 65.f, 95.f), bankDeg = atanf(v * v / (9.81f * R)) / DEG;
   auto at = [&](float t) { return vec3(centre.x + cosf(t) * R, 0.f, centre.z + sinf(t) * R); };
-  constexpr int kN = 72;
-  static vec3 altCentre(1e9f, 0, 0); static std::array<float, kN> alt{};
+  constexpr int kN = CameraState::kStageAltSamples;
+  vec3& altCentre = cams.stageAltCentre; auto& alt = cams.stageAlt;
   if (length(altCentre - centre) > 0.01f) {   // (the height round the circuit: the highest ground across a 500 m band, smoothed into a flyable profile)
     altCentre = centre;
     std::array<float, kN> g{}, m{};

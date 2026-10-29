@@ -364,7 +364,7 @@ void Game::feedAudio() {
     const float rv = radioLevel();
     if (rv != radioSentVol) { radio.setVolume(rv); radioSentVol = rv; }
   }
-  static bool muffled = false;
+  bool& muffled = anrMuffled;
   if (actKeyP(ACT_ANR) || actJoyP(ACT_ANR) || (screen == SCR_FLIGHT && !paused && actPadP(ACT_ANR))) { muffled = !muffled; toast(muffled ? "Engine noise muffled (headset ANR on)" : "Headset ANR off"); }
   ap.muffled = muffled;
   if (screen == SCR_FLIGHT && plane.spec && !crashed) {

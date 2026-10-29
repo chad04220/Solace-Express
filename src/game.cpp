@@ -84,6 +84,7 @@ void Game::initHeadless() {
   // is resident: a fresh career there (its board drawn when the hub opens).
   if (g_world.procedural) { career = Career{}; career.region = g_world.regionId; career.location = 0; }
   else career.newGame();
+  resetMenus();
   set.resMode = 0; failuresArmed = false; g_ren.foveation = 0.f; g_ren.prepassAutoOn = false;
 }   // tools and tests render at the full resolution; nothing breaks unless the test breaks it
 

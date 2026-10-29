@@ -570,7 +570,7 @@ void Game::drawLoading() {
       "Rough air? Settings > Flying > Air: Calm takes the edge off the gusts while you learn.",
     };
     const int n = (int)(sizeof tips / sizeof tips[0]);
-    static int tip = -1; static float lastT = 1e9f;
+    int& tip = menu.tip; float& lastT = menu.tipT;
     if (loading.t < lastT) tip = (tip + 1) % n;   // (a new load: its elapsed time starts again)
     lastT = loading.t;
     const float ty = cy - 44 * s, a = clampf(loading.t / 0.4f, 0.f, 1.f);   // (just above the flight's panel, over the picture)
@@ -582,7 +582,7 @@ void Game::drawLoading() {
 }
 
 // ------------------------------------------------------------------ main menu
-void Game::enterCareerHub() { screen = SCR_HUB; hubTab = TAB_CONTRACTS; hubList = 0; selContract = 0; selAircraft = -1; }
+void Game::enterCareerHub() { screen = SCR_HUB; hubTab = TAB_CONTRACTS; hubList = 0; selContract = 0; selAircraft = -1; resetMenus(); }
 void Game::drawMenu() {
   // the first start: the welcome over the menu, the menu under it without the clicks, the keys or the pad
   const bool welcome = !profile.welcomed && !headless && !diskless;   // (never in a tool's session: its pictures show the menu)
@@ -794,7 +794,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   // build card list: story, free flight, freelance
   struct Card { const Contract* c; bool story; bool free; bool job = false; int trial = -1; bool legend = false; bool travel = false; };
   std::vector<Card> cards;
-  static Contract jobCont;   // the open job's next leg (pinned on top while the job waits for it)
+  Contract& jobCont = menu.jobCont;   // the open job's next leg (pinned on top while the job waits for it)
   const bool openJob = career.job && career.job->state == Career::JobState::RECOVERY;
   if (hubList == 1) { for (int k = 0; k < TR_COUNT; k++) cards.push_back({nullptr, false, false, false, k}); }
   else {
@@ -829,7 +829,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   // reachable (the review of v3.31.0, U2: the last two freelance jobs had no way in), the selected card kept in view
   const float chh = 82 * s, step = chh + 8 * s, listTop = cy, listBot = y + h - 8 * s;
   const int visCards = std::max(1, (int)floorf((listBot - listTop + 8 * s) / step)), nCards = (int)cards.size();
-  static int listScroll = 0; static int listFor = -1, selSeen = -1;
+  int& listScroll = menu.contracts.scroll; int& listFor = menu.contracts.listFor; int& selSeen = menu.contracts.selSeen;
   if (listFor != hubList) { listFor = hubList; listScroll = 0; }
   bool cardsWheeled = false;
   if (hovered(x, listTop, lw, listBot - listTop) && in.wheel != 0) { listScroll -= (int)in.wheel; in.wheel = 0; cardsWheeled = true; }
@@ -920,7 +920,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   // (the route map ends above the chooser: on a short panel - a large UI scale - it is drawn smaller rather than over it)
   mapW = std::max(60 * s, std::min(mapW, chooserTop - (y + 60 * s) - 16 * s));
   const float detTop = py, detBot = chooserTop - 10 * s;
-  static float detScroll = 0.f, detMax = 0.f; static int detFor = -1;
+  float& detScroll = menu.contracts.detScroll; float& detMax = menu.contracts.detMax; int& detFor = menu.contracts.detFor;
   if (detFor != hubList * 1000 + selContract) { detFor = hubList * 1000 + selContract; detScroll = 0.f; detMax = 0.f; }
   bool detWheeled = false;   // (the region with its scroll bar beside it: the bar is the region's own stop in the D-pad's walk)
   if (hovered(px, detTop, textW + 14 * s, detBot - detTop) && in.wheel != 0) { detScroll -= in.wheel * 48.f * s; in.wheel = 0; detWheeled = true; }
@@ -1088,7 +1088,7 @@ void Game::drawHubContracts(float x, float y, float w, float h) {
   // reachable (the review of v3.31.0, U1: an owned Wavecrest sat below six rentals, out of reach)
   const float chooserBot = y + h - 70 * s;
   const int totalRows = (kNumAircraft + 1) / 2, visRows = std::max(1, (int)floorf((chooserBot - py + 6 * s) / rowStep));
-  static int chooserScroll = 0; static int chooserFor = -1;
+  int& chooserScroll = menu.contracts.chooserScroll; int& chooserFor = menu.contracts.chooserFor;
   if (chooserFor != hubList * 1000 + selContract) { chooserFor = hubList * 1000 + selContract; chooserScroll = 0; }
   bool chooserWheeled = false;
   if (hovered(px, py, iw, visRows * rowStep) && in.wheel != 0) { chooserScroll -= (int)in.wheel; in.wheel = 0; chooserWheeled = true; }
@@ -1301,13 +1301,13 @@ void Game::drawTravel(float x, float y, float w, float h) {
   py += 8 * s;
   const bool busy = career.job.has_value() || career.attemptOpen;
   if (busy) { g_ren.text(px, py, 14 * s, "Finish or release the open job before you travel.", C_WARN, 1); py += 26 * s; }
-  static std::string listFor; static int listLic = -1, listWorld = -1; static std::vector<Career::Destination> list;
+  std::string& listFor = menu.travel.listFor; int& listLic = menu.travel.listLic; int& listWorld = menu.travel.listWorld; auto& list = menu.travel.list;
   if (listFor != career.region || listLic != career.license || listWorld != (int)career.realEarth) {
     list = career.destinations(); listFor = career.region; listLic = career.license; listWorld = (int)career.realEarth;
   }
   header(px, py, iw, "DESTINATIONS"); py += 30 * s;
   const float top = py, bottom = y + h - 16 * s, rowH = 56 * s;
-  static float scroll = 0.f;
+  float& scroll = menu.travel.scroll;
   const float limit = std::max(0.f, list.size() * rowH - (bottom - top));
   bool wheeled = false;
   if (hovered(px, top, iw, bottom - top) && in.wheel != 0) { scroll -= in.wheel * 48 * s; in.wheel = 0; wheeled = true; }
@@ -1365,7 +1365,7 @@ void Game::drawHubHangar(float x, float y, float w, float h) {
   g_ren.text(x + 18 * s, y + 48 * s, 11 * s, fmt("%02d AIRFRAMES / %02d CLASSIFIED", catalogCount, 4), C_DIM, 1, 0, false);
   const float top = y + 78 * s, bottom = y + h - 30 * s, rowH = 68 * s;
   const int visible = std::max(1, (int)((bottom - top) / rowH));
-  static int first = 0, lastSel = -1;
+  int& first = menu.hangar.first; int& lastSel = menu.hangar.lastSel;
   bool catalogWheeled = false;
   if (hovered(x, top, lw, bottom - top) && in.wheel) { first -= (int)in.wheel; in.wheel = 0; catalogWheeled = true; }
   if (lastSel != selHangar) { if (selectedRow < first) first = selectedRow; if (selectedRow >= first + visible) first = selectedRow - visible + 1; lastSel = selHangar; }
@@ -1431,7 +1431,7 @@ void Game::drawHubHangar(float x, float y, float w, float h) {
     return;
   }
   header(px, y + 20 * s, iw, "AIRFRAME / OWNERSHIP");
-  static float scroll = 0, contentH = 0; static int inspectFor = -1;
+  float& scroll = menu.hangar.inspScroll; float& contentH = menu.hangar.inspContent; int& inspectFor = menu.hangar.inspectFor;
   if (inspectFor != selHangar) { inspectFor = selHangar; scroll = 0; contentH = 0; }
   bool inspectWheeled = false;
   if (hovered(rx, regTop, rw, regBot - regTop) && in.wheel) { scroll -= in.wheel * 48 * s; in.wheel = 0; inspectWheeled = true; }
@@ -1813,7 +1813,7 @@ void Game::drawFreeFlightSetup(const FrameParams& fp) {
   g_ren.text(x + 18 * s, y + 49 * s, 11 * s, demo ? fmt("3 OF %d IN THE DEMO / FREE", kNumAircraft) : fmt("ALL %d AVAILABLE / FREE", kNumAircraft), C_ACCENT, 1, 0, false);
   const float craftTop = y + 78 * s, craftBottom = y + h - 30 * s, craftStep = 68 * s;
   const int craftVisible = std::max(1, (int)((craftBottom - craftTop) / craftStep));
-  static int craftFirst = 0, craftSeen = -1, airportFirst = 0, airportSeen = -1;
+  int& craftFirst = menu.freeFlight.craftFirst; int& craftSeen = menu.freeFlight.craftSeen; int& airportFirst = menu.freeFlight.airportFirst; int& airportSeen = menu.freeFlight.airportSeen;
   auto craftId = [&](int i) { return uid(0, (float)i, "free-flight-airframe"); };
   bool craftWheeled = false, airportWheeled = false;
   if (hovered(x, craftTop, lw, craftBottom - craftTop) && in.wheel) { craftFirst -= (int)in.wheel; in.wheel = 0; craftWheeled = true; }
@@ -1918,7 +1918,7 @@ void Game::drawHubAirline(float x, float y, float w, float h) {
   }
   float lw = std::min(w * 0.5f, 620 * s);
   panel(x, y, lw, h); panel(x + lw + 16 * s, y, w - lw - 16 * s, h);
-  static float airScroll[2] = {0, 0}, airContent[2] = {0, 0};
+  auto& airScroll = menu.airline.scroll; auto& airContent = menu.airline.content;
   int activeColumn = 0; float clipX = x, clipW = lw; size_t focusStart = 0; bool airWheeled[2] = {false, false};
   const float clipTop = y + 16 * s, clipBottom = y + h - 24 * s;
   auto beginColumn = [&](int col, float left, float width) {
@@ -2045,8 +2045,7 @@ void Game::drawHubLogbook(float x, float y, float w, float h) {
     for (int i = 0; i < 3; i++)
       if (button(dx + 24 * s + i * (bw + 8 * s), y + 18 * s, bw, 30 * s, pages[i], true, logPage == i) && logPage != i) { logPage = i; g_audio.trigger(SFX_CLICK); }
   }
-  static float scroll[2] = {0, 0}, total[2] = {0, 0};
-  static int pageWas = -1;
+  auto& scroll = menu.logbook.scroll; auto& total = menu.logbook.total; int& pageWas = menu.logbook.pageWas;
   if (pageWas != logPage) { pageWas = logPage; scroll[1] = 0; }
   const float top = y + 72 * s, bottom = y + h - 20 * s;
   for (int column = 0; column < 2; ++column) {
@@ -2246,7 +2245,7 @@ void Game::drawSettings(float x, float y, float w, float h) {
   // its control into view): every one stays reachable at any resolution and UI scale (the review of v3.31.0, U3: five
   // rows sat below a 1080p screen). A control outside the region takes no clicks.
   const float rs = 42 * s, regTop = py, regBot = y + h - 24 * s;
-  static float genScroll = 0.f, genMax = 0.f;
+  float& genScroll = menu.settings.genScroll; float& genMax = menu.settings.genMax;
   bool genWheeled = false;
   if (hovered(x - 8 * s, regTop, w + 16 * s, regBot - regTop) && in.wheel != 0) { genScroll -= in.wheel * 48.f * s; in.wheel = 0; genWheeled = true; }
   genScroll = std::clamp(genScroll, 0.f, genMax);
@@ -2536,7 +2535,7 @@ void Game::drawJoystick(float x, float y, float w, float h) {
   // the axes in a clipped region of their own, scrolled (the wheel, the right stick, the focus) when the panel is too
   // short for five rows - at a large UI scale on a small screen the last rows ran under the note at the foot
   const float regTop = py, regBot = y + h - 40 * s;
-  static float axScroll = 0.f, axMax = 0.f;
+  float& axScroll = menu.settings.axScroll; float& axMax = menu.settings.axMax;
   bool axWheeled = false;
   if (hovered(x - 8 * s, regTop, w + 16 * s, regBot - regTop) && in.wheel != 0) { axScroll -= in.wheel * 48.f * s; in.wheel = 0; axWheeled = true; }
   axScroll = std::clamp(axScroll, 0.f, axMax);
@@ -3769,7 +3768,7 @@ void Game::drawAchievementBanner() {
 // The licence card over the hub: what the new licence opens up, the aircraft first
 void Game::drawLicenceCard() {
   const float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
-  static float opened = -1.f; static int openedFor = -1;
+  float& opened = menu.licenceCard.opened; int& openedFor = menu.licenceCard.openedFor;
   if (openedFor != licenceShown) { openedFor = licenceShown; opened = realTime; }
   const float e = realTime - opened, k = clampf(e / 0.4f, 0.f, 1.f), ease = 1.f - (1.f - k) * (1.f - k);
   g_ren.rect(0, 0, W, H, vec3(0, 0, 0), 0.55f * ease);
@@ -4073,7 +4072,8 @@ void Game::drawWelcome() {
   if (!profile.name.empty() && fmodf(realTime, 1.f) < 0.55f) g_ren.rect(x + 44 * s + tw, py + 8 * s, 2 * s, 22 * s, C_ACCENT, 1);
   if (button(x + pw - 30 * s - 160 * s, py, 160 * s, 38 * s, "Surprise me")) {
     static const char* names[] = {"Kestrel", "Ada", "Juno", "Wren", "Maverick", "Skye", "Atlas", "Nova", "Falco", "Iris", "Vega", "Orion"};
-    static int k = (int)(realTime * 7.f); profile.name = names[(k++) % 12];
+    if (menu.nameRoll < 0) menu.nameRoll = (int)(realTime * 7.f);
+    profile.name = names[(menu.nameRoll++) % 12];
   }
   py += 56 * s;
   // how to fly
@@ -4139,7 +4139,7 @@ void Game::drawMilitaryLocked() {
 // The campaign's end: the career in numbers, and what is still out there
 void Game::drawFinaleCard() {
   const float s = S(), W = (float)g_ren.W, H = (float)g_ren.H;
-  static float opened = -1.f;
+  float& opened = menu.finaleOpened;
   if (opened < 0.f || realTime - opened > 1e5f) opened = realTime;
   const float e = realTime - opened, k = clampf(e / 0.6f, 0.f, 1.f), ease = 1.f - (1.f - k) * (1.f - k);
   g_ren.rect(0, 0, W, H, vec3(0, 0, 0), 0.6f * ease);
@@ -4257,7 +4257,7 @@ void Game::drawDebrief() {
   int total = 0;
   for (auto& l : payout) total += l.amount;
   const float bodyTop = py, bodyBot = std::max(bodyTop + 24 * s, totalY - 12 * s);
-  static float payScroll = 0.f, bodyH = 0.f; static std::string payFor;
+  float& payScroll = menu.debrief.payScroll; float& bodyH = menu.debrief.bodyH; std::string& payFor = menu.debrief.payFor;
   const std::string payKey = debriefTitle + "|" + contract.id + "|" + std::to_string(payout.size()) + "|" + std::to_string(total);
   if (payKey != payFor) { payFor = payKey; payScroll = 0.f; }
   const float payMax = std::max(0.f, bodyH - (bodyBot - bodyTop));

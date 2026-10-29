@@ -754,6 +754,31 @@ private:
   std::vector<PayoutLine> payout; int stars = 0; bool lastSuccess = false; std::string debriefTitle;
   int licenseBefore = 0;
 
+  // The menus' own state (game_ui.cpp, game_military_ui.cpp, game_research_ui.cpp): scroll positions, what each list
+  // was last laid out for, cached lists. One struct, reset whole when a career begins or is loaded (enterCareerHub)
+  // and by initHeadless: nothing of a previous career's menus survives into the next, and a test starts clean. (These
+  // were function-local statics: invisible to the class, the save and the tests, and a cached list keyed on the
+  // region and licence alone carried from one career into the next one made in the same region.)
+  struct MenuState {
+    int tip = -1; float tipT = 1e9f;   // the loading screen's tips: the one shown, the elapsed time it was chosen at
+    Contract jobCont;                  // the open job's next leg, pinned on the contracts list
+    struct { int scroll = 0, listFor = -1, selSeen = -1; float detScroll = 0, detMax = 0; int detFor = -1, chooserScroll = 0, chooserFor = -1; } contracts;
+    struct { std::string listFor; int listLic = -1, listWorld = -1; std::vector<Career::Destination> list; float scroll = 0; } travel;
+    struct { int first = 0, lastSel = -1; float inspScroll = 0, inspContent = 0; int inspectFor = -1; } hangar;
+    struct { int craftFirst = 0, craftSeen = -1, airportFirst = 0, airportSeen = -1; } freeFlight;
+    struct { float scroll[2] = {0, 0}, content[2] = {0, 0}; } airline;
+    struct { float scroll[2] = {0, 0}, total[2] = {0, 0}; int pageWas = -1; } logbook;
+    struct { float genScroll = 0, genMax = 0, axScroll = 0, axMax = 0; } settings;
+    struct { float opened = -1; int openedFor = -1; } licenceCard;
+    float finaleOpened = -1;
+    int nameRoll = -1;                 // the welcome's "Surprise me": the next name (-1: from the clock on the first press)
+    struct { float payScroll = 0, bodyH = 0; std::string payFor; } debrief;
+    float researchCueT = 99.f;         // the research terminal's boot sequence: the time its cues were last judged at
+    struct { int firstRow = 0, seenSelection = -1; float briefScroll = 0, briefHeight = 0; int briefMission = -1; } military;
+  } menu;
+  void resetMenus() { menu = MenuState(); }
+  bool anrMuffled = false;             // the headset's noise cancelling, as the pilot last set it (kept across flights)
+  bool lowFuelWarned = false;          // this flight's low-fuel call made
   // hub selections
   int selContract = 0, selAircraft = -1, selHangar = 0, freeDest = 0;
   MenuPreviewView hangarView, researchView, militaryView;
@@ -901,6 +926,16 @@ private:
   // streams nothing new, and the launch builds and keeps its scenery (prewarm). ok false: no stand (a water-only world)
   struct PreviewStage { bool ok = false; int airport = -1; vec3 ground; float heading = 0; };
   PreviewStage previewStage() const;
+  // the cameras' own state (game_cameras.cpp): the demo aircraft the menus show, and what is cached for them
+  struct CameraState {
+    Plane tourDemo; int tourCraft = -1;        // the menu tour's aircraft
+    Plane amblerDemo; bool amblerInit = false;   // the Ambler circling the islands behind the other menus
+    Plane hangarDemo, stageDemo;                 // the hangar stand's and the stage circuit's
+    static constexpr int kStageAltSamples = 72;
+    vec3 stageAltCentre = vec3(1e9f, 0, 0); std::array<float, kStageAltSamples> stageAlt{};   // the circuit's altitude profile, for the centre it was made at
+    struct PreviewCache { int ai = -2; std::string region; size_t n = 0; vec3 pos; PreviewStage stage; };
+    mutable PreviewCache previewCache;           // (previewStage is const: its answer for the world as it last saw it)
+  } cams;
   void hangarPreviewCamera(FrameParams& fp);
   void hangarApronCamera(FrameParams& fp, class Plane& demo, vec3 ground, float heading);   // (the live world's stand)
   // the craft flying a circuit over the stage (the research terminal's and the service board's previews), framed in a

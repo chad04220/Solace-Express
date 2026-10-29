@@ -8,6 +8,10 @@ A rework of the code's structure (`docs/CODE_REWORK_PLAN.md`), with nothing chan
   screen, the cameras, effects, comms, input and the harness scenes each in their own, compiling in seconds instead of
   the 80 the one file took.
 - **The loading screen's state is one struct**, reset in one place instead of four copies of fifteen assignments.
+- **The menus' state belongs to the game, not to the functions that draw them.** Fifty-odd scroll positions, cached
+  lists and preview aircraft were function-local statics that outlived the career: a new career in the same region
+  could show the previous one's destinations until the licence changed. They are one struct, reset whenever a career
+  begins or is loaded.
 
 ## What's new in v4.4.2: the flight opens sooner
 

@@ -1268,7 +1268,6 @@ void Game::updateFlight(float dt) {
   }
   if (endTimer > 0) { endTimer -= dt; if (endTimer <= 0) { endFlight(true, ""); return; } }
   // fuel warnings
-  static bool lowFuelWarned = false;
   if (flightClock < 0.1f) lowFuelWarned = false;
   // (twenty minutes left at cruise: tanks sized for real flying hold hours, and a short hop leaves with a part load)
   if (!lowFuelWarned && cruiseMinutes(*plane.spec, plane.fuel) < 20.f) { lowFuelWarned = true; g_audio.trigger(SFX_BEEP); toast("LOW FUEL", vec3(1, 0.5f, 0.2f)); }

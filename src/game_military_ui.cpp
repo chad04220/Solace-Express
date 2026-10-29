@@ -133,7 +133,7 @@ void Game::drawMilitary(const FrameParams& fp) {
   label(L.lx+14*s,L.top+14*s,L.lw-28*s,s,fmt("SORTIE REGISTER  /  %02d",military::kBoardMissionCount));
   const float listTop=L.top+43*s,listBot=L.bot-46*s,rowH=61*s,step=67*s;
   const int visible=std::max(1,int((listBot-listTop+6*s)/step));
-  static int firstRow=0,seenSelection=-1;
+  int& firstRow=menu.military.firstRow; int& seenSelection=menu.military.seenSelection;
   if(seenSelection!=displayedMission) {
     seenSelection=displayedMission;
     if(selectedRow<firstRow) firstRow=selectedRow;
@@ -203,8 +203,8 @@ void Game::drawMilitary(const FrameParams& fp) {
   surface(L.rx,L.top,L.rw,L.bot-L.top,s);
   const float bx=L.rx+16*s,bw=L.rw-38*s,bodyTop=L.top+42*s,bodyBot=L.bot-47*s;
   label(bx,L.top+14*s,bw,s,"MISSION BRIEFING");
-  static float briefScroll=0.f,briefHeight=0.f;
-  static int briefMission=-1;
+  float& briefScroll=menu.military.briefScroll; float& briefHeight=menu.military.briefHeight;
+  int& briefMission=menu.military.briefMission;
   if(briefMission!=displayedMission) { briefMission=displayedMission;briefScroll=0;briefHeight=0; }
   if(hovered(L.rx,bodyTop,L.rw,bodyBot-bodyTop)&&in.wheel!=0) { briefScroll-=in.wheel*40*s;in.wheel=0; }
   const float maxScroll=std::max(0.f,briefHeight-(bodyBot-bodyTop));

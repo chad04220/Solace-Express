@@ -285,7 +285,7 @@ void Game::drawResearch(const FrameParams& fp) {
     // (no skip: the sequence is the terminal's warm-up, and it opens the terminal itself when the craft are ready)
     in.mPressed[0] = false; in.pressed[K_ENTER] = in.pressed[K_ESC] = in.pressed[' '] = false;
     // stage cues
-    static float lastT = 99.f;
+    float& lastT = menu.researchCueT;
     auto cue = [&](float at, int sfx, float v) { if (lastT < at && T >= at) g_audio.trigger(sfx, v); };
     cue(0.35f, SFX_BEEP, 0.4f); cue(1.75f, SFX_BEEP, 0.5f); cue(2.9f, SFX_BEEP, 0.5f); cue(3.75f, SFX_BEEP, 0.5f); cue(4.05f, SFX_CHIME, 0.9f);
     lastT = T;
