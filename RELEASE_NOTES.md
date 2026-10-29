@@ -15,6 +15,13 @@ A rework of the code's structure (`docs/CODE_REWORK_PLAN.md`), with nothing chan
 - **Tests:** the four GPU tests share one headless-GL set-up; a test that judges time measures this machine first
   (`tests/test_main.h`) instead of assuming a number from another; the three longest tests run nightly and on every
   release rather than on every push.
+- **The diagnostics' tools are their own file.** `--analyze`, `--profile`, `--soak`, `--bench`, `--loadshots` and
+  `--shots` were 660 lines inside the game's launch; they are six functions in `tool_modes_win32.cpp`, run from one
+  dispatch, and the launch reads as the launch. Nothing about what they measure or write changed.
+- **A background job that fails leaves a line in `startup.log`.** A region build, a job-board quote or an Earth
+  prefetch joined after its result was no longer wanted used to swallow whatever it threw; fourteen such places go
+  through one `jobs::drain` that logs a failure and stays quiet about a cancellation.
+- A `.clang-format` for the project's style, applied to the lines a change touches.
 
 ## What's new in v4.4.2: the flight opens sooner
 

@@ -1,6 +1,7 @@
 // Somnium Volandi - environment entities: deterministic placement, chunk streaming and collisions
 #include "entities.h"
 #include "scenery.h"
+#include "jobs.h"
 #include <chrono>
 #include <condition_variable>
 #include <deque>
@@ -17,7 +18,9 @@ void SceneryProfiles::next() {
   if (job.valid()) {
     if (job.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
     std::vector<float> profile;
-    try { profile = job.get(); } catch (...) {}
+    try { profile = job.get(); }
+    catch (const std::exception& e) { if (!cancel->load()) jobs::log(std::string("a scenery profile: ") + e.what()); }
+    catch (...) { if (!cancel->load()) jobs::log("a scenery profile: failed"); }
     if (!cancel->load() && !profile.empty()) made[running] = std::move(profile);
     running = -1;
   }
@@ -43,7 +46,7 @@ const std::vector<float>* SceneryProfiles::get(int key) {
 }
 void SceneryProfiles::reset() {
   std::lock_guard<std::mutex> lk(m);
-  if (job.valid()) { cancel->store(true); try { job.get(); } catch (...) {} }
+  if (job.valid()) { cancel->store(true); jobs::drain(job, "a scenery profile at reset"); }
   made.clear(); waiting.clear(); running = -1;
 }
 

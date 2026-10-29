@@ -1,0 +1,39 @@
+# Somnium Volandi's style, as the code is written (docs/CODE_REWORK_PLAN.md 2.8): two-space indents, braces on the
+# line, short things on one line, a trailing comment set off by three spaces, 140 columns. A guide for new code,
+# applied to the lines a change touches (clang-format-diff), never to whole files: a wholesale reformat would bury the
+# history, and the tool breaks two things the code keeps on one line (a one-line function holding an if/else, a chain
+# of one-line catches), which stay as written.
+BasedOnStyle: Google
+AlwaysBreakTemplateDeclarations: No
+ColumnLimit: 140
+IndentWidth: 2
+ContinuationIndentWidth: 4
+TabWidth: 2
+UseTab: Never
+BreakBeforeBraces: Attach
+AllowShortIfStatementsOnASingleLine: AllIfsAndElse
+AllowShortLoopsOnASingleLine: true
+AllowShortBlocksOnASingleLine: Always
+AllowShortFunctionsOnASingleLine: All
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortLambdasOnASingleLine: All
+AllowAllArgumentsOnNextLine: true
+AllowAllParametersOfDeclarationOnNextLine: true
+BinPackArguments: true
+BinPackParameters: true
+AlignAfterOpenBracket: Align
+AlignOperands: Align
+AlignTrailingComments: false
+SpacesBeforeTrailingComments: 3
+PointerAlignment: Left
+DerivePointerAlignment: false
+ReflowComments: false
+SortIncludes: false
+IncludeBlocks: Preserve
+AccessModifierOffset: -1
+NamespaceIndentation: None
+FixNamespaceComments: true
+Cpp11BracedListStyle: true
+SpaceAfterCStyleCast: false
+SpaceBeforeParens: ControlStatements
+Standard: c++17

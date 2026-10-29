@@ -21,6 +21,7 @@
 #include "hangar_catalog.h"
 #include "military_missions.h"
 #include "game_internal.h"
+#include "jobs.h"
 
 void Game::initFreeRegions() {
   if (!freeRegions.empty()) return;
@@ -93,8 +94,8 @@ void Game::loadFreeRegion(int index, GameScreen after) {
   // future here drains it without freezing the loading screen or publishing a stale quote.
   regionJob = std::async(std::launch::async,
     [this, target, path, stamp, save, makeMap, retired = std::move(earthRetireJob), quote = std::move(quoteJob)]() mutable {
-      if (retired.valid()) { try { retired.get(); } catch (...) {} }
-      if (quote.valid()) { try { quote.get(); } catch (...) {} }
+      jobs::drain(retired, "retiring the Earth prefetch before a region build");
+      jobs::drain(quote, "the job board's quote before a region build");
       sceneryResetWorldCaches(); // joins old-world scenery jobs before any global changes
       g_roadTraffic = RoadTraffic{};
       g_groundPits.clear();
@@ -248,8 +249,8 @@ void Game::retireEarthPrefetch() {
   // worker instead of blocking on its future or freeing large arrays here.
   earthRetireJob = std::async(std::launch::async,
     [job = std::move(earthPrefetchJob), candidate = std::move(earthPrefetch), retired = std::move(earthRetireJob), gpu = std::move(retiredGpu)]() mutable {
-      if (retired.valid()) { try { retired.get(); } catch (...) {} }
-      if (job.valid()) { try { auto abandoned = job.get(); } catch (...) {} }
+      jobs::drain(retired, "retiring the Earth prefetch before it");
+      jobs::drain(job, "the Earth prefetch, retired");
       candidate.reset(); gpu = Renderer::WorldUploadData{};
     });
 }
@@ -362,7 +363,7 @@ void Game::updateEarthFlight() {
   }
   if (earthRetireJob.valid()) {
     if (earthRetireJob.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
-    try { earthRetireJob.get(); } catch (...) {}
+    jobs::drain(earthRetireJob, "retiring the Earth prefetch");
   }
   if (earthSceneryDraining && (!earthPrefetch || owner.id != earthPrefetch->region.id)) {
     g_scenery.resumeStreaming(); earthSceneryDraining = false;
@@ -443,7 +444,7 @@ void Game::updateEarthFlight() {
   if (std::sqrt(dx * dx + dz * dz) < 60000.f) return;
   if (quoteJob.valid()) {   // (a background quote still reading the islands: the chart moves only once it is done)
     if (quoteJob.wait_for(std::chrono::seconds(0)) != std::future_status::ready) { earthPromotionDeferred = true; return; }
-    try { quoteJob.get(); } catch (...) {}
+    jobs::drain(quoteJob, "the job board's quote before the chart moves");
     quoteFlown.clear(); menuPlanCache = menuPlan::Cache{};
   }
   if (!earthSceneryDraining) { g_scenery.beginDrain(); earthSceneryDraining = true; }
@@ -536,7 +537,7 @@ void Game::updateEarthInstall() {
   // up meanwhile; the user's earth folder is among those the game looks in
   if (!earthReopenJob.valid()) { earthReopenJob = std::async(std::launch::async, [] { earthCharts::reopen(); }); return; }
   if (earthReopenJob.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
-  try { earthReopenJob.get(); } catch (...) {}
+  jobs::drain(earthReopenJob, "opening the installed Earth pack");
   earthInstaller.reset();
   if (auto pack = earthCharts::pack())
     toast(pack->streamed() ? "The real Earth is ready: its land comes as you fly. Fly it from Free Flight, or out beyond the islands" :
@@ -576,7 +577,7 @@ void Game::slideEarthChart(const regionTravel::Chart& chart) {
   }
   if (earthRetireJob.valid()) {
     if (earthRetireJob.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
-    try { earthRetireJob.get(); } catch (...) {}
+    jobs::drain(earthRetireJob, "retiring the Earth chart ahead");
   }
   if (earthPrefetchJob.valid()) {
     if (wanted != earthPrefetchId && earthPrefetchCancel) earthPrefetchCancel->requested = true;
@@ -661,7 +662,7 @@ void Game::slideEarthChart(const regionTravel::Chart& chart) {
   if (plane.onGround || crashed || !plane.spec) { earthPromotionDeferred = true; return; }
   if (quoteJob.valid()) {
     if (quoteJob.wait_for(std::chrono::seconds(0)) != std::future_status::ready) { earthPromotionDeferred = true; return; }
-    try { quoteJob.get(); } catch (...) {}
+    jobs::drain(quoteJob, "the job board's quote before the chart slides");
     quoteFlown.clear(); menuPlanCache = menuPlan::Cache{};
   }
   if (!earthSceneryDraining) { g_scenery.beginDrain(); earthPrefetch->scenery->beginDrain(); earthSceneryDraining = true; }

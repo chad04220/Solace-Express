@@ -21,6 +21,7 @@
 #include "hangar_catalog.h"
 #include "military_missions.h"
 #include "game_internal.h"
+#include "jobs.h"
 
 // (a landplane chosen at a seaplane base: nowhere for it to stand, so it starts over the lane instead)
 // The field a float plane is coming down at: the nearest within 4 km (an amphibian may land at any, on whichever
@@ -197,9 +198,9 @@ Game::~Game() {
   if (earthPrefetchCancel) earthPrefetchCancel->requested = true;
   // The loader captures this for its stage flag. Join before member destruction,
   // even when the player closes the window halfway through generation.
-  if (regionJob.valid()) { try { regionJob.get(); } catch (...) {} }
-  if (earthPrefetchJob.valid()) { try { earthPrefetchJob.get(); } catch (...) {} }
-  if (earthRetireJob.valid()) { try { earthRetireJob.get(); } catch (...) {} }
+  jobs::drain(regionJob, "the region build, the game closing");
+  jobs::drain(earthPrefetchJob, "the Earth prefetch, the game closing");
+  jobs::drain(earthRetireJob, "retiring the Earth prefetch, the game closing");
   g_sceneryProfiles.reset();   // (the finals profiled for this game's flights: their worker reads the world)
 }
 

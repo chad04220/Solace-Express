@@ -21,6 +21,7 @@
 #include "hangar_catalog.h"
 #include "military_missions.h"
 #include "game_internal.h"
+#include "jobs.h"
 
 void Game::init(bool buildWorld, const std::function<void(float, const std::string&)>& progress) {
   const float units = float(kNumAircraft + 4);
@@ -91,8 +92,8 @@ void Game::initHeadless() {
 void Game::shutdown() {
   regionalSurface::clearFlightContext();
   retireEarthPrefetch();
-  if (earthRetireJob.valid()) { try { earthRetireJob.get(); } catch (...) {} }
-  if (regionJob.valid()) { try { regionJob.get(); } catch (...) {} }
+  jobs::drain(earthRetireJob, "retiring the Earth prefetch at shutdown");
+  jobs::drain(regionJob, "the region build at shutdown");
   g_sceneryProfiles.reset();
   saveSettings(); radio.shutdown(); g_music.own(false); g_music.stop(); g_ren.releaseLoadingPreview();
 }

@@ -21,6 +21,7 @@
 #include "hangar_catalog.h"
 #include "military_missions.h"
 #include "game_internal.h"
+#include "jobs.h"
 
 // The flown time for a job's plan when it's in; else (start) a background flight is begun for it if none is running
 void Game::applyQuote(const Contract& c, Career::LaunchPlan& e, bool start) {
@@ -296,7 +297,7 @@ void Game::launchFreeFlight() {
       // Initial launch preparation may wait; an already flying Earth session never does.
       freeLaunchPending = true; loadFreeRegion(freeRegion); return;
     }
-    try { quoteJob.get(); } catch (...) {}
+    jobs::drain(quoteJob, "the job board's quote before Free Flight");
     quoteFlown.clear(); menuPlanCache = menuPlan::Cache{};
   }
   const AircraftSpec& s = airframeFor(freeCraft, Career::SRC_NONE);
