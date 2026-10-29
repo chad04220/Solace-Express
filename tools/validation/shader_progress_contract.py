@@ -62,6 +62,6 @@ with tempfile.TemporaryDirectory(prefix='somnium-shader-progress-') as tmp:
  binary = Path(tmp) / 'progress_mock'
  source.write_text(pre + hull + '\n'.join(parts) + main)
  subprocess.run([args.cxx, '-std=c++17', '-O0', '-I'+str(root/'src'),
-                 '-I'+str(args.generated.resolve()), str(source), str(root/'src/gl.cpp'),
-                 '-ldl', '-pthread', '-o', str(binary)], check=True)
+                 '-I'+str(args.generated.resolve()), str(source), str(root/'src/gl.cpp'), str(root/'src/dev_switches.cpp'),
+                 '-ldl', '-pthread', '-o', str(binary)], check=True)   # (dev_switches: the renderer's headers read dev::env)
  subprocess.run([str(binary)], check=True)

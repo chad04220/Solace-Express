@@ -11,6 +11,7 @@
 #include <set>
 #include <string>
 #include <vector>
+#include "dev_switches.h"   // (the extracted functions read dev::env, as renderer.cpp does)
 #include "gl.h"
 #include "shader_prune.h"   // (linkProgramCached prunes each stage before the cache and the compiler see it)
 struct AuditRenderer { std::string compileStage(){return "CPU shader lifetime test";} } g_ren;

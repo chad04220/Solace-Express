@@ -20,7 +20,7 @@ def run(out):
         common += ['-fsanitize=address,undefined','-fno-omit-frame-pointer']
     steps=[('extract',[sys.executable,str(HERE/'extract.py'),str(out)])]
     for name in ['bake_dispatch','shader_lifetime']:
-        steps += [('build_'+name,common+[str(HERE/(name+'_test.cpp')),str(SRC/'src/gl.cpp'),'-o',str(out/name)]),
+        steps += [('build_'+name,common+[str(HERE/(name+'_test.cpp')),str(SRC/'src/gl.cpp'),str(SRC/'src/dev_switches.cpp'),'-o',str(out/name)]),   # (dev_switches: the renderer's headers read dev::env)
                   ('run_'+name,[str(out/name)])]
     results=[]
     for name,command in steps:
