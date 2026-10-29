@@ -263,7 +263,9 @@ void packModel(const AircraftSpec& s, int idx, float gh, float o[24 * 4]) {
   put(18, gst.track, m.wheelR, gst.mainZ, gst.noseZ);
   // Low bit: de-ice; new authored variants carry their explicit roster ID above it.
   // Legacy packed data remains byte-identical. Traffic has no separate model uniform.
-  put(19, gh, gst.tailZ, s.taildragger ? 1.f : 0.f, (float)(m.deice + (idx >= kThistledown ? 2 * idx : 0)));
+  // (z: a taildragger's tail wheel height above the mains' contact, the physics' own (tailY); 0 for a nose wheel. Drawn at a
+  // fixed 0.11 of the length before, the Scrubrunner's stood 15 cm below where the aircraft rested: in the runway)
+  put(19, gh, gst.tailZ, s.taildragger ? gst.tailY : 0.f, (float)(m.deice + (idx >= kThistledown ? 2 * idx : 0)));
   put(20, (float)m.winCount, m.winZ0, m.winZ1, m.winY);
   float panelZ = m.eye.z - (m.cockpit == 2 ? 0.85f : 0.68f);
   put(21, m.winW, m.winH, (float)m.cockpit, panelZ);

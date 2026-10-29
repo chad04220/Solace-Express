@@ -129,9 +129,9 @@ int main() {
         }
         if(s.taildragger) {
           const DebrisBody& tail=bodies[owners[2]];
-          // The rendered tail wheel uses the model offset, not the calibrated
-          // contact-station tailY used to settle a complete aircraft on a runway.
-          const float bottom=-gh+.11f*s.fusLen;
+          // The rendered tail wheel stands on the physics' tail contact (gearStations tailY):
+          // its bottom is the height a complete aircraft settles on a runway at.
+          const float bottom=-gh+gs.tailY;
           assert(bottom>=tail.lo.y-.001f && bottom+.2f<=tail.hi.y+.001f);
         }
       }

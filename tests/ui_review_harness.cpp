@@ -320,7 +320,7 @@ struct GameTest {
       const auto& a=kAircraft[i];float th=tanf(fp.fovY*.5f);
       const auto& md=kModels[i];const auto gst=gearStations(a);const float gh=fp.plane.M[19*4],wr=a.special?.38f:md.wheelR;
       const float nr=a.special?.33f:a.taildragger?.1f:md.gear==3?wr*.75f:wr*.85f;
-      const vec3 centres[]={vec3(-gst.track,wr-gh,gst.mainZ),vec3(gst.track,wr-gh,gst.mainZ),vec3(0,a.taildragger?-gh+.11f*a.fusLen+.1f:nr-gh,a.taildragger?gst.tailZ:gst.noseZ)};
+      const vec3 centres[]={vec3(-gst.track,wr-gh,gst.mainZ),vec3(gst.track,wr-gh,gst.mainZ),vec3(0,a.taildragger?-gh+gst.tailY+.1f:nr-gh,a.taildragger?gst.tailZ:gst.noseZ)};
       for(int wheel=0;wheel<3;wheel++){const auto c=centres[wheel];float bottom=fp.plane.pos.y+fp.plane.rot[1]*c.x+fp.plane.rot[4]*c.y+fp.plane.rot[7]*c.z-(wheel==2?nr:wr);if(fabsf(bottom)>.0001f){fprintf(stderr,"FAIL parked tyre contact aircraft%d wheel%d bottom%.6f\n",i,wheel,bottom);exit(3);}}
       if(fp.plane.propCount>0 && (fp.plane.Pr[1]!=0||fp.plane.Pr[0]!=0)){fprintf(stderr,"FAIL parked prop has motion blur/spin\n");exit(3);}
 

@@ -464,7 +464,8 @@ vec2 gearNoseShape(vec3 l){
 }
 vec2 gearTailShape(vec3 l){
   vec4 G1 = gM[19];
-  vec3 tsec = fusSection(G1.y - 0.3), tc = vec3(0.0, -G1.x + 0.11*gM[0].x + 0.1, 0.0), top = vec3(0.0, tsec.z - tsec.y*0.6, -0.3);
+  // (the wheel's bottom at the physics' tail contact, G1.z above the mains' (gearStations tailY): the aircraft rests on it)
+  vec3 tsec = fusSection(G1.y - 0.3), tc = vec3(0.0, -G1.x + G1.z + 0.1, 0.0), top = vec3(0.0, tsec.z - tsec.y*0.6, -0.3);
   vec2 res = opU(vec2(sdCapsule(l, top, tc + vec3(0.0, 0.03, -0.05), 0.02), 8.0), vec2(sdRoundCylX(l - tc, 0.1, 0.035, 0.02), 6.0));
   res = gearWheelDetails(l - tc, res, 0.1, 0.035, false);
   return gearLegDetails(l, res, top, tc + vec3(0.0, 0.03, -0.05), 0.02, false, false);
@@ -1267,7 +1268,7 @@ vec2 mapPlaneBody(vec3 p){
   // gearPartPose, gearPartField above): placed here by their poses, left out of the airframe's mesh bake. The wells are
   // the airframe's, always open: the doors close over them.
   float gearTop = 1e5;
-  if (gtype <= 2) { vec3 sg0 = fusSection(gM[18].z), sg1 = fusSection(gM[19].z < 0.5 ? gM[18].w : gM[19].y);
+  if (gtype <= 2) { vec3 sg0 = fusSection(gM[18].z), sg1 = fusSection(gM[19].z <= 0.0 ? gM[18].w : gM[19].y);
                     gearTop = max(sg0.z - sg0.y*0.5, sg1.z - sg1.y*0.5) + 0.12; }
   bool retract = gtype >= 3;
   if ((retract ? GEAR_FIELD : gear > 0.02) && p.y - gearTop < res.x) {
@@ -1375,9 +1376,9 @@ vec2 mapPlaneBody(vec3 p){
         }
       }
 #if HAS_FLOATS
-      if (G1.z < 0.5 && gtype != 5) {   // the nose wheel's well along the belly and its near door (a float plane's: in its floats)
+      if (G1.z <= 0.0 && gtype != 5) {   // the nose wheel's well along the belly and its near door (a float plane's: in its floats)
 #else
-      if (G1.z < 0.5) {   // the nose wheel's well along the belly and its near door
+      if (G1.z <= 0.0) {   // the nose wheel's well along the belly and its near door
 #endif
         VBay b = gearVBay(true);
         res = gearWellP(p, res, b.c, b.h, b.depth, b.below, b.pitch);
@@ -1392,7 +1393,7 @@ vec2 mapPlaneBody(vec3 p){
     if (gPartMode == -1) {
       mat3 Rs = partRxz(steer);
       float ns = gearNoseShow();
-      if (G1.z < 0.5 && ns > 0.01) { Pose X = gearNosePose(ns); res = opU(res, gearNoseShape(transpose(X.R)*(p - X.T)/ns)*vec2(ns, 1.0)); }
+      if (G1.z <= 0.0 && ns > 0.01) { Pose X = gearNosePose(ns); res = opU(res, gearNoseShape(transpose(X.R)*(p - X.T)/ns)*vec2(ns, 1.0)); }
       else res = opU(res, gearTailShape(transpose(Rs)*(p - vec3(0.0, 0.0, G1.y))));
     }
   }

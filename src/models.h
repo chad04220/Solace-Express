@@ -30,6 +30,7 @@ struct AircraftSpec;
 // Authored rolling radii shared by player and traffic; matches their visible tyres.
 void modelWheelRadii(int model, float& mainRadius, float& noseRadius);
 // Packs a model into the shader's uM[] uniform array (24 vec4) using the physics gear geometry.
+// uM[19].z is a taildragger's tail wheel height above the mains' contact (gearStations tailY), 0 for a nose wheel.
 // uM[19].w keeps de-ice in bit0; authored new variants encode their roster ID in higher bits.
 // Legacy entries retain their exact historic value (0/1). Integer data is read with texelFetch for traffic.
 void packModel(const AircraftSpec& s, int idx, float gearHeight, float out[24 * 4]);

@@ -27,10 +27,10 @@ vec4 gearWheelFrame(vec3 p, out float halfWidth, out bool braked){
     mq = transpose(X.R)*(p - X.T) - vec3(G0.x, wr - gh, G0.z);
     if (kind == 3) mq.x = abs(mq.x) - 0.22;
     if (isGalleon()) {mq.x=abs(mq.x)-.34;mq.z=abs(mq.z)-.62;}
-    if (G1.z > 0.5) {
+    if (G1.z > 0.0) {   // (a taildragger: G1.z its tail wheel's height above the mains' contact)
       nwr = 0.10; nh = 0.035;
       nq = p - vec3(0.0, 0.0, G1.y); nq.xz = rot2(nq.xz, -gPS.z);
-      nq.y += gh - 0.11*gM[0].x - nwr;
+      nq.y += gh - G1.z - nwr;
     } else {
       float ns = max(gearNoseShow(), 1e-3); Pose N = gearNosePose(ns);
       nq = transpose(N.R)*(p - N.T)/ns - vec3(0.0, nwr - gh, 0.0);

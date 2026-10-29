@@ -71,7 +71,7 @@ inline int parts(const float* M, bool inside, PartInst* out, int model) {
   if (reverie) { out[n++] = {PT_RUDDER, -1, 0}; out[n++] = {PT_RUDDER, 1, 0}; } else out[n++] = {PT_RUDDER, 0, 0};   // the rudder (the XR-20's canted pair)
   if(int(M[19*4+3]+.5f)/2==kGalleon) {out[n++]={PT_GALLEON_FAN,-1,0};out[n++]={PT_GALLEON_FAN,1,0};}
   // and their gear: a retracting main leg a side and its bay's two doors; the nose wheel (and its doors) or the tail wheel
-  const int gtype = (int)(M[1] + 0.5f); const bool tail = M[19 * 4 + 2] > 0.5f;
+  const int gtype = (int)(M[1] + 0.5f); const bool tail = M[19 * 4 + 2] > 0.f;   // (a taildragger: its tail wheel's height)
   for (int s = -1; s <= 1; s += 2) {
     out[n++] = {PT_GEAR_MAIN, (float)s, 0};
     if (gtype >= 3 && gtype != 5) { out[n++] = {PT_GEAR_MDOOR, (float)s, -1}; out[n++] = {PT_GEAR_MDOOR, (float)s, 1}; }   // (a float plane's wells have none)

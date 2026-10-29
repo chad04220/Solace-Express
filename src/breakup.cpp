@@ -110,7 +110,7 @@ int breakPieces(const AircraftSpec& s, float gearDown, float gearHeight, BreakPi
     }
     const float z=s.taildragger?gs.tailZ:gs.noseZ;
     const float nwr=s.taildragger?.10f:s.special?.33f:wr*(galleon?.74f:m.gear==3?.75f:.85f);
-    const vec3 nw(0,nwr-gearHeight+(s.taildragger?.11f*s.fusLen:0.f),z);
+    const vec3 nw(0,nwr-gearHeight+(s.taildragger?gs.tailY:0.f),z);   // (the tail wheel where the model draws it: on the physics' contact)
     float hw,hh,cy;modelSection(m,z-(s.taildragger?.3f:0.f),hw,hh,cy);
     vec3 pivot(0,cy-hh*(s.taildragger?.6f:.7f),z-(s.taildragger?.3f:.05f));
     quat nr;

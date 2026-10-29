@@ -1,3 +1,12 @@
+## What's new in v4.4.4: the Scrubrunner's tail wheel on the runway
+
+- **The Scrubrunner's tail wheel rolls on the runway instead of through it.** The flight model rested the aircraft on a
+  tail contact set for an 11.3 degree ground attitude, 1.03 m above the main wheels' contact, while the model drew the
+  tail wheel at a fixed 0.88 m: standing, taxiing and rolling out, the drawn wheel sat 15 cm inside the runway. The
+  drawn wheel, the hangar's parked pose, the break-up's wheel piece and the tests now take the same height the physics
+  stands on (`gearStations`). The Scrubrunner's bodies are rebuilt by the release; a first launch of a development
+  build bakes them once.
+
 ## What's new in v4.4.3: under the hood
 
 A rework of the code's structure (`docs/CODE_REWORK_PLAN.md`), with nothing changed in what the player sees:

@@ -166,7 +166,7 @@ struct GameTest {
           }
           const auto gs = gearStations(a); const auto& md = kModels[craft];
           const float gh = fp.plane.M[19*4], wr = a.special?.38f:md.wheelR, nr = a.special?.33f:a.taildragger?.1f:md.gear==3?wr*.75f:wr*.85f;
-          const vec3 centres[] = {vec3(-gs.track,wr-gh,gs.mainZ),vec3(gs.track,wr-gh,gs.mainZ),vec3(0,a.taildragger?-gh+.11f*a.fusLen+.1f:nr-gh,a.taildragger?gs.tailZ:gs.noseZ)};
+          const vec3 centres[] = {vec3(-gs.track,wr-gh,gs.mainZ),vec3(gs.track,wr-gh,gs.mainZ),vec3(0,a.taildragger?-gh+gs.tailY+.1f:nr-gh,a.taildragger?gs.tailZ:gs.noseZ)};
           for (int wheel = 0; wheel < 3; ++wheel) grounded &= std::fabs(transformed(fp.plane,centres[wheel]).y-floorY-(wheel==2?nr:wr))<(fp.hangarApron?.002f:.0001f);
           grounded &= fp.plane.propCount==0 || (fp.plane.Pr[0]==0 && fp.plane.Pr[1]==0);
         }

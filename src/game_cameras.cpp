@@ -319,15 +319,15 @@ void Game::hangarPreviewCamera(FrameParams& fp) {
   }
   // Spawn clearance is for physics to settle; a static showroom must sit on the
   // rendered tyres immediately. The main-wheel centres are (wr-gh, mainZ).
-  // gearTailShape uses (-gh + .11*L + .1, tailZ), radius .1. Solve the
-  // main/tail bottom heights together; pitching about their X axles leaves each
-  // circular tyre's vertical support radius unchanged. Do not use the physics
-  // tail contact approximation here or change any aircraft geometry/flight pose.
+  // gearTailShape uses (-gh + tailY + .1, tailZ), radius .1 (gearStations: the
+  // physics' tail contact, which the drawn wheel stands on). Solve the main/tail
+  // bottom heights together; pitching about their X axles leaves each circular
+  // tyre's vertical support radius unchanged.
   const float gh = demo.gearHeight(), wr = kModels[craft].wheelR;
   float pitch = 0.f, height = gh;
   if (sp.taildragger) {
     const GearStations stations = gearStations(sp);
-    const float dy = .11f*sp.fusLen + .1f - wr, dz = stations.tailZ - stations.mainZ;
+    const float dy = stations.tailY + .1f - wr, dz = stations.tailZ - stations.mainZ;
     const float r = sqrtf(dy*dy + dz*dz);
     pitch = atan2f(dy, dz) + asinf(clampf((wr-.1f)/r, -1.f, 1.f));
     height = wr - (wr-gh)*cosf(pitch) + stations.mainZ*sinf(pitch);
@@ -399,7 +399,7 @@ void Game::hangarApronCamera(FrameParams& fp, Plane& demo, vec3 ground, float he
   float pitch = 0.f, height = gh;
   if (sp.taildragger) {
     const GearStations stations = gearStations(sp);
-    const float dy = .11f*sp.fusLen + .1f - wr, dz = stations.tailZ - stations.mainZ;
+    const float dy = stations.tailY + .1f - wr, dz = stations.tailZ - stations.mainZ;
     const float r = sqrtf(dy*dy + dz*dz);
     pitch = atan2f(dy, dz) + asinf(clampf((wr-.1f)/r, -1.f, 1.f));
     height = wr - (wr-gh)*cosf(pitch) + stations.mainZ*sinf(pitch);
