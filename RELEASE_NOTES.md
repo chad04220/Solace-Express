@@ -12,6 +12,9 @@ A rework of the code's structure (`docs/CODE_REWORK_PLAN.md`), with nothing chan
   lists and preview aircraft were function-local statics that outlived the career: a new career in the same region
   could show the previous one's destinations until the licence changed. They are one struct, reset whenever a career
   begins or is loaded.
+- **Tests:** the four GPU tests share one headless-GL set-up; a test that judges time measures this machine first
+  (`tests/test_main.h`) instead of assuming a number from another; the three longest tests run nightly and on every
+  release rather than on every push.
 
 ## What's new in v4.4.2: the flight opens sooner
 

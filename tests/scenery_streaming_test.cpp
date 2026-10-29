@@ -2,21 +2,21 @@
 // trees to farDetail, the buildings to farAll, quality 2's ranges) requested nearest first, the queue refilled once a
 // frame at 60 fps. The v4.4.1 diagnostics showed a loading screen making exactly 12 chunks a frame for 11 s: the queue
 // held two chunks a worker, and most chunks (sea) are made in 0.02 ms, so the workers sat idle for most of every
-// frame. The queue is capped by the work in it now (Scenery::Async::jobLoad), so the run streams at the workers' pace.
+// frame. The queue is capped by the work in it now (Scenery::Async::jobLoad), so the run streams at the workers' pace:
+// judged against this machine's own single-threaded time for the same chunks (test_main.h TimeBudget), not a number.
 #include "../src/entities.h"
+#include "test_main.h"
 #include "test_world.h"
 #include <algorithm>
-#include <chrono>
 #include <thread>
 #include <vector>
 
 struct Need { float d; int cx, cz, level; };
 
 int main() {
-  int failed = 0;
-  auto check = [&](bool pass, const std::string& label) { printf("Scenery streaming: %s: %s\n", label.c_str(), pass ? "ok" : "FAIL"); fflush(stdout); failed += !pass; };
+  TestRun t("Scenery streaming");
   buildTestWorld();
-  if (g_scenery.workers() == 0) { printf("Scenery streaming: no worker threads on this machine: skipped\n"); return 0; }
+  if (g_scenery.workers() == 0) { t.note("no worker threads on this machine: skipped"); return t.done(); }
   const int ai = std::max(0, g_world.findAirport("CAP"));
   const Airport& a = g_world.airports[ai];
   vec3 cam = a.pos() + a.dir() * 1500.f;   // (a research sortie's airborne start)
@@ -35,12 +35,19 @@ int main() {
     }
   std::sort(need.begin(), need.end(), [](const Need& x, const Need& y) { return x.d < y.d; });
   int n2 = 0; for (const Need& n : need) n2 += n.level == 2;
-  printf("Scenery streaming: %zu chunks wanted (%d with trees), %d workers\n", need.size(), n2, g_scenery.workers());
-  const auto start = std::chrono::steady_clock::now();
+  t.note(fmt("%zu chunks wanted (%d with trees), %d workers", need.size(), n2, g_scenery.workers()));
+  // the reference: the same chunks made on this thread alone
+  TimeBudget single;
+  for (const Need& n : need) g_scenery.ensure(n.cx, n.cz, n.level);
+  const double singleS = single.seconds();
+  t.note(fmt("made on one thread in %.2f s", singleS));
+  g_scenery.clear();
+  // the worker path, refilled once a 60 Hz frame as the renderer does
+  TimeBudget run;
   int frames = 0, most = 0, pending = 0;
   std::vector<int> got;
   for (;;) {
-    const auto f0 = std::chrono::steady_clock::now();
+    const auto f0 = TimeBudget::clock::now();
     got.clear(); g_scenery.pump(got);
     most = std::max(most, (int)got.size());
     pending = 0;
@@ -52,20 +59,17 @@ int main() {
     }
     if (pending == 0) break;
     frames++;
-    if (std::chrono::steady_clock::now() - start > std::chrono::seconds(60)) break;
+    if (run.seconds() > 60.) break;
     std::this_thread::sleep_until(f0 + std::chrono::microseconds(16667));   // (the renderer refills once a frame)
   }
-  const double s = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
-  printf("Scenery streaming: %zu chunks in %.2f s, %d frames (%.0f a frame, %d at the most)\n", need.size(), s, frames, frames ? need.size() / (double)frames : 0., most);
-  check(pending == 0, "every chunk about the start made within a minute");
-  // (two a worker a frame was the old cap: 12 a frame on six workers, 11 s for a sortie's 8,000. The level-1 chunks
-  // alone, four fifths of them, are made faster than any queue of a few a worker can be refilled.) The decisive check
-  // is the most installed in one frame: the queue's cap, whatever the machine. The average is judged only outside
-  // CI's quick sanitizer runs (FLIGHT_QUICK), where the chunks themselves are made several times slower on a shared
-  // runner, so the run is bound by the workers, not the queue
-  check(most > 2 * g_scenery.workers(), "more than two chunks a worker installed in one frame");
-  if (getenv("FLIGHT_QUICK")) printf("Scenery streaming: the average a frame not judged (FLIGHT_QUICK: the sanitizers' run)\n");
-  else check(frames < (int)need.size() / (6 * g_scenery.workers()), fmt("far more than %d chunks a frame", 6 * g_scenery.workers()));
-  printf("scenery_streaming_test: %s\n", failed ? "FAILED" : "passed");
-  return failed ? 1 : 0;
+  const double s = run.seconds();
+  t.note(fmt("%zu chunks in %.2f s, %d frames (%.0f a frame, %d at the most)", need.size(), s, frames, frames ? need.size() / (double)frames : 0., most));
+  t.check(pending == 0, "every chunk about the start made within a minute");
+  // the decisive check, whatever the machine: the queue no longer caps a frame at two chunks a worker (12 on six
+  // workers: 11 s for a sortie's 8,000)
+  t.check(most > 2 * g_scenery.workers(), "more than two chunks a worker installed in one frame");
+  // and the workers, refilled once a frame, beat one thread with no refill at all (a queue starving them took 15x
+  // longer than one thread here). Judged against this machine's own time; reported but not judged under FLIGHT_QUICK
+  TimeBudget::within(t, s, singleS, 1.0, "the worker path against one thread");
+  return t.done();
 }

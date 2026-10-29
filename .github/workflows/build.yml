@@ -84,7 +84,9 @@ jobs:
           UBSAN_OPTIONS: print_stacktrace=1
           FLIGHT_QUICK: 1   # (the flight model's type-by-type checks on one of each kind of aircraft: the Windows job flies them all)
           PICKED: ${{ steps.pick.outputs.regex }}
-        run: ctest --test-dir build --output-on-failure -j4 -E "shader_glsl|terrain_shadow_bake|road_grade_gpu|planet_gpu" -R "$PICKED"
+        # (-LE nightly: the three longest tests - the soak, the go-around sweep, the regions' runtime, five minutes each
+        # under the sanitizers - run in the nightly and every release; a push's shards keep to the rest)
+        run: ctest --test-dir build --output-on-failure -j4 -E "shader_glsl|terrain_shadow_bake|road_grade_gpu|planet_gpu" -LE nightly -R "$PICKED"
       - name: Test, every type (nightly)   # (FLIGHT_QUICK unset - set at all, even empty, it counts)
         if: github.event_name == 'schedule' && steps.pick.outputs.mode != 'none'
         env:
