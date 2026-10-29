@@ -9,9 +9,9 @@ namespace aircraftBuild { namespace phantasos {
 // ring from its centre, turning about z
 inline bool partBox(int type, vec3& lo, vec3& hi, float& h) {
   switch (type) {
-    case PT_PX_TIP: lo = vec3(-0.12f, -0.14f, -2.85f); hi = vec3(2.42f, 0.42f, 1.42f); h = 0.006f; return true;
+    case PT_PX_TIP: lo = vec3(-0.12f, -0.14f, -2.85f); hi = vec3(2.42f, 0.56f, 1.20f); h = 0.006f; return true;
     case PT_PX_ELEVON: lo = vec3(0.10f, -0.08f, 0.60f); hi = vec3(2.80f, 0.08f, 4.70f); h = 0.005f; return true;
-    case PT_PX_FIN: lo = vec3(-0.12f, -0.10f, -1.02f); hi = vec3(2.00f, 0.10f, 1.80f); h = 0.006f; return true;
+    case PT_PX_FIN: lo = vec3(-0.12f, -0.10f, -1.02f); hi = vec3(2.22f, 0.10f, 2.00f); h = 0.006f; return true;
     case PT_PX_PETAL: lo = vec3(-0.06f, -0.46f, -0.08f); hi = vec3(0.30f, 0.46f, 1.12f); h = 0.005f; return true;
     case PT_PX_RING: lo = vec3(-1.32f, -1.32f, -0.22f); hi = vec3(1.32f, 1.32f, 0.22f); h = 0.006f; return true;
   }

@@ -185,7 +185,7 @@ float morpheusRocketSeconds(float oxidizerKg, float throttle);   // how long its
 static const vec3 kXr60Ring(0.f, 0.f, 7.0f), kXr60Emit[4] = {vec3(-1.25f, -0.42f, -2.6f), vec3(1.25f, -0.42f, -2.6f), vec3(-1.45f, -0.40f, 2.6f), vec3(1.45f, -0.40f, 2.6f)};
 static const vec3 kXr60Root(1.15f, -0.05f, 1.6f), kXr60TipHinge(4.0f, 0.35f, 1.8f);
 static const float kXr60SurgeSeconds = 40.f, kXr60SurgeRecharge = 1.f / 6.f, kXr60SkinWarn = 2623.f, kXr60SkinLimit = 2773.f;
-static const vec3 kXr60Tip(6.14f, 0.50f, -0.70f), kXr60Tail(0.f, 1.30f, 7.05f), kXr60Beacon(0.f, 0.72f, -1.6f), kXr60Landing(-0.70f, -0.12f, -4.6f);
+static const vec3 kXr60Tip(6.06f, 1.04f, -0.72f), kXr60Tail(0.f, 1.30f, 7.05f), kXr60Beacon(0.f, 0.72f, -1.6f), kXr60Landing(-0.70f, -0.12f, -4.6f);
 // the right tip blade's lens, folded down by f (0 spread .. 1 at 70 deg) about its hinge's chord line
 inline vec3 xr60TipLamp(float f) {
   const vec3 l = kXr60Tip - kXr60TipHinge; const float a = -70.f * DEG * f;

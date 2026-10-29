@@ -604,10 +604,10 @@ void planeMaterialN(vec3 p, vec3 rd, float t, inout int mid, bool trafHit, vec3 
       m.emit += vec3(0.4, 0.2, 1.0)*0.06*sh*pow(1.0 - abs(ln.y), 2.0);   // (the sheath's faint violet over the skin)
       if (abs(lp.z + 8.0) < 0.05 && abs(ln.x) > 0.6 && abs(lp.y + 0.05) < 0.05) { m.alb = vec3(0.015); m.rough = 0.6; }   // the tip emitters' ports
     }
-    else if (mid == 177) {   // the knife edges: a darker metal than the skin, glowing with the heat
+    else if (mid == 177) {   // the knife edges: a darker metal than the skin, lit cyan along their length, glowing with the heat
       tx = triSample(lp, ln, M_METAL, 0.5, nT);
       m.alb = vec3(0.05, 0.05, 0.06)*(0.8 + 0.4*tx.r); m.rough = 0.4; m.metal = 0.6; m.nrm = mix(vec3(0.0, 0.0, 1.0), nT, 0.5);
-      m.emit = glow + plasma*0.08;
+      m.emit = glow + CY*0.30*(0.85 + 0.15*sin(uTime*2.0 + lp.z)) + plasma*0.4;
     }
     else if (mid == 178) {   // the sensor crystal: a cut gem, cyan inside, its facets glassy
       m.alb = vec3(0.04, 0.08, 0.12); m.metal = 0.2; m.rough = 0.04;

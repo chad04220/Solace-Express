@@ -26,7 +26,8 @@ const vec3 PX_ROOT = vec3(1.15, -0.05, 1.6);              // the blade's root: i
 const float PX_DIH = 0.13962634;                          // the blades' dihedral (8 deg)
 const float PX_IN_SPAN = 2.85, PX_IN_RC = 4.6, PX_IN_TC = 2.6, PX_IN_SWEEP = -1.1;   // the fixed inner blade (forward swept)
 const vec3 PX_HINGE = vec3(4.0, 0.35, 1.8);               // the tip blade's hinge (aircraft.h kXr60TipHinge)
-const float PX_TIP_SPAN = 2.2, PX_TIP_RC = 2.6, PX_TIP_TC = 0.45, PX_TIP_SWEEP = -1.4, PX_TIP_LE = -1.3;
+const float PX_TIP_SPAN = 2.2, PX_TIP_RC = 2.0, PX_TIP_TC = 0.30, PX_TIP_SWEEP = -1.7, PX_TIP_LE = -1.0;   // (a narrow claw, raked forward)
+const float PX_TIP_CURL = 0.42;                           // the claw's rise toward its tip (m, at the tip)
 const vec3 PX_FINROOT = vec3(0.92, 0.50, 4.4); const float PX_FIN_CANT = 0.61086524;   // (35 deg off the vertical)
 const vec3 PX_EMIT_F = vec3(1.25, -0.42, -2.6), PX_EMIT_R = vec3(1.45, -0.40, 2.6);     // the right emitters (aircraft.h kXr60Emit)
 const float PX_KEEL_Y = -0.95, PX_KEEL_Z = 2.3;
@@ -68,10 +69,15 @@ float pxCrystal(vec3 p){
   q.z *= 0.42;
   return 0.42*(abs(q.x) + abs(q.y) + abs(q.z) - 0.40)*0.57735;
 }
-// the keel: a deep blade under the body, knife-edged at its front, the scramjet's duct inside it
+// the keel: a deep blade under the body, knife-edged at its front and along its bottom, the scramjet's duct inside
+// it. Its section a flat-sided diamond: a short flat flank, the upper facet into the belly, the lower to the edge
 float pxKeel(vec3 p){
-  float hw = 0.04 + 0.17*smoothstep(-2.4, 0.6, p.z);
-  return 0.9*sdRoundBox(p - vec3(0.0, PX_KEEL_Y, PX_KEEL_Z), vec3(hw, 0.44, 4.3), 0.035);
+  float hw = 0.04 + 0.19*smoothstep(-2.4, 0.6, p.z), h = 0.44;
+  vec2 q = vec2(abs(p.x), p.y - PX_KEEL_Y);
+  float d = max(dot(q - vec2(hw, 0.08), normalize(vec2(h - 0.08, hw))), dot(q - vec2(hw, -0.12), normalize(vec2(h - 0.12, -hw))));
+  d = max(d, q.x - hw);
+  d = max(d, abs(p.z - PX_KEEL_Z) - 4.3);
+  return 0.85*d - 0.02;
 }
 // the outer skin with nothing cut into it (rule 4: AIRCRAFT_AUTHORING.md)
 float pxShell(vec3 p){
@@ -222,8 +228,8 @@ vec2 mapXr60(vec3 p){
 }
 // ---- the parts, each in its own frame (plane_parts.glsl pxPartPose)
 vec2 pxPartField(int k, vec3 l){
-  if (k == PT_PX_TIP) {   // the tip blade from its hinge: forward swept, its chord 2.6 m to 0.45, curving up toward its tip; its lens at the tip
-    vec3 b = l; b.y -= 0.16*(l.x/PX_TIP_SPAN)*(l.x/PX_TIP_SPAN);
+  if (k == PT_PX_TIP) {   // the tip claw from its hinge: raked forward, its chord 2.0 m to 0.3, curling up toward its tip; its lens at the tip
+    vec3 b = l; b.y -= PX_TIP_CURL*(l.x/PX_TIP_SPAN)*(l.x/PX_TIP_SPAN);
     float c = l.z - PX_TIP_LE;
     float w = 0.92*sdPanel(l.x, c, b.y, PX_TIP_SPAN, PX_TIP_RC, PX_TIP_TC, PX_TIP_SWEEP, 0.045, 1.0, 0.0, 0.0);
     float k2 = clamp(l.x/PX_TIP_SPAN, 0.0, 1.0);
@@ -232,9 +238,9 @@ vec2 pxPartField(int k, vec3 l){
     return r;
   }
   if (k == PT_PX_ELEVON) return vec2(sdSurface(l.x, l.z, l.y, PX_IN_SPAN, PX_IN_RC, PX_IN_TC, PX_IN_SWEEP, 0.045, 0.72, 0.2, 2.7, 0.0, 0.0), 176.0);
-  if (k == PT_PX_FIN) {   // its span from the pivot, 35% of the root's chord back from its leading edge: 1.9 m, 2.6 to 0.9 m of chord
+  if (k == PT_PX_FIN) {   // its span from the pivot, 35% of the root's chord back from its leading edge: 2.1 m, 2.6 to 0.55 m of chord, raked 2.2 m
     float c = l.z + 0.9;
-    return vec2(sdPanel(l.x, c, l.y, 1.9, 2.6, 0.9, 1.6, 0.05, 1.0, 0.0, 0.0), c - 1.6*clamp(l.x/1.9, 0.0, 1.0) < 0.1 ? 177.0 : 176.0);
+    return vec2(sdPanel(l.x, c, l.y, 2.1, 2.6, 0.55, 2.2, 0.05, 1.0, 0.0, 0.0), c - 2.2*clamp(l.x/2.1, 0.0, 1.0) < 0.1 ? 177.0 : 176.0);
   }
   if (k == PT_PX_PETAL) {   // a petal: a tapered plate hinged on the ring, its inner face the plasma's
     float taper = 1.0 - 0.25*clamp(l.z, 0.0, 1.0);
