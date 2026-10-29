@@ -239,8 +239,9 @@ int main() {
   // are in every build's source. The XR-50's HAS_NOCTURNE / HAS_MORPHEUS switches did the same; its shape is AF_JET's. Its
   // own ground station in 4.3 - the room, the desk, the monitors and their window cuts in shared shader text - changed both again,
   // as did the Cutwater's belly over its wing root and the XR-50's engine exits. 4.4.4 drew the tail wheel at the
-  // physics' contact height (gM[19].z), AF_LIGHT's again.)
-  for (const auto& family : {std::pair<const char*,uint64_t>{"AF_LIGHT",0xa12a118d942a42eeull}, {"AF_JET",0x8ec1cdf50e7f0a9eull}}) {
+  // physics' contact height (gM[19].z), AF_LIGHT's again. 4.5.0's XR-60 - its HAS_PHANTASOS switch, its pod's material
+  // ranges and its window cuts in the shared text - changed both.)
+  for (const auto& family : {std::pair<const char*,uint64_t>{"AF_LIGHT",0x973608819d30df76ull}, {"AF_JET",0x5d108286c3269058ull}}) {
     uint64_t h=1469598103934665603ull;
     for(const char* n:{"","#define HULL_BAKE_NORMALS\n"})
       for(unsigned char c:shaderPrune::prune(hullBakeFSAssembly(std::string("#define ")+family.first+"\n"+n)))h=(h^c)*1099511628211ull;

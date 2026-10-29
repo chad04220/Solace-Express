@@ -720,7 +720,10 @@ cockpit muffling inside. A new type gets its sound from `engineType`, `engines`,
    stray shape is).
 4. **`autoland_sweep`**, both laws (§5).
 5. **The render server** (`tests/render_harness.cpp serve W H`, client `tools/render_client.sh`) keeps everything
-   loaded between shots. Start it without `PREWARM` so it bakes only the aircraft a shot needs. Useful scenes:
+   loaded between shots. Start it without `PREWARM` so it bakes only the aircraft a shot needs, and with `NOTRAFFIC=1`:
+   with traffic in the frame the objects pass takes the shared every-aircraft build, which carries all the research
+   craft's fields and needs more memory than llvmpipe's compiler has (it is killed past ~14 GB); with the player's
+   aircraft alone the pass takes that type's own build (~3 GB, a minute). Useful scenes:
    - `gav_<i>_<yaw>_<pitch>_<dist>[_<gear>]`: parked on the runway, orbit view;
    - `ckv<i>_<yaw>_<pitch>_<hour>[_<roll>[_<flaps>]]`: the cockpit (`settle=30` lets the anti-aliasing settle);
    - `loadshot_<CODE>`, `loadshot_air_<i>`: the loading pictures (`settle=40`, 1920×1080);
