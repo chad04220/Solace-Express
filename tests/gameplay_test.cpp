@@ -106,9 +106,9 @@ struct GameTest {
         ok &= (int)share.size() == helpers;
         for (const auto& s : share) for (int it : s) { if (it >= 0 && it < n) seen[it]++; else ok = false; }
         for (int c : seen) ok &= c == 1;
-        ok &= !share[0].empty() && share[0][0] == kSomnus * 3 + 1;
+        ok &= !share[0].empty() && share[0][0] == kPhantasos * 3 + 1;   // (the longest build of all goes first: the XR-60's objects program)
       }
-      printf("Aircraft programs for the launch's helpers: %d items, each to one helper of 1, 2, 5, 6 or 60, the XR-40's objects first: %s\n", n, ok ? "ok" : "FAIL");
+      printf("Aircraft programs for the launch's helpers: %d items, each to one helper of 1, 2, 5, 6 or 60, the XR-60's objects first: %s\n", n, ok ? "ok" : "FAIL");
       fails += !ok;
     }
     // ---- sun: finite light for every second of the day, in clear and overcast weather
