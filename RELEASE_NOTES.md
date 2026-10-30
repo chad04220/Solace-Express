@@ -1,3 +1,11 @@
+## What's new in v4.5.2: the launch's compile schedule from measurements
+
+- **The first launch after an update finishes its shader builds sooner.** The helper processes share the aircraft
+  types' programs out longest-first from a table of their costs; the table is now the times v4.5.1's diagnostics
+  measured on their first launch (the XR-60's objects program 34.6 s, its mesh program 20.3 s, the light craft's
+  objects programs 16.4 s). v4.5.1's guess of the XR-60's mesh program had it scheduled 79 s into a 120 s launch,
+  which left one helper 20 s behind the others; it is in the first wave now.
+
 ## What's new in v4.5.1: the XR-60's programs built first
 
 - **After an update, the XR-60's shader programs are compiled first.** The launch's helper processes share the
