@@ -111,11 +111,14 @@ void Renderer::afItemOf(int item, int& model, int& kind) {
   if (item >= kAircraftCount * 3) { model = kSomnus; kind = 3; return; }
   model = item / 3; kind = item % 3;
 }
-// what each takes to compile, roughly (seconds on v3.50.1's diagnostics' RTX 3070 laptop: only their ratios matter)
+// what each takes to compile, roughly (seconds on v3.50.1's diagnostics' RTX 3070 laptop: only their ratios matter).
+// The two remotely piloted craft measured on v4.5.0's first launch on the same laptop, in the same units: the XR-60's
+// objects program is the longest build of all (40 s there), so it goes first - the research terminal wants it, and a
+// terminal opened before the helpers were done compiled it in the main process, the stall on picking the XR-60
 static float afItemCost(int item) {
   int model, kind; Renderer::afItemOf(item, model, kind);
-  static const float light[3] = {2.4f, 5.8f, 1.0f}, xr30[3] = {5.1f, 10.3f, 4.3f}, xr40[3] = {9.5f, 12.6f, 7.3f};
-  return kind == 3 ? 3.7f : model == kSomnus ? xr40[kind] : model == kResearchJet || model == kMorpheus ? xr30[kind] : light[kind];   // (the XR-50: the jet family's other)
+  static const float light[3] = {2.4f, 5.8f, 1.0f}, xr30[3] = {5.1f, 10.3f, 4.3f}, xr40[3] = {9.5f, 12.6f, 7.3f}, xr50[3] = {7.3f, 8.8f, 3.3f}, xr60[3] = {5.4f, 12.8f, 3.4f};
+  return kind == 3 ? 3.7f : model == kSomnus ? xr40[kind] : model == kPhantasos ? xr60[kind] : model == kMorpheus ? xr50[kind] : model == kResearchJet ? xr30[kind] : light[kind];
 }
 std::vector<std::vector<int>> Renderer::afShareItems(int helpers) {
   std::vector<int> order(afItemCount());

@@ -727,7 +727,9 @@ cockpit muffling inside. A new type gets its sound from `engineType`, `engines`,
    - `gav_<i>_<yaw>_<pitch>_<dist>[_<gear>]`: parked on the runway, orbit view;
    - `ckv<i>_<yaw>_<pitch>_<hour>[_<roll>[_<flaps>]]`: the cockpit (`settle=30` lets the anti-aliasing settle);
    - `loadshot_<CODE>`, `loadshot_air_<i>`: the loading pictures (`settle=40`, 1920×1080);
-   - `research` (the XR-30 selected), `research10`, `research20`, `research40`, `research50`, `research60`: the research terminal.
+   - `research` (the XR-30 selected), `research10`, `research20`, `research40`, `research50`, `research60`: the research terminal;
+     `researchcycle`: the terminal with the selection moved on to the next craft every 20 frames (the diagnostics bench it: a
+     switch that loads a program or builds a body shows as a hitch).
    - `apv_<CODE>_<view>_<hour>`, `mountain`, `sunset`, `storm`: the world, for textures and the sea;
    - `wcam_<x>_<z>_<height>_<yaw>_<pitch>[_<hour>]`: a free camera anywhere (metres above the ground, yaw 0 north). The harness loads
      the scanned textures from `assets/materials` (`MATDIR=""` for the procedural ones, §7.4).

@@ -165,10 +165,11 @@ void Game::debugScene(const std::string& name) {
     printf("pad: A skips the career crash to the results: %s\n", wasCrash && screen == SCR_DEBRIEF ? "ok" : "FAIL");
     return;
   }
-  if (name == "research" || name == "research40" || name == "research10" || name == "research20" || name == "research50" || name == "research60") {   // the terminal, settled (selection decrypted)
+  if (name == "research" || name == "research40" || name == "research10" || name == "research20" || name == "research50" || name == "research60" || name == "researchcycle") {   // the terminal, settled (selection decrypted); researchcycle: the selection then cycled through every craft, 20 frames each
     screen = SCR_RESEARCH; realTime = 30; resOpened = 20; resAuthed = true;
     resCraft = name == "research40" ? kSomnus : name == "research10" ? kVigil : name == "research20" ? kReverie : name == "research50" ? kMorpheus : name == "research60" ? kPhantasos : kResearchJet; resLastCraft = resCraft; resSelT = 20; resAirport = std::max(0, g_world.findAirport("CAP"));
     resSeqOpened = resOpened; resSeq = realTime - resOpened; resSeqAt = realTime; resWarm = false; resWork = 1.f;   // (the boot sequence's own clock long past the shutters: drawResearch)
+    if (name == "researchcycle") resCycle = 0;
     return;
   }
   if (name.rfind("researchscan", 0) == 0) {   // the biometric sequence at a moment: researchscan<tenths of a second into the sequence>, the warm-up as far on as the scans show

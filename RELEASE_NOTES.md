@@ -1,3 +1,14 @@
+## What's new in v4.5.1: the XR-60's programs built first
+
+- **After an update, the XR-60's shader programs are compiled first.** The launch's helper processes share the
+  aircraft's programs out longest-first from a table of their costs; the XR-60's was not in it, so its objects
+  program (40 s on the diagnostics' RTX 3070 laptop, the longest of all) went last. It now goes first, with the
+  XR-50's beside it, so the research terminal never waits on them.
+- **The diagnostics bench the XR-50 and the XR-60 in the terminal** (`research50`, `research60`) and a new
+  `researchcycle` scene that moves the terminal's selection through every research craft, 20 frames each: a switch
+  that loads a program or builds a body shows there as a hitch, and the bench now says how many programs each
+  scene loaded from the cache and compiled during its measured frames.
+
 ## What's new in v4.5.0: the XR-60 Phantasos
 
 - **A sixth research craft, built from a field rather than from engines.** The XR-60 Phantasos (`docs/XR60.md`) is a

@@ -1024,6 +1024,7 @@ private:
   std::string resStepText(const ResStep& st) const;   // "MACH 2.70 x 10 s" and the like
   bool resAuthed = false;   // biometric sequence passed this session
   float resSelT = -10.f; int resLastCraft = -1;   // selection scan time
+  int resCycle = -1;   // the researchcycle scene (the diagnostics): the terminal's selection cycled through the craft, 20 frames each, to time the switches
   vec3 resPrevPos; quat resPrevQ;   // where the preview craft is (for the callouts)
   float prevMach = 0, prevAB = 0;
   // gamepad-driven menu cursor (left stick moves, A clicks, B backs out)

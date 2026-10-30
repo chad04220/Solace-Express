@@ -208,6 +208,8 @@ void Game::update(float dt) {
     resWork = std::max(resWork, sceneProgress(views, site ? work.pending : std::max(1, resPend0), resPend0, site && !work.shadow, f > nViews && work.ready() ? 1.f : 0.f));
     if (resWarmFrames > nViews && work.ready()) { resWarm = false; resWarmCraft = -1; resWarmCk = false; g_ren.stream.budgetMs = 2.5f; resWork = 1.f; }
   }
+  // (the diagnostics' researchcycle scene: the terminal's selection moved on to the next craft every 20 frames, so the bench times the switches)
+  if (screen == SCR_RESEARCH && resCycle >= 0 && !resWarm) { resCraft = resCraftAt((resCycle / 20) % resCraftCount()); resCycle++; }
   if (screen == SCR_FLIGHT && (actKeyP(ACT_RADIO) || actJoyP(ACT_RADIO) || (!paused && actPadP(ACT_RADIO)))) showRadio = !showRadio;
   { PartTimer pt(*this, "radio"); radio.poll(); }
   { PartTimer pt(*this, "music"); updateMusic(); }

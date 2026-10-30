@@ -515,6 +515,7 @@ static int benchTool(const std::string& cl, ToolHost& host) {
     const uint64_t overwritten0 = g_ren.gpuSamplesOverwritten;
     uint64_t seenGpu = g_ren.gpuSample.id;
     const int measuredBakes0 = g_ren.bakeCount;
+    const int measuredHits0 = g_shaderCacheHits, measuredMisses0 = g_shaderCacheMisses;   // (programs loaded from the cache, and compiled, during the measured frames: a switch of craft loading one is a hitch)
     const int measuredSceneStatus = g->benchmarkSceneStatus();
     glFinish();
     LARGE_INTEGER f0, f1; QueryPerformanceCounter(&f0);
@@ -578,7 +579,8 @@ static int benchTool(const std::string& cl, ToolHost& host) {
       const float* pm = g_ren.passMs;
       fprintf(bf, "%-22s %6.2f ms/frame (%5.1f fps)   GPU %6.2f ms: world %.2f  displays %.2f  feeds %.2f  objects %.2f  shadow proxy %.2f  lighting %.2f  taa %.2f  sprites %.2f  bloom %.2f  shafts %.2f  composite %.2f\n",
               sc.c_str(), ms, ms > 0 ? 1000.0 / ms : 0, g_ren.gpuMs, pm[0], pm[1], pm[2], pm[3], pm[4], pm[5], pm[6], pm[7], pm[8], pm[9], pm[10]);
-      fprintf(bf, "%-22s (warmed %d frames until built; %d bodies built during it)\n", "", warm, warmBakes);
+      fprintf(bf, "%-22s (warmed %d frames until built; %d bodies built during it; measured frames: %d shader programs loaded from the cache, %d compiled)\n", "", warm, warmBakes,
+              (int)g_shaderCacheHits - measuredHits0, (int)g_shaderCacheMisses - measuredMisses0);
       fflush(bf);
     }
     g_ren.stream.sync = true;
